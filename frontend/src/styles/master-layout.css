@@ -1,0 +1,212 @@
+/* ===== 通用主从工作台布局（MasterLayout 与所有 catalog 型页面共用） ===== */
+
+.catalog-view {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  min-height: 100%;
+}
+
+.catalog-shell {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  gap: 0;
+}
+
+.catalog-shell.is-workbench {
+  display: grid;
+  grid-template-columns: var(--master-list-col, minmax(360px, 440px)) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-lg);
+  min-width: 0;
+}
+
+.catalog-shell.is-workbench > * {
+  min-width: 0;
+}
+
+.catalog-shell.is-workbench .workbench-list-panel,
+.catalog-shell.is-workbench > .packaging-folder-panel {
+  position: sticky;
+  top: 108px;
+  height: calc(100vh - 124px);
+  min-height: 0;
+}
+
+.catalog-workbench {
+  min-height: 0;
+}
+
+/* 通用列表排序下拉（MasterListPanel 与详情内列表共用） */
+.list-sort-select {
+  width: 112px;
+  min-width: 112px;
+  flex: 0 0 112px;
+  padding: 4px 20px 4px 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+  background: var(--color-text-on-primary)
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='10' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E")
+    no-repeat right 6px center;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  cursor: pointer;
+}
+
+/* 列表行徽章（缺项/定制等状态） */
+.catalog-list-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-control-gap-tight);
+  margin-top: 2px;
+}
+
+/* 列表缩略图拖拽上传主图 */
+.catalog-list-thumb.drag-active {
+  border-color: var(--color-primary);
+}
+
+.thumb-drop-label {
+  position: absolute;
+  inset: auto 0 0 0;
+  padding: 2px 0;
+  background: rgba(15, 23, 42, 0.55);
+  color: var(--color-surface);
+  font-size: var(--fs-xxs);
+  font-style: normal;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+}
+
+.catalog-list-thumb:hover .thumb-drop-label {
+  opacity: 1;
+}
+
+/* 工作台无选中时右侧的引导区 */
+.catalog-workspace-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: 60px 20px;
+  color: var(--color-text-faint);
+  text-align: center;
+}
+
+.catalog-workspace-empty strong {
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-muted);
+}
+
+.catalog-workspace-empty span {
+  font-size: var(--fs-sm);
+}
+
+@media (max-width: 979px) {
+  .catalog-shell.is-workbench {
+    display: flex;
+  }
+}
+
+/* ===== 详情面板头部：Tabs + 操作按钮行（MasterDetailHeader 与各详情面板共用） ===== */
+
+.drawer-tabs-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-control-gap);
+  padding: 8px 16px 8px 20px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  flex-shrink: 0;
+}
+
+.drawer-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
+.drawer-actions .btn-sm {
+  padding: 5px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+  font-size: var(--fs-xs);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.drawer-actions .btn-sm:hover {
+  background: var(--color-surface-hover);
+}
+
+.drawer-tabs {
+  display: flex;
+  align-items: center;
+  gap: var(--space-control-gap-tight);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  min-width: 0;
+  flex: 1;
+}
+.drawer-tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.drawer-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 16px;
+  border: none;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: all var(--transition-base);
+}
+
+.drawer-tabs button:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-strong);
+}
+
+.drawer-tabs button.active {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+}
+
+.drawer-tabs .tab-count {
+  min-width: 18px;
+  border-radius: var(--radius-pill);
+  padding: 1px 5px;
+  background: var(--color-primary-bg-light);
+  color: var(--color-primary);
+  font-size: var(--fs-xxs);
+  text-align: center;
+}
+
+.drawer-tabs button.active .tab-count {
+  background: var(--color-primary);
+  color: var(--color-surface);
+}

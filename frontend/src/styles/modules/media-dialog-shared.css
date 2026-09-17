@@ -1,0 +1,92 @@
+﻿/* ===== 媒体账号弹窗共享样式 ===== */
+
+.media-form-dialog .lq-dialog__body,
+.media-platform-dialog .lq-dialog__body {
+  padding: 4px 28px 24px;
+}
+
+.media-detail-dialog .lq-dialog__body {
+  padding: 4px 0 0;
+}
+
+.media-form-dialog .dialog-eyebrow,
+.media-platform-dialog .dialog-eyebrow,
+.media-detail-dialog .dialog-eyebrow {
+  color: var(--color-text-muted);
+  font-size: var(--fs-xs);
+}
+
+.media-form-dialog .dialog-eyebrow,
+.media-platform-dialog .dialog-eyebrow {
+  margin: -4px 0 18px;
+}
+
+.media-detail-dialog .dialog-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-control-gap);
+  margin: -4px 28px 16px;
+}
+
+.media-form-dialog .dialog-form-body,
+.media-platform-dialog .dialog-form-body {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 头部：去掉 .form-dialog-header 与 .lq-dialog__head 的双重内边距，
+   并让左缘与正文（28px）对齐，标题过长时省略号截断 */
+.media-form-dialog .lq-dialog__head,
+.media-platform-dialog .lq-dialog__head {
+  align-items: center;
+  min-height: 64px;
+  padding: 0 18px 0 28px;
+}
+
+.media-form-dialog .form-dialog-header {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0;
+}
+
+.media-form-dialog .form-dialog-header > div {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.media-form-dialog .form-dialog-header > span {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.media-form-dialog .form-dialog-header h3 {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-form-dialog .form-dialog-header p {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .media-form-dialog,
+  .media-detail-dialog {
+    width: 100vw !important;
+    max-width: 100vw;
+    margin: 0 !important;
+    min-height: 100vh;
+    border-radius: 0;
+  }
+
+  .media-form-dialog .lq-dialog__body {
+    padding: 4px 16px 18px;
+  }
+
+  .media-detail-dialog .dialog-eyebrow {
+    margin: -4px 16px 14px;
+    flex-wrap: wrap;
+  }
+}

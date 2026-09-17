@@ -1,0 +1,207 @@
+/* ===== 多标签页导航栏 =====
+ * 非 scoped：右键菜单 Teleport 到 body，scoped 无法触达；统一用 .multi-tab__* BEM 前缀。
+ * 全部色值走 CSS 变量，暗色模式自动兼容（themes/dark.css 覆盖变量）。
+ */
+
+.multi-tab-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-control-gap-tight);
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 38px;
+  padding: 0 var(--space-control-gap);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.multi-tab__scroll {
+  flex: 1 1 auto;
+  overflow-x: auto;
+  overflow-y: hidden;
+  height: 100%;
+  scrollbar-width: none; /* Firefox */
+}
+.multi-tab__scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.multi-tab__list {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-control-gap-tight);
+  height: 100%;
+  white-space: nowrap;
+}
+
+.multi-tab__item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-control-gap-tight);
+  max-width: 200px;
+  height: 28px;
+  padding: 0 var(--space-sm-md);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+  color: var(--color-text-secondary);
+  font-size: var(--fs-xs);
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+.multi-tab__item:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+.multi-tab__item.is-active {
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  border-color: var(--color-primary-border);
+  font-weight: var(--fw-semibold);
+}
+
+.multi-tab__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  opacity: 0.8;
+}
+.multi-tab__icon :deep(svg),
+.multi-tab__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.multi-tab__label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.multi-tab__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-left: var(--space-control-gap-tight);
+  padding: 0;
+  border: none;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+.multi-tab__close:hover {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+.multi-tab__arrow {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: var(--fs-md);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+.multi-tab__arrow:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+.multi-tab__more {
+  flex: 0 0 auto;
+}
+.multi-tab__more-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: var(--fs-md);
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    background var(--transition-fast),
+    color var(--transition-fast);
+}
+.multi-tab__more-btn:hover {
+  background: var(--color-surface-hover);
+  color: var(--color-text-primary);
+}
+
+/* 右键菜单（Teleport 到 body） */
+.multi-tab__ctx-menu {
+  position: fixed;
+  z-index: var(--z-popover);
+  min-width: 140px;
+  margin: 0;
+  padding: var(--space-control-gap-tight) 0;
+  list-style: none;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+}
+.multi-tab__ctx-menu li {
+  padding: var(--space-sm-md) var(--space-md-lg);
+  font-size: var(--fs-xs);
+  color: var(--color-text-primary);
+  cursor: pointer;
+  user-select: none;
+}
+.multi-tab__ctx-menu li:hover {
+  background: var(--color-surface-hover);
+}
+.multi-tab__ctx-menu li.is-disabled {
+  color: var(--color-text-disabled);
+  pointer-events: none;
+}
+.multi-tab__ctx-menu li.is-divided {
+  border-top: 1px solid var(--color-border-lighter);
+  margin-top: var(--space-control-gap-tight);
+  padding-top: var(--space-sm-md);
+}
+.multi-tab__ctx-menu li.is-danger:hover {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+}
+
+@media (max-width: 767px) {
+  .multi-tab-bar {
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+  .multi-tab-bar::-webkit-scrollbar {
+    display: none;
+  }
+  .multi-tab__arrow {
+    display: none;
+  }
+}

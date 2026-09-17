@@ -1,0 +1,90 @@
+/* 全局重置与基础排版。所有页面共享。 */
+* { box-sizing: border-box; }
+html {
+  scroll-behavior: smooth;
+  /* 固定导航高度 + 视觉呼吸，锚点跳转时留出头部空间（兼容原生 hash 导航） */
+  scroll-padding-top: 100px;
+}
+/* 对所有带 id 的 section 兜底，兼容老浏览器 */
+section[id], [id].hero, #top {
+  scroll-margin-top: 100px;
+}
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--ink);
+  background: var(--white);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+a { color: inherit; text-decoration: none; }
+button { font: inherit; }
+img { display: block; max-width: 100%; }
+[hidden] { display: none !important; }
+
+/* 滚动渐入：由 v-reveal 指令添加 .visible 触发 */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity var(--dur-slower) ease, transform var(--dur-slower) ease;
+}
+.reveal.visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* 键盘可达性：统一聚焦态 */
+:focus-visible {
+  outline: 3px solid rgba(96, 196, 220, .48);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* 文本选中 */
+::selection {
+  background: rgba(67, 198, 213, .28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .reveal { opacity: 1; transform: none; transition: none; }
+  * { transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+/* [由 prototype-system.css 迁入] 无障碍跳过链接 */
+.skip-link {
+  position: fixed;
+  top: 12px;
+  left: 12px;
+  z-index: 10000;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--navy);
+  font-weight: var(--font-semibold);
+  transform: translateY(-160%);
+}
+.skip-link:focus { transform: translateY(0); }
+
+/* [由 prototype-system.css 迁入] 移动端交互反馈重置 */
+button,
+a,
+input,
+select,
+textarea { -webkit-tap-highlight-color: transparent; }
+
+/* [由 prototype-system.css 迁入] 触控设备最小 44px 触摸目标 */
+@media (pointer: coarse) {
+  button,
+  .button,
+  .text-link { min-height: 44px; }
+}
+
+/* [由 prototype-system.css 迁入] 页面母版：保证首屏最小高度、内页白色背景 */
+.site-page main {
+  min-height: 70vh;
+  overflow: clip;
+}
+.site-page:not(.site-page--home) main {
+  background: var(--white);
+}

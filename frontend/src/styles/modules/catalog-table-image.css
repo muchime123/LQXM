@@ -1,0 +1,172 @@
+﻿/* ===== 主产品数据表格：图片预览与布局优化 ===== */
+
+/* ========== 批量管理样式 ========== */
+
+.batch-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: 10px 18px;
+  background: var(--color-primary-bg);
+  border-bottom: 1px solid var(--color-primary-border);
+  font-size: var(--fs-sm);
+}
+
+.batch-bar em {
+  flex: 1 1 auto;
+  min-width: 160px;
+  color: var(--color-text-muted);
+  font-size: var(--fs-xs);
+  font-style: normal;
+  font-weight: var(--fw-medium);
+}
+
+.batch-bar span {
+  font-weight: var(--fw-semibold);
+  color: var(--color-primary);
+}
+
+.batch-bar button {
+  font-size: var(--fs-xs);
+  padding: 5px 12px;
+  border: 1px solid var(--color-border-input-hover);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+
+.batch-bar button.primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+}
+
+.batch-bar button.danger {
+  border-color: var(--color-danger-border);
+  background: var(--color-surface);
+  color: var(--color-danger);
+}
+
+.batch-bar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
+.batch-bar--models {
+  background: var(--color-surface-alt);
+  border-bottom: 1px solid var(--color-border-card);
+}
+
+.batch-bar--models span {
+  color: var(--color-text-heading);
+}
+
+.batch-bar--models strong {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  margin-left: var(--space-sm);
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  font-size: var(--fs-sm);
+}
+
+.batch-bar--models.empty strong {
+  background: var(--color-surface-hover);
+  color: var(--color-text-muted);
+}
+
+/* 新建产品引导条 */
+.new-product-guide {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  padding: 12px 18px;
+  margin-bottom: var(--space-section-gap);
+  background: var(--color-warning-bg-soft);
+  border: 1px solid var(--color-warning-border);
+  border-radius: var(--radius-xl);
+  font-size: var(--fs-base);
+}
+
+.new-product-guide .guide-icon {
+  font-size: var(--fs-3xl);
+}
+
+.new-product-guide .guide-text {
+  color: var(--color-warning-text);
+}
+
+.new-product-guide .guide-text strong {
+  color: var(--color-warning-text);
+  font-weight: var(--fw-bold);
+}
+
+.new-product-guide .guide-actions {
+  display: flex;
+  gap: var(--space-control-gap);
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.new-product-guide .guide-actions button {
+  font-size: var(--fs-xs);
+  padding: 5px 14px;
+  white-space: nowrap;
+}
+
+.new-product-guide .text-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.batch-edit-hint {
+  font-size: var(--fs-sm);
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-lg);
+  padding: 8px 12px;
+  background: var(--color-surface-alt);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-light);
+}
+
+.batch-edit-group-title {
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-semibold);
+  color: var(--color-primary);
+  padding: 8px 0 4px;
+  margin-top: var(--space-control-gap-tight);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.batch-field-item {
+  display: flex !important;
+  align-items: center;
+  gap: var(--space-control-gap);
+}
+
+.batch-field-item .field-label {
+  min-width: 120px;
+  font-size: var(--fs-sm);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.batch-field-item .field-label input[type='checkbox'] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--color-primary);
+}
+
+.batch-field-item input:disabled {
+  background: var(--color-surface-disabled);
+  color: var(--color-text-disabled);
+  cursor: not-allowed;
+}

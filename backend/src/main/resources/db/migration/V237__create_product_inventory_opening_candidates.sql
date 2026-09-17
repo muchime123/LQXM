@@ -1,0 +1,41 @@
+CREATE TABLE product_inventory_opening_batches (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  source_stock_batch_id BIGINT NOT NULL,
+  snapshot_at DATETIME NOT NULL,
+  status VARCHAR(30) NOT NULL DEFAULT 'PREVIEW',
+  source_row_count INT NOT NULL DEFAULT 0,
+  candidate_count INT NOT NULL DEFAULT 0,
+  ready_count INT NOT NULL DEFAULT 0,
+  review_count INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_piob_source(source_stock_batch_id),
+  CONSTRAINT fk_piob_source FOREIGN KEY(source_stock_batch_id) REFERENCES h3_preparation_batches(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品库存期初预览批次';
+
+CREATE TABLE product_inventory_opening_items (
+  id BIGINT PRIMARY KEY AUTO_INCREMENT,
+  opening_batch_id BIGINT NOT NULL,
+  source_stock_row_id BIGINT NOT NULL,
+  warehouse_id BIGINT NULL,
+  sales_product_id BIGINT NULL,
+  source_product_code VARCHAR(200) NULL,
+  source_name VARCHAR(500) NULL,
+  source_specification VARCHAR(1000) NULL,
+  source_unit VARCHAR(100) NULL,
+  source_warehouse VARCHAR(200) NULL,
+  raw_quantity DECIMAL(30,12) NOT NULL,
+  normalized_quantity DECIMAL(18,6) NULL,
+  resolution_status VARCHAR(30) NOT NULL,
+  issue_code VARCHAR(50) NULL,
+  resolution_note VARCHAR(500) NULL,
+  version INT NOT NULL DEFAULT 0,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uk_pioi_source(source_stock_row_id),
+  KEY idx_pioi_batch_status(opening_batch_id,resolution_status),
+  KEY idx_pioi_balance(warehouse_id,sales_product_id,source_unit),
+  CONSTRAINT fk_pioi_batch FOREIGN KEY(opening_batch_id) REFERENCES product_inventory_opening_batches(id),
+  CONSTRAINT fk_pioi_warehouse FOREIGN KEY(warehouse_id) REFERENCES warehouses(id),
+  CONSTRAINT fk_pioi_product FOREIGN KEY(sales_product_id) REFERENCES sales_products(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品库存期初来源候选';

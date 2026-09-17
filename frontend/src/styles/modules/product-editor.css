@@ -1,0 +1,81 @@
+﻿/* ===== 产品编辑弹窗新样式 ===== */
+
+.form-section {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--color-border-lighter);
+}
+
+.form-section:last-child {
+  border-bottom: none;
+}
+
+.section-title {
+  margin: 0 0 14px;
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-control-gap);
+}
+
+.section-title::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  background: var(--color-primary);
+  border-radius: 2px;
+}
+
+/* 上传区 - 卡片式布局 */
+.upload-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-section-gap);
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-control-gap);
+  color: var(--color-text-faint);
+}
+
+.upload-icon {
+  font-size: var(--fs-6xl);
+  font-weight: var(--fw-light);
+  color: var(--color-text-faint);
+  line-height: var(--lh-none);
+}
+
+.upload-placeholder span:last-child {
+  font-size: var(--fs-sm);
+}
+
+.hidden-input {
+  display: none;
+}
+
+/* 两列网格通用 */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-lg);
+}
+
+.form-grid .span-2 {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 640px) {
+  .upload-row,
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid .span-2 {
+    grid-column: 1;
+  }
+}

@@ -1,0 +1,39 @@
+/* ===== 路由级顶部进度条 =====
+ * 令牌来源：tokens.css
+ * - 高度：固定 2px
+ * - 进度色：--color-primary，失败色：--color-danger
+ * - z-index：--z-toast（高于 sticky/overlay，低于 drawer/modal）
+ * - 过渡：--duration-moderate + --ease-out
+ */
+
+.route-progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 2px;
+  width: var(--route-progress-width, 0%);
+  background: var(--color-primary);
+  box-shadow: 0 0 8px var(--color-primary-shadow);
+  z-index: var(--z-toast);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    width var(--duration-moderate) var(--ease-out),
+    opacity var(--duration-base) var(--ease-out),
+    background-color var(--duration-base) var(--ease-out);
+}
+
+.route-progress-bar.is-visible {
+  opacity: 1;
+}
+
+.route-progress-bar.is-failed {
+  background: var(--color-danger);
+  box-shadow: 0 0 8px var(--color-danger);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .route-progress-bar {
+    transition: none;
+  }
+}

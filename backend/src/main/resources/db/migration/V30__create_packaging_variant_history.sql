@@ -1,0 +1,22 @@
+CREATE TABLE IF NOT EXISTS packaging_variant_history (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    variant_id BIGINT NOT NULL,
+    model_id BIGINT NOT NULL,
+    field_key VARCHAR(80) NOT NULL,
+    field_label VARCHAR(120),
+    old_value TEXT,
+    new_value TEXT,
+    change_type VARCHAR(40) NOT NULL DEFAULT 'update',
+    change_source VARCHAR(80) NOT NULL DEFAULT 'manual',
+    change_reason VARCHAR(500),
+    source_file VARCHAR(500),
+    source_sheet VARCHAR(200),
+    changed_by VARCHAR(120),
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_pkg_variant_history_variant FOREIGN KEY (variant_id) REFERENCES packaging_variants(id) ON DELETE CASCADE,
+    CONSTRAINT fk_pkg_variant_history_model FOREIGN KEY (model_id) REFERENCES packaging_models(id) ON DELETE CASCADE,
+    INDEX idx_pkg_variant_history_variant_id (variant_id),
+    INDEX idx_pkg_variant_history_model_id (model_id),
+    INDEX idx_pkg_variant_history_field_key (field_key),
+    INDEX idx_pkg_variant_history_created_at (created_at)
+);

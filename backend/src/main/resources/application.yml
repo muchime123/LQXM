@@ -1,0 +1,121 @@
+server:
+  port: 8081
+  address: 0.0.0.0
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+
+spring:
+  application:
+    name: product-archive
+  # 本地开发密钥与密码放在 backend/.env（已被 .gitignore 忽略），不要写回本文件。
+  # 路径兜底：无论 CWD 是项目根目录(LQXM/) 还是 backend/，都能命中同一份 .env。
+  config:
+    import:
+      - optional:file:./.env[.properties]             # CWD = backend/ 时命中
+      - optional:file:./backend/.env[.properties]      # CWD = 项目根目录 时命中
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/product_archive?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+    baseline-version: 0
+    out-of-order: true
+  servlet:
+    multipart:
+      max-file-size: 2GB
+      max-request-size: 3GB
+
+app:
+  dingtalk:
+    # 是否启用钉钉集成。未启用时所有同步端点返回 503 + 中文提示，避免启动时误连。
+    enabled: ${DINGTALK_ENABLED:true}
+    # 钉钉企业内部应用 AppKey（非敏感，可直接写）
+    app-key: ${DINGTALK_APP_KEY:}
+    # 钉钉企业内部应用 AppSecret（敏感，默认空；请在 backend/.env 注入）
+    app-secret: ${DINGTALK_APP_SECRET:}
+    # 企业 CorpId（可选，P6.1 暂不强制）
+    corp-id: ${DINGTALK_CORP_ID:}
+    # AgentId（可选，工作通知推送时需要）
+    agent-id: ${DINGTALK_AGENT_ID:}
+    # 日常报销审批模板 ProcessCode（不填则同步所有审批单类型）
+    reimbursement-process-code: ${DINGTALK_PROCESS_CODE:}
+    # 钉钉网关基址（默认官方生产）
+    base-url: ${DINGTALK_BASE_URL:https://oapi.dingtalk.com}
+    # 拉取审批实例的回溯天数（手动触发时前端可在同步页按次指定 7/15/30 天）
+    sync-days-back: ${DINGTALK_SYNC_DAYS_BACK:7}
+    # 单次同步的最大审批单数
+    sync-max-items: ${DINGTALK_SYNC_MAX_ITEMS:500}
+    # 调用钉钉 API 的超时（毫秒）
+    http-timeout-ms: ${DINGTALK_HTTP_TIMEOUT_MS:10000}
+  # P7 正式身份认证
+  security:
+    # 会话有效期（小时），默认 12 小时
+    session-timeout-hours: ${APP_SECURITY_SESSION_TIMEOUT_HOURS:12}
+    # 未登录时是否返回"兼容管理员"（开发兜底）。生产环境必须为 false
+    compatibility-admin: ${APP_SECURITY_COMPAT_ADMIN:false}
+    # 是否允许用 X-Employee-Id 请求头模拟身份（仅开发环境）。生产环境必须为 false
+    allow-employee-header: ${APP_SECURITY_ALLOW_EMPLOYEE_HEADER:true}
+  archive:
+    soft-delete:
+      # 是否启用软删自动归档（=把 deleted_at 超过保留天数的记录迁移到 *_archive 然后物理删除）
+      enabled: ${SOFT_DELETE_ARCHIVE_ENABLED:true}
+      # 软删数据在主表保留的天数，超过则归档
+      retention-days: ${SOFT_DELETE_ARCHIVE_RETENTION_DAYS:30}
+      # cron 表达式（默认每天 02:00 执行）
+      cron: ${SOFT_DELETE_ARCHIVE_CRON:0 0 2 * * ?}
+  desktop:
+    open-folder-enabled: ${LOCAL_OPEN_FOLDER_ENABLED:true}
+  files:
+    root: ${FILES_ROOT:../storage/lq-files}
+  ffmpeg:
+    # FFmpeg/ffprobe 可执行文件：视频自动封面抽帧与时长/分辨率提取。
+    # 默认指向用户目录下的便携版（b6.0 essentials 静态构建），也可用环境变量覆盖或改为 PATH 中的 "ffmpeg"/"ffprobe"。
+    path: ${FFMPEG_PATH:C:/Users/20676/tools/ffmpeg/bin/ffmpeg.exe}
+    probe-path: ${FFPROBE_PATH:C:/Users/20676/tools/ffmpeg/bin/ffprobe.exe}
+    # 单次进程执行超时（秒）
+    timeout-seconds: ${FFMPEG_TIMEOUT_SECONDS:120}
+  preview:
+    office-converter:
+      path: ${OFFICE_CONVERTER_PATH:C:/Program Files/LibreOffice/program/soffice.com}
+      timeout-seconds: ${OFFICE_CONVERTER_TIMEOUT_SECONDS:60}
+    # Office 转 PDF 缓存清理：04:00 删除超过 retention-days 天未访问的转换结果（可重建，不影响功能）
+    cache:
+      retention-days: ${OFFICE_PREVIEW_CACHE_RETENTION_DAYS:30}
+      cleanup-cron: ${OFFICE_PREVIEW_CACHE_CLEANUP_CRON:0 0 4 * * ?}
+  cors:
+    allowed-origins:
+      - http://localhost:5173
+      - http://127.0.0.1:5173
+      - http://localhost:5174
+      - http://127.0.0.1:5174
+      - http://localhost:8080
+      - http://127.0.0.1:8080
+      - http://192.168.3.65:5173
+      - http://172.30.211.184:5173
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+# 健康检查：/actuator/health（含数据库、磁盘状态，供 scripts/check-health.ps1 使用）
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: always

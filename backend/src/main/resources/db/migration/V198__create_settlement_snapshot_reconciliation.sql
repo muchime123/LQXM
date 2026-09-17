@@ -1,0 +1,20 @@
+CREATE TABLE settlement_snapshot_reconciliations (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    snapshot_allocation_id BIGINT NOT NULL,
+    settlement_receipt_id BIGINT NOT NULL,
+    sales_outbound_id BIGINT NULL,
+    settlement_no VARCHAR(100) NULL,
+    outbound_no VARCHAR(100) NULL,
+    customer_name VARCHAR(255) NULL,
+    snapshot_date DATE NULL,
+    snapshot_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    formal_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    difference_amount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    formal_receipt_count INT NOT NULL DEFAULT 0,
+    reconciliation_status VARCHAR(30) NOT NULL,
+    reconciled_at DATETIME NOT NULL,
+    UNIQUE KEY uk_ssr_snapshot_allocation (snapshot_allocation_id),
+    KEY idx_ssr_status (reconciliation_status),
+    KEY idx_ssr_outbound (sales_outbound_id),
+    KEY idx_ssr_date (snapshot_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='多订单结清累计快照与正式收款核销对账结果';

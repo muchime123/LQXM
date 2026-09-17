@@ -1,0 +1,49 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: product-archive-db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-CHANGE_ME}
+      MYSQL_DATABASE: product_archive
+    ports:
+      - "3307:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    container_name: product-archive-backend
+    ports:
+      - "8081:8081"
+    environment:
+      DB_USERNAME: root
+      DB_PASSWORD: ${DB_PASSWORD:-CHANGE_ME}
+      DB_HOST: mysql
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/product_archive?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false
+      CRYPTO_SECRET_KEY: ${CRYPTO_SECRET_KEY:-}
+      LOCAL_OPEN_FOLDER_ENABLED: "false"
+      FILES_ROOT: /data/files
+      # P7 正式身份认证：生产环境强制关闭开发兼容逻辑（X-Employee-Id 不再作为身份依据）
+      APP_SECURITY_ALLOW_EMPLOYEE_HEADER: "false"
+      APP_SECURITY_COMPAT_ADMIN: "false"
+    volumes:
+      - file-storage:/data/files
+    depends_on:
+      mysql:
+        condition: service_healthy
+
+  frontend:
+    build: ./frontend
+    container_name: product-archive-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql-data:
+  file-storage:

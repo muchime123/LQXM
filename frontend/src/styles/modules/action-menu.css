@@ -1,0 +1,54 @@
+/* ===== 操作菜单弹出层 ===== */
+
+.action-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.action-menu-popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  display: grid;
+  min-width: 112px;
+  padding: var(--space-sm);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.action-menu-popover--floating {
+  position: fixed;
+  /* 菜单通过 Teleport 渲染到 body，需高于详情弹窗(--z-modal:2000)与抽屉(--z-drawer:1000)，
+     与素材卡片菜单(--z-popover)保持同一层级。 */
+  z-index: var(--z-popover);
+}
+
+.action-menu-popover button {
+  justify-content: flex-start;
+  min-height: 34px;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-primary);
+  font-size: var(--fs-sm);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.action-menu-popover button:hover {
+  background: var(--color-surface-alt);
+  color: var(--color-primary);
+}
+
+.action-menu-popover button.danger {
+  color: var(--color-danger);
+}
+
+.action-menu-popover button.danger:hover {
+  background: var(--color-danger-bg-soft);
+  color: var(--color-danger-text);
+}

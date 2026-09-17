@@ -1,0 +1,7 @@
+/* .list-data-panel 仅作 DataState 的布局锚点（min-width:0 防 flex 溢出）。
+   表格容器外观（border/radius/shadow/bg）由 LqTable 的 .lq-table-panel 统一接管，
+   表头/行高由 LqTable 的 density prop 统一控制，此处不再强制覆盖，避免行高不一致。 */
+.list-data-panel {
+  min-width: 0;
+  overflow: hidden;
+}

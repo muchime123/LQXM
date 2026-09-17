@@ -1,0 +1,21 @@
+CREATE TABLE business_commission_settlement_items (
+    id BIGINT PRIMARY KEY AUTO_INCREMENT,
+    settlement_id BIGINT NOT NULL,
+    commission_snapshot_id BIGINT NOT NULL,
+    business_order_id BIGINT NOT NULL,
+    business_no_snapshot VARCHAR(80) NOT NULL,
+    customer_name_snapshot VARCHAR(200) NULL,
+    rule_name_snapshot VARCHAR(100) NULL,
+    commissionable_profit DECIMAL(14,2) NOT NULL DEFAULT 0,
+    sales_revenue DECIMAL(14,2) NOT NULL DEFAULT 0,
+    received_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    receipt_ratio_pct DECIMAL(9,4) NOT NULL DEFAULT 0,
+    commission_rate DECIMAL(7,4) NOT NULL DEFAULT 0,
+    commission_amount DECIMAL(14,2) NOT NULL DEFAULT 0,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_bcsi_settlement FOREIGN KEY(settlement_id) REFERENCES business_commission_settlements(id),
+    CONSTRAINT fk_bcsi_snapshot FOREIGN KEY(commission_snapshot_id) REFERENCES business_commission_snapshots(id),
+    CONSTRAINT fk_bcsi_business FOREIGN KEY(business_order_id) REFERENCES business_orders(id),
+    UNIQUE KEY uk_bcsi_snapshot(commission_snapshot_id),
+    KEY idx_bcsi_settlement(settlement_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='业务提成结算明细';

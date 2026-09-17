@@ -1,0 +1,406 @@
+/* ============ 设计令牌（Design Tokens） ============
+   全站样式唯一数据源。页面 CSS 一律引用此处变量，禁止硬编码。
+   分层：颜色 / 排版 / 间距 / 圆角 / 阴影 / 容器 / 断点 / 动效 / 层级 */
+
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;500;600;700;800;900&family=Outfit:wght@400;500;600;700&display=swap');
+
+:root {
+  /* ===== 颜色：品牌主色系 ===== */
+  --brand-cyan: #60c4dc;
+  --brand-cyan-hover: #73cee3;
+  --brand-blue: #2ba8c3;
+  --brand-blue-hover: #188ba5;
+  --brand-blue-deep: #237f94;
+
+  /* ===== 颜色：深色系（Hero/页脚/导航） ===== */
+  --navy: #10252c;
+  --navy-light: #18353e;
+  --navy-deep: #102027;
+  --navy-tone: #1b3037;
+
+  /* ===== 颜色：文本层级 ===== */
+  --ink: #142a31;
+  --muted: #61757c;
+  --muted-2: #8190a0;
+  --placeholder: #a4a8b0;
+
+  /* ===== 颜色：深色底上的文本 ===== */
+  --on-navy: #ffffff;
+  --on-navy-body: #b6c6d8;
+  --on-navy-muted: #90a2b6;
+  --on-navy-cyan: #8ddde4;
+
+  /* ===== 颜色：状态 ===== */
+  --danger: #d34545;
+  --danger-bg: #fff5f5;
+  --success: #2ba471;
+
+  /* ===== 颜色：表面 ===== */
+  --surface-white: #ffffff;
+  --surface-paper: #f2f8f9;
+  --surface-paper-light: #f7fafb;
+  --line: #dce8eb;
+  --navy-line: #27425f;
+
+  /* ===== 颜色：白色透明度（标准阶梯 + 业务特殊值） ===== */
+  --white-alpha-018: rgba(255, 255, 255, .018);
+  --white-alpha-02: rgba(255, 255, 255, .02);
+  --white-alpha-028: rgba(255, 255, 255, .028);
+  --white-alpha-04: rgba(255, 255, 255, .04);
+  --white-alpha-06: rgba(255, 255, 255, .06);
+  --white-alpha-08: rgba(255, 255, 255, .08);
+  --white-alpha-10: rgba(255, 255, 255, .1);
+  --white-alpha-12: rgba(255, 255, 255, .12);
+  --white-alpha-14: rgba(255, 255, 255, .14);
+  --white-alpha-15: rgba(255, 255, 255, .15);
+  --white-alpha-18: rgba(255, 255, 255, .18);
+  --white-alpha-20: rgba(255, 255, 255, .2);
+  --white-alpha-34: rgba(255, 255, 255, .34);
+  --white-alpha-35: rgba(255, 255, 255, .35);
+  --white-alpha-38: rgba(255, 255, 255, .38);
+  --white-alpha-48: rgba(255, 255, 255, .48);
+  --white-alpha-60: rgba(255, 255, 255, .6);
+  --white-alpha-62: rgba(255, 255, 255, .62);
+  --white-alpha-64: rgba(255, 255, 255, .64);
+  --white-alpha-68: rgba(255, 255, 255, .68);
+  --white-alpha-72: rgba(255, 255, 255, .72);
+  --white-alpha-74: rgba(255, 255, 255, .74);
+  --white-alpha-75: rgba(255, 255, 255, .75);
+  --white-alpha-76: rgba(255, 255, 255, .76);
+  --white-alpha-78: rgba(255, 255, 255, .78);
+  --white-alpha-80: rgba(255, 255, 255, .8);
+  --white-alpha-82: rgba(255, 255, 255, .82);
+  --white-alpha-90: rgba(255, 255, 255, .9);
+  --white-alpha-92: rgba(255, 255, 255, .92);
+  --white-alpha-94: rgba(255, 255, 255, .94);
+  --white-alpha-96: rgba(255, 255, 255, .96);
+
+  /* ===== 排版：字体族 ===== */
+  --font-sans: 'Noto Sans SC', sans-serif;
+  --font-display: 'Outfit', 'Noto Sans SC', sans-serif;
+
+  /* 字号（固定） */
+  --text-xs: 0.75rem;        /* 12 */
+  --text-sm: 0.8125rem;      /* 13 */
+  --text-base: 0.875rem;     /* 14 */
+  --text-md: 0.9375rem;      /* 15 */
+  --text-lg: 1rem;           /* 16 */
+  --text-xl: 1.125rem;       /* 18 */
+  --text-2xl: 1.25rem;       /* 20 */
+  --text-3xl: 1.5rem;        /* 24 */
+  --text-4xl: 1.75rem;       /* 28 */
+
+  /* 字号（流体，随视口缩放） */
+  --text-hero: clamp(38px, 4.4vw, 56px);
+  --text-hero-home: clamp(50px, 5.3vw, 78px);
+  --text-section: clamp(34px, 4vw, 52px);
+  --text-subsection: clamp(28px, 3vw, 38px);
+
+  /* 行高 */
+  --leading-tight: 1.15;
+  --leading-heading: 1.3;
+  --leading-body: 1.7;
+  --leading-relaxed: 1.8;
+  --leading-loose: 1.9;
+
+  /* 字重 */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  --font-extrabold: 800;
+
+  /* 字距 */
+  --tracking-eyebrow: 2.2px;
+  --tracking-mid: 1.2px;
+  --tracking-wide: 1px;
+
+  /* ===== 间距（4px 网格） ===== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 28px;
+  --space-8: 32px;
+  --space-9: 36px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-14: 56px;
+  --space-16: 64px;
+  --space-20: 80px;
+  --space-24: 96px;
+  --space-30: 120px;
+
+  /* ===== 圆角 ===== */
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-card: 16px;
+  --radius-pill: 999px;
+
+  /* ===== 阴影 ===== */
+  --shadow-xs: 0 2px 6px rgba(15, 49, 58, .06);
+  --shadow-sm: 0 8px 20px rgba(15, 49, 58, .08);
+  --shadow-card: 0 20px 50px rgba(15, 49, 58, .09);
+  --shadow-lift: 0 24px 60px rgba(15, 49, 58, .14);
+
+  /* ===== 卡片交互态 ===== */
+  --hover-border: #b9d9ea;
+
+  /* ===== 容器 ===== */
+  --max: 1440px;
+  --pad: clamp(20px, 3vw, 32px);
+
+  /* ===== 区块节奏 ===== */
+  --section-space: clamp(52px, 4.6vw, 76px);
+  --section-space-compact: clamp(40px, 3.6vw, 56px);
+
+  /* ===== 断点 ===== */
+  --bp-sm: 640px;
+  --bp-md: 980px;
+
+  /* ===== 动效 ===== */
+  --dur-fast: .15s;
+  --dur: .25s;
+  --dur-slow: .5s;
+  --dur-slower: .7s;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+  --ease-out: cubic-bezier(0, 0, .2, 1);
+
+  /* ===== 层级 ===== */
+  --z-sticky: 20;
+  --z-header: 100;
+  --z-overlay: 200;
+
+  /* ===== 组件：按钮 ===== */
+  --btn-height: 54px;
+  --btn-height-sm: 46px;
+  --btn-radius: var(--radius-sm);
+  --btn-radius-lg: var(--radius);
+
+  /* ===== 组件：卡片 ===== */
+  --card-radius: var(--radius-card);
+  --card-shadow: var(--shadow-sm);
+  --card-shadow-hover: var(--shadow-lift);
+  --card-border: rgba(120, 158, 168, .24);
+  --card-border-hover: var(--hover-border);
+
+  /* ===== 组件：图片保底 ===== */
+  /* 内联 SVG 品牌占位图，作为 background-image 的最后一层；
+     上层图片加载成功时覆盖它，加载失败时透出占位图，避免空白。 */
+  --img-fallback: url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%20800%20600%22%3E%0A%20%20%3Crect%20width%3D%22800%22%20height%3D%22600%22%20fill%3D%22%23eef4f6%22%2F%3E%0A%20%20%3Cg%20fill%3D%22none%22%20stroke%3D%22%23b9c9cf%22%20stroke-width%3D%2216%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%0A%20%20%20%20%3Crect%20x%3D%22292%22%20y%3D%22212%22%20width%3D%22216%22%20height%3D%22162%22%20rx%3D%2214%22%2F%3E%0A%20%20%20%20%3Ccircle%20cx%3D%22352%22%20cy%3D%22270%22%20r%3D%2226%22%2F%3E%0A%20%20%20%20%3Cpath%20d%3D%22M298%20362%20L415%20296%20L468%20342%20L520%20300%20L576%20362%22%2F%3E%0A%20%20%3C%2Fg%3E%0A%20%20%3Ctext%20x%3D%22400%22%20y%3D%22482%22%20font-family%3D%22Arial%2C%20sans-serif%22%20font-size%3D%2230%22%20letter-spacing%3D%228%22%20fill%3D%22%238aa4ad%22%20text-anchor%3D%22middle%22%3ELIQIANG%3C%2Ftext%3E%0A%3C%2Fsvg%3E");
+
+  /* ===== 组件：导航 ===== */
+  --header-height: 92px;
+  --header-height-mobile: 76px;
+  --header-height-mobile-sm: 72px;
+  --nav-dropdown-radius: 6px;
+  --nav-item-font-size: 15px;
+  --nav-item-opacity: .84;
+  --nav-item-opacity-hover: 1;
+  --nav-underline-height: 2px;
+  --nav-underline-gap: 10px;
+
+  /* ===== 组件：搜索 ===== */
+  --search-height: 48px;
+  --search-height-sm: 44px;
+  --search-radius: var(--radius-sm);
+  --search-bg: var(--surface-paper);
+  --search-focus-border: var(--brand-blue);
+
+  /* ===== 组件：分类 Tab ===== */
+  --tab-height: 44px;
+  --tab-radius: var(--radius-sm);
+  --tab-active-bg: var(--brand-cyan);
+  --tab-active-color: var(--ink);
+
+  /* ===== 组件：分页 ===== */
+  --pagination-btn-size: 40px;
+  --pagination-active-bg: var(--brand-blue);
+
+  /* ===== 组件：标签 / 芯片 ===== */
+  --chip-gap: 7px;
+  --chip-padding: 6px 10px;
+
+  /* ===== 组件：Hero ===== */
+  --hero-ratio: 12 / 5;
+  --hero-min-height: 320px;
+  --hero-dot-size: 34px;
+  --hero-dot-active-width: 58px;
+  --hero-nav-size: 40px;
+
+  /* ===== 组件：CTA 区块 ===== */
+  --cta-min-height: 440px;
+  --cta-padding-y: 100px;
+
+  /* ===== 组件：页脚 ===== */
+  --footer-bg: #0c2027;
+  --footer-bg-deep: #061528;
+  --footer-color: #a1b0c0;
+  --footer-bottom-color: #7c8ea1;
+  --footer-social-bg: var(--white-alpha-06);
+  --footer-social-border: var(--white-alpha-10);
+
+  /* ===== 组件：Header / 导航 ===== */
+  --header-default-bg: rgba(8, 23, 28, .48);
+  --header-solid-shadow: rgba(18, 54, 63, .1);
+  --header-border-light: var(--white-alpha-10);
+  --header-solid-border: rgba(96, 196, 220, .3);
+  --header-cta-bg-hover: var(--white-alpha-08);
+  --header-cta-text-dark: #15343c;
+
+  /* ===== 组件：Hero ===== */
+  --hero-bg: #07171d;
+  --hero-gradient-start: rgba(8, 27, 33, .82);
+  --hero-gradient-mid: rgba(8, 27, 33, .57);
+  --hero-gradient-light: rgba(8, 27, 33, .18);
+  --hero-gradient-end: rgba(8, 27, 33, .28);
+  --hero-gradient-bottom: rgba(8, 27, 33, .34);
+  --hero-nav-bg: rgba(7, 23, 29, .22);
+  --hero-nav-bg-hover: rgba(7, 23, 29, .55);
+  --hero-nav-border: var(--white-alpha-14);
+  --hero-nav-border-hover: var(--white-alpha-35);
+  --hero-nav-icon: var(--white-alpha-78);
+  --hero-ghost-bg: rgba(9, 29, 36, .42);
+  --hero-ghost-bg-hover: rgba(9, 29, 36, .62);
+  --hero-ghost-border: var(--white-alpha-38);
+  --hero-ghost-border-hover: var(--white-alpha-78);
+  --hero-dot-bg: var(--white-alpha-20);
+  --hero-dot-bg-hover: var(--white-alpha-48);
+  --hero-dot-glow: rgba(96, 196, 220, .18);
+  --hero-badge-cyan-hover: #86d8ec;
+
+  /* ===== 组件：产品卡片 ===== */
+  --catalog-plate-gradient-start: rgba(11, 29, 53, .72);
+  --catalog-plate-gradient-mid: rgba(11, 29, 53, .42);
+  --catalog-plate-eyebrow: var(--white-alpha-72);
+  --catalog-plate-name: var(--white-alpha-94);
+  --catalog-overlay-gradient: linear-gradient(135deg, rgba(14, 22, 40, .86) 0%, rgba(11, 29, 53, .92) 100%);
+  --catalog-meta-border: var(--white-alpha-12);
+  --catalog-meta-text: var(--white-alpha-68);
+
+  /* ===== 组件：案例卡片 ===== */
+  --case-tag-bg: rgba(6, 21, 28, .72);
+  --case-overlay-gradient: linear-gradient(to top, rgba(11, 31, 38, .88), rgba(11, 31, 38, .48) 58%, transparent);
+
+  /* ===== 组件：场景辅助 ===== */
+  --scene-assist-gradient: linear-gradient(120deg, var(--paper), var(--paper-tint));
+
+  /* ===== 组件：服务项目 ===== */
+  --service-icon-bg: var(--paper-tint);
+
+  /* ===== 组件：行业卡片 ===== */
+  --industry-card-gradient-start: rgba(7, 25, 31, .08);
+  --industry-card-gradient-mid: rgba(7, 25, 31, .14);
+  --industry-card-gradient-end: rgba(7, 25, 31, .82);
+  --industry-text-light: var(--white-alpha-68);
+  --industry-index: var(--white-alpha-75);
+  --industry-link-opacity: .72;
+
+  /* ===== 组件：制造卡片 ===== */
+  --manufacturing-overlay-gradient: linear-gradient(to top, rgba(8, 24, 30, .90) 0%, rgba(8, 24, 30, .58) 38%, rgba(8, 24, 30, .18) 72%, transparent 100%);
+  --manufacturing-overlay-gradient-hover: linear-gradient(to top, rgba(8, 24, 30, .94) 0%, rgba(8, 24, 30, .64) 38%, rgba(8, 24, 30, .22) 72%, transparent 100%);
+
+  /* ===== 组件：制造能力 / 首页亮点 ===== */
+  --home-strength-bg: linear-gradient(110deg, #0d1f26 0%, #132a32 52%, #16323a 100%);
+  --home-strength-cyan: #8ee3f5;
+  --home-strength-text: var(--white-alpha-62);
+  --home-strength-text-hover: var(--white-alpha-80);
+  --home-strength-border: var(--white-alpha-08);
+  --home-strength-bg-hover: var(--white-alpha-02);
+
+  /* ===== 组件：CTA 区块 ===== */
+  --cta-bg-default: linear-gradient(120deg, #0876e8, #0ba7c1);
+  --cta-bg-dark: linear-gradient(110deg, #0c568c 0%, #1685a8 46%, #47b5cf 80%, #60c4dc 100%);
+  --cta-bg-white: #f0faff;
+  --cta-text-light: #d6efff;
+  --cta-white-text: #0a4b78;
+  --cta-white-text-hover: #074068;
+
+  /* ===== 组件：数据状态 ===== */
+  --state-loading: #8190a0;
+
+  /* ===== 组件：分页 / 轮播控件 ===== */
+  --carousel-control-bg: var(--white-alpha-94);
+  --carousel-control-border: rgba(20, 42, 49, .12);
+  --carousel-control-shadow: rgba(10, 28, 34, .12);
+  --carousel-control-shadow-hover: rgba(10, 28, 34, .18);
+
+  /* ===== 组件：搜索栏 ===== */
+  --searchbar-bg: var(--white);
+  --toolbar-bg: var(--white-alpha-96);
+  --toolbar-shadow: rgba(20, 42, 49, .05);
+
+  /* ===== 组件：制造证明链接 ===== */
+  --proof-link-border: rgba(35, 127, 148, .18);
+  --proof-link-border-hover: rgba(35, 127, 148, .34);
+  --proof-link-bg: rgba(96, 196, 220, .08);
+  --proof-link-bg-hover: rgba(96, 196, 220, .18);
+  --proof-link-text-hover: #146578;
+
+  /* ===== 组件：内页行业卡片 ===== */
+  --industry-card-hover-bg: #e9f5f7;
+
+  /* ===== 组件：行业卡片 ===== */
+  --industry-icon-size: 52px;
+  --industry-icon-bg: #f0f7fa;
+  --industry-item-min-h: 210px;
+
+  /* ===== 组件：案例/服务/制造卡片 ===== */
+  --case-media-ratio: 16 / 8.5;
+  --service-item-padding: 24px 22px 22px;
+  --manufacturing-grid-gap: 18px;
+  --manufacturing-card-min-h: 260px;
+
+  /* ===== 组件：骨架屏 ===== */
+  --skeleton-gradient: linear-gradient(90deg, #eef2f6 25%, #f6f9fc 50%, #eef2f6 75%);
+
+  /* ===== 组件：表单状态色 ===== */
+  --form-success-bg: #e8f5ee;
+  --form-success-text: #1a6b47;
+  --form-danger-bg: #fdecea;
+  --form-danger-text: #a03020;
+  --form-error-text: #e5484d;
+
+  /* ===== 组件：地图标记 ===== */
+  --map-marker: #ff5c5c;
+  --map-viewport-bg: #dcecf1;
+  --map-status-bg: #e8f2f5;
+
+  /* ===== 组件：样品模式 ===== */
+  --sample-mode-accent: #5eeaaa;
+  --sample-mode-accent-soft: rgba(94, 234, 170, .28);
+
+  /* ===== 组件：Hero CTA 终点色 ===== */
+  --hero-cta-tint: #0f5c8b;
+  --navy-accent: #1a2744;
+
+  /* ===== 组件：场景辅助 / 卡片淡青背景 ===== */
+  --paper-tint: #eaf4f6;
+  --paper-alt: #f6f9fc;
+  --paper-alt-deep: #f2f6fa;
+
+  /* ===== 组件：图像辅助标签 cyan ===== */
+  --image-label-cyan: #64cbd5;
+
+  /* ===== 组件：徽标 Badge ===== */
+  --badge-bg-blue: #e6f0fb;
+  --badge-bg-amber: #fdf4e3;
+  --badge-text-amber: #b07d1e;
+  --badge-bg-violet: #f0eaf8;
+  --badge-text-violet: #6b4ba6;
+
+  /* ===== 组件：Section 分割线 ===== */
+  --section-divider: rgba(220, 228, 236, .72);
+
+  /* ===== 向后兼容别名 ===== */
+  --cyan: var(--brand-cyan);
+  --blue: var(--brand-blue);
+  --blue-hover: var(--brand-blue-hover);
+  --blue-deep: var(--brand-blue-deep);
+  --paper: var(--surface-paper);
+  --paper-light: var(--surface-paper-light);
+  --white: var(--surface-white);
+}

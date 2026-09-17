@@ -1,0 +1,45 @@
+﻿/* ===== 列表公共控件 ===== */
+
+.list-pagination,
+.lq-pagination {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.list-pagination {
+  margin-top: var(--space-md);
+}
+
+.lq-pagination .el-pagination__total,
+.lq-pagination .el-pagination__sizes {
+  color: var(--color-text-secondary);
+}
+
+.lq-pagination.is-background .btn-next,
+.lq-pagination.is-background .btn-prev,
+.lq-pagination.is-background .el-pager li {
+  border: 1px solid var(--color-border);
+}
+
+.lq-search-input {
+  width: min(280px, 100%);
+}
+
+.view-mode-toggle .el-radio-button__inner {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-control-gap-tight);
+}
+
+.pager-left {
+  display: flex;
+  align-items: center;
+  gap: var(--space-control-gap-tight);
+}
+
+@media (max-width: 640px) {
+  .lq-pagination--full .el-pagination__total,
+  .lq-pagination--full .el-pagination__sizes {
+    display: none;
+  }
+}

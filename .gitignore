@@ -1,0 +1,136 @@
+# --- IDE ---
+.idea/
+.vscode/
+*.iml
+*.swp
+*.swo
+
+# --- Backend ---
+backend/target/
+backend/*.jar
+backend/*.war
+backend/*.class
+backend/logs/
+backend/.flattened-pom.xml
+
+# --- Frontend ---
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+frontend/test-results/
+frontend/playwright-report/
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+nul
+
+# --- Logs ---
+*.log
+replay_pid*.log
+hs_err_pid*.log
+
+# --- Temp ---
+tmp/
+*.tmp
+.tmp_*
+.tmp-*/
+test.txt
+unused_css.txt
+query
+
+# --- One-off analysis / dev session artifacts ---
+/outputs/
+corporate-website/node_modules/
+scripts/node_modules/
+
+# --- Env ---
+.env
+.env.local
+.env.*.local
+
+# --- Python ---
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# --- AI agent working files ---
+.workbuddy/
+.codex-tmp/
+.agents/
+memory/
+.uploads/
+.rewind_parsefile/
+frontend.bak.*/
+rescue-*.txt
+
+# --- Project generated artifacts ---
+docs/tools/proxy.log
+backend/query
+/BOOT-INF/
+/backend/BOOT-INF/
+backend/TestDecrypt.java
+frontend/*.timestamp-*.mjs
+
+# --- One-off local repair scripts ---
+/check_css_usage.py
+/fix_*.py
+/merge_*.py
+/frontend/fix_*.py
+/frontend/merge_*.py
+/frontend/restore_*.py
+
+# --- Runtime / business data (do not track) ---
+/data/
+/storage/
+/product-archive-analysis/
+/小Tips/
+/docs/data/*.sql
+/docs/data/*.csv
+*.xlsm
+
+# --- Sensitive scripts (moved to .workbuddy/sensitive-scripts/) ---
+/scripts/import_passwords.py
+/scripts/recover_params.py
+/scripts/fix_recover_params.py
+/scripts/infer_fields.py
+
+# --- Project working/backup/local-tooling directories (added 2026-09-17 for initial commit) ---
+/.backup/
+/backup/
+/.maven-user/
+/.venv-data/
+/.trae/
+/.workbuddy_backup_*/
+/db_cleanup_*/
+/$null
+
+# --- Root-level one-off analysis & exports (HTML reports, CSV snapshots, temp binaries) ---
+/*.html
+/*.csv
+/factory.webp
+/workshop.webp
+/manual-sealer.jpg
+/pack_source.bat
+/pack_source使用方法.txt
+
+# --- One-off DB backup / cleanup snapshots (do not track) ---
+/tools/_backup_*/
+/backend/db_cleanup_*/
+/backend/test-business-backup-*.sql
+/backend/src/main/houduan.zip
+*.sql.bak
+
+# --- Chinese-named one-off docs at root (sessions snapshots, ad-hoc reports) ---
+/氚云数据全链路串联文档.md
+/氚云数据全链路全景图.html
+/利润核算_财务口径确认清单.html
+/历史出库未补档探查结果.html
+/历史出库补档*.html
+/页面数据口径清单.html
+/客户地区_人工处理清单_*.csv
+/财务对账_代表性出库单_*.{csv,html}
+/V174*.html

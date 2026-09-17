@@ -1,0 +1,404 @@
+/* ===== CSS Design Tokens ===== */
+
+:root {
+  /* Colors - Primary */
+  --color-primary: #0f766e;
+  --color-primary-light: #0d9488;
+  --color-primary-hover: #0f9f8e;
+  --color-primary-bg: #ecfdf5;
+  --color-primary-bg-light: #f0fdfa;
+  --color-primary-bg-deep: #f0fdf4;
+  --color-primary-border: #a7f3d0;
+  --color-primary-border-light: #bbf7d0;
+  --color-primary-ring: rgba(15, 118, 110, 0.12);
+  --color-primary-ring-strong: rgba(15, 118, 110, 0.15);
+  --color-primary-ring-light: rgba(15, 118, 110, 0.1);
+  --color-primary-shadow: rgba(15, 118, 110, 0.3);
+
+  /* Colors - Sidebar */
+  --color-sidebar-bg: #17212b;
+  --color-sidebar-hover: #1a2735;
+  --color-sidebar-active: #223140;
+  --color-sidebar-text: #cbd5df;
+  --color-sidebar-text-strong: #ffffff;
+  --color-sidebar-muted: #8ea0af;
+  --color-brand-cyan: #60c4dc;
+
+  /* Colors - Surface & Background */
+  --color-page-bg: #f4f6f8;
+  --color-surface: #ffffff;
+  --color-surface-alt: #f8fafc;
+  --color-surface-raised: #fbfcfd;
+  --color-surface-hover: #f1f5f9;
+  --color-surface-selected: #ecfdf5;
+  --color-surface-selected-hover: #dff8ee;
+  --color-surface-readonly: #f1f5f9;
+  --color-surface-disabled: #eef2f6;
+
+  /* Colors - Border */
+  --color-border: #e2e8f0;
+  --color-border-light: #e3e8ee;
+  --color-border-lighter: #edf1f5;
+  --color-border-input: #cfd7df;
+  --color-border-input-hover: #cbd5e1;
+  --color-border-selected: #5eead4;
+  --color-border-focus: #0f766e;
+
+  /* Colors - Text */
+  --color-text-primary: #1d252f;
+  --color-text-heading: #0f172a;
+  --color-text-secondary: #5f6f82;
+  --color-text-strong: #475569;
+  --color-text-muted: #64748b;
+  --color-text-faint: #94a3b8;
+  --color-text-disabled: #94a3b8;
+  --color-text-placeholder: #94a3b8;
+  --color-text-heading-alt: #1e293b;
+  --color-text-link: #0f766e;
+  --color-text-on-primary: #ffffff;
+
+  /* Colors - Status */
+  --color-success: #16a34a;
+  --color-success-bg: #dcfce7;
+  --color-success-bg-soft: #f0fdf4;
+  --color-success-border: #a7f3d0;
+  --color-success-text: #166534;
+
+  --color-warning: #d97706;
+  --color-warning-bg: #fef3c7;
+  --color-warning-bg-soft: #fffbeb;
+  --color-warning-border: #fde68a;
+  --color-warning-text: #92400e;
+
+  /* Completion ring — 完成度环专用色（warning 梯度，与通用 warning 色阶有微差） */
+  --color-completion-ring: #f59e0b;
+  --color-completion-track: #fde7ba;
+  --color-completion-text: #b45309;
+
+  /* Product type badge — 产品类型分类标签色 */
+  --color-type-seal-bg: #d1fae5;
+  --color-type-seal-text: #065f46;
+  --color-type-skin-bg: #ede9fe;
+  --color-type-skin-text: #5b21b6;
+  --color-type-pneumatic-bg: #ffe4e6;
+  --color-type-pneumatic-text: #9b1c31;
+  --color-type-custom-bg: #ffedd5;
+  --color-type-custom-text: #9a3412;
+
+  /* Completion ring — danger variant */
+  --color-completion-danger-ring: #f05252;
+
+  --color-danger: #dc2626;
+  --color-danger-bg: #fee2e2;
+  --color-danger-bg-soft: #fff1f2;
+  --color-danger-border: #fecaca;
+  --color-danger-text: #be123c;
+
+  --color-info: #2563eb;
+  --color-info-bg: #eff6ff;
+  --color-info-bg-soft: #f0f7ff;
+  --color-info-border: #dbeafe;
+  --color-info-text: #1e40af;
+
+  /* Colors - Misc */
+  --color-purple: #7c3aed;
+  --color-purple-bg: #f3e8ff;
+  --color-purple-border: #ddd6fe;
+  --color-overlay: rgba(15, 23, 42, 0.6);
+  --color-overlay-backdrop: rgba(15, 23, 42, 0.4);
+  --color-overlay-bg: var(--color-overlay);
+  --color-overlay-image: rgba(0, 0, 0, 0.5);
+  --color-overlay-image-strong: rgba(0, 0, 0, 0.7);
+  --color-glass-bg: rgba(255, 255, 255, 0.92);
+  --color-glass-text: rgba(255, 255, 255, 0.8);
+  --color-border-card: #dbe4ee;
+
+  /* Tooltip - C16 LqTooltip 主题色 */
+  --color-tooltip-bg: #303133;
+  --color-tooltip-text: #ffffff;
+  --color-tooltip-border: transparent;
+
+  /* Sidebar - extended */
+  --color-sidebar-text-strong: #ffffff;
+  --color-sidebar-overlay-border: rgba(255, 255, 255, 0.1);
+  --color-sidebar-overlay-bg: rgba(255, 255, 255, 0.05);
+  --color-sidebar-overlay-hover-bg: rgba(255, 255, 255, 0.1);
+  --color-sidebar-overlay-hover-border: rgba(255, 255, 255, 0.2);
+
+  /* Element Plus 扩展色阶 — 供 element-plus.css 引用的语义化色阶令牌。
+     深色模式覆盖在 themes/dark.css 中统一维护。 */
+  --ep-primary-3: #0d9488;
+  --ep-primary-5: #5eead4;
+  --ep-primary-7: #99f6e4;
+  --ep-primary-8: #a7f3d0;
+  --ep-primary-9: #ccfbf1;
+  --ep-primary-dark: #0d6b63;
+  --ep-primary-filled: #0f766e;
+
+  --ep-success-3: #4ade80;
+  --ep-success-5: #86efac;
+  --ep-success-7: #bbf7d0;
+  --ep-success-8: #d1fae5;
+  --ep-success-9: #dcfce7;
+  --ep-success-dark: #15803d;
+
+  --ep-warning-3: #fbbf24;
+  --ep-warning-5: #fcd34d;
+  --ep-warning-7: #fde68a;
+  --ep-warning-8: #fef3c7;
+  --ep-warning-9: #fffbeb;
+  --ep-warning-dark: #b45309;
+
+  --ep-danger-3: #f87171;
+  --ep-danger-5: #fca5a5;
+  --ep-danger-7: #fecaca;
+  --ep-danger-8: #fee2e2;
+  --ep-danger-9: #fff1f2;
+  --ep-danger-dark: #b91c1c;
+
+  --ep-info: #64748b;
+  --ep-info-3: #94a3b8;
+  --ep-info-5: #cbd5e1;
+  --ep-info-7: #e2e8f0;
+  --ep-info-8: #f1f5f9;
+  --ep-info-9: #f8fafc;
+  --ep-info-dark: #475569;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 6px;
+  --space-sm-md: 8px;
+  --space-md: 10px;
+  --space-md-lg: 12px;
+  --space-lg: 14px;
+  --space-lg-xl: 16px;
+  --space-xl: 18px;
+  --space-xl-2xl: 20px;
+  --space-2xl: 24px;
+  --space-3xl: 32px;
+
+  /* Semantic Layout */
+  --control-height-sm: 28px;
+  --control-height-default: 32px;
+  --control-height-lg: 40px;
+  --page-inline-padding: 28px;
+  --page-block-padding: 20px;
+  --toolbar-min-height: 48px;
+  --card-padding: 18px;
+  --card-radius: var(--radius-lg);
+  --content-max-width: 1440px;
+  --sidebar-width: 240px;
+  --sidebar-width-collapsed: 72px;
+
+  /* Semantic Spacing Aliases - 场景化间距别名，业务 CSS 应优先使用别名而非直接引用数字梯度令牌。
+     新增场景化间距时优先在此追加别名，避免在业务 CSS 中重复 hardcode gap 数值。
+     别名值与项目主流使用对齐：替换现有数字梯度令牌时仅替换值匹配的场景，避免视觉变化。 */
+  --space-control-gap: var(--space-sm-md);        /* 8px 控件水平间距（按钮组、工具栏控件、表单字段横向） */
+  --space-control-gap-tight: var(--space-xs);     /* 4px 紧凑控件组（icon 按钮、tag 组） */
+  --space-control-gap-wide: var(--space-md-lg);   /* 12px 宽松控件组（批量条、复杂工具栏） */
+  --space-form-item-gap: var(--space-lg-xl);      /* 16px 表单字段纵向间距 */
+  --space-section-gap: var(--space-lg-xl);         /* 16px 页面级区块纵向间距（list-page-layout 主流值） */
+  --space-section-gap-wide: var(--space-2xl);      /* 24px 宽松区块间距（header 内部、特殊场景） */
+  --space-card-gap: var(--space-md-lg);            /* 12px 卡片网格间距（metric-grid 主流值） */
+  --space-list-row-gap: var(--space-sm-md);        /* 8px 列表行间纵向间距 */
+
+  /* Responsive Breakpoints — 供 JS/TS 引用。
+     CSS @media 无法直接使用 var()，媒体查询中仍写字面量值。 */
+  --bp-desktop: 1200px;
+  --bp-tablet: 768px;
+  --bp-mobile: 767px;
+
+  /* Border Radius */
+  --radius-sm: 4px;
+  --radius-xs: 2px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 16px;
+  --radius-pill: 999px;
+
+  /* Border Width */
+  --border-width-thin: 1px;
+  --border-width-default: 1px;
+  --border-width-thick: 2px;
+  --border-width-focus: 2px;
+  --border-width-strong: 3px;
+
+  /* Shadows */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.04);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.05);
+  --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.15);
+  --shadow-drawer: 0 24px 72px rgba(15, 23, 42, 0.26);
+  --shadow-focus: 0 0 0 3px var(--color-primary-ring);
+
+  /* Shadow color components — 用于自定义 box-shadow 中的色值引用 */
+  --shadow-color-faint: rgba(15, 23, 42, 0.04);
+  --shadow-color-light: rgba(15, 23, 42, 0.05);
+  --shadow-color-medium: rgba(15, 23, 42, 0.12);
+  --shadow-color-strong: rgba(15, 23, 42, 0.16);
+  --shadow-color-soft: rgba(0, 0, 0, 0.06);
+  --shadow-color-gray: rgba(0, 0, 0, 0.08);
+  --shadow-color-dark: rgba(0, 0, 0, 0.1);
+
+  /* Glass effect extensions — 玻璃态/覆层扩展色 */
+  --color-glass-border: rgba(255, 255, 255, 0.3);
+  --color-glass-hover: rgba(255, 255, 255, 0.9);
+  --color-glass-solid: rgba(255, 255, 255, 0.94);
+  --color-overlay-dark: rgba(10, 18, 34, 0.82);
+
+  /* Misc semantic */
+  --color-danger-accent: #ef4444;
+  --color-danger-bg-tint: rgba(220, 38, 38, 0.06);
+  --color-border-light: #e5e7eb;
+  --color-text-dim: #666;
+
+  /* Typography */
+  --font-sans: 'Noto Sans SC', 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif;
+  --font-mono: Consolas, 'Microsoft YaHei', monospace;
+
+  /* Font Size */
+  --fs-3xs: 10px;
+  --fs-xxs: 11px;
+  --fs-xs: 12px;
+  --fs-sm: 13px;
+  --fs-base: 14px;
+  --fs-md: 15px;
+  --fs-lg: 16px;
+  --fs-xl: 18px;
+  --fs-2xl: 20px;
+  --fs-3xl: 22px;
+  --fs-4xl: 24px;
+  --fs-5xl: 28px;
+  --fs-6xl: 32px;
+  --fs-7xl: 36px;
+
+  /* Font Weight */
+  --fw-light: 300;
+  --fw-normal: 400;
+  --fw-medium: 500;
+  --fw-semibold: 600;
+  --fw-bold: 700;
+  --fw-extrabold: 800;
+  --fw-black: 900;
+
+  /* Line Height */
+  --lh-none: 1;
+  --lh-tight: 1.2;
+  --lh-snug: 1.3;
+  --lh-normal: 1.4;
+  --lh-relaxed: 1.5;
+  --lh-loose: 1.6;
+  --lh-wide: 1.7;
+  --lh-wider: 1.8;
+
+  /* Letter Spacing */
+  --tracking-tighter: -0.05em;
+  --tracking-tight: -0.02em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.02em;
+  --tracking-wider: 0.05em;
+  --tracking-widest: 0.1em;
+
+  /* Typography Composition (font-size + line-height paired) */
+  --text-display: var(--fs-6xl) / var(--lh-tight);
+  --text-h1: var(--fs-4xl) / var(--lh-tight);
+  --text-h2: var(--fs-2xl) / var(--lh-snug);
+  --text-h3: var(--fs-xl) / var(--lh-snug);
+  --text-h4: var(--fs-lg) / var(--lh-normal);
+  --text-body: var(--fs-base) / var(--lh-relaxed);
+  --text-body-sm: var(--fs-sm) / var(--lh-relaxed);
+  --text-caption: var(--fs-xs) / var(--lh-normal);
+  --text-overline: var(--fs-xxs) / var(--lh-normal);
+
+  /* Transitions */
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.25s ease;
+
+  /* Easing Curves */
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+
+  /* Animation Duration */
+  --duration-instant: 0.01ms;
+  --duration-fast: 0.15s;
+  --duration-base: 0.2s;
+  --duration-moderate: 0.3s;
+  --duration-slow: 0.4s;
+  --duration-slower: 0.6s;
+
+  /* Semantic Transitions */
+  --transition-modal: 0.25s var(--ease-out);
+  --transition-drawer: 0.3s var(--ease-out);
+  --transition-collapse: 0.25s var(--ease-in-out);
+  --transition-overlay: 0.2s var(--ease-in-out);
+  --transition-dropdown: 0.15s var(--ease-out);
+  --transition-tooltip: 0.15s var(--ease-out);
+
+  /* Opacity */
+  --opacity-disabled: 0.5;
+  --opacity-muted: 0.7;
+  --opacity-subtle: 0.85;
+  --opacity-overlay: 0.6;
+  --opacity-overlay-light: 0.4;
+  --opacity-overlay-strong: 0.8;
+
+  /* Z-Index Scale */
+  --z-base: 1;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 500;
+  --z-fixed: 800;
+  --z-drawer: 1000;
+  --z-page-popover: 1500;
+  --z-modal: 2000;
+  --z-modal-raised: 2200;
+  --z-preview: 2400;
+  --z-popover: 2600;
+  --z-toast: 4000;
+  --z-max: 9999;
+
+  /* Deprecated compatibility aliases. Do not use in new code; migrate touched
+     modules to the canonical semantic token on the right-hand side. */
+  --color-surface-elevated: var(--color-surface-raised);
+  --color-background: var(--color-page-bg);
+  --color-bg-page: var(--color-page-bg);
+  --color-bg-card: var(--color-surface);
+  --color-text: var(--color-text-primary);
+  --color-text-regular: var(--color-text-primary);
+  --color-text-tertiary: var(--color-text-muted);
+  --text-placeholder: var(--color-text-placeholder);
+  --color-text-inverse: var(--color-text-on-primary);
+  --color-primary-text: var(--color-text-on-primary);
+  --color-hover: var(--color-surface-hover);
+  --color-border-strong: var(--color-border-input);
+  --color-border-subtle: var(--color-border-lighter);
+  --color-border-dark: var(--color-border-input);
+  --color-primary-dark: var(--color-primary-hover);
+  --color-primary-50: var(--color-primary-bg);
+  --color-success-light: var(--color-success-bg);
+  --color-success-bright: var(--color-success);
+  --color-success-border-light: var(--color-success-border);
+  --color-success-ring: var(--color-success-border);
+  --color-success-100: var(--color-success-bg);
+  --color-success-700: var(--color-success-text);
+  --color-warning-light: var(--color-warning-bg);
+  --color-warning-50: var(--color-warning-bg-soft);
+  --color-warning-100: var(--color-warning-bg);
+  --color-warning-700: var(--color-warning-text);
+  --color-amber-50: var(--color-warning-bg-soft);
+  --color-amber-100: var(--color-warning-bg);
+  --color-amber-600: var(--color-warning);
+  --color-amber-700: var(--color-warning-text);
+  --color-danger-light: var(--color-danger-bg);
+  --radius-full: var(--radius-pill);
+  --space-3: var(--space-md-lg);
+  --space-5: var(--space-xl-2xl);
+  --fs-2xs: var(--fs-xxs);
+}

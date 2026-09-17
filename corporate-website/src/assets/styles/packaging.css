@@ -1,0 +1,52 @@
+/* 包装耗材与定制模具页样式。 */
+.packaging-page {
+  background: var(--white);
+  color: var(--ink);
+}
+
+/* 2026 耗材页面：以材料系列与适配验证为主线。 */
+.packaging-family-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+.packaging-family-grid article { min-height: 310px; padding: clamp(26px, 3vw, 40px); border-right: 1px solid var(--line); background: var(--white); }
+.packaging-family-grid article:last-child { border-right: 0; }
+.packaging-family-grid article > div { width: 54px; height: 54px; display: grid; place-items: center; margin-bottom: 42px; color: var(--blue-deep); background: var(--paper); border-radius: 50%; }
+.packaging-family-grid article > span { color: var(--blue); font-size: 11px; font-weight: var(--font-bold); letter-spacing: .12em; }
+.packaging-family-grid h3 { margin: 14px 0 12px; color: var(--ink); font-size: clamp(20px, 1.7vw, 25px); line-height: 1.45; }
+.packaging-family-grid p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.7; }
+.packaging-live-catalog { scroll-margin-top: 100px; }
+.packaging-live-catalog .packaging-record-card { overflow: hidden; border-radius: var(--radius-card); }
+.packaging-live-catalog .packaging-record-card__visual { aspect-ratio: 4 / 3; }
+.packaging-live-catalog .packaging-record-card__visual img { object-fit: cover; }
+.packaging-catalog-state { min-height: 220px; display: grid; place-content: center; justify-items: center; padding: 40px; border: 1px solid var(--line); background: var(--white); text-align: center; color: var(--muted); }
+.packaging-catalog-state strong { color: var(--ink); font-size: 22px; }
+.packaging-catalog-state p { max-width: 620px; margin: 12px 0 0; line-height: 1.75; }
+.packaging-selection-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+.packaging-selection-grid article { min-height: 220px; padding: 30px; border: 1px solid var(--line); border-radius: var(--radius-card); }
+.packaging-selection-grid span { color: var(--blue); font-size: 11px; font-weight: var(--font-bold); }
+.packaging-selection-grid h3 { margin: 42px 0 10px; color: var(--ink); font-size: 22px; }
+.packaging-selection-grid p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.75; }
+
+@media (max-width: 760px) {
+  .packaging-family-grid, .packaging-selection-grid { grid-template-columns: 1fr; }
+  .packaging-family-grid article { min-height: 0; border-right: 0; border-bottom: 1px solid var(--line); }
+  .packaging-family-grid article:last-child { border-bottom: 0; }
+}
+.catalog-tabs { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-bottom: var(--space-8); }
+.catalog-tabs button { border: 1px solid var(--line); background: var(--white); color: var(--muted); padding: 10px 18px; border-radius: var(--radius-sm); font: var(--font-semibold) var(--text-sm) var(--font-sans); cursor: pointer; transition: var(--dur); }
+.catalog-tabs button:hover { border-color: var(--blue); color: var(--blue); }
+.catalog-tabs button.active { background: var(--navy); border-color: var(--navy); color: var(--on-navy); }
+.packaging-record-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-6); }
+.packaging-record-card { min-width: 0; background: var(--white); border: 1px solid var(--line); transition: var(--dur); }
+.packaging-record-card:hover { border-color: var(--hover-border); box-shadow: var(--shadow-lift); transform: translateY(-4px); }
+.packaging-record-card__visual { aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; color: var(--blue); background: linear-gradient(135deg, #eef6fb, #f8fbfd); overflow: hidden; }
+.packaging-record-card__visual img { width: 100%; height: 100%; object-fit: contain; }
+.packaging-record-card__body { padding: var(--space-6); }
+.packaging-record-card__body small { color: var(--blue-deep); font-weight: var(--font-semibold); }
+.packaging-record-card__body h3 { margin: 8px 0; color: var(--ink); font-size: var(--text-xl); }
+.packaging-record-card__body p { margin: 0; color: var(--muted); line-height: var(--leading-body); font-size: var(--text-sm); }
+.record-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: var(--space-4) 0; }
+.record-tags span { padding: 5px 9px; background: var(--paper); color: var(--blue-deep); border-radius: var(--radius-sm); font-size: var(--text-xs); }
+.record-applicable { padding-top: var(--space-4); border-top: 1px solid var(--line); }
+.record-action { display: flex; justify-content: space-between; align-items: center; margin-top: var(--space-5); padding-top: var(--space-4); border-top: 1px solid var(--line); color: var(--blue); font-size: var(--text-sm); font-weight: var(--font-semibold); }
+.packaging-record-card button.record-action { width: 100%; border-right: 0; border-bottom: 0; border-left: 0; background: transparent; font-family: inherit; cursor: pointer; }
+.record-action span { transition: transform var(--dur) var(--ease); }
+.record-action:hover span { transform: translateX(4px); }

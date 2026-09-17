@@ -1,0 +1,1 @@
+ALTER TABLE knowledge_articles ADD COLUMN website_visible TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否展示到官网';

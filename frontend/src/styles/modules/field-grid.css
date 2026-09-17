@@ -1,0 +1,132 @@
+﻿/* ===== 字段网格与表单样式 ===== */
+
+.spec-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-section-gap);
+}
+
+.price-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field-label.required::before {
+  content: '*';
+  color: var(--color-danger-accent);
+  margin-right: var(--space-control-gap-tight);
+  font-weight: var(--fw-bold);
+}
+
+.field-error input,
+.field-error textarea,
+.field-error select {
+  border-color: var(--color-danger-accent) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12) !important;
+}
+
+.field-error .field-label {
+  color: var(--color-danger);
+}
+
+.field-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-control-gap);
+  position: relative;
+}
+
+.field-label {
+  color: var(--color-text-muted);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  display: flex;
+  align-items: center;
+  gap: var(--space-control-gap-tight);
+}
+
+.field-item input,
+.field-item textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  font-size: var(--fs-base);
+  color: var(--color-text-heading-alt);
+  background: var(--color-surface);
+  transition: all var(--transition-base);
+  width: 100%;
+}
+
+.field-item input:hover,
+.field-item textarea:hover {
+  border-color: var(--color-border-input-hover);
+}
+
+.field-item input:focus,
+.field-item textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-ring-light);
+  outline: none;
+}
+
+.field-item input::placeholder,
+.field-item textarea::placeholder {
+  color: var(--color-text-faint);
+}
+
+.field-unit {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  color: var(--color-text-faint);
+  font-size: var(--fs-xs);
+  pointer-events: none;
+}
+
+.field-item-wide {
+  grid-column: 1 / -1;
+}
+
+/* 向后兼容：旧版 .spec-field-grid label 样式 */
+.spec-field-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-control-gap);
+}
+
+.spec-field-grid label > input,
+.spec-field-grid label > textarea {
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-xl);
+  font-size: var(--fs-base);
+  color: var(--color-text-heading-alt);
+  background: var(--color-surface);
+  transition: all var(--transition-base);
+  width: 100%;
+}
+
+.spec-field-grid label > input:hover,
+.spec-field-grid label > textarea:hover {
+  border-color: var(--color-border-input-hover);
+}
+
+.spec-field-grid label > input:focus,
+.spec-field-grid label > textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-ring-light);
+  outline: none;
+}
+
+@media (max-width: 768px) {
+  .spec-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .price-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-item-wide {
+    grid-column: 1;
+  }
+}

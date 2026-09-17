@@ -1,0 +1,30 @@
+/* ===== 产品档案管理系统样式库 ===== */
+
+/* 核心层：令牌 → 重置 → Element Plus → 工具类 → 主题 */
+@import './tokens.css';
+@import './reset.css';
+@import './element-plus.css';
+@import './utilities.css';
+@import './accessibility.css';
+@import './route-progress.css';
+@import './themes/light.css';
+@import './themes/dark.css';
+
+/* 业务模块（多组件共享） */
+@import './modules/product-editor.css';
+@import './modules/dialog-layout.css';
+@import './modules/list-controls.css';
+@import './modules/list-page-surfaces.css';
+@import './modules/action-menu.css';
+@import './modules/asset-grid.css';
+@import './modules/media-dialog-shared.css';
+@import './modules/field-grid.css';
+@import './modules/image-editor-inline.css';
+@import './modules/catalog-table-image.css';
+@import './modules/multi-tabs.css';
+
+/* 业务模块（多组件共享，保留全局） */
+@import './master-layout.css';
+
+/* 页面级专属样式（仅对单一视图生效，影响外层布局） */
+@import './packaging-mold-view.css';

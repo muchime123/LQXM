@@ -1,0 +1,14 @@
+ALTER TABLE product_models DROP COLUMN name_formula;
+ALTER TABLE product_models DROP COLUMN product_line_code;
+ALTER TABLE product_models DROP COLUMN specification_table;
+ALTER TABLE product_models DROP COLUMN power_formula;
+ALTER TABLE product_models DROP COLUMN worktable_height_mm;
+ALTER TABLE product_models DROP COLUMN temp_range;
+ALTER TABLE product_models DROP COLUMN heating_method;
+ALTER TABLE product_models DROP COLUMN cutting_method;
+ALTER TABLE product_models DROP COLUMN cover_material;
+ALTER TABLE product_models DROP COLUMN custom_mold_supported;
+ALTER TABLE product_models DROP COLUMN vacuum_chamber;
+ALTER TABLE product_models DROP COLUMN ultimate_vacuum;
+ALTER TABLE product_models DROP COLUMN optional_device;
+ALTER TABLE product_models DROP COLUMN gas_fresh_keeping_description;

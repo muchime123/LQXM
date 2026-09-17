@@ -1,0 +1,456 @@
+/* ===== Element Plus Theme Overrides ===== */
+/* 用项目现有 CSS Design Tokens 覆盖 Element Plus 默认变量 */
+
+:root {
+  /* 主色 */
+  --el-color-primary: var(--color-primary);
+  --el-color-primary-light-3: var(--ep-primary-3);
+  --el-color-primary-light-5: var(--ep-primary-5);
+  --el-color-primary-light-7: var(--ep-primary-7);
+  --el-color-primary-light-8: var(--ep-primary-8);
+  --el-color-primary-light-9: var(--ep-primary-9);
+  --el-color-primary-dark-2: var(--ep-primary-dark);
+
+  /* 功能色 */
+  --el-color-success: var(--color-success);
+  --el-color-success-light-3: var(--ep-success-3);
+  --el-color-success-light-5: var(--ep-success-5);
+  --el-color-success-light-7: var(--ep-success-7);
+  --el-color-success-light-8: var(--ep-success-8);
+  --el-color-success-light-9: var(--ep-success-9);
+  --el-color-success-dark-2: var(--ep-success-dark);
+
+  --el-color-warning: var(--color-warning);
+  --el-color-warning-light-3: var(--ep-warning-3);
+  --el-color-warning-light-5: var(--ep-warning-5);
+  --el-color-warning-light-7: var(--ep-warning-7);
+  --el-color-warning-light-8: var(--ep-warning-8);
+  --el-color-warning-light-9: var(--ep-warning-9);
+  --el-color-warning-dark-2: var(--ep-warning-dark);
+
+  --el-color-danger: var(--color-danger);
+  --el-color-danger-light-3: var(--ep-danger-3);
+  --el-color-danger-light-5: var(--ep-danger-5);
+  --el-color-danger-light-7: var(--ep-danger-7);
+  --el-color-danger-light-8: var(--ep-danger-8);
+  --el-color-danger-light-9: var(--ep-danger-9);
+  --el-color-danger-dark-2: var(--ep-danger-dark);
+
+  --el-color-info: var(--ep-info);
+  --el-color-info-light-3: var(--ep-info-3);
+  --el-color-info-light-5: var(--ep-info-5);
+  --el-color-info-light-7: var(--ep-info-7);
+  --el-color-info-light-8: var(--ep-info-8);
+  --el-color-info-light-9: var(--ep-info-9);
+  --el-color-info-dark-2: var(--ep-info-dark);
+
+  /* 圆角 */
+  --el-border-radius-base: var(--radius-md);
+  --el-border-radius-small: var(--radius-sm);
+  --el-border-radius-round: var(--radius-pill);
+
+  /* 字体 */
+  --el-font-family: var(--font-sans);
+  --el-font-size-base: 14px;
+
+  /* 背景色 */
+  --el-bg-color: var(--color-surface);
+  --el-bg-color-page: var(--color-page-bg);
+  --el-bg-color-overlay: var(--color-surface);
+
+  /* 文字色 */
+  --el-text-color-primary: var(--color-text-primary);
+  --el-text-color-regular: var(--color-text-primary);
+  --el-text-color-secondary: var(--color-text-secondary);
+  --el-text-color-placeholder: var(--color-text-faint);
+  --el-text-color-disabled: var(--color-text-faint);
+  --el-disabled-bg-color: var(--color-surface-disabled);
+  --el-disabled-border-color: var(--color-border-light);
+
+  /* 边框色 */
+  --el-border-color: var(--color-border-light);
+  --el-border-color-light: var(--color-border-lighter);
+  --el-border-color-lighter: var(--color-border-lighter);
+  --el-border-color-extra-light: var(--color-border-lighter);
+
+  /* 填充色 */
+  --el-fill-color: var(--color-surface-hover);
+  --el-fill-color-light: var(--color-surface-hover);
+  --el-fill-color-lighter: var(--color-surface-alt);
+  --el-fill-color-extra-light: var(--color-surface-raised);
+  --el-fill-color-blank: var(--color-surface);
+
+  /* 遮罩 */
+  --el-mask-color: var(--color-overlay);
+
+  /* 阴影 */
+  --el-box-shadow: var(--shadow-md);
+  --el-box-shadow-light: var(--shadow-sm);
+  --el-box-shadow-lighter: var(--shadow-sm);
+  --el-box-shadow-dark: var(--shadow-lg);
+
+  /* 过渡 */
+  --el-transition-duration: var(--transition-base);
+
+  /* 分割线 */
+  --el-border-width: 1px;
+  --el-border-width-thin: 1px;
+  --el-border-style: solid;
+}
+
+/* Accessible semantic foregrounds: Element Plus defaults are decorative hues
+   and do not consistently reach WCAG AA on light surfaces. */
+.el-tag--success.el-tag--plain {
+  --el-tag-text-color: var(--color-success-text);
+}
+
+/* ======================================================
+   DANGER / DELETE BUTTONS — FULL RESET & OVERRIDE
+   Completely bypass Element Plus' internal color-mix logic
+   with explicit, high-priority rules. Colors use hard-coded
+   hex values (no EP tokens) to avoid any dynamic mutation.
+   ====================================================== */
+
+/* ---- 1. Solid fill: type="danger" ---------------------- */
+button.el-button.el-button--danger:not(.is-plain):not(.is-text):not(.is-link),
+.el-button-group button.el-button.el-button--danger:not(.is-plain):not(.is-text):not(.is-link) {
+  --el-button-text-color: #ffffff;
+  --el-button-bg-color: #dc2626;
+  --el-button-border-color: #dc2626;
+  --el-button-hover-text-color: #ffffff;
+  --el-button-hover-bg-color: #b91c1c;
+  --el-button-hover-border-color: #b91c1c;
+  --el-button-active-text-color: #ffffff;
+  --el-button-active-bg-color: #991b1b;
+  --el-button-active-border-color: #991b1b;
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+button.el-button.el-button--danger:not(.is-plain):not(.is-text):not(.is-link):hover,
+button.el-button.el-button--danger:not(.is-plain):not(.is-text):not(.is-link):focus-visible {
+  background-color: #b91c1c !important;
+  border-color: #b91c1c !important;
+  color: #ffffff !important;
+}
+
+button.el-button.el-button--danger:not(.is-plain):not(.is-text):not(.is-link):active {
+  background-color: #991b1b !important;
+  border-color: #991b1b !important;
+  color: #ffffff !important;
+}
+
+/* ---- 2. Plain / Ghost fill: type="danger" plain -------- */
+button.el-button.el-button--danger.is-plain,
+.el-button-group button.el-button.el-button--danger.is-plain {
+  --el-button-text-color: #be123c;
+  --el-button-bg-color: #fff1f2;
+  --el-button-border-color: #fecaca;
+  --el-button-hover-text-color: #ffffff;
+  --el-button-hover-bg-color: #dc2626;
+  --el-button-hover-border-color: #dc2626;
+  --el-button-active-text-color: #ffffff;
+  --el-button-active-bg-color: #be123c;
+  --el-button-active-border-color: #be123c;
+  background-color: #fff1f2 !important;
+  border-color: #fecaca !important;
+  color: #be123c !important;
+}
+
+button.el-button.el-button--danger.is-plain:hover,
+button.el-button.el-button--danger.is-plain:focus-visible {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+
+button.el-button.el-button--danger.is-plain:active {
+  background-color: #be123c !important;
+  border-color: #be123c !important;
+  color: #ffffff !important;
+}
+
+/* ---- 3. Text / Link fill: type="danger" text | link ---- */
+button.el-button.el-button--danger.is-text,
+button.el-button.el-button--danger.is-link,
+.el-button-group button.el-button.el-button--danger.is-text,
+.el-button-group button.el-button.el-button--danger.is-link {
+  --el-button-text-color: #dc2626;
+  --el-button-hover-text-color: #b91c1c;
+  --el-button-hover-bg-color: #fff1f2;
+  background-color: transparent !important;
+  border-color: transparent !important;
+  color: #dc2626 !important;
+}
+
+button.el-button.el-button--danger.is-text:hover,
+button.el-button.el-button--danger.is-link:hover,
+button.el-button.el-button--danger.is-text:focus-visible,
+button.el-button.el-button--danger.is-link:focus-visible {
+  background-color: #fff1f2 !important;
+  border-color: transparent !important;
+  color: #b91c1c !important;
+}
+
+/* ---- 4. Row compact destructive action ----------------- */
+button.el-button.lq-row-danger-action,
+.el-button-group button.el-button.lq-row-danger-action {
+  --el-button-text-color: #be123c;
+  --el-button-bg-color: transparent;
+  --el-button-border-color: #fecaca;
+  --el-button-hover-text-color: #b91c1c;
+  --el-button-hover-bg-color: #fff1f2;
+  --el-button-hover-border-color: #dc2626;
+  --el-button-active-text-color: #be123c;
+  --el-button-active-bg-color: #fee2e2;
+  --el-button-active-border-color: #dc2626;
+
+  min-width: 44px;
+  background-color: transparent !important;
+  border-color: #fecaca !important;
+  color: #be123c !important;
+}
+
+button.el-button.lq-row-danger-action:hover,
+button.el-button.lq-row-danger-action:focus-visible {
+  background-color: #fff1f2 !important;
+  border-color: #dc2626 !important;
+  color: #b91c1c !important;
+}
+
+button.el-button.lq-row-danger-action:active {
+  background-color: #fee2e2 !important;
+  border-color: #dc2626 !important;
+  color: #be123c !important;
+}
+
+/* Dark mode overrides for EP danger buttons */
+[data-theme='dark'] button.el-button.el-button--danger:not(.is-plain):not(.is-text):not(.is-link) {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+[data-theme='dark'] button.el-button.el-button--danger:not(.is-plain):not(.is-text):not(.is-link):hover {
+  background-color: #ef4444 !important;
+  border-color: #ef4444 !important;
+  color: #ffffff !important;
+}
+[data-theme='dark'] button.el-button.el-button--danger.is-plain {
+  background-color: rgba(220, 38, 38, 0.15) !important;
+  border-color: rgba(220, 38, 38, 0.3) !important;
+  color: #fca5a5 !important;
+}
+[data-theme='dark'] button.el-button.el-button--danger.is-plain:hover {
+  background-color: #dc2626 !important;
+  border-color: #dc2626 !important;
+  color: #ffffff !important;
+}
+[data-theme='dark'] button.el-button.el-button--danger.is-text,
+[data-theme='dark'] button.el-button.el-button--danger.is-link {
+  background-color: transparent !important;
+  color: #fca5a5 !important;
+}
+[data-theme='dark'] button.el-button.el-button--danger.is-text:hover,
+[data-theme='dark'] button.el-button.el-button--danger.is-link:hover {
+  background-color: rgba(220, 38, 38, 0.15) !important;
+  color: #f87171 !important;
+}
+[data-theme='dark'] button.el-button.lq-row-danger-action {
+  background-color: transparent !important;
+  border-color: rgba(220, 38, 38, 0.3) !important;
+  color: #fca5a5 !important;
+}
+[data-theme='dark'] button.el-button.lq-row-danger-action:hover {
+  background-color: rgba(220, 38, 38, 0.15) !important;
+  border-color: #f87171 !important;
+  color: #f87171 !important;
+}
+
+.el-alert--error .el-alert__title {
+  color: var(--color-danger-text);
+}
+
+.el-step__title.is-wait,
+.el-step__description.is-wait {
+  color: var(--color-text-strong);
+}
+
+/* 暗色模式覆盖 — 色阶令牌在 themes/dark.css 统一覆盖，此处仅保留 EP 内部变量 */
+[data-theme='dark'] {
+  --el-bg-color: var(--color-surface);
+  --el-bg-color-page: var(--color-page-bg);
+  --el-bg-color-overlay: var(--color-surface);
+
+  --el-text-color-primary: var(--color-text-primary);
+  --el-text-color-regular: var(--color-text-primary);
+  --el-text-color-secondary: var(--color-text-secondary);
+  --el-text-color-placeholder: var(--color-text-faint);
+
+  --el-border-color: var(--color-border);
+  --el-border-color-light: var(--color-border-light);
+  --el-border-color-lighter: var(--color-border-lighter);
+
+  --el-fill-color: var(--color-surface-alt);
+  --el-fill-color-light: var(--color-surface-alt);
+  --el-fill-color-lighter: var(--color-surface-raised);
+  --el-fill-color-extra-light: #283548;
+  --el-fill-color-blank: var(--color-surface);
+
+  --el-box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  --el-box-shadow-light: 0 1px 3px rgba(0, 0, 0, 0.2);
+  --el-box-shadow-dark: 0 8px 24px rgba(0, 0, 0, 0.4);
+
+  --el-mask-color: rgba(0, 0, 0, 0.7);
+}
+
+[data-theme='dark'] .el-button.el-button--primary,
+[data-theme='dark'] .el-radio-button__original-radio:checked + .el-radio-button__inner,
+[data-theme='dark'] .el-radio-button.is-active .el-radio-button__inner {
+  color: var(--color-text-on-primary);
+  background-color: var(--ep-primary-filled);
+  border-color: var(--ep-primary-filled);
+}
+
+[data-theme='dark'] .el-radio-group,
+[data-theme='dark'] .el-radio-button {
+  --el-radio-button-checked-bg-color: var(--ep-primary-filled);
+  --el-radio-button-checked-text-color: var(--color-text-on-primary);
+  --el-radio-button-checked-border-color: var(--ep-primary-filled);
+}
+
+[data-theme='dark'] .el-radio-button.is-active .el-radio-button__inner,
+[data-theme='dark'] .el-radio-button.is-active .el-radio-button__inner span {
+  color: var(--color-text-on-primary);
+}
+
+[data-theme='dark'] .el-alert--error {
+  --el-alert-text-color: var(--color-danger-text);
+  color: var(--color-danger-text);
+}
+
+[data-theme='dark'] .el-tag--danger {
+  color: var(--color-danger-text);
+  background-color: var(--color-danger-bg-soft);
+  border-color: var(--color-danger-border);
+}
+
+/* ===== 分页器全局统一 ===== */
+.el-pagination {
+  --el-pagination-button-bg-color: var(--color-surface);
+  --el-pagination-hover-color: var(--color-primary);
+  font-size: var(--fs-sm);
+}
+
+/* ===== 表格全局统一 ===== */
+:root {
+  --el-table-bg-color: var(--color-surface);
+  --el-table-header-bg-color: var(--color-surface-alt);
+  --el-table-tr-bg-color: var(--color-surface);
+  --el-table-row-hover-bg-color: var(--color-surface-hover);
+  --el-table-current-row-bg-color: var(--color-primary-bg);
+  --el-table-border-color: var(--color-border-light);
+  --el-table-border: 1px solid var(--color-border-light);
+  --el-table-text-color: var(--color-text-primary);
+  --el-table-header-text-color: var(--color-text-strong);
+  --el-table-header-font-weight: var(--fw-semibold);
+  --el-table-fixed-box-shadow: var(--shadow-sm);
+}
+
+/* 表格轻量基线：供弹窗等非列表 el-table 使用；列表页统一走 LqTable 接管结构样式。
+   此处不使用 !important，避免与 LqTable 的 scoped 样式互相覆盖。
+   表头/选中行底色由 --el-table-header-bg-color / --el-table-current-row-bg-color 令牌驱动。 */
+.el-table {
+  font-size: var(--fs-sm);
+}
+
+.el-table th.el-table__cell {
+  font-weight: var(--el-table-header-font-weight);
+  color: var(--color-text-strong);
+}
+
+.el-table .el-table__cell {
+  padding: var(--space-control-gap) var(--space-control-gap-wide);
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background: var(--color-surface-alt);
+}
+
+.el-table__body tr.hover-row > td.el-table__cell {
+  background: var(--color-surface-hover);
+}
+
+.el-input-group__prepend,
+.el-input-group__append {
+  color: var(--color-text-secondary);
+}
+
+/* ===== 消息提示全局统一 ===== */
+.el-message {
+  --el-message-bg-color: var(--color-surface);
+  --el-message-border-color: var(--color-border-light);
+  --el-message-text-color: var(--color-text-primary);
+  --el-message-padding: var(--space-control-gap-wide) var(--space-section-gap);
+  --el-message-close-size: var(--fs-lg);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  font-size: var(--fs-sm);
+}
+
+.el-message--success {
+  --el-message-bg-color: var(--color-success-bg-soft);
+  --el-message-border-color: var(--color-success-border);
+  --el-message-text-color: var(--color-success-text);
+}
+
+.el-message--warning {
+  --el-message-bg-color: var(--color-warning-bg-soft);
+  --el-message-border-color: var(--color-warning-border);
+  --el-message-text-color: var(--color-warning-text);
+}
+
+.el-message--error {
+  --el-message-bg-color: var(--color-danger-bg-soft);
+  --el-message-border-color: var(--color-danger-border);
+  --el-message-text-color: var(--color-danger-text);
+}
+
+.el-message--info {
+  --el-message-bg-color: var(--color-info-bg);
+  --el-message-border-color: var(--color-info-border);
+  --el-message-text-color: var(--color-info-text);
+}
+
+/* ===== 骨架屏全局统一 ===== */
+.el-skeleton {
+  --el-skeleton-color: var(--color-surface-hover);
+  --el-skeleton-to-color: var(--color-surface-alt);
+}
+
+.el-skeleton__item {
+  height: var(--space-xl-2xl);
+  border-radius: var(--radius-sm);
+}
+
+/* ===== 结果页全局统一 ===== */
+.el-result {
+  padding: var(--space-3xl) var(--space-section-gap-wide);
+}
+
+.el-result__title {
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-heading);
+}
+
+.el-result__subtitle p {
+  font-size: var(--fs-sm);
+  color: var(--color-text-secondary);
+}
+
+.el-result__extra {
+  margin-top: var(--space-xl-2xl);
+}
+
+/* 表格紧凑模式已迁移至 LqTable 的 density="compact" */

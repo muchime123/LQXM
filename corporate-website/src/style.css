@@ -1,0 +1,19 @@
+/* 样式入口：仅做 @import 聚合，不在此文件追加样式。
+   级联顺序（后者覆盖前者）：
+   - tokens.css    设计令牌（颜色 / 字体 / 间距 / 圆角 / 阴影 / 动效）
+   - base.css      全局重置 + 通用类（.reveal 等）
+   - components.css 公共组件原语（.page-hero / .button / .eyebrow / .pagination 等）
+   - home.css / products.css / …  各页面专属样式
+   - site-redesign.css  全站视觉重设计覆盖层（原 prototype-system.css 规则已全部迁入各归属文件）
+   新增页面样式时，新建页面 css 并在此追加 @import。 */
+@import './assets/styles/tokens.css';
+@import './assets/styles/base.css';
+@import './assets/styles/components.css';
+@import './assets/styles/home.css';
+@import './assets/styles/products.css';
+@import './assets/styles/solutions.css';
+@import './assets/styles/article.css';
+@import './assets/styles/about.css';
+@import './assets/styles/packaging.css';
+@import './assets/styles/molds.css';
+@import './assets/styles/site-redesign.css';

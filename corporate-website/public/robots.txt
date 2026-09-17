@@ -1,0 +1,10 @@
+User-agent: *
+Allow: /
+
+# 禁止爬取后台管理 API
+Disallow: /api/admin/
+Disallow: /api/website/inquiries/admin/
+Disallow: /api/file-assets/
+
+# Sitemap
+Sitemap: https://www.liqiangbz.com/sitemap.xml
