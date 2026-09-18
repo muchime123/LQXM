@@ -78,10 +78,18 @@ OTHER_OUT(ImportKindDescriptor.OTHER_OUT),
 TRANSFER(ImportKindDescriptor.TRANSFER),
 INVOICE_PROFILE(ImportKindDescriptor.INVOICE_PROFILE),
 INVOICE_REQUEST(ImportKindDescriptor.INVOICE_REQUEST),
-PRODUCTION_REPORT(ImportKindDescriptor.PRODUCTION_REPORT);
+PRODUCTION_REPORT(ImportKindDescriptor.PRODUCTION_REPORT),
+INVOICE_INPUT(ImportKindDescriptor.INVOICE_INPUT),
+INVOICE_SALES(ImportKindDescriptor.INVOICE_SALES),
+SUPPLIER_PAYABLE(ImportKindDescriptor.SUPPLIER_PAYABLE),
+CASHFLOW_JOURNAL(ImportKindDescriptor.CASHFLOW_JOURNAL),
+CASHIER_LOG(ImportKindDescriptor.CASHIER_LOG);
 final String dbType;
 final String keyHeader;
-FactType(ImportKindDescriptor kind) { this.dbType = kind.dbType(); this.keyHeader = kind.keyHeader(); }
+final boolean multiSheet;
+FactType(ImportKindDescriptor kind) {
+    this.dbType = kind.dbType(); this.keyHeader = kind.keyHeader(); this.multiSheet = kind.multiSheet();
+}
 public static FactType from(String value) {
 // 两种入参形态：A 域控制器传路由 key（purchase），批次表回读传 data_type（PURCHASE_IN）。
 // 旧类型 route 与 dbType 仅大小写不同故侥幸兼容；新类型（PURCHASE_IN）必须显式双查。
@@ -102,6 +110,11 @@ case TRANSFER -> TRANSFER;
 case INVOICE_PROFILE -> INVOICE_PROFILE;
 case INVOICE_REQUEST -> INVOICE_REQUEST;
 case PRODUCTION_REPORT -> PRODUCTION_REPORT;
+case INVOICE_INPUT -> INVOICE_INPUT;
+case INVOICE_SALES -> INVOICE_SALES;
+case SUPPLIER_PAYABLE -> SUPPLIER_PAYABLE;
+case CASHFLOW_JOURNAL -> CASHFLOW_JOURNAL;
+case CASHIER_LOG -> CASHIER_LOG;
 default -> throw new IllegalArgumentException("不支持的数据类型: " + value);
 };
 }
@@ -138,10 +151,39 @@ if (name == null || name.toLowerCase(Locale.ROOT).endsWith(".xlsx")) {
     return parseXlsxStreaming(type, file);
 }
 try (Workbook workbook = WorkbookFactory.create(file.getInputStream())) {
+    // multiSheet（供应商应付）：所有匹配模板 sheet 聚合，sheet 名注入「供应商」列 + 组键前缀
+    if (type.multiSheet) {
+        List<Group> all = new ArrayList<>();
+        boolean anyMatched = false;
+        // sheet 名注入列：供应商应付=「供应商」（sheet名=供应商）；流水日记账=「账户」（sheet名=账户，
+        // 覆盖源表账户列——宋文温州银行等 sheet 存在账户列错填，以 sheet 名为确定性来源）。
+        String sheetCol = type == FactType.CASHFLOW_JOURNAL ? "账户" : "供应商";
+        for (Sheet sheet : workbook) {
+            Header header = locateHeader(sheet, type);
+            if (header == null) continue;
+            anyMatched = true;
+            String sheetName = sheet.getSheetName();
+            for (Group g0 : groupRows(sheet, header, type)) {
+                Map<String, String> main2 = new LinkedHashMap<>(g0.main());
+                main2.put(sheetCol, sheetName);
+                List<Map<String, String>> rows2 = new ArrayList<>(g0.rows().size());
+                for (Map<String, String> r : g0.rows()) {
+                    Map<String, String> c = new LinkedHashMap<>(r);
+                    c.put(sheetCol, sheetName);
+                    rows2.add(c);
+                }
+                // 流水日记账行级组键已在 groupRows 内含 sheet 名前缀，不再二次拼接
+                String key2 = type == FactType.CASHFLOW_JOURNAL ? g0.key() : sheetName + "#" + g0.key();
+                all.add(new Group(key2, externalIdOf(type, key2, main2), main2, rows2, hashGroup(key2, main2, rows2)));
+            }
+        }
+        if (anyMatched) return all;
+    } else {
 for (Sheet sheet : workbook) {
 Header header = locateHeader(sheet, type);
 if (header != null) return groupRows(sheet, header, type);
 }
+    }
 } catch (IOException | RuntimeException e) {
 String rawMsg = e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage();
 String msg = rawMsg;
@@ -168,15 +210,24 @@ private List<Group> parseXlsxStreaming(FactType type, MultipartFile file) throws
             StylesTable styles = reader.getStylesTable();
             ReadOnlySharedStringsTable strings = new ReadOnlySharedStringsTable(pkg);
             XSSFReader.SheetIterator sheets = (XSSFReader.SheetIterator) reader.getSheetsData();
+            Map<String, MutableGroup> mergedGroups = type.multiSheet ? new LinkedHashMap<>() : null;
+            boolean anyMatched = false;
             while (sheets.hasNext()) {
                 try (var sheet = sheets.next()) {
-                    StreamingSheetHandler handler = new StreamingSheetHandler(type);
+                    // multiSheet：SheetIterator 在 next() 后可取当前 sheet 名，注入每行「供应商」列
+                    StreamingSheetHandler handler = new StreamingSheetHandler(type, type.multiSheet ? sheets.getSheetName() : null);
                     XMLReader parser = XMLHelper.newXMLReader();
                     parser.setContentHandler(new XSSFSheetXMLHandler(styles, null, strings, handler, formatter, false));
                     parser.parse(new InputSource(sheet));
-                    if (handler.headerMatched()) return toGroups(handler.groups(), type);
+                    if (handler.headerMatched()) {
+                        if (!type.multiSheet) return toGroups(handler.groups(), type);
+                        anyMatched = true;
+                        // 聚合所有匹配模板的 sheet（组键已含 sheet 名，putIfAbsent 防重名冲突）
+                        handler.groups().forEach(mergedGroups::putIfAbsent);
+                    }
                 }
             }
+            if (anyMatched) return toGroups(mergedGroups, type);
         } catch (IllegalArgumentException e) {
             throw e;
         } catch (Exception e) {
@@ -199,8 +250,12 @@ private final class StreamingSheetHandler implements XSSFSheetXMLHandler.SheetCo
     /** 列号 → 表头，用于 endRow 只保留本行实际有值的单元格。 */
     private Map<Integer, String> indexHeader;
     private MutableGroup current;
+    /** multiSheet kind 的当前 sheet 名（注入「供应商/账户」列 + 组键前缀）；单 sheet kind 恒 null。 */
+    private final String sheetName;
+    /** 流水日记账同键序号（键=账户#日期#收入#支出#结存；handler 每 sheet 一个实例 → 序号按行序确定）。 */
+    private final Map<String, Integer> journalKeySeq = new HashMap<>();
 
-    private StreamingSheetHandler(FactType type) { this.type = type; }
+    private StreamingSheetHandler(FactType type, String sheetName) { this.type = type; this.sheetName = sheetName; }
     boolean headerMatched() { return columns != null; }
     Map<String, MutableGroup> groups() { return groups; }
 
@@ -232,7 +287,26 @@ private final class StreamingSheetHandler implements XSSFSheetXMLHandler.SheetCo
             String header = indexHeader.get(index);
             if (header != null) values.put(header, value);
         });
-        String key = clean(values.get(type.keyHeader));
+        if (type.multiSheet && sheetName != null) {
+            // multiSheet（2026-09-18 第 17/18 类）：sheet 名注入列按 kind——供应商应付=「供应商」、
+            // 流水日记账=「账户」（覆盖源表账户列错填，sheet 名为确定性来源）。注入 + 组键防跨 sheet 串组。
+            values.put(type == FactType.CASHFLOW_JOURNAL ? "账户" : "供应商", sheetName);
+        }
+        String key;
+        if (type == FactType.CASHFLOW_JOURNAL) {
+            // 流水日记账（2026-09-18 第 18 类）：无单号/数据ID，幂等必须行级。
+            // 组键 = 账户#日期#收入#支出#结存#同键序号（同键最多 3 行实测）；
+            // 「上期结存」伪行（无日期）单独成组 → save 转写账户维度表期初余额、不入分录。
+            key = cashflowRowKey(values, sheetName, journalKeySeq);
+            if (key == null) return;   // 排除行：非期初的空白填充行，不入组（否则会并进上一组污染其哈希）
+        } else if (type == FactType.CASHIER_LOG) {
+            // 收银通（2026-09-18 第 19 类）：时间#金额#付款人识别号（仅时间有同秒不同额，实测三元素零重复）。
+            key = cashierRowKey(values);
+            if (key == null) return;   // 排除行：无交易时间，不入组
+        } else {
+            key = clean(values.get(type.keyHeader));
+            if (key != null && type.multiSheet && sheetName != null) key = sheetName + "#" + key;
+        }
         if (key != null) current = groups.computeIfAbsent(key, MutableGroup::new);
         if (current == null || values.isEmpty()) return;
         current.mergeMain(values);
@@ -259,7 +333,10 @@ private List<Group> toGroups(Map<String, MutableGroup> mutableGroups, FactType t
  * 故 PURCHASE_IN 统一取业务单号作幂等键。
  */
 private String externalIdOf(FactType type, String key, Map<String, String> main) {
-    if (type == FactType.PURCHASE_IN || type == FactType.TRANSFER) return key;
+    // 采购/调拨/供应商应付/流水日记账/收银通：无数据ID 或数据ID不可用 → 统一取组键作幂等键
+    //（流水日记账=行级组键 账户#日期#金额#序号；收银通=时间#金额，实测零重复）
+    if (type == FactType.PURCHASE_IN || type == FactType.TRANSFER || type == FactType.SUPPLIER_PAYABLE
+            || type == FactType.CASHFLOW_JOURNAL || type == FactType.CASHIER_LOG) return key;
     String externalId = clean(main.get("数据ID(不可修改)"));
     return externalId == null ? key : externalId;
 }
@@ -282,6 +359,21 @@ private void putHeader(Map<String, Integer> built, FactType type, String raw, in
     } else if (type == FactType.PRODUCTION_REPORT && "报工人".equals(raw) && built.containsKey(raw)) {
         // 生产报工有两个同名「报工人」列（第 5 列=主报工 F0000005、第 6 列=辅助 F0000038 实测 329 行非空 22 人）
         built.put("报工人(辅助)", index);
+    } else if (type == FactType.INVOICE_SALES && "备注".equals(raw) && built.containsKey(raw)) {
+        // 销项发票（2026-09-18 第 16 类）有两个同名「备注」列：第 17 列=人工收款备注（11 行）/
+        // 第 24 列=平台红冲备注（271 行，含「被红冲蓝字数电发票号码：X」红冲链），0 行同时非空 → 语义不同必须改名
+        built.put("备注(平台)", index);
+    } else if (type == FactType.SUPPLIER_PAYABLE && "付款方式".equals(raw) && built.containsKey(raw)) {
+        // 供应商应付（2026-09-18 第 17 类）：点时激光 sheet 尾部另有同名「付款方式」列（人工分析列），
+        // 首列（第 6 列）才是应付侧付款方式 → 第二列改名留存
+        built.put("付款方式(尾)", index);
+    } else if (type == FactType.CASHFLOW_JOURNAL && raw.replaceAll("\\s+", "").equals("客户供应商")) {
+        // 流水日记账（2026-09-18 第 18 类）：源表头「客   户    供应商」夹带不规则空白 → 归一为无空格键
+        built.put("客户供应商", index);
+    } else if (type == FactType.CASHFLOW_JOURNAL && "人民币".equals(raw) && built.containsKey(raw)) {
+        // 流水日记账外币 sheet（温州睿包美元/欧元）：两个「人民币」语义不同——第 14 列=收入折算、
+        // 第 16 列=结汇折算 → 第二列改名留存（仓管员/报工人/备注同款陷阱）
+        built.put("人民币(结汇)", index);
     } else {
         built.putIfAbsent(raw, index);
     }
@@ -329,17 +421,52 @@ case INVOICE_REQUEST -> columns.containsKey("开票内容.金额小计") || colu
 // 叠加「报工时间」+「报工数量」三列同时存在，防误认其他表单
 case PRODUCTION_REPORT -> columns.containsKey("报工时间") && columns.containsKey("生产工单编号")
         && columns.containsKey("报工数量");
+// 进项/销项发票（2026-09-18 第 16 类，税务平台导出）：同一文件两个 sheet 表头不同。
+// 销项独有收款域列（收款金额+业务员+发票状态）；进项按「销方识别号+无收款金额」与销项区分。
+// 对公流水 sheet（同文件，属流水日记账域）无数电发票号码，keyHeader 检查即排除。
+case INVOICE_INPUT -> columns.containsKey("销方识别号") && columns.containsKey("发票票种")
+        && !columns.containsKey("收款金额");
+case INVOICE_SALES -> columns.containsKey("收款金额") && columns.containsKey("业务员")
+        && columns.containsKey("发票状态");
+// 供应商应付（2026-09-18 第 17 类）：人工月度台账 8 列模板（月份/应付货款/结算货款/折让/付款日期/
+// 付款方式/付款金额/剩余货款）。汇总（序号/供应商/期初余额/1..12）与封口机（无表头）被排除；
+// 制版费/全自动气调机等复合 sheet 左侧即该模板，一并导入（右侧异构列不读）。
+case SUPPLIER_PAYABLE -> columns.containsKey("月份") && columns.containsKey("应付货款")
+        && columns.containsKey("结算货款") && columns.containsKey("折让")
+        && columns.containsKey("付款日期") && columns.containsKey("付款方式")
+        && columns.containsKey("付款金额") && columns.containsKey("剩余货款");
+// 流水日记账（2026-09-18 第 18 类）：账户 sheet 12 列基线（日期/收入/支出/结存/摘要同现）。
+// 汇总（无收入/支出精确列）、Sheet2 字典（无日期/结存）、收银通（无收入/结存）均被排除；
+// 缺月份列（温州数创/宋文）与多汇率列（睿包外币）的变体同样命中——multiSheet 全聚合。
+case CASHFLOW_JOURNAL -> columns.containsKey("日期") && columns.containsKey("收入")
+        && columns.containsKey("支出") && columns.containsKey("结存") && columns.containsKey("摘要");
+// 收银通收单流水（2026-09-18 第 19 类）：微信收单导出独有「订单总扣费(元)」+「付款人识别号」，
+// 账户 sheet/汇总/Sheet2 均无此二列
+case CASHIER_LOG -> columns.containsKey("交易完成时间") && columns.containsKey("订单总扣费(元)")
+        && columns.containsKey("付款人识别号");
 };
 }
 
 private List<Group> groupRows(Sheet sheet, Header header, FactType type) {
 Map<String, MutableGroup> groups = new LinkedHashMap<>();
 MutableGroup current = null;
+Map<String, Integer> journalKeySeq = new HashMap<>();
+String journalSheet = type == FactType.CASHFLOW_JOURNAL ? sheet.getSheetName() : null;
 for (int r = header.rowIndex() + 1; r <= sheet.getLastRowNum(); r++) {
 Row row = sheet.getRow(r);
 if (row == null || blank(row)) continue;
 Map<String, String> values = rowValues(row, header.columns());
-String key = clean(values.get(type.keyHeader));
+String key;
+if (type == FactType.CASHFLOW_JOURNAL) {
+    // 与流式路径同口径：行级组键（账户#日期#收入#支出#结存#同键序号），保证两路径 source_hash 一致
+    key = cashflowRowKey(values, journalSheet, journalKeySeq);
+    if (key == null) continue;
+} else if (type == FactType.CASHIER_LOG) {
+    key = cashierRowKey(values);
+    if (key == null) continue;
+} else {
+    key = clean(values.get(type.keyHeader));
+}
 if (key != null) current = groups.computeIfAbsent(key, MutableGroup::new);
 if (current == null) continue;
 current.mergeMain(values);
@@ -382,7 +509,17 @@ return true;
 
 private Map<String, ExistingFact> loadExistingFacts(FactType type) {
 Map<String, ExistingFact> result = new HashMap<>();
-jdbc.query("SELECT id,external_id,source_hash,source_updated_at FROM " + table(type) + " WHERE external_source='H3YUN'",
+String sql = "SELECT id,external_id,source_hash,source_updated_at FROM " + table(type) + " WHERE external_source='H3YUN'";
+if (type == FactType.CASHFLOW_JOURNAL) {
+    // 流水日记账（第 18 类）的既有事实横跨两张表：分录表（行级组键）+ 账户档案表（期初行）。
+    // 期初行组键 = 账户名#期初 → 用 CONCAT(account_name,'#期初') 合成同型事实键，否则期初行
+    // 每轮都查不到 existing、恒判 CREATE，台账永不收敛（首次实测每轮多计 34 条 CREATE）。
+    sql = "SELECT id,external_id,source_hash,source_updated_at FROM h3_cashflow_entries WHERE external_source='H3YUN'"
+        + " UNION ALL "
+        + "SELECT id,CONCAT(account_name,'#期初') AS external_id,source_hash,source_updated_at"
+        + " FROM h3_cash_accounts WHERE external_source='H3YUN'";
+}
+jdbc.query(sql,
         (org.springframework.jdbc.core.RowCallbackHandler) rs -> {
             result.put(rs.getString("external_id"),
                     new ExistingFact(rs.getLong("id"), rs.getString("source_hash"), rs.getTimestamp("source_updated_at")));
@@ -433,6 +570,12 @@ case INVOICE_REQUEST -> "SELECT id FROM h3_invoice_requests WHERE source_no=? AN
 case SUPPLIER -> null;
 // 生产报工无业务单号（source_no=数据ID UUID 兜底，每行唯一）：external_id 唯一即可，不走清理
 case PRODUCTION_REPORT -> null;
+// 进项/销项发票（2026-09-18 第 16 类）：source_no=数电发票号码=external_id，二者恒等不存在单号冲突，不走清理
+case INVOICE_INPUT, INVOICE_SALES -> null;
+// 供应商应付（第 17 类）：external_id=供应商#月份 恒唯一，不走清理
+case SUPPLIER_PAYABLE -> null;
+// 流水日记账（第 18 类）/收银通（第 19 类）：external_id=行级组键恒唯一（source_no 同值），不走清理
+case CASHFLOW_JOURNAL, CASHIER_LOG -> null;
 };
 if (sql == null) return;
 List<Long> ids = jdbc.query(sql, (rs, i) -> rs.getLong(1), no, group.externalId());
@@ -456,6 +599,9 @@ jdbc.update("DELETE FROM h3_invoice_request_receipt_refs WHERE request_id=?", id
 case INVOICE_PROFILE -> { /* 不可达：sql==null 已 return */ }
 case SUPPLIER -> { /* 不可达：sql==null 已 return */ }
 case PRODUCTION_REPORT -> { /* 不可达：sql==null 已 return */ }
+case INVOICE_INPUT, INVOICE_SALES -> { /* 不可达：sql==null 已 return */ }
+case SUPPLIER_PAYABLE -> { /* 不可达：sql==null 已 return */ }
+case CASHFLOW_JOURNAL, CASHIER_LOG -> { /* 不可达：sql==null 已 return */ }
 }
 jdbc.update("DELETE FROM " + table(type) + " WHERE id=?", id);
 }
@@ -473,6 +619,11 @@ case TRANSFER -> "h3_inventory_transfers";
 case INVOICE_PROFILE -> "h3_customer_invoice_profiles";
 case INVOICE_REQUEST -> "h3_invoice_requests";
 case PRODUCTION_REPORT -> "h3_production_reports";
+case INVOICE_INPUT -> "h3_input_invoices";
+case INVOICE_SALES -> "h3_sales_invoices";
+case SUPPLIER_PAYABLE -> "h3_supplier_payables";
+case CASHFLOW_JOURNAL -> "h3_cashflow_entries";
+case CASHIER_LOG -> "h3_cashier_log";
 };
 }
 
@@ -1373,6 +1524,393 @@ private String productionReportWarning(Group g) {
     return String.join("；", w);
 }
 
+// ==================== 进项/销项发票（2026-09-18 第 16 类，税务平台导出） ====================
+
+/**
+ * 进项发票：单表 2 382 行（幂等键=数电发票号码）。无修改时间列 → unchanged 全靠 source_hash
+ * （税务平台再导出列序稳定，不会触发氚云那类「仅列序变化误报 UPDATE」问题）。
+ */
+private Long saveInvoiceInput(Group g) {
+    Map<String, String> m = g.main();
+    jdbc.update("""
+        INSERT INTO h3_input_invoices(external_source,external_id,source_no,seller_tax_no,seller_name,
+        buyer_tax_no,buyer_name,invoice_date,amount,tax_amount,total_amount,
+        invoice_source,invoice_kind,invoice_status,is_positive,risk_level,drawer,remark,
+        source_hash,last_synced_at)
+        VALUES('H3YUN',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())
+        ON DUPLICATE KEY UPDATE seller_tax_no=VALUES(seller_tax_no),seller_name=VALUES(seller_name),
+        buyer_tax_no=VALUES(buyer_tax_no),buyer_name=VALUES(buyer_name),invoice_date=VALUES(invoice_date),
+        amount=VALUES(amount),tax_amount=VALUES(tax_amount),total_amount=VALUES(total_amount),
+        invoice_source=VALUES(invoice_source),invoice_kind=VALUES(invoice_kind),
+        invoice_status=VALUES(invoice_status),is_positive=VALUES(is_positive),risk_level=VALUES(risk_level),
+        drawer=VALUES(drawer),remark=VALUES(remark),source_hash=VALUES(source_hash),last_synced_at=NOW()
+        """, g.externalId(), g.externalId(),
+            clean(m.get("销方识别号")), clean(m.get("销方名称")),
+            clean(m.get("购方识别号")), clean(m.get("购买方名称")),
+            dateTime(first(m, "开票日期")),
+            normDecimal(m.get("金额")), normDecimal(m.get("税额")), normDecimal(m.get("价税合计")),
+            clean(m.get("发票来源")), clean(m.get("发票票种")), clean(m.get("发票状态")),
+            clean(m.get("是否正数发票")), clean(m.get("发票风险等级")), clean(m.get("开票人")),
+            clean(m.get("备注")), g.hash());
+    return jdbc.queryForObject(
+            "SELECT id FROM h3_input_invoices WHERE external_source='H3YUN' AND external_id=?",
+            Long.class, g.externalId());
+}
+
+/**
+ * 销项发票：主表 4 174 张 + 收款子表 512 行（组内无票号行，整删重插）。
+ * ⚠️ source_item_id = 发票号#组内序号（源文件无数据ID/UUID，同文件行序稳定 → 幂等成立）。
+ * 收款字段只落校验源（收款权威=销售出库，§9.3 拍板），不写 receipts、不回写任何余额。
+ */
+private Long saveInvoiceSales(Group g) {
+    Map<String, String> m = g.main();
+    jdbc.update("""
+        INSERT INTO h3_sales_invoices(external_source,external_id,source_no,seller_tax_no,seller_name,
+        buyer_tax_no,buyer_name,invoice_date,amount,tax_amount,total_amount,
+        receipt_date,payment_method,receipt_amount,unreceived_amount,salesman,remark,remark_platform,
+        invoice_source,invoice_kind,invoice_status,is_positive,risk_level,drawer,
+        source_hash,last_synced_at)
+        VALUES('H3YUN',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())
+        ON DUPLICATE KEY UPDATE seller_tax_no=VALUES(seller_tax_no),seller_name=VALUES(seller_name),
+        buyer_tax_no=VALUES(buyer_tax_no),buyer_name=VALUES(buyer_name),invoice_date=VALUES(invoice_date),
+        amount=VALUES(amount),tax_amount=VALUES(tax_amount),total_amount=VALUES(total_amount),
+        receipt_date=VALUES(receipt_date),payment_method=VALUES(payment_method),
+        receipt_amount=VALUES(receipt_amount),unreceived_amount=VALUES(unreceived_amount),
+        salesman=VALUES(salesman),remark=VALUES(remark),remark_platform=VALUES(remark_platform),
+        invoice_source=VALUES(invoice_source),invoice_kind=VALUES(invoice_kind),
+        invoice_status=VALUES(invoice_status),is_positive=VALUES(is_positive),risk_level=VALUES(risk_level),
+        drawer=VALUES(drawer),source_hash=VALUES(source_hash),last_synced_at=NOW()
+        """, g.externalId(), g.externalId(),
+            clean(m.get("销方识别号")), clean(m.get("销方名称")),
+            clean(m.get("购方识别号")), clean(m.get("购买方名称")),
+            dateTime(first(m, "开票日期")),
+            normDecimal(m.get("金额")), normDecimal(m.get("税额")), normDecimal(m.get("价税合计")),
+            date(first(m, "收款日期")), clean(m.get("付款方式")),
+            normDecimal(m.get("收款金额")), normDecimal(m.get("未收款金额")),
+            clean(m.get("业务员")), clean(m.get("备注")), clean(m.get("备注(平台)")),
+            clean(m.get("发票来源")), clean(m.get("发票票种")), clean(m.get("发票状态")),
+            clean(m.get("是否正数发票")), clean(m.get("发票风险等级")), clean(m.get("开票人")),
+            g.hash());
+    Long invoiceId = jdbc.queryForObject(
+            "SELECT id FROM h3_sales_invoices WHERE external_source='H3YUN' AND external_id=?",
+            Long.class, g.externalId());
+    jdbc.update("DELETE FROM h3_sales_invoice_receipts WHERE invoice_id=?", invoiceId);
+    int seq = 0;
+    for (Map<String, String> row : g.rows()) {
+        if (!empty(row.get("数电发票号码"))) continue; // 主行
+        seq++;
+        jdbc.update("""
+            INSERT INTO h3_sales_invoice_receipts(invoice_id,source_item_id,receipt_date,payment_method,
+            receipt_amount,salesman,remark) VALUES(?,?,?,?,?,?,?)
+            """, invoiceId, g.externalId() + "#" + seq,
+                date(first(row, "收款日期")), clean(row.get("付款方式")),
+                normDecimal(row.get("收款金额")), clean(row.get("业务员")), clean(row.get("备注")));
+    }
+    return invoiceId;
+}
+
+/**
+ * 供应商应付月度台账（2026-09-18 第 17 类）：主表单写，无子表。
+ * multiSheet：组键 = 供应商 sheet 名#月份（55+ 张 sheet 聚合），main 已含注入的「供应商」列。
+ * ⚠️ 尾部 RK/费用明细行被吸附进组但不入库（RK 已由 purchase_receipts 覆盖，费用行是人工脏结构）。
+ * 应付口径（§9）：合计应付=Σ月度应付货款−折让、剩余应付=合计应付−合计支付（文件月度行原值入库，不重算）。
+ */
+private Long saveSupplierPayable(Group g) {
+    Map<String, String> m = g.main();
+    Integer monthNo = monthNo(m.get("月份"));
+    jdbc.update("""
+        INSERT INTO h3_supplier_payables(external_source,external_id,source_no,supplier_name,month_no,month_raw,
+        payable_amount,settled_amount,allowance,pay_date,pay_method,pay_amount,remaining_amount,
+        source_hash,last_synced_at)
+        VALUES('H3YUN',?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())
+        ON DUPLICATE KEY UPDATE supplier_name=VALUES(supplier_name),month_no=VALUES(month_no),month_raw=VALUES(month_raw),
+        payable_amount=VALUES(payable_amount),settled_amount=VALUES(settled_amount),allowance=VALUES(allowance),
+        pay_date=VALUES(pay_date),pay_method=VALUES(pay_method),pay_amount=VALUES(pay_amount),
+        remaining_amount=VALUES(remaining_amount),source_hash=VALUES(source_hash),last_synced_at=NOW()
+        """, g.externalId(), g.externalId(), clean(m.get("供应商")), monthNo, clean(m.get("月份")),
+            normDecimal(m.get("应付货款")), normDecimal(m.get("结算货款")), normDecimal(m.get("折让")),
+            date(first(m, "付款日期")), clean(m.get("付款方式")), normDecimal(m.get("付款金额")),
+            normDecimal(m.get("剩余货款")), g.hash());
+    return jdbc.queryForObject(
+            "SELECT id FROM h3_supplier_payables WHERE external_source='H3YUN' AND external_id=?",
+            Long.class, g.externalId());
+}
+
+/** 月份单元格 → 1..12；无法解析返回 null（入库 month_no=NULL 并告警）。 */
+private Integer monthNo(String v) {
+    if (empty(v)) return null;
+    try {
+        int n = Integer.parseInt(v.trim());
+        return n >= 1 && n <= 12 ? n : null;
+    } catch (NumberFormatException e) {
+        return null;
+    }
+}
+
+/** 供应商应付告警：①付款日期/金额不成对 ②月份无法解析（预览 + confirm 双阶段）。 */
+private List<String> supplierPayableWarnings(Group g) {
+    Map<String, String> m = g.main();
+    List<String> w = new ArrayList<>();
+    if (monthNo(m.get("月份")) == null) w.add("月份无法解析：" + first(m, "月份"));
+    boolean hasPay = normDecimal(m.get("付款金额")) != null;
+    boolean hasDate = !empty(first(m, "付款日期"));
+    if (hasPay && !hasDate) w.add("有付款金额缺付款日期");
+    if (hasDate && !hasPay) w.add("有付款日期缺付款金额");
+    return w;
+}
+
+// ==================== 流水日记账 / 收银通（2026-09-18 第 18/19 类，校验源） ====================
+
+/**
+ * 流水日记账账户分录（第 18 类）：行级幂等（组键 = 账户#日期#收入#支出#结存#同键序号）。
+ * multiSheet：账户 = sheet 名（源「账户」列有错填，不采信）。
+ * 「上期结存」伪行（无日期、无收支）不入分录 → 转写 h3_cash_accounts 期初余额/币种。
+ * 人工标注字段（月份/供应商/客户 供应商/报销人/是否开票）原样入库不解读（§4 拍板 2）。
+ */
+private Long saveCashflowEntry(Group g) {
+    Map<String, String> m = g.main();
+    String account = clean(m.get("账户"));
+    LocalDate entryDate = cashflowDate(m);
+    boolean hasMoney = !empty(first(m, "收入", "支出"));
+    if (entryDate == null && !hasMoney) {
+        // 伪行分支（2026-09-18 实测踩坑）：账户 sheet 顶部除「上期结存」行外，还有逐月重复的
+        // 空白填充行（只有结存/月份、无日期无收支，实测 243 行）。若一律 upsert 账户期初余额，
+        // 靠后的空白行会把已写入的期初余额覆盖成 NULL/月度结存（实测 15 个账户期初被清零）。
+        // → 仅「摘要=上期结存」行写账户维度，其余伪行直接跳过（不入分录、不碰账户表）。
+        if (!isOpeningBalanceRow(m)) return null;
+        upsertCashAccount(account, normDecimal(m.get("结存")), g.hash());
+        return jdbc.queryForObject(
+                "SELECT id FROM h3_cash_accounts WHERE external_source='H3YUN' AND external_id=?",
+                Long.class, account);
+    }
+    jdbc.update("""
+        INSERT INTO h3_cashflow_entries(external_source,external_id,source_no,account_name,entry_date,month_label,
+        summary,supplier_raw,counterparty_raw,reimbursed_by,invoiced,income,expense,balance,
+        fx_rate,fx_cny,settle_rate,settle_cny,fx_gain_loss,source_hash,last_synced_at)
+        VALUES('H3YUN',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())
+        ON DUPLICATE KEY UPDATE account_name=VALUES(account_name),entry_date=VALUES(entry_date),
+        month_label=VALUES(month_label),summary=VALUES(summary),supplier_raw=VALUES(supplier_raw),
+        counterparty_raw=VALUES(counterparty_raw),reimbursed_by=VALUES(reimbursed_by),invoiced=VALUES(invoiced),
+        income=VALUES(income),expense=VALUES(expense),balance=VALUES(balance),fx_rate=VALUES(fx_rate),
+        fx_cny=VALUES(fx_cny),settle_rate=VALUES(settle_rate),settle_cny=VALUES(settle_cny),
+        fx_gain_loss=VALUES(fx_gain_loss),source_hash=VALUES(source_hash),last_synced_at=NOW()
+        """, g.externalId(), g.externalId(), account, entryDate == null ? null : Date.valueOf(entryDate),
+            clean(m.get("月份")), clean(m.get("摘要")), clean(m.get("供应商")),
+            // ⚠️ 表头归一后的键是「客户供应商」（putHeader 已剥不规则空白），此处曾写成带空格的
+            // 「客户 供应商」→ 取值恒 null、counterparty_raw 全表 0 行（源侧 7 129 行！）。
+            // 两个键都试，防后续改归一口径时再断。
+            clean(first(m, "客户供应商", "客户 供应商")),
+            clean(m.get("报销人")), clean(m.get("是否开票")),
+            normDecimal(m.get("收入")), normDecimal(m.get("支出")), normDecimal(m.get("结存")),
+            normDecimal(m.get("汇率")), normDecimal(m.get("人民币")), normDecimal(m.get("结汇汇率")),
+            normDecimal(m.get("人民币(结汇)")), normDecimal(m.get("汇兑损益")), g.hash());
+    return jdbc.queryForObject(
+            "SELECT id FROM h3_cashflow_entries WHERE external_source='H3YUN' AND external_id=?",
+            Long.class, g.externalId());
+}
+
+/**
+ * 收银通收单流水（第 19 类）：单表单写，无子表。
+ * 幂等键 = 交易完成时间#交易金额#付款人识别号（实测 6088 行零重复；仅时间有 1 对同秒不同额）。
+ * 手续费（订单总扣费）源值带负号，原样存（校验源不清洗）。
+ */
+private Long saveCashierRow(Group g) {
+    Map<String, String> m = g.main();
+    jdbc.update("""
+        INSERT INTO h3_cashier_log(external_source,external_id,source_no,tx_time,status,amount,fee,
+        payer_openid,summary,salesperson,source_hash,last_synced_at)
+        VALUES('H3YUN',?,?,?,?,?,?,?,?,?,?,NOW())
+        ON DUPLICATE KEY UPDATE tx_time=VALUES(tx_time),status=VALUES(status),amount=VALUES(amount),
+        fee=VALUES(fee),payer_openid=VALUES(payer_openid),summary=VALUES(summary),salesperson=VALUES(salesperson),
+        source_hash=VALUES(source_hash),last_synced_at=NOW()
+        """, g.externalId(), g.externalId(), cashierTime(first(m, "交易完成时间")), clean(m.get("交易状态")),
+            normDecimal(m.get("交易金额(元)")), normDecimal(m.get("订单总扣费(元)")),
+            clean(m.get("付款人识别号")), clean(m.get("摘要")), clean(m.get("业务员")), g.hash());
+    return jdbc.queryForObject(
+            "SELECT id FROM h3_cashier_log WHERE external_source='H3YUN' AND external_id=?",
+            Long.class, g.externalId());
+}
+
+/** 账户维度表 upsert：期初余额来自「上期结存」伪行；币种按 sheet 名判定（美元/欧元，其余 CNY）。 */
+private void upsertCashAccount(String account, java.math.BigDecimal openingBalance, String hash) {
+    if (empty(account)) return;
+    jdbc.update("""
+        INSERT INTO h3_cash_accounts(external_source,external_id,source_no,account_name,currency,
+        opening_balance,source_hash,last_synced_at)
+        VALUES('H3YUN',?,?,?,?,?,?,NOW())
+        ON DUPLICATE KEY UPDATE currency=VALUES(currency),opening_balance=VALUES(opening_balance),
+        source_hash=VALUES(source_hash),last_synced_at=NOW()
+        """, account, account, account, currencyOf(account), openingBalance, hash);
+}
+
+/**
+ * 账户档案补建（只建不改，不碰已有期初余额）：账户 sheet 共 35 张，其中「浙江利强中国银行欧元」
+ * 没有「上期结存」行 → 只在期初行 upsert 会让该账户整体缺档。这里按账户名补档、期初留空。
+ */
+private void ensureCashAccountExists(String account) {
+    if (empty(account)) return;
+    jdbc.update("""
+        INSERT INTO h3_cash_accounts(external_source,external_id,source_no,account_name,currency,
+        opening_balance,last_synced_at)
+        VALUES('H3YUN',?,?,?,?,NULL,NOW())
+        ON DUPLICATE KEY UPDATE account_name=VALUES(account_name)
+        """, account, account, account, currencyOf(account));
+}
+
+/** confirm 前置一步：账户涉及面去重后建档（一次 confirm 只跑一遍，避免逐行补档的 7 500+ 次往返）。 */
+private void ensureCashflowAccounts(List<Group> groups) {
+    java.util.LinkedHashSet<String> accounts = new java.util.LinkedHashSet<>();
+    for (Group g : groups) accounts.add(clean(g.main().get("账户")));
+    for (String account : accounts) ensureCashAccountExists(account);
+}
+
+/** 币种按账户名判定（账户 sheet 命名含币种，如「浙江利强中国银行美元」）。 */
+private static String currencyOf(String account) {
+    return account.contains("美元") ? "USD" : account.contains("欧元") ? "EUR" : "CNY";
+}
+
+/** 账户分录日期三分支解析：日期列格式（date()）/ 带时间（dateTime() 取日）/ Excel 序列号（6816 实测 7 行）。 */
+private LocalDate cashflowDate(Map<String, String> m) {
+    String v = first(m, "日期");
+    if (empty(v)) return null;
+    // ⚠️ 流式路径的日期值来自 POI DataFormatter 的「按单元格显示格式」输出：源表日期列格式为
+    // yyyy"年"m"月"d"日"，DataFormatter 会把引号一并产出（实测 7 183 行原文 = 2026"年"1"月"1"日"）。
+    // 不剥引号则 date()/dateTime() 全部落空 → entry_date 大面积 NULL（首次 confirm 实测 7 183/7 588 行为 NULL）。
+    String norm = v.replace("\"", "").replace("'", "").trim();
+    Date d = date(norm);
+    if (d != null) return d.toLocalDate();
+    Timestamp ts = dateTime(norm);
+    if (ts != null) return ts.toLocalDateTime().toLocalDate();
+    String t = norm.replaceAll("(\\.0+)$", "");
+    try {
+        double num = Double.parseDouble(t);
+        if (num >= 20000 && num < 80000) return LocalDate.of(1899, 12, 30).plusDays((long) num);
+    } catch (NumberFormatException ignored) { }
+    return null;
+}
+
+/**
+ * 「上期结存」期初行判定。⚠️ 标记列不固定：多数账户 sheet 落在「摘要」列，但
+ * 「浙江利强中国银行欧元」sheet 列序不同、标记落在「供应商」列（该 sheet 仅 1 行、结存=0）。
+ * → 全字段扫描（本判定只用于「无日期且无收支」的行，真实分录行不会走到这里，无副作用）。
+ */
+private boolean isOpeningBalanceRow(Map<String, String> m) {
+    for (String v : m.values()) {
+        if (v != null && v.contains("上期结存")) return true;
+    }
+    return false;
+}
+
+private LocalDate cashflowDate(Group g) { return cashflowDate(g.main()); }
+
+/** 真实分录行判定：有收入/支出即数据行（否则可能是「上期结存」伪行）。 */
+private boolean isCashflowData(Group g) { return !empty(first(g.main(), "收入", "支出")); }
+
+/** 收银通交易时间解析：dateTime() 优先，失败退 date()（取当日零点）。 */
+private Timestamp cashierTime(String v) {
+    Timestamp ts = dateTime(v);
+    if (ts != null) return ts;
+    Date d = date(v);
+    return d != null ? Timestamp.valueOf(d.toLocalDate().atStartOfDay()) : null;
+}
+
+/**
+ * 流水日记账行级组键：账户#日期#收入#支出#结存#n（n = 同键序号，seq 由调用路径持有、按行序确定；
+ * 「上期结存」伪行 material 同样唯一）。external_id=组键，重导同行序不变 → 幂等成立。
+ */
+private String cashflowRowKey(Map<String, String> values, String sheetName, Map<String, Integer> seq) {
+    // 排除行（返回 null = 不入组）：账户 sheet 顶部除「上期结存」期初行外，还有逐月空白填充行
+    // （只有结存/月份，无日期无收支，实测 209 行）。它们既不是分录、也不代表期初余额；
+    // 若让其成组，台账里永远查不到对应 existing → 每轮重导都计一次 CREATE，台账永不收敛。
+    if (empty(values.get("日期")) && empty(values.get("收入")) && empty(values.get("支出"))) {
+        // ⚠️ 必须与 isOpeningBalanceRow 同口径（全字段扫描）。此处曾硬取「摘要」列，
+        // 导致标记落在「供应商」列的 浙江利强中国银行欧元 被判为空白行排除 → 该账户整体缺档。
+        if (!isOpeningBalanceRow(values)) return null;
+        // 期初行：组键 = 账户#期初（不掺结存数值，避免金额修订后被判为新行）。
+        // 该键与账户档案一一对应：loadExistingFacts 会把 h3_cash_accounts 以 账户名+"#期初"
+        // 合成事实键代入比对 → 重导时判 UNCHANGED，收敛成立（详见 loadExistingFacts 注释）。
+        return sheetName + "#期初";
+    }
+    String material = sheetName + "#" + orDash(values.get("日期")) + "#" + orDash(values.get("收入"))
+            + "#" + orDash(values.get("支出")) + "#" + orDash(values.get("结存"));
+    return material + "#" + seq.merge(material, 1, Integer::sum);
+}
+
+/** 收银通行级组键：时间#金额#付款人识别号（实测零重复）。时间列为空返回 null（不产生游离组）。 */
+private String cashierRowKey(Map<String, String> values) {
+    String t = clean(values.get("交易完成时间"));
+    if (t == null) return null;
+    return t + "#" + orDash(values.get("交易金额(元)")) + "#" + orDash(values.get("付款人识别号"));
+}
+
+private static String orDash(String v) { return empty(v) ? "-" : v.trim(); }
+
+/**
+ * 流水日记账告警（预览 + confirm 双阶段）：①真实分录行日期无法解析 ②外币行缺汇率 ③同键多行（n>1）。
+ * 「账户列与 sheet 名不一致」不告警——账户列本就不采信（sheet 名为确定性来源，设计稿 §1）。
+ */
+private List<String> cashflowJournalWarnings(Group g) {
+    Map<String, String> m = g.main();
+    List<String> w = new ArrayList<>();
+    boolean hasMoney = !empty(first(m, "收入", "支出"));
+    if (hasMoney && cashflowDate(m) == null) w.add("日期无法解析：" + first(m, "日期"));
+    String acct = first(m, "账户");
+    boolean fx = acct != null && (acct.contains("美元") || acct.contains("欧元"));
+    if (fx && hasMoney && normDecimal(m.get("汇率")) == null && normDecimal(m.get("人民币")) == null) {
+        w.add("外币行缺汇率/折算值");
+    }
+    String ext = g.externalId();
+    if (ext != null) {
+        int hashIdx = ext.lastIndexOf('#');
+        if (hashIdx > 0 && ext.substring(hashIdx + 1).matches("\\d+")) {
+            int n = Integer.parseInt(ext.substring(hashIdx + 1));
+            if (n > 1) w.add("同键多行（该键第 " + n + " 行）");
+        }
+    }
+    return w;
+}
+
+/** 收银通告警（D4 拍板）：缺摘要/业务员照常入库 + 告警计数，不回填不猜。 */
+private List<String> cashierLogWarnings(Group g) {
+    Map<String, String> m = g.main();
+    List<String> w = new ArrayList<>();
+    if (empty(m.get("摘要"))) w.add("缺摘要（付款人识别号未在 Sheet2 字典中）");
+    if (empty(m.get("业务员"))) w.add("缺业务员");
+    if (cashierTime(first(m, "交易完成时间")) == null) w.add("交易完成时间无法解析");
+    return w;
+}
+
+/**
+ * 发票台账告警（预览 + confirm 双阶段）：
+ * ①金额勾稽 金额+税额 ≠ 价税合计（容差 0.005，红字票同式）；
+ * ②销项已红冲但平台备注无红冲链引用（红冲关系无法回溯）；
+ * ③销项收款子行缺收款金额（登记不完整）。
+ */
+private List<String> invoiceWarnings(FactType type, Group g) {
+    Map<String, String> m = g.main();
+    List<String> w = new ArrayList<>();
+    BigDecimal amount = normDecimal(m.get("金额"));
+    BigDecimal tax = normDecimal(m.get("税额"));
+    BigDecimal total = normDecimal(m.get("价税合计"));
+    if (amount != null && tax != null && total != null
+            && amount.add(tax).subtract(total).abs().compareTo(new BigDecimal("0.005")) > 0) {
+        w.add("金额+税额 " + amount.add(tax).stripTrailingZeros().toPlainString()
+                + " ≠ 价税合计 " + total.stripTrailingZeros().toPlainString());
+    }
+    if (type == FactType.INVOICE_SALES) {
+        String status = clean(m.get("发票状态"));
+        boolean red = status != null && status.contains("已红冲");
+        boolean hasRef = !empty(m.get("备注(平台)")) && m.get("备注(平台)").contains("被红冲蓝字数电发票号码");
+        if (red && !hasRef) w.add("已红冲但平台备注无红冲链引用");
+        if (!red && hasRef) w.add("平台备注含红冲引用但发票状态=" + status);
+        for (Map<String, String> row : g.rows()) {
+            if (!empty(row.get("数电发票号码"))) continue;
+            if (empty(first(row, "收款金额", "付款方式", "收款日期"))) w.add("收款子行登记不完整（缺收款金额/方式/日期）");
+        }
+    }
+    return w;
+}
+
 /**
  * P3 开票申请：主表 + 开票内容 + 收款引用三写（整删重插，行级 UUID 幂等）。
  *
@@ -1523,6 +2061,13 @@ case INVOICE_PROFILE -> false;
 case INVOICE_REQUEST -> !empty(row.get("开票内容.数据ID(不可修改)"))
 || !empty(first(row, "开票内容.产品名称"));
 case PRODUCTION_REPORT -> false;
+// 销项发票收款子行（2026-09-18）：无数电发票号码的行 = 挂靠发票的多次收款登记（512 行实测）
+case INVOICE_SALES -> empty(row.get("数电发票号码"));
+case INVOICE_INPUT -> false;
+// 供应商应付（第 17 类）：尾部 RK/费用明细行被吸附但不入库，不计子行
+case SUPPLIER_PAYABLE -> false;
+// 流水日记账（第 18 类）行级分组、收银通（第 19 类）单行组：均无子表
+case CASHFLOW_JOURNAL, CASHIER_LOG -> false;
 }).count();
 }
 
@@ -1577,7 +2122,7 @@ private Long memberEmployeeId(String name) {
     return h3EmployeeIdentityService.resolveName(name);
 }
 private Long optionalLong(String sql, Object... args) { List<Long> ids = jdbc.query(sql, (rs,n)->rs.getLong(1), args); return ids.isEmpty()?null:ids.getFirst(); }
-private String title(FactType type, Map<String,String> m) { return switch(type) { case PRODUCTION -> first(m,"产品名称","数据标题"); case OUTBOUND -> first(m,"客户名称","数据标题"); case RECEIPT,SETTLEMENT -> first(m,"客户名称","选择客户","数据标题"); case SUPPLIER -> first(m,"供应商名称","数据标题"); case PURCHASE_IN -> first(m,"数据标题","采购入库编号"); case OTHER_IN, OTHER_OUT -> first(m,"数据标题","流水号","其他出库编号"); case TRANSFER -> first(m,"数据标题","流水号"); case INVOICE_PROFILE, INVOICE_REQUEST -> first(m,"户名","数据标题"); case PRODUCTION_REPORT -> first(m,"数据标题","生产工单编号"); }; }
+private String title(FactType type, Map<String,String> m) { return switch(type) { case PRODUCTION -> first(m,"产品名称","数据标题"); case OUTBOUND -> first(m,"客户名称","数据标题"); case RECEIPT,SETTLEMENT -> first(m,"客户名称","选择客户","数据标题"); case SUPPLIER -> first(m,"供应商名称","数据标题"); case PURCHASE_IN -> first(m,"数据标题","采购入库编号"); case OTHER_IN, OTHER_OUT -> first(m,"数据标题","流水号","其他出库编号"); case TRANSFER -> first(m,"数据标题","流水号"); case INVOICE_PROFILE, INVOICE_REQUEST -> first(m,"户名","数据标题"); case PRODUCTION_REPORT -> first(m,"数据标题","生产工单编号"); case INVOICE_INPUT -> first(m,"销方名称","数电发票号码"); case INVOICE_SALES -> first(m,"购买方名称","数电发票号码"); case SUPPLIER_PAYABLE -> first(m,"供应商")+" "+first(m,"月份")+"月"; case CASHFLOW_JOURNAL -> first(m,"账户")+" "+first(m,"日期"); case CASHIER_LOG -> first(m,"交易完成时间"); }; }
 private String first(Map<String,String> m, String... keys) { for(String k:keys){String v=clean(m.get(k)); if(v!=null)return v;} return null; }
 private static String clean(String v) { return v==null||v.isBlank()?null:v.trim(); }
 private static boolean empty(String v) { return clean(v)==null; }
@@ -1698,7 +2243,7 @@ private BigDecimal decimal(String v) { if(empty(v))return null; try{return new B
 private Integer integer(String v) { BigDecimal n=decimal(v); return n==null?null:n.intValue(); }
 private Boolean bool(String v) { if(empty(v))return null; return Set.of("是","已完成","完成","true","1").contains(v.trim()); }
 private Date date(String v) { if(empty(v))return null; for(String p:List.of("yyyy-MM-dd","yyyy/M/d","yyyy/M/dd","yyyy/MM/d","yyyy.MM.dd","yyyy.M.d","yyyy年M月d日")){try{return Date.valueOf(LocalDate.parse(v.trim(),DateTimeFormatter.ofPattern(p)));}catch(Exception ignored){}} return null; }
-private Timestamp dateTime(String v) { if(empty(v))return null; for(String p:List.of("yyyy-MM-dd HH:mm:ss","yyyy-MM-dd HH:mm","yyyy/M/d H:mm:ss","yyyy/M/d H:mm","yyyy/M/dd H:mm:ss","yyyy/MM/d H:mm:ss","yyyy.MM.dd HH:mm:ss","yyyy.M.d H:mm:ss","yyyy年M月d日 HH:mm:ss")){try{return Timestamp.valueOf(LocalDateTime.parse(v.trim(),DateTimeFormatter.ofPattern(p)));}catch(Exception ignored){}} return null; }
+private Timestamp dateTime(String v) { if(empty(v))return null; for(String p:List.of("yyyy-MM-dd HH:mm:ss","yyyy-MM-dd HH:mm","yyyy/M/d H:mm:ss","yyyy/M/d H:mm","yyyy/M/dd H:mm:ss","yyyy/MM/d H:mm:ss","yyyy.MM.dd HH:mm:ss","yyyy.M.d H:mm:ss","yyyy年M月d日 HH:mm:ss","yyyy-MM-dd'T'HH:mm:ss")){try{return Timestamp.valueOf(LocalDateTime.parse(v.trim(),DateTimeFormatter.ofPattern(p)));}catch(Exception ignored){}} return null; }
 // ==================== 导入期客户档案增量补齐 ====================
 
 private void enrichCustomerFromOutbound(Long customerId, Map<String,String> m) {
@@ -1953,6 +2498,8 @@ public Result confirmFromStaging(Long batchId) {
     FactType factType = FactType.from(String.valueOf(meta.get("data_type")));
     rejectStoppedFactTypes(factType);
     List<Group> groups = loadStagingGroups(batchId);
+    // 流水日记账（第 18 类）：先把账户档案补齐（含无「上期结存」行的欧元账户），再逐组写分录/期初
+    if (factType == FactType.CASHFLOW_JOURNAL) ensureCashflowAccounts(groups);
     Map<String, ExistingFact> existingFacts = loadExistingFacts(factType);
     // 已生效出库单变化跟踪：导入事务提交后，逐单对比「当前值 vs 基线」识别修正变化（单据级）
     final boolean trackChanges = factType == FactType.OUTBOUND;
@@ -1993,6 +2540,11 @@ public Result confirmFromStaging(Long batchId) {
 case INVOICE_PROFILE -> saveInvoiceProfile(group);
 case INVOICE_REQUEST -> saveInvoiceRequest(group);
 case PRODUCTION_REPORT -> saveProductionReport(group);
+case INVOICE_INPUT -> saveInvoiceInput(group);
+case INVOICE_SALES -> saveInvoiceSales(group);
+case SUPPLIER_PAYABLE -> saveSupplierPayable(group);
+case CASHFLOW_JOURNAL -> saveCashflowEntry(group);
+case CASHIER_LOG -> saveCashierRow(group);
 };
             if ("CREATE".equals(action)) created++; else updated++;
             children += childCount(factType, group);
@@ -2044,6 +2596,25 @@ case PRODUCTION_REPORT -> saveProductionReport(group);
                     // 报工告警（缺工单号/缺工序/非已生效）计入 missing_quantity；缺报工时间计入 missing_date
                     if (!productionReportWarning(group).isEmpty()) missingQuantity++;
                     if (empty(group.main().get("报工时间"))) missingDate++;
+                }
+                case INVOICE_INPUT, INVOICE_SALES -> {
+                    // 发票台账（2026-09-18 第 16 类）：勾稽/红冲链/子行登记告警计入 missing_quantity；缺开票日期计入 missing_date
+                    if (!invoiceWarnings(factType, group).isEmpty()) missingQuantity++;
+                    if (empty(group.main().get("开票日期"))) missingDate++;
+                }
+                case SUPPLIER_PAYABLE -> {
+                    // 供应商应付（第 17 类）：付款日期/金额不成对、月份无法解析计入 missing_quantity；无客户概念
+                    if (!supplierPayableWarnings(group).isEmpty()) missingQuantity++;
+                }
+                case CASHFLOW_JOURNAL -> {
+                    // 流水日记账（第 18 类）：日期解析失败/收支双空/缺账户 计入 missing_quantity；缺日期计入 missing_date
+                    if (!cashflowJournalWarnings(group).isEmpty()) missingQuantity++;
+                    if (isCashflowData(group) && cashflowDate(group) == null) missingDate++;
+                }
+                case CASHIER_LOG -> {
+                    // 收银通（第 19 类）：缺摘要/业务员（openid 不在人工字典）、状态非成功 计入 missing_quantity
+                    if (!cashierLogWarnings(group).isEmpty()) missingQuantity++;
+                    if (group.main().get("交易完成时间") == null) missingDate++;
                 }
             }
         }
@@ -2142,13 +2713,19 @@ private void collectScopeFromGroup(FactType factType, Group group,
         case RECEIPT -> m.get("客户名称");
         case SETTLEMENT -> first(m, "选择客户", "客户名称", "选择经销商");
         // 供应商/采购入库/其他入出库不进客户/业务员编排范围（无回款/利润联动）
-        case SUPPLIER, PURCHASE_IN, OTHER_IN, OTHER_OUT, TRANSFER, INVOICE_PROFILE, INVOICE_REQUEST, PRODUCTION_REPORT -> null;
+        case SUPPLIER, PURCHASE_IN, OTHER_IN, OTHER_OUT, TRANSFER, INVOICE_PROFILE, INVOICE_REQUEST, PRODUCTION_REPORT,
+                INVOICE_INPUT, INVOICE_SALES, SUPPLIER_PAYABLE, CASHFLOW_JOURNAL, CASHIER_LOG -> null;
     };
     String salesperson = switch (factType) {
         case PRODUCTION, OUTBOUND -> m.get("业务员(必填)");
         case RECEIPT -> m.get("业务员");
         case SETTLEMENT -> m.get("归属业务员");
-        case SUPPLIER, PURCHASE_IN, OTHER_IN, OTHER_OUT, TRANSFER, INVOICE_PROFILE, INVOICE_REQUEST, PRODUCTION_REPORT -> null;
+        case SUPPLIER, PURCHASE_IN, OTHER_IN, OTHER_OUT, TRANSFER, INVOICE_PROFILE, INVOICE_REQUEST, PRODUCTION_REPORT, SUPPLIER_PAYABLE, CASHFLOW_JOURNAL -> null;
+        // 流水日记账人工「报销人」仅作台账展示，不进编排范围
+        case CASHIER_LOG -> null;
+        // 销项发票业务员仅作台账展示，不进编排范围
+        case INVOICE_INPUT -> null;
+        case INVOICE_SALES -> m.get("业务员");
     };
     if (customer != null && !customer.isBlank()) customerNames.add(customer.trim());
     if (salesperson != null && !salesperson.isBlank()) salespersonNames.add(salesperson.trim());
@@ -2174,6 +2751,10 @@ private String extractPreviewAmount(FactType factType, Map<String, String> m) {
 case INVOICE_PROFILE -> null;  // 开票资料无金额列
 case INVOICE_REQUEST -> first(m, "本次申请开票金额");
 case PRODUCTION_REPORT -> first(m, "报工数量");
+case INVOICE_INPUT, INVOICE_SALES -> first(m, "价税合计");
+case SUPPLIER_PAYABLE -> first(m, "应付货款");
+case CASHFLOW_JOURNAL -> first(m, "收入", "支出");
+case CASHIER_LOG -> first(m, "交易金额(元)");
 };
 }
 private String extractPreviewCustomer(FactType factType, Map<String, String> m) {
@@ -2191,6 +2772,12 @@ private String extractPreviewCustomer(FactType factType, Map<String, String> m) 
         case TRANSFER -> transferRoute(m);
 case INVOICE_PROFILE, INVOICE_REQUEST -> first(m, "户名");
 case PRODUCTION_REPORT -> first(m, "报工人所属部门", "产线文本");
+// 发票台账预览「对象」列 = 交易对手方：进项=销方（供应商），销项=购买方（客户）
+case INVOICE_INPUT -> first(m, "销方名称");
+case INVOICE_SALES -> first(m, "购买方名称");
+case SUPPLIER_PAYABLE -> first(m, "供应商");
+case CASHFLOW_JOURNAL -> first(m, "账户");
+case CASHIER_LOG -> first(m, "摘要", "付款人识别号");
 };
 }
 private String extractPreviewSalesperson(FactType factType, Map<String, String> m) {
@@ -2207,6 +2794,11 @@ private String extractPreviewSalesperson(FactType factType, Map<String, String> 
 case INVOICE_PROFILE -> first(m, "拥有者(必填)", "拥有者");
 case INVOICE_REQUEST -> first(m, "业务员");
 case PRODUCTION_REPORT -> first(m, "报工人");
+case INVOICE_INPUT -> null;
+case INVOICE_SALES -> first(m, "业务员");
+case SUPPLIER_PAYABLE -> null;
+case CASHFLOW_JOURNAL -> first(m, "报销人");
+case CASHIER_LOG -> first(m, "业务员");
 };
 }
 
@@ -2259,6 +2851,22 @@ private Preview buildPreviewFromGroups(FactType factType, String fileName, List<
                 // 生产报工（2026-09-17 第 15 类）：缺工单号/缺工序/非已生效 → 预览即标
                 String pw = productionReportWarning(g);
                 if (!pw.isEmpty()) warnings = pw;
+            } else if (factType == FactType.INVOICE_INPUT || factType == FactType.INVOICE_SALES) {
+                // 发票台账（2026-09-18 第 16 类）：勾稽/红冲链/收款子行 → 预览即标（⚠️ confirm 段同款填充点已补）
+                List<String> groupWarnings = invoiceWarnings(factType, g);
+                if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
+            } else if (factType == FactType.SUPPLIER_PAYABLE) {
+                // 供应商应付（2026-09-18 第 17 类）：付款日期/金额不成对、月份异常 → 预览即标（confirm 段同款已补）
+                List<String> groupWarnings = supplierPayableWarnings(g);
+                if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
+            } else if (factType == FactType.CASHFLOW_JOURNAL) {
+                // 流水日记账（2026-09-18 第 18 类）：日期解析失败/收支双空/账户缺失 → 预览即标（confirm 段同款已补）
+                List<String> groupWarnings = cashflowJournalWarnings(g);
+                if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
+            } else if (factType == FactType.CASHIER_LOG) {
+                // 收银通（2026-09-18 第 19 类）：缺摘要/业务员、状态非成功 → 预览即标（confirm 段同款已补）
+                List<String> groupWarnings = cashierLogWarnings(g);
+                if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
             }
         rows.add(new RowPreview(g.key(), g.externalId(), title(factType, g.main()), action, childCount(factType, g),
                 extractPreviewAmount(factType, g.main()),

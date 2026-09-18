@@ -679,6 +679,201 @@ public class H3BusinessQueryService {
         return Map.of("kind", "productionReport", "row", row, "rows", List.of());
     }
 
+    /**
+     * 进项发票台账（V312，第 16 类）：税务平台全量导出（幂等键=数电发票号码）。
+     * 搜索覆盖销方名称/税号/票种/状态/开票人。
+     */
+    public Map<String,Object> invoiceInputLedger(String keyword, int page, int size) {
+        StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
+        java.util.ArrayList<Object> params = new java.util.ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String k = "%" + keyword.trim() + "%";
+            where.append(" AND (r.source_no LIKE ? OR r.seller_name LIKE ? OR r.seller_tax_no LIKE ?" +
+                    " OR r.invoice_kind LIKE ? OR r.invoice_status LIKE ? OR r.drawer LIKE ?)");
+            for (int i = 0; i < 6; i++) params.add(k);
+        }
+        Long total = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM h3_input_invoices r" + where, Long.class, params.toArray());
+        params.add(size); params.add((page - 1) * size);
+        List<Map<String,Object>> items = jdbc.query("""
+                SELECT r.id,r.source_no,r.seller_tax_no,r.seller_name,r.buyer_name,r.invoice_date,
+                       r.amount,r.tax_amount,r.total_amount,r.invoice_kind,r.invoice_status,
+                       r.is_positive,r.drawer,r.invoice_date
+                  FROM h3_input_invoices r
+                """ + where + " ORDER BY r.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+        return page(items, total, page, size);
+    }
+
+    /** 进项发票详情：单表全字段（无子表）。行级历史键 = 数电发票号码。 */
+    public Map<String,Object> invoiceInputDetail(Long id) {
+        Map<String,Object> row = oneRow("""
+                SELECT r.id,r.external_source,r.external_id,r.source_no,r.seller_tax_no,r.seller_name,
+                       r.buyer_tax_no,r.buyer_name,r.invoice_date,r.amount,r.tax_amount,r.total_amount,
+                       r.invoice_source,r.invoice_kind,r.invoice_status,r.is_positive,r.risk_level,
+                       r.drawer,r.remark,r.source_hash,r.last_synced_at,r.created_at,r.updated_at
+                  FROM h3_input_invoices r
+                 WHERE r.id=? AND r.external_source='H3YUN'
+                """, "进项发票", id);
+        return Map.of("kind", "invoiceInput", "row", row, "rows", List.of());
+    }
+
+    /**
+     * 销项发票台账（V312，第 16 类）：4 174 张 + 收款子行（校验源，收款权威=销售出库 §9.3）。
+     * 搜索覆盖购买方/票号/付款方式/业务员/状态。
+     */
+    public Map<String,Object> invoiceSalesLedger(String keyword, int page, int size) {
+        StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
+        java.util.ArrayList<Object> params = new java.util.ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String k = "%" + keyword.trim() + "%";
+            where.append(" AND (r.source_no LIKE ? OR r.buyer_name LIKE ? OR r.buyer_tax_no LIKE ?" +
+                    " OR r.payment_method LIKE ? OR r.salesman LIKE ? OR r.invoice_status LIKE ?)");
+            for (int i = 0; i < 6; i++) params.add(k);
+        }
+        Long total = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM h3_sales_invoices r" + where, Long.class, params.toArray());
+        params.add(size); params.add((page - 1) * size);
+        List<Map<String,Object>> items = jdbc.query("""
+                SELECT r.id,r.source_no,r.buyer_tax_no,r.buyer_name,r.invoice_date,
+                       r.amount,r.tax_amount,r.total_amount,
+                       r.receipt_date,r.payment_method,r.receipt_amount,r.unreceived_amount,r.salesman,
+                       r.invoice_kind,r.invoice_status,r.is_positive,
+                       (SELECT COUNT(*) FROM h3_sales_invoice_receipts x WHERE x.invoice_id=r.id) receipt_count
+                  FROM h3_sales_invoices r
+                """ + where + " ORDER BY r.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+        return page(items, total, page, size);
+    }
+
+    /** 销项发票详情：主表全字段 + 收款登记子行（rows）。行级历史键 = 数电发票号码。 */
+    public Map<String,Object> invoiceSalesDetail(Long id) {
+        Map<String,Object> row = oneRow("""
+                SELECT r.id,r.external_source,r.external_id,r.source_no,r.seller_tax_no,r.seller_name,
+                       r.buyer_tax_no,r.buyer_name,r.invoice_date,r.amount,r.tax_amount,r.total_amount,
+                       r.receipt_date,r.payment_method,r.receipt_amount,r.unreceived_amount,
+                       r.salesman,r.remark,r.remark_platform,
+                       r.invoice_source,r.invoice_kind,r.invoice_status,r.is_positive,r.risk_level,r.drawer,
+                       r.source_hash,r.last_synced_at,r.created_at,r.updated_at
+                  FROM h3_sales_invoices r
+                 WHERE r.id=? AND r.external_source='H3YUN'
+                """, "销项发票", id);
+        List<Map<String,Object>> rows = jdbc.query("""
+                SELECT x.source_item_id,x.receipt_date,x.payment_method,x.receipt_amount,x.salesman,x.remark
+                  FROM h3_sales_invoice_receipts x
+                 WHERE x.invoice_id=? ORDER BY x.id
+                """, this::row, id);
+        return Map.of("kind", "invoiceSales", "row", row, "rows", rows);
+    }
+
+    /**
+     * 供应商应付台账（V313，第 17 类）：multiSheet 聚合的人工月度台账（幂等键=供应商#月份）。
+     * 搜索覆盖供应商/月份/付款方式/折让。resolved_* 由 RK 反查脚本回填（可空）。
+     */
+    public Map<String,Object> supplierPayableLedger(String keyword, int page, int size) {
+        StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
+        java.util.ArrayList<Object> params = new java.util.ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String k = "%" + keyword.trim() + "%";
+            where.append(" AND (r.supplier_name LIKE ? OR r.month_raw LIKE ? OR r.pay_method LIKE ?" +
+                    " OR CAST(r.allowance AS CHAR) LIKE ?)");
+            for (int i = 0; i < 4; i++) params.add(k);
+        }
+        Long total = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM h3_supplier_payables r" + where, Long.class, params.toArray());
+        params.add(size); params.add((page - 1) * size);
+        List<Map<String,Object>> items = jdbc.query("""
+                SELECT r.id,r.supplier_name,r.month_no,r.month_raw,r.payable_amount,r.settled_amount,
+                       r.allowance,r.pay_date,r.pay_method,r.pay_amount,r.remaining_amount,
+                       r.resolved_supplier_id,r.resolved_supplier_name
+                  FROM h3_supplier_payables r
+                """ + where + " ORDER BY r.supplier_name, r.month_no, r.id LIMIT ? OFFSET ?", this::row, params.toArray());
+        return page(items, total, page, size);
+    }
+
+    /** 供应商应付详情：单表全字段（无子表；RK/费用明细行不入库）。行级历史键 = 供应商#月份。 */
+    public Map<String,Object> supplierPayableDetail(Long id) {
+        Map<String,Object> row = oneRow("""
+                SELECT r.id,r.external_source,r.external_id,r.source_no,r.supplier_name,r.month_no,r.month_raw,
+                       r.payable_amount,r.settled_amount,r.allowance,r.pay_date,r.pay_method,r.pay_amount,
+                       r.remaining_amount,r.resolved_supplier_id,r.resolved_supplier_name,
+                       r.source_hash,r.last_synced_at,r.created_at,r.updated_at
+                  FROM h3_supplier_payables r
+                 WHERE r.id=? AND r.external_source='H3YUN'
+                """, "供应商应付", id);
+        return Map.of("kind", "supplierPayable", "row", row, "rows", List.of());
+    }
+
+    /**
+     * 流水日记账台账（V315，第 18 类）：35 张账户 sheet 聚合的 7 588 行账户分录（校验源，§9.3）。
+     * 账户维度（期初余额/币种/35 个账户）在 h3_cash_accounts，不在本台账；搜索覆盖账户/摘要/供应商/客户/报销人。
+     */
+    public Map<String,Object> cashflowJournalLedger(String keyword, int page, int size) {
+        StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
+        java.util.ArrayList<Object> params = new java.util.ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String k = "%" + keyword.trim() + "%";
+            where.append(" AND (r.account_name LIKE ? OR r.summary LIKE ? OR r.supplier_raw LIKE ?" +
+                    " OR r.counterparty_raw LIKE ? OR r.reimbursed_by LIKE ? OR r.invoiced LIKE ?)");
+            for (int i = 0; i < 6; i++) params.add(k);
+        }
+        Long total = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM h3_cashflow_entries r" + where, Long.class, params.toArray());
+        params.add(size); params.add((page - 1) * size);
+        List<Map<String,Object>> items = jdbc.query("""
+                SELECT r.id,r.account_name,r.entry_date,r.month_label,r.summary,r.supplier_raw,
+                       r.counterparty_raw,r.reimbursed_by,r.invoiced,r.income,r.expense,r.balance,
+                       r.fx_rate,r.fx_cny,r.settle_rate,r.settle_cny,r.fx_gain_loss
+                  FROM h3_cashflow_entries r
+                """ + where + " ORDER BY r.account_name, r.entry_date, r.id LIMIT ? OFFSET ?", this::row, params.toArray());
+        return page(items, total, page, size);
+    }
+
+    /** 流水日记账详情：单表全字段（无子表）。行级历史键 = external_id（账户#日期#收入#支出#结存#序号）。 */
+    public Map<String,Object> cashflowJournalDetail(Long id) {
+        Map<String,Object> row = oneRow("""
+                SELECT r.id,r.external_source,r.external_id,r.source_no,r.account_name,r.entry_date,r.month_label,
+                       r.summary,r.supplier_raw,r.counterparty_raw,r.reimbursed_by,r.invoiced,
+                       r.income,r.expense,r.balance,r.fx_rate,r.fx_cny,r.settle_rate,r.settle_cny,r.fx_gain_loss,
+                       r.source_hash,r.last_synced_at,r.created_at,r.updated_at
+                  FROM h3_cashflow_entries r
+                 WHERE r.id=? AND r.external_source='H3YUN'
+                """, "流水日记账", id);
+        return Map.of("kind", "cashflowJournal", "row", row, "rows", List.of());
+    }
+
+    /**
+     * 收银通收单流水台账（V316，第 19 类）：6 088 行微信收单记录（校验源）。
+     * 搜索覆盖摘要/业务员/付款人识别号/交易状态。
+     */
+    public Map<String,Object> cashierLogLedger(String keyword, int page, int size) {
+        StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
+        java.util.ArrayList<Object> params = new java.util.ArrayList<>();
+        if (keyword != null && !keyword.isBlank()) {
+            String k = "%" + keyword.trim() + "%";
+            where.append(" AND (r.summary LIKE ? OR r.salesperson LIKE ? OR r.payer_openid LIKE ?" +
+                    " OR r.status LIKE ?)");
+            for (int i = 0; i < 4; i++) params.add(k);
+        }
+        Long total = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM h3_cashier_log r" + where, Long.class, params.toArray());
+        params.add(size); params.add((page - 1) * size);
+        List<Map<String,Object>> items = jdbc.query("""
+                SELECT r.id,r.tx_time,r.status,r.amount,r.fee,r.payer_openid,r.summary,r.salesperson
+                  FROM h3_cashier_log r
+                """ + where + " ORDER BY r.tx_time, r.id LIMIT ? OFFSET ?", this::row, params.toArray());
+        return page(items, total, page, size);
+    }
+
+    /** 收银通详情：单表全字段（无子表）。行级历史键 = 时间#金额#付款人识别号。 */
+    public Map<String,Object> cashierLogDetail(Long id) {
+        Map<String,Object> row = oneRow("""
+                SELECT r.id,r.external_source,r.external_id,r.source_no,r.tx_time,r.status,r.amount,r.fee,
+                       r.payer_openid,r.summary,r.salesperson,r.source_hash,r.last_synced_at,r.created_at,r.updated_at
+                  FROM h3_cashier_log r
+                 WHERE r.id=? AND r.external_source='H3YUN'
+                """, "收银通流水", id);
+        return Map.of("kind", "cashierLog", "row", row, "rows", List.of());
+    }
+
     private Map<String,Object> oneRow(String sql, String label, Object... args) {
         List<Map<String,Object>> rows = jdbc.query(sql, this::row, args);
         if (rows.isEmpty()) throw new NoSuchElementException(label + "不存在或不属于氚云台账（id=" + args[0] + "）");

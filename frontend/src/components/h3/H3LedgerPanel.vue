@@ -546,6 +546,194 @@
         </el-table-column>
       </el-table>
     </template>
+    <template v-else-if="ledgerType === 'invoiceInput'">
+      <el-table v-loading="loading" :data="items" stripe>
+        <el-table-column prop="sourceNo" label="数电发票号码" width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.sourceNo || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="invoiceDate" label="开票日期" width="150" :formatter="dateCell" />
+        <el-table-column prop="sellerName" label="销方名称" min-width="220" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.sellerName || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="sellerTaxNo" label="销方识别号" width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.sellerTaxNo || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="amount" label="金额" width="110" align="right">
+          <template #default="{ row }">{{ money(row.amount) }}</template>
+        </el-table-column>
+        <el-table-column prop="taxAmount" label="税额" width="100" align="right">
+          <template #default="{ row }">{{ money(row.taxAmount) }}</template>
+        </el-table-column>
+        <el-table-column prop="totalAmount" label="价税合计" width="110" align="right">
+          <template #default="{ row }">{{ money(row.totalAmount) }}</template>
+        </el-table-column>
+        <el-table-column prop="invoiceKind" label="票种" width="180" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.invoiceKind || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="invoiceStatus" label="状态" width="110">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.invoiceStatus === '正常' ? 'success' : 'warning'">{{ row.invoiceStatus || '—' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="drawer" label="开票人" width="120" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.drawer || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="72" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </template>
+    <template v-else-if="ledgerType === 'invoiceSales'">
+      <el-table v-loading="loading" :data="items" stripe>
+        <el-table-column prop="sourceNo" label="数电发票号码" width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.sourceNo || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="invoiceDate" label="开票日期" width="150" :formatter="dateCell" />
+        <el-table-column prop="buyerName" label="购买方名称" min-width="220" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.buyerName || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="totalAmount" label="价税合计" width="110" align="right">
+          <template #default="{ row }">{{ money(row.totalAmount) }}</template>
+        </el-table-column>
+        <el-table-column prop="receiptDate" label="收款日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="paymentMethod" label="付款方式" width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.paymentMethod || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="receiptAmount" label="收款金额" width="110" align="right">
+          <template #default="{ row }">{{ money(row.receiptAmount) }}</template>
+        </el-table-column>
+        <el-table-column prop="unreceivedAmount" label="未收款" width="110" align="right">
+          <template #default="{ row }">{{ money(row.unreceivedAmount) }}</template>
+        </el-table-column>
+        <el-table-column prop="salesman" label="业务员" width="90" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.salesman || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="receiptCount" label="收款行" width="80" align="center" />
+        <el-table-column prop="invoiceStatus" label="状态" width="110">
+          <template #default="{ row }">
+            <el-tag size="small" :type="row.invoiceStatus === '正常' ? 'success' : 'warning'">{{ row.invoiceStatus || '—' }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="72" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </template>
+    <template v-else-if="ledgerType === 'supplierPayable'">
+      <el-table v-loading="loading" :data="items" stripe>
+        <el-table-column prop="supplierName" label="供应商" min-width="160" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.supplierName || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="monthNo" label="月份" width="80" align="center">
+          <template #default="{ row }">{{ row.monthNo ? row.monthNo + '月' : (row.monthRaw || '—') }}</template>
+        </el-table-column>
+        <el-table-column prop="payableAmount" label="应付货款" width="120" align="right">
+          <template #default="{ row }">{{ money(row.payableAmount) }}</template>
+        </el-table-column>
+        <el-table-column prop="settledAmount" label="结算货款" width="120" align="right">
+          <template #default="{ row }">{{ money(row.settledAmount) }}</template>
+        </el-table-column>
+        <el-table-column prop="allowance" label="折让" width="110" align="right">
+          <template #default="{ row }">{{ money(row.allowance) }}</template>
+        </el-table-column>
+        <el-table-column prop="payDate" label="付款日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="payMethod" label="付款方式" width="130" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.payMethod || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="payAmount" label="付款金额" width="120" align="right">
+          <template #default="{ row }">{{ money(row.payAmount) }}</template>
+        </el-table-column>
+        <el-table-column prop="remainingAmount" label="剩余货款" width="120" align="right">
+          <template #default="{ row }">{{ money(row.remainingAmount) }}</template>
+        </el-table-column>
+        <el-table-column prop="resolvedSupplierName" label="RK反查身份" min-width="160" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.resolvedSupplierName || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="72" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </template>
+    <template v-else-if="ledgerType === 'cashflowJournal'">
+      <el-table v-loading="loading" :data="items" stripe>
+        <el-table-column prop="accountName" label="账户" min-width="170" show-overflow-tooltip fixed="left">
+          <template #default="{ row }">{{ row.accountName || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="entryDate" label="日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="monthLabel" label="月份" width="70" align="center">
+          <template #default="{ row }">{{ row.monthLabel || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.summary || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="supplierRaw" label="供应商" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.supplierRaw || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="counterpartyRaw" label="客户 供应商" min-width="140" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.counterpartyRaw || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="reimbursedBy" label="报销人" width="100" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.reimbursedBy || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="invoiced" label="是否开票" width="90" align="center">
+          <template #default="{ row }">{{ row.invoiced || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="income" label="收入" width="120" align="right">
+          <template #default="{ row }">{{ money(row.income) }}</template>
+        </el-table-column>
+        <el-table-column prop="expense" label="支出" width="120" align="right">
+          <template #default="{ row }">{{ money(row.expense) }}</template>
+        </el-table-column>
+        <el-table-column prop="balance" label="结存" width="120" align="right">
+          <template #default="{ row }">{{ money(row.balance) }}</template>
+        </el-table-column>
+        <el-table-column v-if="fxMode" prop="fxRate" label="汇率" width="100" align="right">
+          <template #default="{ row }">{{ row.fxRate ?? '—' }}</template>
+        </el-table-column>
+        <el-table-column v-if="fxMode" prop="fxGainLoss" label="汇兑损益" width="110" align="right">
+          <template #default="{ row }">{{ row.fxGainLoss == null ? '—' : money(row.fxGainLoss) }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="72" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </template>
+    <template v-else-if="ledgerType === 'cashierLog'">
+      <el-table v-loading="loading" :data="items" stripe>
+        <el-table-column prop="txTime" label="交易完成时间" width="165" :formatter="dateTimeCell" />
+        <el-table-column prop="status" label="状态" width="80" align="center">
+          <template #default="{ row }">{{ row.status || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="amount" label="交易金额" width="120" align="right">
+          <template #default="{ row }">{{ money(row.amount) }}</template>
+        </el-table-column>
+        <el-table-column prop="fee" label="订单总扣费" width="120" align="right">
+          <template #default="{ row }">{{ money(row.fee) }}</template>
+        </el-table-column>
+        <el-table-column prop="payerOpenid" label="付款人识别号" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.payerOpenid || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="summary" label="摘要" min-width="200" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.summary || '—' }}</template>
+        </el-table-column>
+        <el-table-column prop="salesperson" label="业务员" width="100" show-overflow-tooltip>
+          <template #default="{ row }">{{ row.salesperson || '—' }}</template>
+        </el-table-column>
+        <el-table-column label="操作" width="72" fixed="right" align="center">
+          <template #default="{ row }">
+            <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+    </template>
     <div class="ledger-pager">
       <el-pagination
         v-model:current-page="page"
@@ -587,6 +775,11 @@ import {
   fetchInvoiceProfileLedger,
   fetchInvoiceRequestLedger,
   fetchProductionReportLedger,
+  fetchInvoiceInputLedger,
+  fetchInvoiceSalesLedger,
+  fetchSupplierPayableLedger,
+  fetchCashflowJournalLedger,
+  fetchCashierLogLedger,
   fetchLedgerDetail
 } from '@/api/business/orders'
 import { fetchProductCatalogLedger, fetchWarehouseStockLedger, fetchDealerLedger } from '@/api/productInventory'
@@ -611,7 +804,12 @@ const FETCHERS: Record<H3LedgerKind, (p: { keyword?: string; page?: number; size
   transfer: fetchTransferLedger,
   invoiceProfile: fetchInvoiceProfileLedger,
   invoiceRequest: fetchInvoiceRequestLedger,
-  productionReport: fetchProductionReportLedger
+  productionReport: fetchProductionReportLedger,
+  invoiceInput: fetchInvoiceInputLedger,
+  invoiceSales: fetchInvoiceSalesLedger,
+  supplierPayable: fetchSupplierPayableLedger,
+  cashflowJournal: fetchCashflowJournalLedger,
+  cashierLog: fetchCashierLogLedger
 }
 const META: Record<H3LedgerKind, { placeholder: string; hint: string }> = {
   outbound: {
@@ -673,6 +871,26 @@ const META: Record<H3LedgerKind, { placeholder: string; hint: string }> = {
   productionReport: {
     placeholder: '搜索工单号 / 工序 / 报工人 / 部门 / 产线',
     hint: '氚云生产报工（V311，第 15 类）：工序完工报工，粒度=生产工单×零部件制程（零部件流水号全表 10 值=工序模板，非 BOM/材料领料）。生产工单编号可关联生产工单台账（实测 87.8% 工单有报工）；数据状态全「已生效」、氚云无撤销原语，误报需 ERP 侧冲销。'
+  },
+  invoiceInput: {
+    placeholder: '搜索发票号 / 销方名称 / 税号 / 票种 / 状态',
+    hint: '进项发票（V312，第 16 类，税务平台全量导出）：实开口径权威源·进项侧（2026-09-18 拍板，氚云开票申请降为申请侧意向）。按数电发票号码幂等；数据只到 2026-08。'
+  },
+  invoiceSales: {
+    placeholder: '搜索发票号 / 购买方 / 付款方式 / 业务员 / 状态',
+    hint: '销项发票（V312，第 16 类，税务平台全量导出）：实开口径权威源·销项侧 + 多次收款登记子行。发票侧收款仅用于核对销售出库回款（收款权威=销售出库，不写收款事实）；「备注(平台)」列承载红冲链（被红冲蓝字发票号），负数票=红字发票。'
+  },
+  supplierPayable: {
+    placeholder: '搜索供应商 / 月份 / 付款方式 / 折让',
+    hint: '供应商应付（V313，第 17 类，《2026年各供应商明细.xlsx》）：55+ 张供应商 sheet 聚合的人工月度台账（应付/结算/折让/付款/剩余），补库内采购单应付侧残缺（paid_amount 全 0）。折让为独立一等概念；尾部 RK 明细行不入库（库内 purchase_receipts 已覆盖，实测 1064/1064 命中）；汇总 sheet 不导入。'
+  },
+  cashflowJournal: {
+    placeholder: '搜索账户 / 摘要 / 供应商 / 客户 / 报销人',
+    hint: '流水日记账（V315，第 18 类，《2026年流水日记账.xlsx》）：35 张账户 sheet 行级聚合 7 588 行分录（日期/收入/支出/结存 + 供应商/客户/报销人/是否开票人工标注），「上期结存」期初行转写账户期初余额（34 张有期初行），逐月空白填充行不入库。本表定位=校验源（收款权威=销售出库，§9.3），只核对不回写；汇总/Sheet2 字典/收银通 sheet 均不导入。'
+  },
+  cashierLog: {
+    placeholder: '搜索摘要 / 业务员 / 付款人识别号 / 状态',
+    hint: '收银通收单流水（V316，第 19 类，同文件「利强收银通」sheet）：6 088 行微信收单记录，幂等键=交易完成时间#金额#付款人识别号。401 行缺摘要/业务员（openid 未在人工字典 Sheet2 中）照常入库并告警；「订单总扣费」为手续费（源值带负号，原样存）。本表定位=校验源，只核对不回写。'
   }
 }
 const meta = computed(() => META[props.ledgerType])
@@ -760,6 +978,8 @@ function dateCell(_r: any, _c: any, v: any) {
 function dateTimeCell(_r: any, _c: any, v: any) {
   return v ? String(v).replace('T', ' ').slice(0, 19) : '—'
 }
+/** 流水日记账外币列（汇率/汇兑损益）仅在本页出现外币行时展示（人民币账户 35 张中 32 张无此列）。 */
+const fxMode = computed(() => items.value.some((r) => r.fxRate != null || r.fxGainLoss != null))
 
 defineExpose({ reload, keyword, items, total, page, size, loading })
 

@@ -365,7 +365,12 @@ const KIND_LABEL: Record<H3LedgerKind, string> = {
   transfer: '库存调拨',
   invoiceProfile: '开票资料',
   invoiceRequest: '开票申请',
-  productionReport: '生产报工'
+  productionReport: '生产报工',
+  invoiceInput: '进项发票',
+  invoiceSales: '销项发票',
+  supplierPayable: '供应商应付',
+  cashflowJournal: '流水日记账',
+  cashierLog: '收银通流水'
 }
 const kindLabel = computed(() => KIND_LABEL[props.ledgerType] || props.ledgerType)
 
@@ -1243,6 +1248,238 @@ const CFG: Record<H3LedgerKind, Cfg> = {
       }
     ],
     emptyText: '生产报工为单表，无子表明细'
+  },
+  invoiceInput: {
+    titleKey: 'sourceNo',
+    subtitleKeys: ['sellerName', 'invoiceKind', 'invoiceStatus', 'invoiceDate'],
+    sections: [
+      {
+        title: '发票信息',
+        fields: [
+          { key: 'sourceNo', label: '数电发票号码' },
+          { key: 'invoiceDate', label: '开票日期', fmt: 'dateTime' },
+          { key: 'invoiceKind', label: '发票票种' },
+          { key: 'invoiceSource', label: '发票来源' },
+          { key: 'invoiceStatus', label: '发票状态' },
+          { key: 'isPositive', label: '是否正数发票' },
+          { key: 'riskLevel', label: '发票风险等级' },
+          { key: 'drawer', label: '开票人' }
+        ]
+      },
+      {
+        title: '销方（供应商侧）',
+        fields: [
+          { key: 'sellerName', label: '销方名称', span: 2 },
+          { key: 'sellerTaxNo', label: '销方识别号', span: 2 },
+          { key: 'buyerName', label: '购买方名称（我方主体）' },
+          { key: 'buyerTaxNo', label: '购方识别号', span: 2 }
+        ]
+      },
+      {
+        title: '金额',
+        fields: [
+          { key: 'amount', label: '金额（不含税）', fmt: 'money' },
+          { key: 'taxAmount', label: '税额', fmt: 'money' },
+          { key: 'totalAmount', label: '价税合计', fmt: 'money' },
+          { key: 'remark', label: '备注', fmt: 'longText', span: 2 }
+        ]
+      },
+      {
+        title: '导入与系统信息',
+        fields: [
+          { key: 'externalId', label: '外部 ID（数电发票号码）' },
+          { key: 'sourceHash', label: '来源哈希', span: 2 },
+          { key: 'lastSyncedAt', label: '最后同步', fmt: 'dateTime' },
+          { key: 'createdAt', label: '入库时间', fmt: 'dateTime' },
+          { key: 'updatedAt', label: '更新时间', fmt: 'dateTime' },
+          { key: 'id', label: '记录 ID' }
+        ]
+      }
+    ],
+    emptyText: '进项发票为单表，无子表明细'
+  },
+  supplierPayable: {
+    titleKey: 'supplierName',
+    subtitleKeys: ['monthRaw', 'payMethod', 'payDate', 'remainingAmount'],
+    sections: [
+      {
+        title: '应付信息',
+        fields: [
+          { key: 'supplierName', label: '供应商（sheet 名）', span: 2 },
+          { key: 'monthNo', label: '月份' },
+          { key: 'monthRaw', label: '月份原值' },
+          { key: 'payableAmount', label: '应付货款', fmt: 'money' },
+          { key: 'settledAmount', label: '结算货款', fmt: 'money' },
+          { key: 'allowance', label: '折让（独立概念）', fmt: 'money' },
+          { key: 'remainingAmount', label: '剩余货款', fmt: 'money' }
+        ]
+      },
+      {
+        title: '付款信息',
+        fields: [
+          { key: 'payDate', label: '付款日期', fmt: 'date' },
+          { key: 'payMethod', label: '付款方式' },
+          { key: 'payAmount', label: '付款金额', fmt: 'money' }
+        ]
+      },
+      {
+        title: '身份反查与导入信息',
+        fields: [
+          { key: 'resolvedSupplierName', label: 'RK 反查正式身份', span: 2 },
+          { key: 'externalId', label: '外部 ID（供应商#月份）' },
+          { key: 'sourceHash', label: '来源哈希', span: 2 },
+          { key: 'lastSyncedAt', label: '最后同步', fmt: 'dateTime' },
+          { key: 'createdAt', label: '入库时间', fmt: 'dateTime' },
+          { key: 'updatedAt', label: '更新时间', fmt: 'dateTime' },
+          { key: 'id', label: '记录 ID' }
+        ]
+      }
+    ],
+    emptyText: '供应商应付为单表（尾部 RK/费用明细行不入库）'
+  },
+  cashflowJournal: {
+    titleKey: 'accountName',
+    subtitleKeys: ['entryDate', 'summary', 'income', 'expense', 'balance'],
+    sections: [
+      {
+        title: '分录信息',
+        fields: [
+          { key: 'accountName', label: '账户（sheet 名，源账户列不采信）', span: 2 },
+          { key: 'entryDate', label: '日期', fmt: 'date' },
+          { key: 'monthLabel', label: '月份（人工标注原值）' },
+          { key: 'summary', label: '摘要', span: 2 },
+          { key: 'income', label: '收入', fmt: 'money' },
+          { key: 'expense', label: '支出', fmt: 'money' },
+          { key: 'balance', label: '结存', fmt: 'money' }
+        ]
+      },
+      {
+        title: '人工标注字段（原样存，不解读）',
+        fields: [
+          { key: 'supplierRaw', label: '供应商', span: 2 },
+          { key: 'counterpartyRaw', label: '客户 供应商', span: 2 },
+          { key: 'reimbursedBy', label: '报销人' },
+          { key: 'invoiced', label: '是否开票' }
+        ]
+      },
+      {
+        title: '外币折算（仅睿包外币账户，人民币行全空）',
+        fields: [
+          { key: 'fxRate', label: '汇率' },
+          { key: 'fxCny', label: '人民币（折算）', fmt: 'money' },
+          { key: 'settleRate', label: '结汇汇率' },
+          { key: 'settleCny', label: '人民币（结汇）', fmt: 'money' },
+          { key: 'fxGainLoss', label: '汇兑损益', fmt: 'money' }
+        ]
+      },
+      {
+        title: '导入与系统信息',
+        fields: [
+          { key: 'externalId', label: '外部 ID（账户#日期#收入#支出#结存#序号）', span: 2 },
+          { key: 'sourceNo', label: '业务键（无单号，同外部 ID）', span: 2 },
+          { key: 'sourceHash', label: '来源哈希', span: 2 },
+          { key: 'lastSyncedAt', label: '最后同步', fmt: 'dateTime' },
+          { key: 'createdAt', label: '入库时间', fmt: 'dateTime' },
+          { key: 'updatedAt', label: '更新时间', fmt: 'dateTime' },
+          { key: 'id', label: '记录 ID' }
+        ]
+      }
+    ],
+    emptyText: '流水日记账为单表（「上期结存」伪行转写账户期初余额，不入分录）'
+  },
+  cashierLog: {
+    titleKey: 'summary',
+    subtitleKeys: ['txTime', 'amount', 'salesperson'],
+    sections: [
+      {
+        title: '交易信息',
+        fields: [
+          { key: 'txTime', label: '交易完成时间', fmt: 'dateTime' },
+          { key: 'status', label: '交易状态' },
+          { key: 'amount', label: '交易金额', fmt: 'money' },
+          { key: 'fee', label: '订单总扣费（手续费，源值带负号）', fmt: 'money' },
+          { key: 'payerOpenid', label: '付款人识别号', span: 2 },
+          { key: 'summary', label: '摘要（人工文本：折扣率+客户名+备注）', span: 2 },
+          { key: 'salesperson', label: '业务员' }
+        ]
+      },
+      {
+        title: '导入与系统信息',
+        fields: [
+          { key: 'externalId', label: '外部 ID（时间#金额#付款人识别号）', span: 2 },
+          { key: 'sourceHash', label: '来源哈希', span: 2 },
+          { key: 'lastSyncedAt', label: '最后同步', fmt: 'dateTime' },
+          { key: 'createdAt', label: '入库时间', fmt: 'dateTime' },
+          { key: 'updatedAt', label: '更新时间', fmt: 'dateTime' },
+          { key: 'id', label: '记录 ID' }
+        ]
+      }
+    ],
+    emptyText: '收银通收单流水为单表'
+  },
+  invoiceSales: {
+    titleKey: 'sourceNo',
+    subtitleKeys: ['buyerName', 'paymentMethod', 'invoiceStatus', 'invoiceDate'],
+    sections: [
+      {
+        title: '发票信息',
+        fields: [
+          { key: 'sourceNo', label: '数电发票号码' },
+          { key: 'invoiceDate', label: '开票日期', fmt: 'dateTime' },
+          { key: 'invoiceKind', label: '发票票种' },
+          { key: 'invoiceSource', label: '发票来源' },
+          { key: 'invoiceStatus', label: '发票状态' },
+          { key: 'isPositive', label: '是否正数发票（否=红字票）' },
+          { key: 'riskLevel', label: '发票风险等级' },
+          { key: 'drawer', label: '开票人' }
+        ]
+      },
+      {
+        title: '购买方（客户侧）',
+        fields: [
+          { key: 'buyerName', label: '购买方名称', span: 2 },
+          { key: 'buyerTaxNo', label: '购方识别号', span: 2 },
+          { key: 'sellerName', label: '销方名称（我方主体）' },
+          { key: 'sellerTaxNo', label: '销方识别号' },
+          { key: 'salesman', label: '业务员' }
+        ]
+      },
+      {
+        title: '金额与收款（校验源：收款权威=销售出库）',
+        fields: [
+          { key: 'amount', label: '金额（不含税）', fmt: 'money' },
+          { key: 'taxAmount', label: '税额', fmt: 'money' },
+          { key: 'totalAmount', label: '价税合计', fmt: 'money' },
+          { key: 'receiptDate', label: '收款日期', fmt: 'date' },
+          { key: 'paymentMethod', label: '付款方式（收款渠道）' },
+          { key: 'receiptAmount', label: '收款金额', fmt: 'money' },
+          { key: 'unreceivedAmount', label: '未收款金额', fmt: 'money' },
+          { key: 'remark', label: '备注（业务收款备注）', fmt: 'longText', span: 2 },
+          { key: 'remarkPlatform', label: '备注（平台红冲链）', fmt: 'longText', span: 2 }
+        ]
+      },
+      {
+        title: '导入与系统信息',
+        fields: [
+          { key: 'externalId', label: '外部 ID（数电发票号码）' },
+          { key: 'sourceHash', label: '来源哈希', span: 2 },
+          { key: 'lastSyncedAt', label: '最后同步', fmt: 'dateTime' },
+          { key: 'createdAt', label: '入库时间', fmt: 'dateTime' },
+          { key: 'updatedAt', label: '更新时间', fmt: 'dateTime' },
+          { key: 'id', label: '记录 ID' }
+        ]
+      }
+    ],
+    cols: [
+      { prop: 'sourceItemId', label: '子行键', width: 150 },
+      { prop: 'receiptDate', label: '收款日期', width: 110, fmt: 'date' },
+      { prop: 'paymentMethod', label: '付款方式', width: 130 },
+      { prop: 'receiptAmount', label: '收款金额', width: 120, fmt: 'money', align: 'right' },
+      { prop: 'salesman', label: '业务员', width: 90 },
+      { prop: 'remark', label: '备注', minWidth: 160 }
+    ],
+    colsLabel: '多次收款登记',
+    emptyText: '本票无多次收款登记行'
   }
 }
 

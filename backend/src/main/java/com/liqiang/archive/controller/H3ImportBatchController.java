@@ -151,6 +151,11 @@ public class H3ImportBatchController {
             case "invoiceProfile" -> queryService.invoiceProfileLedger(keyword, page, Math.min(size, 100));
             case "invoiceRequest" -> queryService.invoiceRequestLedger(keyword, page, Math.min(size, 100));
             case "productionReport" -> queryService.productionReportLedger(keyword, page, Math.min(size, 100));
+            case "invoiceInput" -> queryService.invoiceInputLedger(keyword, page, Math.min(size, 100));
+            case "invoiceSales" -> queryService.invoiceSalesLedger(keyword, page, Math.min(size, 100));
+            case "supplierPayable" -> queryService.supplierPayableLedger(keyword, page, Math.min(size, 100));
+            case "cashflowJournal" -> queryService.cashflowJournalLedger(keyword, page, Math.min(size, 100));
+            case "cashierLog" -> queryService.cashierLogLedger(keyword, page, Math.min(size, 100));
             default -> throw new IllegalArgumentException("未知台账类型：" + kind);
         };
     }
@@ -185,6 +190,11 @@ public class H3ImportBatchController {
             case "invoiceProfile" -> queryService.invoiceProfileDetail(id);
             case "invoiceRequest" -> queryService.invoiceRequestDetail(id);
             case "productionReport" -> queryService.productionReportDetail(id);
+            case "invoiceInput" -> queryService.invoiceInputDetail(id);
+            case "invoiceSales" -> queryService.invoiceSalesDetail(id);
+            case "supplierPayable" -> queryService.supplierPayableDetail(id);
+            case "cashflowJournal" -> queryService.cashflowJournalDetail(id);
+            case "cashierLog" -> queryService.cashierLogDetail(id);
             default -> throw new IllegalArgumentException("未知台账类型：" + kind);
         };
     }

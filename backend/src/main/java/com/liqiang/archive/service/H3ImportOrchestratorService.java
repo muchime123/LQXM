@@ -79,6 +79,12 @@ public class H3ImportOrchestratorService {
 case INVOICE_PROFILE, INVOICE_REQUEST -> List.of();
             // 生产报工（2026-09-17 第 15 类）：工序完工事实层，无回款/利润联动，不编排
             case PRODUCTION_REPORT -> List.of();
+            // 进项/销项发票（2026-09-18 第 16 类）：实开口径权威源 + 收款校验源（收款权威=销售出库，§9.3），不编排
+            case INVOICE_INPUT, INVOICE_SALES -> List.of();
+            // 供应商应付（2026-09-18 第 17 类）：月度应付事实层，无回款/利润联动，不编排
+            case SUPPLIER_PAYABLE -> List.of();
+            // 流水日记账 / 收银通收单流水（2026-09-18 第 18/19 类）：纯校验源（§9.3 拍板收款权威=销售出库），不编排
+            case CASHFLOW_JOURNAL, CASHIER_LOG -> List.of();
         };
     }
 

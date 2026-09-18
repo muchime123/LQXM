@@ -502,7 +502,12 @@ const ledgerTypes: Array<{ type: H3LedgerKind; label: string }> = [
   { type: 'supplier', label: '供应商' },
   { type: 'invoiceProfile', label: '开票资料' },
   { type: 'invoiceRequest', label: '开票申请' },
-  { type: 'productionReport', label: '生产报工' }
+  { type: 'productionReport', label: '生产报工' },
+  { type: 'invoiceInput', label: '进项发票' },
+  { type: 'invoiceSales', label: '销项发票' },
+  { type: 'supplierPayable', label: '供应商应付' },
+  { type: 'cashflowJournal', label: '流水日记账' },
+  { type: 'cashierLog', label: '收银通流水' }
 ]
 const section = ref<'import' | 'ledger'>('import')
 const ledgerType = ref<H3LedgerKind>('outbound')

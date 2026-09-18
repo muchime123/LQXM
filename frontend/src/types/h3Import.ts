@@ -23,6 +23,11 @@ export type H3FactType =
   | 'invoiceProfile'
   | 'invoiceRequest'
   | 'productionReport'
+  | 'invoiceInput'
+  | 'invoiceSales'
+  | 'supplierPayable'
+  | 'cashflowJournal'
+  | 'cashierLog'
 /** 产品台账批次导入（B 域 /api/product-inventory 的 {kind} 路径段） */
 export type LedgerImportKind = 'catalog' | 'stock' | 'dealer'
 /** 导入中心卡片统一 key：4 业务事实（type 直用）+ 产品/仓库/经销商台账卡 + 合并入库批次卡（仅列表展示） */
@@ -39,6 +44,11 @@ export type H3ImportKindKey =
   | 'invoiceProfile'
   | 'invoiceRequest'
   | 'productionReport'
+  | 'invoiceInput'
+  | 'invoiceSales'
+  | 'supplierPayable'
+  | 'cashflowJournal'
+  | 'cashierLog'
   | 'product'
   | 'stock'
   | 'dealer'
@@ -57,6 +67,11 @@ export type H3ImportDbType =
   | 'INVOICE_PROFILE'
   | 'INVOICE_REQUEST'
   | 'PRODUCTION_REPORT'
+  | 'INVOICE_INPUT'
+  | 'INVOICE_SALES'
+  | 'SUPPLIER_PAYABLE'
+  | 'CASHFLOW_JOURNAL'
+  | 'CASHIER_LOG'
   | 'PRODUCT_INFO'
   | 'WAREHOUSE_STOCK'
   | 'DEALER'
@@ -86,13 +101,15 @@ export type H3ImportGroup =
 export type H3ImportParticipation = 'in_accounting' | 'updates_master' | 'archive_only'
 /** 入口阶段：daily=日常入口直接可见；advanced=收进「历史数据导入」折叠区（低频/归档类） */
 export type H3ImportEntryStage = 'daily' | 'advanced'
-/** 历史台账 Tab（15 值：五类事实镜像 + 产品信息/仓库明细/经销商/供应商 + 其他入/出库/调拨 + 开票资料/开票申请 + 生产报工） */
+/** 历史台账 Tab（19 值：五类事实镜像 + 产品信息/仓库明细/经销商/供应商 + 其他入/出库/调拨 + 开票资料/开票申请 + 生产报工 + 进项/销项发票 + 供应商应付 + 流水日记账/收银通） */
 export type H3LedgerKind =
   | 'outbound' | 'production' | 'receipt' | 'settlement' | 'purchase'
   | 'product' | 'stock' | 'dealer' | 'supplier'
   | 'otherIn' | 'otherOut' | 'transfer'
   | 'invoiceProfile' | 'invoiceRequest'
   | 'productionReport'
+  | 'invoiceInput' | 'invoiceSales' | 'supplierPayable'
+  | 'cashflowJournal' | 'cashierLog'
 
 // ===== A 域 / B 域批次导入契约 =====
 export type LedgerRowAction = 'CREATE' | 'UPDATE' | 'UNCHANGED'

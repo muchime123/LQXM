@@ -54,6 +54,11 @@ public class H3LedgerRowHistoryService {
             Map.entry("invoiceProfile", List.of("INVOICE_PROFILE")),
             Map.entry("invoiceRequest", List.of("INVOICE_REQUEST")),
             Map.entry("productionReport", List.of("PRODUCTION_REPORT")),
+            Map.entry("invoiceInput", List.of("INVOICE_INPUT")),
+            Map.entry("invoiceSales", List.of("INVOICE_SALES")),
+            Map.entry("supplierPayable", List.of("SUPPLIER_PAYABLE")),
+            Map.entry("cashflowJournal", List.of("CASHFLOW_JOURNAL")),
+            Map.entry("cashierLog", List.of("CASHIER_LOG")),
             Map.entry("outbound", List.of("OUTBOUND", "NORMAL")),
             Map.entry("production", List.of("PRODUCTION")),
             Map.entry("receipt", List.of("RECEIPT")),
@@ -179,6 +184,20 @@ public class H3LedgerRowHistoryService {
             // 生产报工无业务单号：业务键 = 数据ID UUID（分组键同为数据ID）
             case "productionReport" -> jdbc.queryForList(
                     "SELECT TRIM(external_id) k, work_order_no title FROM h3_production_reports WHERE id=?", id);
+            // 进项/销项发票（2026-09-18 第 16 类）：分组键 = 数电发票号码（税务平台导出，无数据ID）
+            case "invoiceInput" -> jdbc.queryForList(
+                    "SELECT TRIM(source_no) k, seller_name title FROM h3_input_invoices WHERE id=?", id);
+            case "invoiceSales" -> jdbc.queryForList(
+                    "SELECT TRIM(source_no) k, buyer_name title FROM h3_sales_invoices WHERE id=?", id);
+            // 供应商应付（2026-09-18 第 17 类）：分组键 = 供应商sheet名#月份（multiSheet 人工台账）
+            case "supplierPayable" -> jdbc.queryForList(
+                    "SELECT TRIM(external_id) k, supplier_name title FROM h3_supplier_payables WHERE id=?", id);
+            // 流水日记账（第 18 类）：分组键 = 行级 external_id（账户#日期#收入#支出#结存#序号）
+            case "cashflowJournal" -> jdbc.queryForList(
+                    "SELECT TRIM(external_id) k, account_name title FROM h3_cashflow_entries WHERE id=?", id);
+            // 收银通收单流水（第 19 类）：分组键 = 时间#金额#付款人识别号
+            case "cashierLog" -> jdbc.queryForList(
+                    "SELECT TRIM(external_id) k, summary title FROM h3_cashier_log WHERE id=?", id);
             default -> throw new IllegalArgumentException("未知台账类型：" + kind);
         };
         if (rows.isEmpty()) throw new NoSuchElementException("台账记录不存在：" + kind + "/" + id);

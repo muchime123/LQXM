@@ -142,3 +142,8 @@ frontend/*.timestamp-*.mjs
 /_*.json
 /journal_probe*.txt
 /p_journal*.py
+
+# --- Local edit backups & empty probe files (added 2026-09-18) ---
+*.bak-*
+/tools/activate_window.ps1
+/tools/add_git_to_path.ps1

@@ -135,6 +135,57 @@ public enum ImportKindDescriptor {
     PRODUCTION_REPORT("productionReport", "PRODUCTION_REPORT", "数据ID(不可修改)", "生产报工", KindDomain.BUSINESS_FACT,
             false, false),
 
+    /**
+     * 进项发票（2026-09-18 第 16 类，G2 实开口径权威源·进项侧）：税务平台全量导出单表，2 382 行。
+     * 非氚云导出件（无数据ID列）→ 幂等键 = 数电发票号码（实测唯一）。keyHeader 即数电发票号码。
+     * LQ 拍板（§9.3）：实开口径以发票明细为权威，氚云开票申请降为申请侧意向。
+     * 同文件「销项发票」sheet 表头不同（matchesTemplate 以收款金额区分）→ 各自 stage 一次。
+     */
+    INVOICE_INPUT("invoiceInput", "INVOICE_INPUT", "数电发票号码", "进项发票", KindDomain.BUSINESS_FACT,
+            false, false),
+
+    /**
+     * 销项发票（2026-09-18 第 16 类，G2 实开口径权威源·销项侧）：4 174 主行 + 512 收款子行。
+     * ⚠️ sheet 实为主子结构：无票号行=多次收款登记（挂靠前一行发票），childCount 按缺数电发票号码判定。
+     * ⚠️ 同名列 ×2：「备注」第 17 列=人工收款备注 / 第 24 列=平台红冲备注（0 行同时非空）→
+     *   解析层把第二列改名「备注(平台)」（putHeader，仓管员/报工人同款陷阱）。
+     * 收款字段只作校验源（收款权威=销售出库，§9.3），不写 receipts、不触发编排。
+     */
+    INVOICE_SALES("invoiceSales", "INVOICE_SALES", "数电发票号码", "销项发票", KindDomain.BUSINESS_FACT,
+            true, false),
+
+    /**
+     * 供应商应付（2026-09-18 第 17 类，G1 应付侧权威补缺）：《2026年各供应商明细.xlsx》55+ 张
+     * 供应商 sheet（每张 12 个月度行：应付货款/结算货款/折让/付款日期/方式/金额/剩余货款）。
+     * ⭐ 首个 multiSheet kind：管线聚合所有匹配模板的 sheet，sheet 名注入「供应商」列、
+     *   组键改为 sheet名#月份；汇总/封口机/异构 sheet 由 matchesTemplate（8 列模板）排除。
+     * 幂等键 = sheet名#月份（人工月度台账无业务单号）。⚠️ 尾部 RK/费用明细行不入库：
+     *   RK 已由 purchase_receipts 覆盖（1064/1064 命中），费用行是人工脏结构（见口径手册 §9）。
+     */
+    SUPPLIER_PAYABLE("supplierPayable", "SUPPLIER_PAYABLE", "月份", "供应商应付", KindDomain.BUSINESS_FACT,
+            false, false, true),
+
+    /**
+     * 流水日记账（2026-09-18 第 18 类，G5 资金校验源）：《2026年流水日记账.xlsx》35 张账户
+     * sheet（12 列基线 + 3 张外币 sheet 多汇率列）。multiSheet kind：sheet 名 = 账户名。
+     * 无任何业务单号/数据ID → 幂等键 = 账户#日期#收入#支出#结存#n（n=同键序号，
+     * 实测同键最多 3 行）。期初行（摘要=上期结存）组键 = 账户#期初 → 写账户维度表期初余额；
+     * 其余无日期无收支的空白填充行不入组（否则恒判 CREATE 永不收敛）。
+     * 日期三分支：datetime 显示串（须剥 POI 带出的引号，如 2026"年"1"月"1"日"）/ Excel 序列号。
+     * 供应商/客户/摘要/月份/报销人/是否开票均为人工自由文本，只存 _raw 原文（校验源纪律）。
+     */
+    CASHFLOW_JOURNAL("cashflowJournal", "CASHFLOW_JOURNAL", "日期", "流水日记账", KindDomain.BUSINESS_FACT,
+            false, false, true),
+
+    /**
+     * 收银通收单流水（2026-09-18 第 19 类，G5 资金校验源·微信收单侧）：
+     * 同文件「利强收银通」sheet 单表 6088 行（交易完成时间/状态/金额/扣费/openid/摘要/业务员）。
+     * 幂等键 = 时间#金额#openid（实测零重复）。401 行缺摘要/业务员（openid 未在人工字典 Sheet2
+     * 中）→ 照常入库 + 告警计数。摘要为「折扣率+客户名+备注」人工文本，不解读不清洗。
+     */
+    CASHIER_LOG("cashierLog", "CASHIER_LOG", "交易完成时间", "收银通流水", KindDomain.BUSINESS_FACT,
+            false, false),
+
     // ==================== B 域：历史台账（库存类产品/仓库档案） ====================
 
     /** 产品信息台账：按产品编码逐行比对增量写入 h3_product_catalog，无表头识别（列位固定）。 */
@@ -172,9 +223,16 @@ public enum ImportKindDescriptor {
     private final boolean detailSubTable;
     /** confirm 提交后是否需要触发编排刷新（目前仅销售出库）。 */
     private final boolean orchestrates;
+    /** 是否多 sheet 聚合（同一文件所有匹配模板的 sheet 都导入，sheet 名注入「供应商」列）。 */
+    private final boolean multiSheet;
 
     ImportKindDescriptor(String route, String dbType, String keyHeader, String displayName,
                          KindDomain domain, boolean detailSubTable, boolean orchestrates) {
+        this(route, dbType, keyHeader, displayName, domain, detailSubTable, orchestrates, false);
+    }
+
+    ImportKindDescriptor(String route, String dbType, String keyHeader, String displayName,
+                         KindDomain domain, boolean detailSubTable, boolean orchestrates, boolean multiSheet) {
         this.route = route;
         this.dbType = dbType;
         this.keyHeader = keyHeader;
@@ -182,6 +240,7 @@ public enum ImportKindDescriptor {
         this.domain = domain;
         this.detailSubTable = detailSubTable;
         this.orchestrates = orchestrates;
+        this.multiSheet = multiSheet;
     }
 
     /** 前端路由 key / 控制器 kind 参数（小写），如 outbound / catalog。 */
@@ -207,6 +266,9 @@ public enum ImportKindDescriptor {
 
     /** confirm 后是否触发编排刷新（含自动跟踪）。 */
     public boolean orchestrates() { return orchestrates; }
+
+    /** 是否多 sheet 聚合 kind（所有匹配模板 sheet 全导入 + sheet 名注入）。 */
+    public boolean multiSheet() { return multiSheet; }
 
     /** 是否 B 域台账（ledger）。 */
     public boolean isLedger() { return domain == KindDomain.LEDGER; }
