@@ -11,6 +11,7 @@ import com.liqiang.archive.dto.H3FactImportDtos.FieldChange;
 import com.liqiang.archive.dto.H3FactImportDtos.StageAccepted;
 import com.liqiang.archive.dto.H3FactImportDtos.StagingPreview;
 import com.liqiang.archive.util.ChinaAddressParser;
+import com.liqiang.archive.util.H3SnapshotKey;
 import com.liqiang.archive.util.SupplierNameNormalizer;
 import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
@@ -535,10 +536,32 @@ return result;
 private boolean unchanged(ExistingFact existing, Group incoming) {
     if (existing == null) return false;
     if (Objects.equals(existing.hash(), incoming.hash())) return true;
+    // 口径升级过渡：2026-09-18 起 source_hash 走 H3SnapshotKey 归一（表头空白/数值位数/日期分隔符）。
+    // 已入库行存的仍是旧口径哈希，若旧口径命中，说明差异只来自归一化本身、业务未变 → 判 UNCHANGED，
+    // 由调用方的 touch() 把哈希刷成新口径。惰性计算：稳态下现行口径先命中，这里不会执行，无额外开销。
+    if (legacyHash(incoming).equals(existing.hash())) return true;
     // 采购/生产/销售/收款主表用「修改时间(必填)」；供应商导出件表头为「修改时间」（无后缀）
     Timestamp incomingUpdatedAt = dateTime(first(incoming.main(), "修改时间(必填)", "修改时间"));
     return incomingUpdatedAt != null && existing.sourceUpdatedAt() != null
             && existing.sourceUpdatedAt().toLocalDateTime().equals(incomingUpdatedAt.toLocalDateTime());
+}
+
+/**
+ * 旧口径哈希（2026-09-18 之前：只排序字段名、不做表头/值归一）。
+ *
+ * <p>仅用于口径升级期的兼容回退——没有它，5 个无「修改时间」列的 kind
+ * （进项/销项发票、供应商应付、流水日记账、收银通）在换口径后会把全部行误判 UPDATE，
+ * 产生约 2.1 万行的一次性无谓写入。凡 {@code touch()} 已回写，即不再走本分支。
+ *
+ * <p><b>删除条件</b>：5 类各完成一轮重导（其 source_hash 全量刷成新口径）后，本方法连同
+ * {@link #unchanged} 中的回退分支可一并移除。在此之前<b>不得删除</b>——删了会立刻触发上述风暴。
+ */
+private String legacyHash(Group group) {
+    Map<String, Object> payload = new LinkedHashMap<>();
+    payload.put("key", group.key());
+    payload.put("main", new TreeMap<>(group.main()));
+    payload.put("rows", group.rows().stream().map(TreeMap::new).toList());
+    return hash(payload);
 }
 
 private Long existingId(FactType type, Group group) {
@@ -2357,12 +2380,19 @@ private void ensureSalespersonRelation(Long customerId, String salesperson, Stri
 
 private String json(Object value) { try{return objectMapper.writeValueAsString(value);}catch(JsonProcessingException e){throw new IllegalStateException("无法保存导入快照",e);} }
 
-/** 字段名排序后计算业务源哈希，使同一数据不受网页版/客户端导出列顺序影响。 */
+/**
+ * 计算业务源哈希（{@code source_hash}）。
+ *
+ * <p>判等口径集中在 {@link com.liqiang.archive.util.H3SnapshotKey}（唯一实现，勿在本方法内另写归一）：
+ * 表头归一（NFKC + 删内部空白）+ 值归一（数字规范十进制、日期规范形态）+ 键排序。
+ * 这样同一份氚云数据即使换导出渠道（网页版/客户端）导致表头空白、数值位数、日期分隔符变化，
+ * 也不会被判成 UPDATE。审计原文仍保存在 {@code h3_import_rows.raw_data}，不受影响。
+ */
 private String hashGroup(String key, Map<String, String> main, List<Map<String, String>> rows) {
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("key", key);
-    payload.put("main", new TreeMap<>(main));
-    payload.put("rows", rows.stream().map(TreeMap::new).toList());
+    payload.put("main", H3SnapshotKey.canonicalize(main));
+    payload.put("rows", rows.stream().map(H3SnapshotKey::canonicalize).toList());
     return hash(payload);
 }
 
