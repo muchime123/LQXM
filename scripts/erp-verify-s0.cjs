@@ -24,30 +24,19 @@
 const fs = require('node:fs');
 const path = require('node:path');
 const mysql = require('mysql2/promise');
+const accounting = require('./erp-s0-accounting.cjs');
+const stock = require('./erp-s0-stock.cjs');
 
-const SCHEMA = 'erp_s0_verify';
+const SCHEMA = process.env.ERP_S0_SCHEMA || 'erp_s0_verify';
+if (!['erp_s0_verify', 'erp_s0_hardening'].includes(SCHEMA)) throw new Error('Unsafe verification schema');
 const EPS = 1e-9;                    // 数值比较容差（对应 nEq 的 1e-9）
 const C = 'CNY';
 
 // ---------------------------------------------------------------------------
 // 基础设施：连接、断言、序号
 // ---------------------------------------------------------------------------
-function loadDbConfig() {
-  const envPath = path.join(__dirname, '../backend/.env');
-  const env = Object.fromEntries(
-    fs.readFileSync(envPath, 'utf8')
-      .split(/\r?\n/)
-      .filter((l) => /^[A-Z_]+=/.test(l))
-      .map((l) => { const i = l.indexOf('='); return [l.slice(0, i), l.slice(i + 1).trim()]; })
-  );
-  return {
-    host: 'localhost',
-    port: 3306,
-    user: env.DB_USERNAME || 'root',
-    password: env.DB_PASSWORD || '',
-    multipleStatements: false,
-  };
-}
+const verification = require('./erp-verification-config.cjs');
+function loadDbConfig() { return verification.config(); }
 
 let conn;
 let seq = 1000;
@@ -93,7 +82,7 @@ class Checker {
     try {
       await fn();
     } catch (e) {
-      if (e.code && expectedCode && e.code !== expectedCode) {
+      if (!accounting.rejectionMatches(e, expectedCode)) {
         this.failures.push(`${label}: 期望拒绝码 ${expectedCode}，实际 ${e.code}（${e.message}）`);
       }
       return this;
@@ -321,7 +310,8 @@ async function postSalesOut(docId) {
     for (const l of lines) {
       const q = Number(l.base_quantity);
       await emitEvent(docId, l.id, 'ISSUE', doc.company_id, l.warehouse_id, l.sku_id, -q, { groupId });
-      await applyBalance(doc.company_id, l.warehouse_id, l.sku_id, -q);
+      const [[sku]] = await conn.query('SELECT base_unit FROM sku WHERE id=?', [l.sku_id]);
+      await stock.consumeAvailable(conn, doc.company_id, l.warehouse_id, l.sku_id, sku.base_unit, l.base_quantity);
       await conn.query(`UPDATE doc_line SET executed_base_qty = executed_base_qty + ? WHERE id=?`, [q, l.id]);
     }
     await conn.query(`UPDATE doc SET posting_status='POSTED' WHERE id=?`, [docId]);
@@ -551,24 +541,7 @@ async function itemState(itemId) {
 
 /** 核销（契约 §7.2）：同时校验资金剩余额度与项目未结额，原子提交 */
 async function allocate(fundId, itemId, amount) {
-  return inTx(async () => {
-    const f = await fundState(fundId);
-    const it = await itemState(itemId);
-    if (Number(amount) > f.available + EPS) {
-      throw new BizError('ALLOCATION_EXCEEDED', `可分配 ${f.available} < 本次 ${amount}`);
-    }
-    if (Number(amount) > it.outstanding + EPS) {
-      throw new BizError('ALLOCATION_EXCEEDED', `未结额 ${it.outstanding} < 本次 ${amount}`);
-    }
-    const id = nextId();
-    await conn.query(
-      `INSERT INTO settlement_allocation (id, fund_id, item_id, amount, status) VALUES (?,?,?,?, 'ACTIVE')`,
-      [id, fundId, itemId, amount]
-    );
-    await conn.query(`UPDATE fund_doc SET allocated_amount = allocated_amount + ? WHERE id=?`, [amount, fundId]);
-    await conn.query(`UPDATE ar_ap_item SET settled_amount = settled_amount + ? WHERE id=?`, [amount, itemId]);
-    return id;
-  });
+  return accounting.allocate(conn, fundId, itemId, amount, nextId());
 }
 
 /** 取消核销：保留反向记录，释放两侧额度，不改变资金 F（契约 §7.2 / T04） */
@@ -585,19 +558,7 @@ async function reverseAllocation(allocId) {
 
 /** 往来调整（契约 §7.2）：改变有效应结额，保留原额 */
 async function adjustItem(itemId, signedAmount) {
-  return inTx(async () => {
-    const it = await itemState(itemId);
-    const newOutstanding = it.outstanding + Number(signedAmount);
-    if (newOutstanding < -EPS) {
-      throw new BizError('REFUND_EXCEEDED', `调整后未结为负 ${newOutstanding}，拒绝`);
-    }
-    if (newOutstanding + EPS < it.settled) {
-      throw new BizError('ALLOCATION_EXCEEDED', `调整后应结 ${newOutstanding} 小于已核销 ${it.settled}`);
-    }
-    await conn.query(`UPDATE ar_ap_item SET adjusted_amount = adjusted_amount + ? WHERE id=?`,
-      [signedAmount, itemId]);
-    return itemId;
-  });
+  return accounting.adjustItem(conn, itemId, signedAmount);
 }
 
 /** 幂等请求（契约 §8）：同键同内容返回原结果；同键不同内容冲突 */
@@ -688,9 +649,11 @@ async function main() {
 
   const cfg = loadDbConfig();
   conn = await mysql.createConnection({ ...cfg, database: SCHEMA });
+  await verification.acquire(conn, SCHEMA);
   const results = [];
 
   const ids = Object.keys(CASES).sort();
+  if (want.some(id => !CASES[id])) { await conn.end(); throw new Error('Unknown case ID'); }
   for (const id of ids) {
     if (want.length && !want.includes(id)) continue;
     const c = CASES[id];
@@ -704,7 +667,18 @@ async function main() {
       status = 'ERROR';
       detail = e instanceof AssertionError ? e.message : `${e.code || e.name}: ${e.message}`;
     }
-    results.push({ id, title: c.title, status, detail });
+    const limitations = {
+      T06: 'Sequential simulation only; no concurrent stock service verified',
+      B11: 'Sequential simulation; see H01/H02 for independent-connection accounting tests',
+      T17: 'State and explicit SQL filter only; no identity/API authorization verified',
+      B19: 'Scope simulation only; no identity/API authorization verified',
+      B20: 'Schema check only; no actual import executed',
+      T15: 'Simplified invoice model only; no actual invoice integration',
+      X02: 'Legacy Number arithmetic; not an exact-decimal proof'
+    };
+    results.push({ id, title: c.title, status, detail,
+      evidenceLevel: limitations[id] ? 'LIMITED_MODEL' : 'S0_MODEL',
+      limitation: limitations[id] || 'S0 model only, not production ERP acceptance' });
     if (!asJson) {
       const icon = status === 'PASS' ? '\u2713' : (status === 'FAIL' ? '\u2717' : '!');
       console.log(`${icon} ${id.padEnd(5)} ${status.padEnd(6)} ${c.title}${detail ? '\n        -> ' + detail : ''}`);
@@ -732,7 +706,8 @@ async function main() {
   process.exitCode = fail + err > 0 ? 1 : 0;
 }
 
-main().catch((e) => {
+main().catch(async (e) => {
+  if (conn) await conn.end();
   console.error('harness 启动失败:', e.code || e.name, e.message);
   process.exitCode = 2;
 });

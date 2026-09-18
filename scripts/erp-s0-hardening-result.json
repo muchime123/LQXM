@@ -1,0 +1,39 @@
+{
+  "at": "2026-09-18T06:27:50.725Z",
+  "schema": "erp_s0_hardening",
+  "scope": "S0 accounting implementation only; no HTTP authorization or production ERP verification",
+  "results": [
+    {
+      "id": "H01_SHARED_FUND",
+      "status": "PASS"
+    },
+    {
+      "id": "H02_SHARED_ITEM",
+      "status": "PASS"
+    },
+    {
+      "id": "H03_EXACT_DATABASE_AMOUNT",
+      "status": "PASS"
+    },
+    {
+      "id": "H04_ADJUST_PARTIALLY_SETTLED",
+      "status": "PASS"
+    },
+    {
+      "id": "H05_SCOPE_AND_DIRECTION",
+      "status": "PASS"
+    },
+    {
+      "id": "H06_FAILURE_ROLLBACK",
+      "status": "PASS"
+    },
+    {
+      "id": "H07_NONPOSITIVE_AMOUNT",
+      "status": "PASS"
+    },
+    {
+      "id": "H08_CONCURRENT_STOCK",
+      "status": "PASS"
+    }
+  ]
+}

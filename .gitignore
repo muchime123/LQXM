@@ -134,3 +134,11 @@ frontend/*.timestamp-*.mjs
 /客户地区_人工处理清单_*.csv
 /财务对账_代表性出库单_*.{csv,html}
 /V174*.html
+
+# --- Root-level throwaway probes (AI/diagnostic one-off scripts & dumps, added 2026-09-18) ---
+/_*.ps1
+/_*.txt
+/_*.sql
+/_*.json
+/journal_probe*.txt
+/p_journal*.py

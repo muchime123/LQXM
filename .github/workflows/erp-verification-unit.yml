@@ -1,0 +1,14 @@
+name: ERP verification unit contracts
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+jobs:
+  accounting-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test scripts/erp-s0-accounting.test.cjs
