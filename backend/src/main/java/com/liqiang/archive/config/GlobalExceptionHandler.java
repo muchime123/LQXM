@@ -1,6 +1,7 @@
 package com.liqiang.archive.config;
 
 import com.liqiang.archive.dto.ApiResponse;
+import com.liqiang.archive.erp.ErpBusinessException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -22,6 +23,7 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.util.NestedServletException;
 
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -177,6 +179,28 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(SecurityException.class)
     public ResponseEntity<ApiResponse<Void>> handleForbidden(SecurityException ex) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN).body(ApiResponse.error(403, ex.getMessage()));
+    }
+
+    /**
+     * ERP 业务异常（技术方案映射 §5.1 / DA7）。
+     *
+     * <p>HTTP 状态码仍放在 {@code code}（前端现有判断不变），业务码、字段定位与可修正数据
+     * 放在 {@code data} 里，前端如需区分「同一个 422」的具体原因读 {@code data.errorCode}。
+     */
+    @ExceptionHandler(ErpBusinessException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> handleErpBusiness(ErpBusinessException ex) {
+        log.warn("ERP 业务校验失败 [{}]: {}", ex.errorCode().name(), ex.getMessage());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("errorCode", ex.errorCode().name());
+        if (ex.field() != null) {
+            body.put("field", ex.field());
+        }
+        if (!ex.detail().isEmpty()) {
+            body.put("detail", ex.detail());
+        }
+        return ResponseEntity.status(ex.errorCode().httpStatus())
+                .body(new ApiResponse<>(ex.errorCode().httpStatusCode(), ex.getMessage(), body, null,
+                        java.time.LocalDateTime.now()));
     }
 
     /** 钉钉集成未启用或凭证未配置（登录等场景返回 503 与明确提示）。 */
