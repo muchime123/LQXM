@@ -515,6 +515,7 @@ if (type == FactType.CASHFLOW_JOURNAL) {
     // 流水日记账（第 18 类）的既有事实横跨两张表：分录表（行级组键）+ 账户档案表（期初行）。
     // 期初行组键 = 账户名#期初 → 用 CONCAT(account_name,'#期初') 合成同型事实键，否则期初行
     // 每轮都查不到 existing、恒判 CREATE，台账永不收敛（首次实测每轮多计 34 条 CREATE）。
+    // ⚠️ SQL 无法引用 Java 常量，此处 '#期初' 必须与 CASHFLOW_OPENING_SUFFIX 保持同口径。
     sql = "SELECT id,external_id,source_hash,source_updated_at FROM h3_cashflow_entries WHERE external_source='H3YUN'"
         + " UNION ALL "
         + "SELECT id,CONCAT(account_name,'#期初') AS external_id,source_hash,source_updated_at"
@@ -529,39 +530,19 @@ return result;
 }
 
 /**
- * 网页版与客户端导出会调整列顺序，而旧 source_hash 对 LinkedHashMap 的字段顺序敏感。
- * 氚云主记录修改时间相同代表同一业务版本，可避免仅因导出列顺序变化误报 UPDATE；
- * 修改时间变化时仍以哈希差异判定更新，确保真实业务变化能够写入。
+ * 判等：优先比 {@code source_hash}（口径见 {@link H3SnapshotKey}，已对列顺序、表头空白、
+ * 数值与日期渲染做归一，导出渠道差异不再误报 UPDATE）；哈希未命中时，若氚云「修改时间」
+ * 相同，视为同一业务版本 —— 兜住归一化覆盖不到的残余渲染噪声。修改时间确实变化则仍按
+ * UPDATE 写入，确保真实业务变化不被吞掉（注意：5 个无「修改时间」列的 kind 走不到这一步，
+ * 判等 100% 依赖哈希，故其哈希口径必须保持稳定）。
  */
 private boolean unchanged(ExistingFact existing, Group incoming) {
     if (existing == null) return false;
     if (Objects.equals(existing.hash(), incoming.hash())) return true;
-    // 口径升级过渡：2026-09-18 起 source_hash 走 H3SnapshotKey 归一（表头空白/数值位数/日期分隔符）。
-    // 已入库行存的仍是旧口径哈希，若旧口径命中，说明差异只来自归一化本身、业务未变 → 判 UNCHANGED，
-    // 由调用方的 touch() 把哈希刷成新口径。惰性计算：稳态下现行口径先命中，这里不会执行，无额外开销。
-    if (legacyHash(incoming).equals(existing.hash())) return true;
     // 采购/生产/销售/收款主表用「修改时间(必填)」；供应商导出件表头为「修改时间」（无后缀）
     Timestamp incomingUpdatedAt = dateTime(first(incoming.main(), "修改时间(必填)", "修改时间"));
     return incomingUpdatedAt != null && existing.sourceUpdatedAt() != null
             && existing.sourceUpdatedAt().toLocalDateTime().equals(incomingUpdatedAt.toLocalDateTime());
-}
-
-/**
- * 旧口径哈希（2026-09-18 之前：只排序字段名、不做表头/值归一）。
- *
- * <p>仅用于口径升级期的兼容回退——没有它，5 个无「修改时间」列的 kind
- * （进项/销项发票、供应商应付、流水日记账、收银通）在换口径后会把全部行误判 UPDATE，
- * 产生约 2.1 万行的一次性无谓写入。凡 {@code touch()} 已回写，即不再走本分支。
- *
- * <p><b>删除条件</b>：5 类各完成一轮重导（其 source_hash 全量刷成新口径）后，本方法连同
- * {@link #unchanged} 中的回退分支可一并移除。在此之前<b>不得删除</b>——删了会立刻触发上述风暴。
- */
-private String legacyHash(Group group) {
-    Map<String, Object> payload = new LinkedHashMap<>();
-    payload.put("key", group.key());
-    payload.put("main", new TreeMap<>(group.main()));
-    payload.put("rows", group.rows().stream().map(TreeMap::new).toList());
-    return hash(payload);
 }
 
 private Long existingId(FactType type, Group group) {
@@ -1838,6 +1819,23 @@ private Timestamp cashierTime(String v) {
 }
 
 /**
+ * 流水日记账「期初行」组键后缀（组键 = 账户名 + 本后缀）。
+ * 与 {@code loadExistingFacts} 里的 {@code CONCAT(account_name,'#期初')} 必须同口径。
+ */
+private static final String CASHFLOW_OPENING_SUFFIX = "#期初";
+
+/** 该组是否为流水日记账期初行 —— 其既有事实在 {@code h3_cash_accounts}，不在分录表。 */
+private static boolean isCashflowOpeningGroup(Group g) {
+    return g.externalId() != null && g.externalId().endsWith(CASHFLOW_OPENING_SUFFIX);
+}
+
+/** 期初行组键 → 账户名（与 {@link #cashflowRowKey} 的期初分支互逆）。 */
+private static String cashflowAccountOf(Group g) {
+    String key = g.externalId();
+    return key.substring(0, key.length() - CASHFLOW_OPENING_SUFFIX.length());
+}
+
+/**
  * 流水日记账行级组键：账户#日期#收入#支出#结存#n（n = 同键序号，seq 由调用路径持有、按行序确定；
  * 「上期结存」伪行 material 同样唯一）。external_id=组键，重导同行序不变 → 幂等成立。
  */
@@ -1852,7 +1850,7 @@ private String cashflowRowKey(Map<String, String> values, String sheetName, Map<
         // 期初行：组键 = 账户#期初（不掺结存数值，避免金额修订后被判为新行）。
         // 该键与账户档案一一对应：loadExistingFacts 会把 h3_cash_accounts 以 账户名+"#期初"
         // 合成事实键代入比对 → 重导时判 UNCHANGED，收敛成立（详见 loadExistingFacts 注释）。
-        return sheetName + "#期初";
+        return sheetName + CASHFLOW_OPENING_SUFFIX;
     }
     String material = sheetName + "#" + orDash(values.get("日期")) + "#" + orDash(values.get("收入"))
             + "#" + orDash(values.get("支出")) + "#" + orDash(values.get("结存"));
@@ -2549,7 +2547,17 @@ public Result confirmFromStaging(Long batchId) {
         if ("UNCHANGED".equals(action)) {
             unchanged++;
             businessId = existing.id();
-            touch(factType, businessId, group.hash());
+            // ⚠️ 流水日记账期初行（组键 = 账户名#期初）的既有事实取自 h3_cash_accounts，
+            // existing.id() 是「账户表 id」而非分录表 id：直接 touch 会拿它去 UPDATE
+            // h3_cashflow_entries（实测命中 0 行 = 空操作），导致账户表 source_hash 永不刷新
+            // → 每次判等口径变更都要多跑一轮 UPDATE 才收敛（2026-09-21 删旧口径回退后实测：
+            // 首轮 3 行 UPDATE、次轮才 0）。故期初行改走账户表幂等 upsert，与 UPDATE 分支
+            // saveCashflowEntry 的期初分支同路径，hash 当轮即刷新。
+            if (factType == FactType.CASHFLOW_JOURNAL && isCashflowOpeningGroup(group)) {
+                upsertCashAccount(cashflowAccountOf(group), normDecimal(group.main().get("结存")), group.hash());
+            } else {
+                touch(factType, businessId, group.hash());
+            }
             // source_hash 只说明氚云源记录未变化，不能保证本地派生/历史修复未改写主表金额。
             // 销售出库的收款主表值以本批原始快照为准；同步不改变本批 UNCHANGED 计数。
             if (factType == FactType.OUTBOUND) {
