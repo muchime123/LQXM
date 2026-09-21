@@ -15,6 +15,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /** Opt-in real MySQL test: session-local temporary tables, no production schema or persistent rows. */
 @EnabledIfSystemProperty(named="erp.foundation.mysql", matches="true")
 class ErpFoundationMysqlTest {
+    static final ErpActor ACTOR = new ErpActor(23L, "李强");
     SingleConnectionDataSource source;
     JdbcTemplate jdbc;
     ErpIdempotencyService service;
@@ -27,29 +28,31 @@ class ErpFoundationMysqlTest {
         String url="jdbc:mysql://"+uri.getHost()+":"+(uri.getPort()<0?3306:uri.getPort())+"/erp_s0_hardening";
         source=new SingleConnectionDataSource(DriverManager.getConnection(url,env.getOrDefault("DB_USERNAME","root"),env.getOrDefault("DB_PASSWORD","")),true);
         jdbc=new JdbcTemplate(source);
-        jdbc.execute("CREATE TEMPORARY TABLE idem_request(request_key VARCHAR(100) PRIMARY KEY, action VARCHAR(64), payload_hash CHAR(64), result_ref VARCHAR(200)) ENGINE=InnoDB");
+        jdbc.execute("CREATE TEMPORARY TABLE idem_request(request_key VARCHAR(100) PRIMARY KEY, action VARCHAR(64), payload_hash CHAR(64), result_ref VARCHAR(200), created_by BIGINT) ENGINE=InnoDB");
         jdbc.execute("CREATE TEMPORARY TABLE foundation_probe(id INT PRIMARY KEY) ENGINE=InnoDB");
         jdbc.execute("CREATE TEMPORARY TABLE foundation_master("+ErpCommonColumns.MASTER_DATA_DDL+", PRIMARY KEY(id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         service=new ErpIdempotencyService(jdbc,new DataSourceTransactionManager(source));
     }
     @AfterEach void close() {if(source!=null)source.destroy();}
     @Test void rollbackThenRetryAndReplay() {
-        assertThrows(IllegalStateException.class,()->service.execute("k","post",Map.of("id",1),()->{
+        assertThrows(IllegalStateException.class,()->service.execute(ACTOR,"k","post",Map.of("id",1),()->{
             jdbc.update("INSERT INTO foundation_probe VALUES(1)");throw new IllegalStateException("injected");
         }));
         assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM foundation_probe",Integer.class));
         assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM idem_request",Integer.class));
-        assertEquals("1",service.execute("k","post",Map.of("id",1),()->{jdbc.update("INSERT INTO foundation_probe VALUES(1)");return "1";}));
-        assertEquals("1",service.execute("k","post",Map.of("id",1),()->fail("must not replay work")));
-        assertThrows(ErpBusinessException.class,()->service.execute("k","refund",Map.of("id",1),()->fail()));
+        assertEquals("1",service.execute(ACTOR,"k","post",Map.of("id",1),()->{jdbc.update("INSERT INTO foundation_probe VALUES(1)");return "1";}));
+        assertEquals("1",service.execute(ACTOR,"k","post",Map.of("id",1),()->fail("must not replay work")));
+        assertThrows(ErpBusinessException.class,()->service.execute(ACTOR,"k","refund",Map.of("id",1),()->fail()));
         assertEquals(1,jdbc.queryForObject("SELECT COUNT(*) FROM foundation_probe",Integer.class));
+        Long createdBy=jdbc.queryForObject("SELECT created_by FROM idem_request WHERE request_key='k'",Long.class);
+        assertEquals(23L, createdBy==null?-1L:createdBy.longValue());
     }
     @Test void idempotencyInsertFailureRollsBackBusinessWrite() {
-        jdbc.update("INSERT INTO idem_request VALUES('taken','post',?,'old')",service.hash(Map.of("id",1)));
+        jdbc.update("INSERT INTO idem_request VALUES('taken','post',?,'old',23)",service.hash(Map.of("id",1)));
         // Simulate a concurrent winner becoming visible only at insertion, without a second connection.
-        assertThrows(ErpBusinessException.class,()->service.execute("new","post",Map.of("id",1),()->{
+        assertThrows(ErpBusinessException.class,()->service.execute(ACTOR,"new","post",Map.of("id",1),()->{
             jdbc.update("INSERT INTO foundation_probe VALUES(2)");
-            jdbc.update("INSERT INTO idem_request VALUES('new','post',?,'winner')",service.hash(Map.of("id",1)));
+            jdbc.update("INSERT INTO idem_request VALUES('new','post',?,'winner',23)",service.hash(Map.of("id",1)));
             return "2";
         }));
         assertEquals(0,jdbc.queryForObject("SELECT COUNT(*) FROM foundation_probe",Integer.class));
