@@ -767,10 +767,15 @@ public class H3BusinessQueryService {
     /**
      * 供应商应付台账（V313，第 17 类）：multiSheet 聚合的人工月度台账（幂等键=供应商#月份）。
      * 搜索覆盖供应商/月份/付款方式/折让。resolved_* 由 RK 反查脚本回填（可空）。
+     * {@code supplier} 为 sheet 维度（= supplier_name）精确筛选，配合 {@link #supplierPayableSuppliers()} 汇总条使用。
      */
-    public Map<String,Object> supplierPayableLedger(String keyword, int page, int size) {
+    public Map<String,Object> supplierPayableLedger(String keyword, String supplier, int page, int size) {
         StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
+        if (supplier != null && !supplier.isBlank()) {
+            where.append(" AND r.supplier_name = ?");
+            params.add(supplier.trim());
+        }
         if (keyword != null && !keyword.isBlank()) {
             String k = "%" + keyword.trim() + "%";
             where.append(" AND (r.supplier_name LIKE ? OR r.month_raw LIKE ? OR r.pay_method LIKE ?" +
@@ -803,12 +808,40 @@ public class H3BusinessQueryService {
     }
 
     /**
+     * 供应商应付「sheet 维度」汇总：源文件 59 张供应商 sheet 各聚合一行（supplier_name=sheet 名）。
+     * 金额列合计与月数对应明细行；resolved_supplier_name 取该供应商下任一非空反查名（同供应商反查结论一致）。
+     * 供台账汇总条的下拉与小计使用；行数 = distinct supplier_name（58）。
+     */
+    public Map<String,Object> supplierPayableSuppliers() {
+        List<Map<String,Object>> items = jdbc.query("""
+                SELECT r.supplier_name,
+                       MAX(r.resolved_supplier_name) AS resolved_supplier_name,
+                       COUNT(*)                      AS month_count,
+                       COALESCE(SUM(r.payable_amount),0)   AS payable_amount,
+                       COALESCE(SUM(r.settled_amount),0)   AS settled_amount,
+                       COALESCE(SUM(r.allowance),0)        AS allowance,
+                       COALESCE(SUM(r.pay_amount),0)       AS pay_amount,
+                       COALESCE(SUM(r.remaining_amount),0) AS remaining_amount
+                  FROM h3_supplier_payables r
+                 WHERE r.external_source='H3YUN'
+                 GROUP BY r.supplier_name
+                 ORDER BY r.supplier_name
+                """, this::row);
+        return Map.of("items", items);
+    }
+
+    /**
      * 流水日记账台账（V315，第 18 类）：35 张账户 sheet 聚合的 7 588 行账户分录（校验源，§9.3）。
      * 账户维度（期初余额/币种/35 个账户）在 h3_cash_accounts，不在本台账；搜索覆盖账户/摘要/供应商/客户/报销人。
+     * {@code account} 为 sheet 维度（= account_name）精确筛选，配合 {@link #cashflowJournalAccounts()} 汇总条使用。
      */
-    public Map<String,Object> cashflowJournalLedger(String keyword, int page, int size) {
+    public Map<String,Object> cashflowJournalLedger(String keyword, String account, int page, int size) {
         StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
+        if (account != null && !account.isBlank()) {
+            where.append(" AND r.account_name = ?");
+            params.add(account.trim());
+        }
         if (keyword != null && !keyword.isBlank()) {
             String k = "%" + keyword.trim() + "%";
             where.append(" AND (r.account_name LIKE ? OR r.summary LIKE ? OR r.supplier_raw LIKE ?" +
@@ -838,6 +871,29 @@ public class H3BusinessQueryService {
                  WHERE r.id=? AND r.external_source='H3YUN'
                 """, "流水日记账", id);
         return Map.of("kind", "cashflowJournal", "row", row, "rows", List.of());
+    }
+
+    /**
+     * 流水日记账「sheet 维度」账户汇总：源文件 35 张账户 sheet 各聚合一行，对应 h3_cash_accounts 全表
+     * （账户档案由导入期初行回写，见 H3FactImportService.saveCashflowEntry / upsertCashAccount）。
+     * 收入/支出为该账户全部分录合计（外币账户为外币原值，与期初同币种）；期末 = 期初 + 收入 − 支出。
+     * 无分录的账户照常返回（LEFT JOIN，income/expense=0）。
+     */
+    public Map<String,Object> cashflowJournalAccounts() {
+        List<Map<String,Object>> items = jdbc.query("""
+                SELECT a.id, a.account_name, a.currency, a.opening_balance,
+                       COALESCE(SUM(e.income),0) AS income,
+                       COALESCE(SUM(e.expense),0) AS expense,
+                       a.opening_balance + COALESCE(SUM(e.income),0) - COALESCE(SUM(e.expense),0) AS closing_balance,
+                       COUNT(e.id) AS entry_count,
+                       MAX(e.entry_date) AS last_entry_date
+                  FROM h3_cash_accounts a
+                  LEFT JOIN h3_cashflow_entries e
+                         ON e.external_source='H3YUN' AND e.account_name = a.account_name
+                 GROUP BY a.id, a.account_name, a.currency, a.opening_balance
+                 ORDER BY a.id
+                """, this::row);
+        return Map.of("items", items);
     }
 
     /**

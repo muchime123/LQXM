@@ -18,6 +18,63 @@
       </span>
     </div>
 
+    <!-- sheet 维度汇总条（2026-09-21）：源文件「每账户/每供应商一个 sheet」的结构，以汇总下拉 + 小计还原。
+         选中 = 只看该 sheet 的行（后端精确筛选）；不选 = 全量平铺 + 全局合计。 -->
+    <div v-if="ledgerType === 'cashflowJournal'" v-loading="facetLoading" class="ledger-facet">
+      <el-select v-model="accountFilter" filterable clearable :placeholder="`全部账户（${accountSummaries.length}）`" class="ledger-facet__select" @change="reload(1)">
+        <el-option v-for="a in accountSummaries" :key="a.id" :value="a.accountName" :label="a.accountName">
+          <div class="facet-option">
+            <span>{{ a.accountName }}</span>
+            <span class="facet-option__right">{{ money(a.closingBalance) }} {{ a.currency }}</span>
+          </div>
+        </el-option>
+      </el-select>
+      <div class="ledger-facet__stats">
+        <template v-if="selectedAccount">
+          <span class="facet-chip">期初 <b>{{ money(selectedAccount.openingBalance) }}</b></span>
+          <span class="facet-chip facet-chip--in">收入 <b>{{ money(selectedAccount.income) }}</b></span>
+          <span class="facet-chip facet-chip--out">支出 <b>{{ money(selectedAccount.expense) }}</b></span>
+          <span class="facet-chip">期末 <b>{{ money(selectedAccount.closingBalance) }}</b> {{ selectedAccount.currency }}</span>
+          <span class="facet-chip">{{ selectedAccount.entryCount }} 笔</span>
+          <span class="facet-chip">最近 {{ selectedAccount.lastEntryDate ? String(selectedAccount.lastEntryDate).slice(0, 10) : '—' }}</span>
+        </template>
+        <template v-else>
+          <span class="facet-chip">{{ accountSummaries.length }} 个账户</span>
+          <span class="facet-chip facet-chip--in">收入合计 <b>{{ money(cashflowAgg.income) }}</b></span>
+          <span class="facet-chip facet-chip--out">支出合计 <b>{{ money(cashflowAgg.expense) }}</b></span>
+          <span v-if="cashflowAgg.foreignCount" class="facet-chip facet-chip--muted">含 {{ cashflowAgg.foreignCount }} 个外币账户，合计为原值混算</span>
+        </template>
+      </div>
+    </div>
+    <div v-else-if="ledgerType === 'supplierPayable'" v-loading="facetLoading" class="ledger-facet">
+      <el-select v-model="supplierFilter" filterable clearable :placeholder="`全部供应商（${supplierSummaries.length}）`" class="ledger-facet__select" @change="reload(1)">
+        <el-option v-for="s in supplierSummaries" :key="s.supplierName" :value="s.supplierName" :label="s.supplierName">
+          <div class="facet-option">
+            <span>{{ s.supplierName }}</span>
+            <span class="facet-option__right">剩 {{ money(s.remainingAmount) }}</span>
+          </div>
+        </el-option>
+      </el-select>
+      <div class="ledger-facet__stats">
+        <template v-if="selectedSupplier">
+          <span v-if="selectedSupplier.resolvedSupplierName" class="facet-chip facet-chip--muted">RK反查：{{ selectedSupplier.resolvedSupplierName }}</span>
+          <span class="facet-chip">应付 <b>{{ money(selectedSupplier.payableAmount) }}</b></span>
+          <span class="facet-chip">结算 <b>{{ money(selectedSupplier.settledAmount) }}</b></span>
+          <span class="facet-chip">折让 <b>{{ money(selectedSupplier.allowance) }}</b></span>
+          <span class="facet-chip">付款 <b>{{ money(selectedSupplier.payAmount) }}</b></span>
+          <span class="facet-chip">剩余 <b>{{ money(selectedSupplier.remainingAmount) }}</b></span>
+          <span class="facet-chip">{{ selectedSupplier.monthCount }} 个月</span>
+        </template>
+        <template v-else>
+          <span class="facet-chip">{{ supplierSummaries.length }} 家供应商</span>
+          <span class="facet-chip">应付合计 <b>{{ money(payableAgg.payable) }}</b></span>
+          <span class="facet-chip">折让合计 <b>{{ money(payableAgg.allowance) }}</b></span>
+          <span class="facet-chip">付款合计 <b>{{ money(payableAgg.pay) }}</b></span>
+          <span class="facet-chip">剩余合计 <b>{{ money(payableAgg.remaining) }}</b></span>
+        </template>
+      </div>
+    </div>
+
     <!-- 销售出库台账 -->
     <template v-if="ledgerType === 'outbound'">
       <el-table v-loading="loading" :data="items" stripe>
@@ -780,7 +837,11 @@ import {
   fetchSupplierPayableLedger,
   fetchCashflowJournalLedger,
   fetchCashierLogLedger,
-  fetchLedgerDetail
+  fetchLedgerDetail,
+  fetchCashflowAccounts,
+  fetchPayableSuppliers,
+  type CashAccountSummary,
+  type PayableSupplierSummary
 } from '@/api/business/orders'
 import { fetchProductCatalogLedger, fetchWarehouseStockLedger, fetchDealerLedger } from '@/api/productInventory'
 import { notify } from '@/composables/ui/useToast'
@@ -789,7 +850,7 @@ import type { H3LedgerKind, LedgerDetailResult, LedgerRow } from '@/api/business
 /** initialKeyword：从外部深链（如出库单详情 → 本页台账）带入的初始搜索词，仅挂载时生效一次 */
 const props = defineProps<{ ledgerType: H3LedgerKind; initialKeyword?: string }>()
 
-const FETCHERS: Record<H3LedgerKind, (p: { keyword?: string; page?: number; size?: number }) => Promise<{ items: LedgerRow[]; total: number }>> = {
+const FETCHERS: Record<H3LedgerKind, (p: { keyword?: string; account?: string; supplier?: string; page?: number; size?: number }) => Promise<{ items: LedgerRow[]; total: number }>> = {
   outbound: fetchOutboundLedger,
   production: fetchProductionLedger,
   receipt: fetchReceiptLedger,
@@ -902,11 +963,51 @@ const page = ref(1)
 const size = ref(20)
 const loading = ref(false)
 
+// ---- sheet 维度汇总条（仅 cashflowJournal / supplierPayable）：账户/供应商下拉 + 小计 ----
+const facetLoading = ref(false)
+const accountSummaries = ref<CashAccountSummary[]>([])
+const accountFilter = ref('')
+const supplierSummaries = ref<PayableSupplierSummary[]>([])
+const supplierFilter = ref('')
+const selectedAccount = computed(() => accountSummaries.value.find((a) => a.accountName === accountFilter.value) || null)
+const selectedSupplier = computed(() => supplierSummaries.value.find((s) => s.supplierName === supplierFilter.value) || null)
+/** 全账户合计：收入/支出为各账户原值直接相加（外币账户存在时以提示标注，不折算） */
+const cashflowAgg = computed(() => ({
+  income: accountSummaries.value.reduce((s, a) => s + Number(a.income || 0), 0),
+  expense: accountSummaries.value.reduce((s, a) => s + Number(a.expense || 0), 0),
+  foreignCount: accountSummaries.value.filter((a) => a.currency && a.currency !== 'CNY').length
+}))
+const payableAgg = computed(() => ({
+  payable: supplierSummaries.value.reduce((s, x) => s + Number(x.payableAmount || 0), 0),
+  allowance: supplierSummaries.value.reduce((s, x) => s + Number(x.allowance || 0), 0),
+  pay: supplierSummaries.value.reduce((s, x) => s + Number(x.payAmount || 0), 0),
+  remaining: supplierSummaries.value.reduce((s, x) => s + Number(x.remainingAmount || 0), 0)
+}))
+/** 汇总条数据独立于列表加载；失败只降级为无下拉，不阻断台账本身 */
+async function loadFacets() {
+  if (props.ledgerType !== 'cashflowJournal' && props.ledgerType !== 'supplierPayable') return
+  facetLoading.value = true
+  try {
+    if (props.ledgerType === 'cashflowJournal') accountSummaries.value = (await fetchCashflowAccounts()).items
+    else supplierSummaries.value = (await fetchPayableSuppliers()).items
+  } catch {
+    /* 汇总条非关键路径，静默降级 */
+  } finally {
+    facetLoading.value = false
+  }
+}
+
 async function reload(p?: number | undefined) {
   if (p !== undefined) page.value = p
   loading.value = true
   try {
-    const r = await FETCHERS[props.ledgerType]({ keyword: keyword.value || undefined, page: page.value, size: size.value })
+    const r = await FETCHERS[props.ledgerType]({
+      keyword: keyword.value || undefined,
+      account: accountFilter.value || undefined,
+      supplier: supplierFilter.value || undefined,
+      page: page.value,
+      size: size.value
+    })
     items.value = r.items
     total.value = r.total
   } catch (e: any) {
@@ -983,7 +1084,10 @@ const fxMode = computed(() => items.value.some((r) => r.fxRate != null || r.fxGa
 
 defineExpose({ reload, keyword, items, total, page, size, loading })
 
-onMounted(() => reload(1))
+onMounted(() => {
+  reload(1)
+  loadFacets()
+})
 </script>
 
 <style scoped>
@@ -1020,6 +1124,37 @@ onMounted(() => reload(1))
   font-variant-numeric: tabular-nums;
 }
 .ledger-pager { display: flex; justify-content: flex-end; margin-top: 14px; }
+/* sheet 维度汇总条：下拉 + 小计片（2026-09-21） */
+.ledger-facet {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.ledger-facet__select { width: 280px; }
+.ledger-facet__stats { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.facet-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill, 999px);
+  background: var(--color-surface-alt, #f6f8fa);
+  border: 1px solid var(--color-border-lighter, #eef2f6);
+  color: var(--color-text-muted, #64748b);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.facet-chip b {
+  color: var(--color-text-heading, #0f172a);
+  font-variant-numeric: tabular-nums;
+}
+.facet-chip--in b { color: var(--color-danger, #c0392b); }
+.facet-chip--out b { color: var(--color-success, #1e8e5a); }
+.facet-chip--muted { border-style: dashed; }
+.facet-option { display: flex; justify-content: space-between; align-items: center; gap: 16px; }
+.facet-option__right { color: var(--color-text-muted, #94a3b8); font-variant-numeric: tabular-nums; }
 .expand-body { padding: 4px 8px 12px; }
 .expand-hint { margin: 0 0 8px; font-size: 12px; color: var(--color-text-muted, #64748b); }
 .expand-empty { margin: 4px 0; font-size: 12px; color: var(--color-text-muted, #64748b); }

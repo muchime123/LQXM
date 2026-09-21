@@ -133,6 +133,8 @@ public class H3ImportBatchController {
     public Map<String, Object> ledger(@PathVariable String kind,
                                       @RequestParam(required = false) String keyword,
                                       @RequestParam(required = false) String filter,
+                                      @RequestParam(required = false) String account,
+                                      @RequestParam(required = false) String supplier,
                                       @RequestParam(defaultValue = "1") int page,
                                       @RequestParam(defaultValue = "50") int size) {
         return switch (kind) {
@@ -153,11 +155,27 @@ public class H3ImportBatchController {
             case "productionReport" -> queryService.productionReportLedger(keyword, page, Math.min(size, 100));
             case "invoiceInput" -> queryService.invoiceInputLedger(keyword, page, Math.min(size, 100));
             case "invoiceSales" -> queryService.invoiceSalesLedger(keyword, page, Math.min(size, 100));
-            case "supplierPayable" -> queryService.supplierPayableLedger(keyword, page, Math.min(size, 100));
-            case "cashflowJournal" -> queryService.cashflowJournalLedger(keyword, page, Math.min(size, 100));
+            case "supplierPayable" -> queryService.supplierPayableLedger(keyword, supplier, page, Math.min(size, 100));
+            case "cashflowJournal" -> queryService.cashflowJournalLedger(keyword, account, page, Math.min(size, 100));
             case "cashierLog" -> queryService.cashierLogLedger(keyword, page, Math.min(size, 100));
             default -> throw new IllegalArgumentException("未知台账类型：" + kind);
         };
+    }
+
+    /**
+     * sheet 维度汇总条（2026-09-21）：源文件「每账户/每供应商一个 sheet」的结构在台账以
+     * 汇总下拉 + 小计呈现。字面量路径，优先于 {@code /ledger/{kind}/{id}} 匹配。
+     */
+    @GetMapping("/ledger/cashflowJournal/accounts")
+    @RequirePermission({"integration.h3", "product_inventory.read"})
+    public Map<String, Object> cashflowJournalAccounts() {
+        return queryService.cashflowJournalAccounts();
+    }
+
+    @GetMapping("/ledger/supplierPayable/suppliers")
+    @RequirePermission({"integration.h3", "product_inventory.read"})
+    public Map<String, Object> supplierPayableSuppliers() {
+        return queryService.supplierPayableSuppliers();
     }
 
     /**

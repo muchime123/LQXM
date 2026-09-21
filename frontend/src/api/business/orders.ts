@@ -280,13 +280,45 @@ export async function fetchInvoiceInputLedger(params: { keyword?: string; page?:
 export async function fetchInvoiceSalesLedger(params: { keyword?: string; page?: number; size?: number }) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/invoiceSales', { params })).data
 }
-/** 供应商应付台账（V313 第 17 类；multiSheet 聚合人工月度台账，补库内应付侧残缺） */
-export async function fetchSupplierPayableLedger(params: { keyword?: string; page?: number; size?: number }) {
+/** 供应商应付台账（V313 第 17 类；multiSheet 聚合人工月度台账，补库内应付侧残缺）。supplier=sheet 维度精确筛选 */
+export async function fetchSupplierPayableLedger(params: { keyword?: string; supplier?: string; page?: number; size?: number }) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/supplierPayable', { params })).data
 }
-/** 流水日记账台账（V315 第 18 类；35 张账户 sheet 行级聚合 7 588 行分录，校验源·只核对不回写） */
-export async function fetchCashflowJournalLedger(params: { keyword?: string; page?: number; size?: number }) {
+/** 流水日记账台账（V315 第 18 类；35 张账户 sheet 行级聚合 7 588 行分录，校验源·只核对不回写）。account=sheet 维度精确筛选 */
+export async function fetchCashflowJournalLedger(params: { keyword?: string; account?: string; page?: number; size?: number }) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/cashflowJournal', { params })).data
+}
+
+/** 流水日记账账户汇总行（sheet 维度，源文件每账户一个 sheet；期末=期初+收入−支出，外币账户为外币原值） */
+export interface CashAccountSummary {
+  id: number
+  accountName: string
+  currency: string
+  openingBalance: number | null
+  income: number
+  expense: number
+  closingBalance: number
+  entryCount: number
+  lastEntryDate: string | null
+}
+/** 供应商应付供应商汇总行（sheet 维度，supplier_name=源 sheet 名） */
+export interface PayableSupplierSummary {
+  supplierName: string
+  resolvedSupplierName: string | null
+  monthCount: number
+  payableAmount: number
+  settledAmount: number
+  allowance: number
+  payAmount: number
+  remainingAmount: number
+}
+/** 流水日记账账户汇总（GET /h3-imports/ledger/cashflowJournal/accounts）：台账汇总条数据源 */
+export async function fetchCashflowAccounts() {
+  return (await http.get<{ items: CashAccountSummary[] }>('/h3-imports/ledger/cashflowJournal/accounts')).data
+}
+/** 供应商应付供应商汇总（GET /h3-imports/ledger/supplierPayable/suppliers）：台账汇总条数据源 */
+export async function fetchPayableSuppliers() {
+  return (await http.get<{ items: PayableSupplierSummary[] }>('/h3-imports/ledger/supplierPayable/suppliers')).data
 }
 /** 收银通收单流水台账（V316 第 19 类；微信收单 6088 行，校验源·只核对不回写） */
 export async function fetchCashierLogLedger(params: { keyword?: string; page?: number; size?: number }) {

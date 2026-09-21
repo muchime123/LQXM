@@ -15,7 +15,7 @@ import java.util.List;
  *   <li>{@code version}（并发乐观锁）与 {@code revision}（业务修订）**必须分列**——S0 骨架把两者
  *       合一，生产表要分开（契约 §2）。</li>
  *   <li>编码列用 {@code utf8mb4_0900_as_cs} 显式声明大小写敏感，不依赖库默认 collation；
- *       「唯一性只在启用范围生效」靠存储生成列 + 唯一键实现（M02）。</li>
+ *       编码一经分配即保留，停用后仍由 UNIQUE(code) 保证不复用（M02）。</li>
  * </ol>
  */
 public final class ErpCommonColumns {
@@ -40,7 +40,7 @@ public final class ErpCommonColumns {
     /** 主数据公共列 DDL 片段（追加到 CREATE TABLE 的列定义区）。 */
     public static final String MASTER_DATA_DDL = """
             id               BIGINT        NOT NULL AUTO_INCREMENT,
-            code             VARCHAR(64)   COLLATE utf8mb4_0900_as_cs NULL COMMENT '启用时必填；唯一性只在 ACTIVE 范围生效',
+            code             VARCHAR(64)   COLLATE utf8mb4_0900_as_cs NULL COMMENT '启用时必填；非空编码永久占用，停用不复用',
             name             VARCHAR(200)  NOT NULL COMMENT '名称不是身份键',
             lifecycle_status VARCHAR(20)   NOT NULL DEFAULT 'DRAFT' COMMENT 'DRAFT/ACTIVE/INACTIVE',
             version          INT           NOT NULL DEFAULT 0 COMMENT '并发乐观锁（与 revision 分列）',
@@ -53,9 +53,11 @@ public final class ErpCommonColumns {
             activated_by     BIGINT        NULL,
             disabled_at      DATETIME      NULL,
             disabled_by      BIGINT        NULL,
-            active_code      VARCHAR(64)   COLLATE utf8mb4_0900_as_cs
-                             GENERATED ALWAYS AS (IF(lifecycle_status = 'ACTIVE', code, NULL)) STORED
-                             COMMENT 'M02 唯一性只在启用范围生效：UNIQUE(active_code)'
+            UNIQUE KEY uk_master_code (code),
+            CHECK (
+                (code IS NULL AND lifecycle_status = 'DRAFT')
+                OR (code IS NOT NULL AND CHAR_LENGTH(TRIM(code)) > 0)
+            )
             """;
 
     /** 单据公共列 DDL 片段（追加到 CREATE TABLE 的列定义区）。 */

@@ -21,7 +21,7 @@ public enum ErpErrorCode {
     INVALID_STATE(HttpStatus.CONFLICT, "当前状态不允许该操作"),
     /** 乐观锁冲突：行已被他人修改。 */
     STALE_VERSION(HttpStatus.CONFLICT, "数据已被他人修改，请刷新后重试"),
-    /** 编码冲突（M02：唯一性只在启用范围生效，故此处指 ACTIVE 范围内重码）。 */
+    /** 编码冲突（M02：非空编码终身占用，包含停用对象）。 */
     CODE_CONFLICT(HttpStatus.CONFLICT, "编码已被占用"),
     /** 生效区间重叠（M18：如 sku_conversion 同一产品的换算区间不得交叠）。 */
     EFFECTIVE_RANGE_OVERLAP(HttpStatus.CONFLICT, "生效区间与已有记录重叠"),
