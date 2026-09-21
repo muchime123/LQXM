@@ -105,6 +105,19 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/sales/CustomerView.vue'),
     meta: { title: '客户档案', layout: 'workspace', group: 'h3' }
   },
+  // ERP 正式销售出库单（P2）：把「有货直接出库」这条主线在 ERP 里跑通。
+  // 与 /h3-outbound-relations（氚云台账关联工作台）不是同一批数据：那个查历史台账，这个录 ERP 正式单。
+  {
+    path: '/sales-outbounds',
+    name: 'salesOutbounds',
+    component: () => import('../views/sales/SalesOutboundView.vue'),
+    meta: {
+      title: '销售出库',
+      layout: 'list',
+      permission: ['sales_order.read.self', 'sales_order.read.department', 'sales_order.read.all'],
+      group: 'sales'
+    }
+  },
   // P1-1：氚云导入中心（原 H3Business import stage 独立）
   {
     path: '/h3-imports',

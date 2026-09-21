@@ -15,20 +15,107 @@ import java.util.*;
 public class ProductInventoryService {
     private final JdbcTemplate jdbc;private final CurrentUserService users;
 
+    /**
+     * 确保一张正式生产任务有一个「交易产品身份」，并返回该身份 id。
+     *
+     * <p><b>归一口径（2026-09-21 / Q1 拍板）</b>：先按 (名称, 规格, 单位) 找**唯一**的氚云标准
+     * SKU（{@code external_id IS NOT NULL}）——找到就直接复用，**不造 {@code MFG-}**；找不到才造
+     * {@code MFG-<工单号>} 作为「订单专属产出标识」（编码保留、可追溯到工单）。
+     *
+     * <p>无论走哪条路，都会保证 {@code canonical_product_id} 有值：它是**库存聚合维度**，
+     * 库存余额按它唯一。这样即使某张单造了独立身份，只要它归一到某个标准 SKU，库存就不会
+     * 分裂成 N 个 product_id（这正是 Q1 要保留 {@code MFG-} 又不保留缺陷的关键）。
+     *
+     * <p>匹配刻意保守：命中 0 个或多个一律不归一（{@link #findCanonicalProduct}）。
+     * 错合并两件不同的货是不可逆的，各自独立只是暂时没聚合——两者代价不对称。
+     */
     @Transactional
     public long ensureManufacturingProduct(long orderId,String orderNo,String name,String specification,String unit){
         Long linked=jdbc.queryForObject("SELECT sales_product_id FROM manufacturing_orders WHERE id=?",Long.class,orderId);if(linked!=null)return linked;
-        var exact=jdbc.queryForList("SELECT id FROM sales_products WHERE deleted_at IS NULL AND product_name=? AND COALESCE(specification,'')=? AND COALESCE(unit,'')=?",Long.class,name,clean(specification),clean(unit));
-        long productId;if(exact.size()==1)productId=exact.getFirst();else{String code="MFG-"+orderNo;jdbc.update("INSERT INTO sales_products(product_code,product_name,specification,unit,source,status,remark) VALUES(?,?,?,?, 'MANUFACTURING','PENDING_REVIEW','由正式生产任务自动建立的交易产品身份') ON DUPLICATE KEY UPDATE id=id",code,name,blank(specification),unit);productId=jdbc.queryForObject("SELECT id FROM sales_products WHERE product_code=?",Long.class,code);}
+        Long exact=findCanonicalProduct(name,specification,unit);
+        long productId;
+        if(exact!=null){productId=exact;}
+        else{
+            String code="MFG-"+orderNo;
+            jdbc.update("INSERT INTO sales_products(product_code,product_name,specification,unit,source,status,remark) VALUES(?,?,?,?, 'MANUFACTURING','PENDING_REVIEW','由正式生产任务自动建立的交易产品身份') ON DUPLICATE KEY UPDATE id=id",code,name,blank(specification),unit);
+            productId=jdbc.queryForObject("SELECT id FROM sales_products WHERE product_code=?",Long.class,code);
+            // 新造的身份先归自身；若将来同一件货在氚云建了标准 SKU，由归一迁移一次性回填
+            jdbc.update("UPDATE sales_products SET canonical_product_id=? WHERE id=? AND canonical_product_id IS NULL",productId,productId);
+        }
         jdbc.update("UPDATE manufacturing_orders SET sales_product_id=? WHERE id=? AND sales_product_id IS NULL",productId,orderId);return productId;
     }
 
+    /**
+     * 归一口径**唯一实现**（与 V320 回填同口径，勿在别处另写一份）。
+     *
+     * <p>按 (名称, 规格, 单位) 精确匹配、且限定 {@code external_id IS NOT NULL}（只归一到氚云标准 SKU，
+     * 不归到另一个 {@code MFG-}）。
+     *
+     * @return 命中恰好 1 个时返回其 id；命中 0 个或多个返回 {@code null}（不归一）
+     */
+    private Long findCanonicalProduct(String name,String specification,String unit){
+        var hits=jdbc.queryForList("SELECT id FROM sales_products WHERE deleted_at IS NULL AND external_id IS NOT NULL AND product_name=? AND COALESCE(specification,'')=? AND COALESCE(unit,'')=?",Long.class,name,clean(specification),clean(unit));
+        return hits.size()==1?hits.getFirst():null;
+    }
+
+    /** 产品身份的库存聚合口径（{@code canonical_product_id}）；未设置或查不到时回退自身。 */
+    private long canonicalOf(long productId){
+        var rows=jdbc.queryForList("SELECT COALESCE(canonical_product_id,id) c FROM sales_products WHERE id=?",Long.class,productId);
+        return rows.isEmpty()?productId:rows.getFirst();
+    }
+
+    /**
+     * 记一笔库存变动：余额按 **canonical 口径**聚合，流水同时记业务身份与归一口径。
+     *
+     * <p>为什么余额用 canonical 而不是 {@code sales_product_id}（2026-09-21 / Q1）：
+     * `MFG-<工单号>` 是按单造的身份，若余额按它唯一，同一件商品会分裂成 N 行、各 1 件，
+     * 「有货直接出库」永远判断不出来。改按 canonical 聚合后，多张工单产出的同款货累加在一行，
+     * 而流水仍保留 {@code sales_product_id} 供追溯「这笔货是哪张单产出的」。
+     *
+     * <p>库存不足抛异常 → 由调用方事务整体回滚（余额、流水、单据三者同生共死）。
+     */
     @Transactional
     public void post(long warehouseId,long productId,Long lotId,String name,String specification,String unit,String type,BigDecimal change,String sourceType,long sourceId,String sourceNo,LocalDateTime at,String remark){
-        jdbc.update("INSERT INTO product_inventory_balances(warehouse_id,sales_product_id,unit,quantity) VALUES(?,?,?,0) ON DUPLICATE KEY UPDATE id=id",warehouseId,productId,unit);
-        var balance=jdbc.queryForMap("SELECT id,quantity FROM product_inventory_balances WHERE warehouse_id=? AND sales_product_id=? AND unit=? FOR UPDATE",warehouseId,productId,unit);BigDecimal after=((BigDecimal)balance.get("quantity")).add(change);if(after.signum()<0)throw new IllegalStateException("统一产品库存不足，不能完成操作");
-        jdbc.update("UPDATE product_inventory_balances SET quantity=? WHERE id=?",after,balance.get("id"));String tmp="PENDING-"+UUID.randomUUID();var user=users.current();jdbc.update("INSERT INTO product_inventory_transactions(transaction_no,warehouse_id,sales_product_id,finished_goods_lot_id,product_name_snapshot,specification_snapshot,unit,transaction_type,quantity_change,balance_after,source_type,source_id,source_no,operator_employee_id,operator_name,occurred_at,remark) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",tmp,warehouseId,productId,lotId,name,blank(specification),unit,type,change,after,sourceType,sourceId,sourceNo,user.employeeId(),user.name(),at,blank(remark));long id=jdbc.queryForObject("SELECT id FROM product_inventory_transactions WHERE transaction_no=?",Long.class,tmp);jdbc.update("UPDATE product_inventory_transactions SET transaction_no=? WHERE id=?","PI"+String.format("%08d",id),id);
+        long canonicalId=canonicalOf(productId);
+        jdbc.update("INSERT INTO product_inventory_balances(warehouse_id,sales_product_id,canonical_product_id,unit,quantity) VALUES(?,?,?,?,0) ON DUPLICATE KEY UPDATE id=id",warehouseId,productId,canonicalId,unit);
+        var balance=jdbc.queryForMap("SELECT id,quantity FROM product_inventory_balances WHERE warehouse_id=? AND canonical_product_id=? AND unit=? FOR UPDATE",warehouseId,canonicalId,unit);BigDecimal after=((BigDecimal)balance.get("quantity")).add(change);if(after.signum()<0)throw new IllegalStateException("统一产品库存不足，不能完成操作");
+        jdbc.update("UPDATE product_inventory_balances SET quantity=? WHERE id=?",after,balance.get("id"));String tmp="PENDING-"+UUID.randomUUID();var user=users.current();jdbc.update("INSERT INTO product_inventory_transactions(transaction_no,warehouse_id,sales_product_id,canonical_product_id,finished_goods_lot_id,product_name_snapshot,specification_snapshot,unit,transaction_type,quantity_change,balance_after,source_type,source_id,source_no,operator_employee_id,operator_name,occurred_at,remark) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",tmp,warehouseId,productId,canonicalId,lotId,name,blank(specification),unit,type,change,after,sourceType,sourceId,sourceNo,user.employeeId(),user.name(),at,blank(remark));long id=jdbc.queryForObject("SELECT id FROM product_inventory_transactions WHERE transaction_no=?",Long.class,tmp);jdbc.update("UPDATE product_inventory_transactions SET transaction_no=? WHERE id=?","PI"+String.format("%08d",id),id);
     }
+
+    /**
+     * 某产品身份的库存流水（含归一到它的、以及它归一出去的那些）。
+     *
+     * <p>按 canonical 检索而非按 {@code sales_product_id}：否则用 {@code MFG-} 身份造的行
+     * 在标准 SKU 的流水页里看不见（反之亦然），用户会以为「库存凭空变了」。
+     */
+    public List<Map<String,Object>> transactions(long productId){
+        return jdbc.queryForList("SELECT t.*,w.warehouse_name warehouseName FROM product_inventory_transactions t JOIN warehouses w ON w.id=t.warehouse_id WHERE t.canonical_product_id=? ORDER BY t.occurred_at DESC,t.id DESC LIMIT 500",canonicalOf(productId));
+    }
+
+    /**
+     * 可售库存（canonical 口径，数量 &gt; 0），供 ERP 出库选货。
+     *
+     * <p>只列真正有货的行——「选不到货」本身就是业务信号（该下生产任务），不是错误。
+     */
+    public List<Map<String,Object>> availableStock(String keyword,Long warehouseId,int limit){
+        StringBuilder where=new StringBuilder(" WHERE b.quantity>0");List<Object> p=new ArrayList<>();
+        if(warehouseId!=null){where.append(" AND b.warehouse_id=?");p.add(warehouseId);}
+        if(keyword!=null&&!keyword.isBlank()){
+            where.append(" AND (sp.product_code LIKE ? OR sp.product_name LIKE ? OR COALESCE(sp.specification,'') LIKE ?)");
+            String k="%"+keyword.trim()+"%";p.add(k);p.add(k);p.add(k);
+        }
+        p.add(Math.max(1,Math.min(limit,200)));
+        return jdbc.queryForList(
+                "SELECT b.id balanceId,b.warehouse_id warehouseId,w.warehouse_name warehouseName," +
+                " b.sales_product_id salesProductId,b.canonical_product_id canonicalProductId," +
+                " sp.product_code productCode,sp.product_name productName,sp.specification,sp.unit,b.quantity available" +
+                " FROM product_inventory_balances b" +
+                " JOIN sales_products sp ON sp.id=b.canonical_product_id AND sp.deleted_at IS NULL" +
+                " JOIN warehouses w ON w.id=b.warehouse_id" + where +
+                " ORDER BY sp.product_name,sp.specification,b.warehouse_id LIMIT ?",p.toArray());
+    }
+
+    private static String clean(String s){return s==null?"":s.trim();}private static String blank(String s){s=clean(s);return s.isEmpty()?null:s;}
 
     /**
      * 库存清单驱动集（2026-09-14 重建为「台账合并视图」）：
@@ -626,6 +713,4 @@ public class ProductInventoryService {
         return c!=null?c:"个";
     }
 
-    public List<Map<String,Object>> transactions(long productId){return jdbc.queryForList("SELECT t.*,w.warehouse_name warehouseName FROM product_inventory_transactions t JOIN warehouses w ON w.id=t.warehouse_id WHERE t.sales_product_id=? ORDER BY t.occurred_at DESC,t.id DESC LIMIT 500",productId);}
-    private static String clean(String s){return s==null?"":s.trim();}private static String blank(String s){s=clean(s);return s.isEmpty()?null:s;}
 }

@@ -86,6 +86,26 @@ const primaryNavItems: NavItem[] = [
       }
     ]
   },
+  // ==================== 销售管理 ====================
+  // ERP 自建单据的第一块：与「氚云数据管理」并列，因为它是**正式业务**而不是台账参考。
+  // 台账出库在「氚云数据管理 → 销售出库关联」，只读历史；这里的单子可录、可扣库存、可追溯。
+  {
+    to: '/sales-outbounds',
+    label: '销售管理',
+    description: '有货直接出库：按可售库存选货，过账即扣减库存并留痕。',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+    group: 'sales',
+    children: [
+      {
+        to: '/sales-outbounds',
+        permission: ['sales_order.read.self', 'sales_order.read.department', 'sales_order.read.all'],
+        label: '销售出库',
+        description: '业务员按可售库存选货出库；过账即扣库存，冲销回补。选不到货说明该先下生产任务。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
+        group: 'sales'
+      }
+    ]
+  },
   // ==================== 产品中心 ====================
   {
     to: '/products',

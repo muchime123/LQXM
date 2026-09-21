@@ -141,6 +141,10 @@ public class ErpChangeLogWriter {
             } catch (Exception e) {
                 // 审计写入不得因序列化失败而吞掉业务结果：降级为摘要文本并告警
                 // （该行可用 WHERE JSON_EXTRACT(changed_fields,'$._serializationError') IS NOT NULL 检索后补数）
+                //
+                // ⚠️ 注意 java.time 不在此列：构造器已 objectMapper.findAndRegisterModules()，
+                // 故 LocalDate/LocalDateTime 不会走到这里（见 ErpChangeLogWriterTest 的回归断言）。
+                // 能走到这里的只有「真的无法序列化」的内容（如 getter 抛异常的匿名对象）。
                 log.warn("row_change_log 的 changed_fields 序列化失败，降级为文本摘要：{}", e.getMessage());
                 changedJson = "{\"" + SERIALIZATION_ERROR_KEY + "\":\"" + e.getClass().getSimpleName() + "\"}";
             }

@@ -5,6 +5,8 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
 
+import java.time.LocalDate;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -67,5 +69,35 @@ class ErpChangeLogWriterTest {
                 Map.of("note", Map.of("to", "x")), "R1", "初建", "k", "t"));
         verify(jdbc).update(anyString(), eq("m0_probe"), eq(5L), eq("INSERT"),
                 contains("\"note\""), eq("R1"), eq("初建"), eq(23L), eq("李强"), eq("k"), eq("t"));
+    }
+
+    /**
+     * {@code java.time} 值**不得**导致审计载荷降级为 {@code _serializationError} 摘要。
+     *
+     * <p>背景（2026-09-21）：ERP 写路径的 changed_fields 普遍带 {@code java.time} 值
+     * （建生产任务 {@code LocalDate dueDate}、建销售出库单 {@code LocalDate outboundDate}、
+     * 过账 {@code LocalDateTime postedAt}）。本类构造器已调用
+     * {@code objectMapper.findAndRegisterModules()}，因此即便调用方传的是
+     * {@code new ObjectMapper()}（未显式注册 JavaTimeModule），也不会走到降级分支。
+     *
+     * <p>这条断言守的是「**别把 findAndRegisterModules() 删掉**」——删了它，审计行还在，
+     * 但「改前改后是什么」会静默丢成一条错误桩，而制造执行段真库验证时正是这样踩过一次。
+     *
+     * <p>注：日期在此路径下序列化为组件数组（{@code [2026,9,21]}），因为没有关掉
+     * {@code WRITE_DATES_AS_TIMESTAMPS}。这与 {@link ErpPayloadHasher}（哈希，需文本形态）
+     * 是不同用途，故不强行统一；断言只要求「日期值确实落进了 JSON」。
+     */
+    @Test void javaTimeValueDoesNotDegradeAuditContent() {
+        Map<String, Object> fields = new LinkedHashMap<>();
+        fields.put("outboundDate", LocalDate.of(2026, 9, 21));
+        fields.put("dueDate", null); // 未填的日期字段，不得让整条审计失败
+        writer.write(ErpChangeLogWriter.of(actor, "m0_probe", 7L, "INSERT",
+                fields, "R1", "建单", "k", "t"));
+        verify(jdbc).update(anyString(), eq("m0_probe"), eq(7L), eq("INSERT"),
+                argThat((String json) -> json != null
+                        && !json.contains(ErpChangeLogWriter.SERIALIZATION_ERROR_KEY)
+                        && json.contains("outboundDate")
+                        && json.contains("2026")),
+                eq("R1"), eq("建单"), eq(23L), eq("李强"), eq("k"), eq("t"));
     }
 }
