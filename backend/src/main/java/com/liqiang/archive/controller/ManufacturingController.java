@@ -89,17 +89,25 @@ public class ManufacturingController {
     @DeleteMapping("/master/templates/{id}/rules/{ruleId}") @RequirePermission("manufacturing.template.manage")
     public void deleteTemplateRule(@PathVariable long id,@PathVariable long ruleId){execution.deleteTemplateRule(id,ruleId);}
     @PostMapping("/orders/{id}/operations/generate") @RequirePermission("manufacturing.manage")
-    public void generate(@PathVariable long id,@RequestBody Map<String,Long> request){execution.generateOperations(id,request.get("templateId"));}
+    public void generate(@PathVariable long id,@RequestBody Map<String,Long> request,
+            @RequestHeader(value="X-Request-Key",required=false) String requestKey){execution.generateOperations(id,request.get("templateId"),requestKey);}
+    // ---------- M0 契约写动作：全部要求 X-Request-Key（决策 #12「无键不直通」） ----------
+    // 前端每次提交生成一个新键；同一次提交的重试必须复用同一个键，否则会被判为两次新动作。
     @PostMapping("/orders/{orderId}/operations/{operationId}/work-reports") @RequirePermission("manufacturing.report")
-    public long report(@PathVariable long orderId,@PathVariable long operationId,@RequestBody com.liqiang.archive.service.ManufacturingExecutionService.WorkReportRequest request){return execution.report(orderId,operationId,request);}
+    public long report(@PathVariable long orderId,@PathVariable long operationId,@RequestBody com.liqiang.archive.service.ManufacturingExecutionService.WorkReportRequest request,
+            @RequestHeader(value="X-Request-Key",required=false) String requestKey){return execution.report(orderId,operationId,request,requestKey);}
     @PostMapping("/work-reports/{id}/reverse") @RequirePermission("manufacturing.report.override")
-    public void reverse(@PathVariable long id,@RequestBody Map<String,String> request){execution.reverse(id,request.get("reason"));}
+    public void reverse(@PathVariable long id,@RequestBody Map<String,String> request,
+            @RequestHeader(value="X-Request-Key",required=false) String requestKey){execution.reverse(id,request.get("reason"),requestKey);}
     @PostMapping("/orders/{id}/inspections") @RequirePermission("manufacturing.inspect")
-    public long inspect(@PathVariable long id,@RequestBody com.liqiang.archive.service.ManufacturingExecutionService.InspectionRequest request){return execution.inspect(id,request);}
+    public long inspect(@PathVariable long id,@RequestBody com.liqiang.archive.service.ManufacturingExecutionService.InspectionRequest request,
+            @RequestHeader(value="X-Request-Key",required=false) String requestKey){return execution.inspect(id,request,requestKey);}
     @PostMapping("/orders") @RequirePermission("manufacturing.manage")
-    public long create(@RequestBody ManufacturingService.CreateOrder request){return service.create(request);}
+    public long create(@RequestBody ManufacturingService.CreateOrder request,
+            @RequestHeader(value="X-Request-Key",required=false) String requestKey){return service.create(request,requestKey);}
     @PostMapping("/orders/{id}/completion-receipts") @RequirePermission("manufacturing.receive")
-    public long complete(@PathVariable long id,@RequestBody ManufacturingService.CompleteOrder request){return service.complete(id,request);}
+    public long complete(@PathVariable long id,@RequestBody ManufacturingService.CompleteOrder request,
+            @RequestHeader(value="X-Request-Key",required=false) String requestKey){return service.complete(id,request,requestKey);}
     @GetMapping("/completion-receipts") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.receive","manufacturing.receive.reverse"})
     public Map<String,Object> completionReceipts(@RequestParam(defaultValue="")String keyword,@RequestParam(defaultValue="")String status,
             @RequestParam(required=false)Long warehouseId,@RequestParam(defaultValue="")String operatorName,
@@ -110,5 +118,6 @@ public class ManufacturingController {
     @GetMapping("/completion-receipts/{id}") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.receive","manufacturing.receive.reverse"})
     public Map<String,Object> receiptDetail(@PathVariable long id){return service.receiptDetail(id);}
     @PostMapping("/completion-receipts/{id}/reverse") @RequirePermission("manufacturing.receive.reverse")
-    public void reverseReceipt(@PathVariable long id,@RequestBody Map<String,String> request){service.reverseReceipt(id,request.get("reason"));}
+    public void reverseReceipt(@PathVariable long id,@RequestBody Map<String,String> request,
+            @RequestHeader(value="X-Request-Key",required=false) String requestKey){service.reverseReceipt(id,request.get("reason"),requestKey);}
 }

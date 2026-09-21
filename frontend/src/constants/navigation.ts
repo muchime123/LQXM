@@ -55,6 +55,20 @@ const primaryNavItems: NavItem[] = [
         group: 'h3'
       },
       {
+        to: '/manufacturing-execution',
+        permission: [
+          'manufacturing.report',
+          'manufacturing.receive',
+          'manufacturing.read.self',
+          'manufacturing.read.department',
+          'manufacturing.read.all'
+        ],
+        label: '车间执行',
+        description: '车间按工序报工，成品由仓库办理交付收货。含执行看板、报工记录、入库冲销。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+        group: 'h3'
+      },
+      {
         to: '/manufacturing-process-management',
         permission: 'manufacturing.template.manage',
         label: '制程与工序管理',

@@ -1,10 +1,8 @@
 package com.liqiang.archive.erp;
 
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.JdbcTemplate;
-import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -35,17 +33,39 @@ import java.util.function.Supplier;
  *
  * <p>与导入管线的「来源哈希幂等」是两层，二者缺一不可：请求键防 HTTP 重试，
  * 业务唯一键防业务语义上的重复录入。
+ *
+ * <p><b>⚠️ 绑定纪律（首次接入业务写路径时发现，勿改回）：本模板必须与「业务写入」绑定
+ * 同一个 DataSource 与同一个事务管理器。</b>否则 B15 立刻退化——两条连接各自成事务，
+ * 「业务回滚则键也不存在」与「键冲突则业务回滚」两条都失效，表现为并发下业务写进去了、
+ * 幂等键没进去（或反之）。制造域等主库业务写路径用 {@code archiveIdempotencyService}
+ * （绑定主库，幂等表以 {@code erp.idem_request} 限定名访问，同一 MySQL 实例下仍是一条连接一个事务）；
+ * erp schema 内的业务写路径用 {@code erpIdempotencyService}。两者是**同一份实现的两个绑定**，
+ * 不复制逻辑（守「唯一实现」不变量）。
  */
 @Slf4j
-@Service
 public class ErpIdempotencyService {
 
-    private final JdbcTemplate erpJdbcTemplate;
+    /** 幂等表名：erp 内业务用 {@code idem_request}；主库业务用 {@code erp.idem_request}。 */
+    private final String idemTable;
+    private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
-    public ErpIdempotencyService(@Qualifier("erpJdbcTemplate") JdbcTemplate erpJdbcTemplate,
-                                 @Qualifier("erpTransactionManager") PlatformTransactionManager erpTransactionManager) {
-        this.erpJdbcTemplate = erpJdbcTemplate;
-        this.transactionTemplate = new TransactionTemplate(erpTransactionManager);
+
+    /** erp schema 内业务写入的默认绑定（幂等表取当前 schema）。 */
+    public ErpIdempotencyService(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager) {
+        this(jdbcTemplate, transactionManager, "idem_request");
+    }
+
+    /**
+     * @param idemTable 幂等表名，允许 {@code 表名} 或 {@code schema.表名} 两种形态（防注入白名单校验）
+     */
+    public ErpIdempotencyService(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager,
+                                 String idemTable) {
+        if (idemTable == null || !idemTable.matches("[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)?")) {
+            throw new ErpBusinessException(ErpErrorCode.INVALID_ARGUMENT, "幂等表名不合法：" + idemTable);
+        }
+        this.jdbcTemplate = jdbcTemplate;
+        this.transactionTemplate = new TransactionTemplate(transactionManager);
+        this.idemTable = idemTable;
     }
 
     /**
@@ -69,8 +89,9 @@ public class ErpIdempotencyService {
         if (work == null) throw new ErpBusinessException(ErpErrorCode.INVALID_ARGUMENT, "缺少业务执行体");
         String payloadHash = hash(payload);
 
-        List<Map<String, Object>> existing = erpJdbcTemplate.queryForList(
-                "SELECT action, payload_hash, result_ref, created_by FROM idem_request WHERE BINARY request_key = BINARY ?",
+        List<Map<String, Object>> existing = jdbcTemplate.queryForList(
+                "SELECT action, payload_hash, result_ref, created_by FROM " + idemTable
+                        + " WHERE BINARY request_key = BINARY ?",
                 requestKey);
         if (!existing.isEmpty()) {
             Map<String, Object> first = existing.get(0);
@@ -95,8 +116,9 @@ public class ErpIdempotencyService {
         return transactionTemplate.execute(status -> {
             String resultRef = work.get();
             try {
-                erpJdbcTemplate.update(
-                        "INSERT INTO idem_request(request_key, action, payload_hash, result_ref, created_by) VALUES(?,?,?,?,?)",
+                jdbcTemplate.update(
+                        "INSERT INTO " + idemTable
+                                + "(request_key, action, payload_hash, result_ref, created_by) VALUES(?,?,?,?,?)",
                         requestKey, action, payloadHash, resultRef, actor.employeeId());
             } catch (DuplicateKeyException e) {
                 // 并发同键：另一线程抢先写入 → 本次业务写入一并回滚，让调用方按键查询结果。

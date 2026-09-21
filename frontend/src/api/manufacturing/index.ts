@@ -109,20 +109,34 @@ export const fetchManufacturingOrder = async (id: number) =>
   (await http.get<ManufacturingDetail>(`/manufacturing/orders/${id}`)).data
 export const fetchManufacturingWarehouses = async () =>
   (await http.get<Warehouse[]>('/manufacturing/warehouses')).data
-export const createManufacturingOrder = async (payload: Record<string, unknown>) =>
-  (await http.post<number>('/manufacturing/orders', payload)).data
-export const completeManufacturingOrder = async (id: number, payload: Record<string, unknown>) =>
-  (await http.post<number>(`/manufacturing/orders/${id}/completion-receipts`, payload)).data
+// ============ M0 幂等契约：写动作请求键 ============
+// 后端对报工 / 冲正 / 收货 / 冲销等写动作要求 X-Request-Key（决策 #12「无键不直通」）：
+//  - 同一次提交的重试必须复用同一个键 → 后端认定为「重放」，直接返回首次结果，不会重复落账；
+//  - 新的一次提交必须换新键 → 否则会被当成上一次的重放而被静默丢弃。
+// 因此页面在「打开弹窗 / 发起动作」时生成一次键，提交失败重试沿用，成功后丢弃。
+export function newRequestKey(): string {
+  const c = globalThis.crypto as Crypto | undefined
+  if (c && typeof c.randomUUID === 'function') return c.randomUUID()
+  return `rk-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+/** 组请求键头；未传键时兜底新生成一个，避免漏带键导致后端拒收。 */
+function idemConfig(requestKey?: string) {
+  return { headers: { 'X-Request-Key': requestKey || newRequestKey() } }
+}
+export const createManufacturingOrder = async (payload: Record<string, unknown>, requestKey?: string) =>
+  (await http.post<number>('/manufacturing/orders', payload, idemConfig(requestKey))).data
+export const completeManufacturingOrder = async (id: number, payload: Record<string, unknown>, requestKey?: string) =>
+  (await http.post<number>(`/manufacturing/orders/${id}/completion-receipts`, payload, idemConfig(requestKey))).data
 export const fetchProcessTemplates = async () =>
   (await http.get<ProcessTemplate[]>('/manufacturing/process-templates')).data
-export const generateManufacturingOperations = async (id:number,templateId:number) =>
-  { await http.post(`/manufacturing/orders/${id}/operations/generate`,{templateId}) }
-export const submitWorkReport = async (orderId:number,operationId:number,payload:Record<string,unknown>) =>
-  (await http.post<number>(`/manufacturing/orders/${orderId}/operations/${operationId}/work-reports`,payload)).data
-export const reverseWorkReport = async (id:number,reason:string) =>
-  { await http.post(`/manufacturing/work-reports/${id}/reverse`,{reason}) }
-export const submitManufacturingInspection = async (orderId:number,payload:Record<string,unknown>) =>
-  (await http.post<number>(`/manufacturing/orders/${orderId}/inspections`,payload)).data
+export const generateManufacturingOperations = async (id:number,templateId:number,requestKey?:string) =>
+  { await http.post(`/manufacturing/orders/${id}/operations/generate`,{templateId},idemConfig(requestKey)) }
+export const submitWorkReport = async (orderId:number,operationId:number,payload:Record<string,unknown>,requestKey?:string) =>
+  (await http.post<number>(`/manufacturing/orders/${orderId}/operations/${operationId}/work-reports`,payload,idemConfig(requestKey))).data
+export const reverseWorkReport = async (id:number,reason:string,requestKey?:string) =>
+  { await http.post(`/manufacturing/work-reports/${id}/reverse`,{reason},idemConfig(requestKey)) }
+export const submitManufacturingInspection = async (orderId:number,payload:Record<string,unknown>,requestKey?:string) =>
+  (await http.post<number>(`/manufacturing/orders/${orderId}/inspections`,payload,idemConfig(requestKey))).data
 export const fetchExecutionBoard = async (params:Record<string,unknown>) =>
   (await http.get<ExecutionBoardResult>('/manufacturing/execution-board',{ params })).data
 export const fetchMyWorkReports = async (params:Record<string,unknown>) =>
@@ -161,8 +175,8 @@ export const fetchCompletionReceipts = async (params:Record<string,unknown>) =>
   (await http.get<CompletionReceiptsResult>('/manufacturing/completion-receipts',{ params })).data
 export const fetchCompletionReceiptDetail = async (id:number) =>
   (await http.get<{ receipt:CompletionReceipt; lots:FinishedGoodsLot[]; movements:Array<Record<string,unknown>> }>(`/manufacturing/completion-receipts/${id}`)).data
-export const reverseCompletionReceipt = async (id:number,reason:string) =>
-  { await http.post(`/manufacturing/completion-receipts/${id}/reverse`,{ reason }) }
+export const reverseCompletionReceipt = async (id:number,reason:string,requestKey?:string) =>
+  { await http.post(`/manufacturing/completion-receipts/${id}/reverse`,{ reason },idemConfig(requestKey)) }
 export const fetchManufacturingAssignees = async () =>
   (await http.get<ManufacturingAssignee[]>('/manufacturing/assignees')).data
 export const fetchManufacturingMaterials=async(id:number)=>(await http.get<ManufacturingMaterials>(`/manufacturing/orders/${id}/materials`)).data

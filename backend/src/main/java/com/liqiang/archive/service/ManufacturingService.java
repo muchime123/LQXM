@@ -1,9 +1,13 @@
 package com.liqiang.archive.service;
 
+import com.liqiang.archive.erp.ErpActor;
+import com.liqiang.archive.erp.ErpActorResolver;
+import com.liqiang.archive.erp.ErpChangeLogWriter;
+import com.liqiang.archive.erp.ErpIdempotencyService;
 import com.liqiang.archive.security.CurrentUserService;
 import com.liqiang.archive.security.FeatureCode;
 import com.liqiang.archive.security.DataScopeSupport;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,9 +17,22 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
+/**
+ * 生产任务与车间交付收货。
+ *
+ * <p>M0 契约接入（与 {@code ManufacturingExecutionService} 同款）：本类的三个写动作
+ * —— 建单 {@link #create}、车间交付收货 {@link #complete}、收货冲销 {@link #reverseReceipt}
+ * —— 全部经「幂等模板 + 行级审计」，操作人与请求键缺失即拒绝。
+ * 幂等表与审计表走主库绑定（{@code archiveIdempotencyService} / {@code archiveAuditWriter}），
+ * 与业务写入同连接同事务；选错绑定不报错，只是保护静默失效（见 {@code ErpContractConfig}）。
+ */
 @Service
-@RequiredArgsConstructor
 public class ManufacturingService {
+
+    private static final String ACTION_ORDER_CREATE = "manufacturing.order.create";
+    private static final String ACTION_COMPLETION_RECEIPT = "manufacturing.completionReceipt.post";
+    private static final String ACTION_COMPLETION_RECEIPT_REVERSE = "manufacturing.completionReceipt.reverse";
+
     private final JdbcTemplate jdbc;
     private final ProductInventoryService productInventory;
     private final CurrentUserService users;
@@ -23,6 +40,31 @@ public class ManufacturingService {
     private final AuditLogService audit;
     private final ManufacturingExecutionService execution;
     private final ManufacturingTaskTemplateResolver taskTemplateResolver;
+    private final ErpIdempotencyService idem;
+    private final ErpChangeLogWriter changeLog;
+    private final ErpActorResolver actors;
+
+    public ManufacturingService(JdbcTemplate jdbc,
+                                ProductInventoryService productInventory,
+                                CurrentUserService users,
+                                DataScopeSupport scope,
+                                AuditLogService audit,
+                                ManufacturingExecutionService execution,
+                                ManufacturingTaskTemplateResolver taskTemplateResolver,
+                                @Qualifier("archiveIdempotencyService") ErpIdempotencyService idem,
+                                @Qualifier("archiveAuditWriter") ErpChangeLogWriter changeLog,
+                                ErpActorResolver actors) {
+        this.jdbc = jdbc;
+        this.productInventory = productInventory;
+        this.users = users;
+        this.scope = scope;
+        this.audit = audit;
+        this.execution = execution;
+        this.taskTemplateResolver = taskTemplateResolver;
+        this.idem = idem;
+        this.changeLog = changeLog;
+        this.actors = actors;
+    }
 
     public record CreateOrder(String salesOrderRef,Long customerId,String customerName,String productName,
                               String specification,String customRequirement,BigDecimal plannedQuantity,
@@ -97,8 +139,27 @@ public class ManufacturingService {
         result.put("reworks",execution.reworks(id));
         return result;
     }
-    @Transactional
-    public long create(CreateOrder request) {
+    /**
+     * 建生产任务（M0 契约写动作）。
+     *
+     * <p>为什么建单也要带键：重复点击/网络重试会生成两张内容相同、单号不同的工单，
+     * 后续报工与收货都会各做一遍，属于最难回滚的一类重复（单据已流转）。
+     *
+     * @param requestKey 请求键，必填；重放返回首次建单 id，不再新建
+     */
+    public long create(CreateOrder request,String requestKey) {
+        ErpActor actor=actors.current();
+        Map<String,Object> payload=ErpChangeLogWriter.changes(
+                "salesOrderRef",clean(request.salesOrderRef()),"customerId",request.customerId(),
+                "customerName",clean(request.customerName()),"productName",clean(request.productName()),
+                "plannedQuantity",request.plannedQuantity(),"unit",clean(request.unit()),
+                "taskType",clean(request.taskType()),"workshopId",request.workshopId(),
+                "processTemplateId",request.processTemplateId(),"dueDate",request.dueDate());
+        return Long.parseLong(idem.execute(actor,requestKey,ACTION_ORDER_CREATE,payload,
+                ()->String.valueOf(doCreate(request,actor,requestKey))));
+    }
+
+    private long doCreate(CreateOrder request,ErpActor actor,String requestKey) {
         String customer=required(request.customerName(),"客户名称",300);
         String product=required(request.productName(),"生产成品名称",500);
         String unit=required(request.unit(),"单位",40);
@@ -123,16 +184,41 @@ public class ManufacturingService {
         var selection = request.workshopId()==null ? null : taskTemplateResolver.resolve(request.workshopId(),product);
         Long templateId=selection!=null ? selection.templateId() : request.processTemplateId();
         if(templateId==null) throw new IllegalArgumentException("请选择生产车间以确定产品或车间默认制程");
-        execution.generateOperations(id,templateId);
+        execution.doGenerateOperations(id,templateId,actor,requestKey);
         // 产线由下单选择决定，不能被制程模板上的历史车间标签覆盖。
         if(selection!=null) jdbc.update("UPDATE manufacturing_orders SET workshop_type=? WHERE id=?",selection.workshopName(),id);
         audit.log("ManufacturingOrder",id,no,"CREATE","创建手工生产任务；类型="+taskType+"；计划数量="+request.plannedQuantity()+unit);
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_orders",id,"INSERT",
+                ErpChangeLogWriter.changes(
+                        "orderNo",no,"taskType",taskType,"customerNameSnapshot",customer,
+                        "productNameSnapshot",product,"plannedQuantity",request.plannedQuantity(),"unit",unit,
+                        "workshopType",selection!=null?selection.workshopName():null,
+                        "processTemplateId",templateId,"dueDate",request.dueDate()),
+                null,"创建手工生产任务",requestKey,null));
         return id;
     }
 
 
-    @Transactional
-    public long complete(long orderId,CompleteOrder request) {
+    /**
+     * 车间交付收货（M0 契约写动作：幂等 + 行级审计）。
+     *
+     * <p>口径提醒（决策登记 #17）：这是**仓库收货方**的动作 —— 车间把成品交付到利强仓库，
+     * 利强确认入库。不是「车间报完工」，也不是「向车间领料」。
+     *
+     * @param requestKey 请求键，必填；重放返回首次入库单 id，不重复入库（否则会多出成品批次与库存流水）
+     */
+    public long complete(long orderId,CompleteOrder request,String requestKey) {
+        ErpActor actor=actors.current();
+        Map<String,Object> payload=ErpChangeLogWriter.changes(
+                "orderId",orderId,"warehouseId",request.warehouseId(),
+                "quantity",request.quantity(),"completedAt",request.completedAt(),
+                "finishedGoodsName",clean(request.finishedGoodsName()),
+                "unitCost",request.unitCost(),"specification",clean(request.specification()));
+        return Long.parseLong(idem.execute(actor,requestKey,ACTION_COMPLETION_RECEIPT,payload,
+                ()->String.valueOf(doComplete(orderId,request,actor,requestKey))));
+    }
+
+    private long doComplete(long orderId,CompleteOrder request,ErpActor actor,String requestKey) {
         requireVisible(orderId);
         var order=jdbc.query("SELECT * FROM manufacturing_orders WHERE id=? FOR UPDATE",(r,n)->row(r),orderId)
                 .stream().findFirst().orElseThrow(()->new IllegalArgumentException("生产任务不存在"));
@@ -183,6 +269,17 @@ public class ManufacturingService {
         jdbc.update("UPDATE manufacturing_orders SET completed_quantity=?,status=? WHERE id=?",total,status,orderId);
         audit.log("ManufacturingOrder",orderId,String.valueOf(order.get("orderNo")),"COMPLETE_RECEIPT",
                 receiptNo+"生成成品批次"+lotNo+"；入库"+qty+order.get("unit")+"；实际单位成本="+unitCost);
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_completion_receipts",receiptId,"INSERT",
+                ErpChangeLogWriter.changes(
+                        "receiptNo",receiptNo,"manufacturingOrderId",orderId,"warehouseId",request.warehouseId(),
+                        "quantity",qty,"unit",order.get("unit"),"finishedGoodsName",name,
+                        "completedAt",at,"finishedGoodsLotNo",lotNo,"salesProductId",salesProductId,
+                        "status","POSTED"),
+                null,clean(request.remark()),requestKey,null));
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_orders",orderId,"UPDATE",
+                ErpChangeLogWriter.changes(
+                        "completedQuantity",completed+"→"+total,"status","→"+status,"completionReceiptNo",receiptNo),
+                null,"车间交付收货",requestKey,null));
         return receiptId;
     }
 
@@ -235,9 +332,21 @@ public class ManufacturingService {
         return Map.of("receipt",r,"lots",lots,"movements",movements);
     }
 
+    /**
+     * 反入库（M0 契约写动作：幂等 + 行级审计）。
+     *
+     * @param requestKey 请求键，必填；重放不重复反入库（否则会二次扣减批次与库存）
+     */
+    public void reverseReceipt(long receiptId,String reason,String requestKey){
+        ErpActor actor=actors.current();
+        Map<String,Object> payload=ErpChangeLogWriter.changes(
+                "receiptId",receiptId,"reason",clean(reason));
+        idem.execute(actor,requestKey,ACTION_COMPLETION_RECEIPT_REVERSE,payload,
+                ()->{doReverseReceipt(receiptId,reason,actor,requestKey);return String.valueOf(receiptId);});
+    }
+
     /** 反入库：抵消本次入库数量，回退生产任务已完成数量与状态。 */
-    @Transactional
-    public void reverseReceipt(long receiptId,String reason){
+    private void doReverseReceipt(long receiptId,String reason,ErpActor actor,String requestKey){
         String r=clean(reason);
         if(r==null||r.isBlank())throw new IllegalArgumentException("请填写反入库原因");
         if(r.length()>500)throw new IllegalArgumentException("反入库原因不能超过500字");
@@ -303,6 +412,16 @@ public class ManufacturingService {
         jdbc.update("UPDATE manufacturing_orders SET completed_quantity=?,status=? WHERE id=?",newCompleted,newStatus,orderId);
         audit.log("ManufacturingOrder",orderId,String.valueOf(order.get("orderNo")),"RECEIPT_REVERSE",
                 "反入库"+receipt.get("receiptNo")+"；抵消"+qty+receipt.get("unit")+"；原因="+r);
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_completion_receipts",receiptId,"UPDATE",
+                ErpChangeLogWriter.changes(
+                        "status","POSTED→REVERSED","reversalReason",r,"quantity",qty,
+                        "reversalMovementId",reversalMovementId,"reversedAt",at),
+                "REVERSAL",r,requestKey,null));
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_orders",orderId,"UPDATE",
+                ErpChangeLogWriter.changes(
+                        "completedQuantity",completed+"→"+newCompleted,"status","→"+newStatus,
+                        "reversedReceiptNo",receipt.get("receiptNo")),
+                "REVERSAL",r,requestKey,null));
     }
     private Long defaultTemplateId(String code){return jdbc.query("SELECT id FROM manufacturing_process_templates WHERE template_code=? AND active=1",(r,n)->r.getLong(1),code).stream().findFirst().orElseThrow(()->new IllegalStateException("缺少默认制程模板："+code));}
     public void requireVisible(long id) {

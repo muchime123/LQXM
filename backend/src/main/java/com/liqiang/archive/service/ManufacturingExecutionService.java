@@ -1,7 +1,11 @@
 package com.liqiang.archive.service;
 
+import com.liqiang.archive.erp.ErpActor;
+import com.liqiang.archive.erp.ErpActorResolver;
+import com.liqiang.archive.erp.ErpChangeLogWriter;
+import com.liqiang.archive.erp.ErpIdempotencyService;
 import com.liqiang.archive.security.CurrentUserService;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,12 +16,45 @@ import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.util.*;
 
+/**
+ * 制造执行（报工 / 冲正 / 检验）—— M0 契约首次接入的业务写路径。
+ *
+ * <p>写动作（{@link #report} / {@link #reverse} / {@link #inspect}）统一走
+ * 「幂等模板 + 行级审计」：操作人与请求键缺失直接拒绝，不存在无键直通；
+ * 幂等键、审计行与业务写入在**同一条主库连接、同一个事务**内（所以用
+ * {@code archiveIdempotencyService} / {@code archiveAuditWriter}，见 {@code ErpContractConfig}）。
+ */
 @Service
-@RequiredArgsConstructor
 public class ManufacturingExecutionService {
+
+    /** M0 契约的 action 标识：同键换动作会被判冲突，故必须稳定且全局唯一。 */
+    private static final String ACTION_WORK_REPORT = "manufacturing.workReport.submit";
+    private static final String ACTION_WORK_REPORT_REVERSE = "manufacturing.workReport.reverse";
+    private static final String ACTION_INSPECTION = "manufacturing.inspection.submit";
+    private static final String ACTION_OPERATIONS_GENERATE = "manufacturing.operations.generate";
+
     private final JdbcTemplate jdbc;
     private final CurrentUserService users;
     private final AuditLogService audit;
+    /** 主库绑定的幂等模板（制造域在主库；选错绑定会让 B15 静默失效）。 */
+    private final ErpIdempotencyService idem;
+    /** 主库绑定的行级审计写入器。 */
+    private final ErpChangeLogWriter changeLog;
+    private final ErpActorResolver actors;
+
+    public ManufacturingExecutionService(JdbcTemplate jdbc,
+                                         CurrentUserService users,
+                                         AuditLogService audit,
+                                         @Qualifier("archiveIdempotencyService") ErpIdempotencyService idem,
+                                         @Qualifier("archiveAuditWriter") ErpChangeLogWriter changeLog,
+                                         ErpActorResolver actors) {
+        this.jdbc = jdbc;
+        this.users = users;
+        this.audit = audit;
+        this.idem = idem;
+        this.changeLog = changeLog;
+        this.actors = actors;
+    }
 
     public record WorkReportRequest(BigDecimal quantity, LocalDateTime reportedAt, String remark,
                                     boolean allowOverproduction, String overproductionReason) {}
@@ -382,8 +419,21 @@ public class ManufacturingExecutionService {
                 "reinspectionCount",readyCount);
     }
 
-    @Transactional
-    public void generateOperations(long orderId, Long templateId) {
+    /**
+     * 按制程模板展开任务工序（M0 契约写动作）。
+     *
+     * <p>建单流程内部调用 {@link #doGenerateOperations}（外层 {@code create} 的请求键已覆盖整笔建单），
+     * 只有从 {@code POST /orders/{id}/operations/generate} 单独触发时才走本方法取键。
+     */
+    public void generateOperations(long orderId, Long templateId, String requestKey) {
+        ErpActor actor=actors.current();
+        idem.execute(actor,requestKey,ACTION_OPERATIONS_GENERATE,
+                ErpChangeLogWriter.changes("orderId",orderId,"templateId",templateId),
+                ()->{doGenerateOperations(orderId,templateId,actor,requestKey);return String.valueOf(orderId);});
+    }
+
+    /** 工序展开业务体：不加 {@code @Transactional}，事务边界由调用方（幂等模板或建单）提供。 */
+    void doGenerateOperations(long orderId, Long templateId, ErpActor actor, String requestKey) {
         if(templateId==null) throw new IllegalArgumentException("请选择制程模板");
         Integer existing=jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_order_operations WHERE manufacturing_order_id=?",Integer.class,orderId);
         if(existing!=null&&existing>0) throw new IllegalStateException("生产任务已经生成工序，不能重复生成");
@@ -411,10 +461,36 @@ public class ManufacturingExecutionService {
         jdbc.update("UPDATE manufacturing_orders SET process_template_id=?,process_template_name_snapshot=?,workshop_type=?,inspection_status=?,status='RELEASED' WHERE id=?",
                 templateId,template.get("name"),template.get("workshop"),needInspection?"PENDING":"NOT_REQUIRED",orderId);
         audit.log("ManufacturingOrder",orderId,String.valueOf(order.get("order_no")),"GENERATE_OPERATIONS","按模板“"+template.get("name")+"”生成"+rows.size()+"道任务工序"+(needInspection?"（含人工检验工序）":"（无人工检验工序，完工后自动确认）"));
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_orders",orderId,"UPDATE",
+                ErpChangeLogWriter.changes(
+                        "processTemplateId",templateId,"processTemplateNameSnapshot",template.get("name"),
+                        "workshopType",template.get("workshop"),"operationCount",rows.size(),
+                        "inspectionStatus",needInspection?"PENDING":"NOT_REQUIRED","status","→RELEASED"),
+                null,"按制程模板展开工序",requestKey,null));
     }
 
-    @Transactional
-    public long report(long orderId,long operationId,WorkReportRequest request) {
+    /**
+     * 报工（M0 契约写动作：幂等 + 行级审计）。
+     *
+     * @param requestKey 请求键（HTTP 头 {@code X-Request-Key}），**必填**：
+     *                   同键同载荷重放直接返回首次结果、不重复落账；同键异载荷抛 IDEMPOTENCY_PAYLOAD_CONFLICT
+     */
+    public long report(long orderId,long operationId,WorkReportRequest request,String requestKey) {
+        ErpActor actor=actors.current();
+        Map<String,Object> payload=ErpChangeLogWriter.changes(
+                "orderId",orderId,"operationId",operationId,
+                "quantity",request.quantity(),"reportedAt",request.reportedAt(),
+                "allowOverproduction",request.allowOverproduction(),
+                "overproductionReason",clean(request.overproductionReason()));
+        return Long.parseLong(idem.execute(actor,requestKey,ACTION_WORK_REPORT,payload,
+                ()->String.valueOf(doReport(orderId,operationId,request,actor,requestKey))));
+    }
+
+    /**
+     * 报工业务体：只在幂等模板开启的事务内被调用，因此**不加** {@code @Transactional}
+     * （自调用不经过代理，加了也无效；真正的边界在 {@code ErpIdempotencyService}）。
+     */
+    private long doReport(long orderId,long operationId,WorkReportRequest request,ErpActor actor,String requestKey) {
         if(request.quantity()==null||request.quantity().signum()<=0||request.quantity().scale()>6) throw new IllegalArgumentException("报工数量必须大于0且最多6位小数");
         var operation=jdbc.query("SELECT * FROM manufacturing_order_operations WHERE id=? AND manufacturing_order_id=? FOR UPDATE",
                 (r,n)->row(r),operationId,orderId).stream().findFirst().orElseThrow(()->new IllegalArgumentException("任务工序不存在"));
@@ -437,11 +513,30 @@ public class ManufacturingExecutionService {
         String no="WR"+String.format("%08d",id);jdbc.update("UPDATE manufacturing_work_reports SET report_no=? WHERE id=?",no,id);
         recalculate(orderId,operationId);
         audit.log("ManufacturingWorkReport",id,no,"CREATE","工序“"+operation.get("operationNameSnapshot")+"”报工"+request.quantity());
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_work_reports",id,"INSERT",
+                ErpChangeLogWriter.changes(
+                        "reportNo",no,"manufacturingOrderId",orderId,"manufacturingOrderOperationId",operationId,
+                        "executionRound",operation.get("executionRound"),"reportedQuantity",request.quantity(),
+                        "overproductionQuantity",over,"reportedAt",at,"status","VALID",
+                        "reporterEmployeeId",actor.employeeId()),
+                over.signum()>0?"OVERPRODUCTION":null,clean(request.overproductionReason()),requestKey,null));
         return id;
     }
 
-    @Transactional
-    public void reverse(long reportId,String reason) {
+    /**
+     * 报工冲正（M0 契约写动作：幂等 + 行级审计）。
+     *
+     * @param requestKey 请求键，必填；重放返回首次冲正的原报工单号，不重复冲正
+     */
+    public void reverse(long reportId,String reason,String requestKey) {
+        ErpActor actor=actors.current();
+        Map<String,Object> payload=ErpChangeLogWriter.changes(
+                "reportId",reportId,"reason",clean(reason));
+        idem.execute(actor,requestKey,ACTION_WORK_REPORT_REVERSE,payload,
+                ()->{doReverse(reportId,reason,actor,requestKey);return String.valueOf(reportId);});
+    }
+
+    private void doReverse(long reportId,String reason,ErpActor actor,String requestKey) {
         if(!users.can("manufacturing.report.override")) throw new SecurityException("没有报工冲正权限");
         reason=clean(reason);if(reason==null)throw new IllegalArgumentException("请填写冲正原因");
         var report=jdbc.query("SELECT * FROM manufacturing_work_reports WHERE id=? FOR UPDATE",(r,n)->row(r),reportId)
@@ -459,10 +554,33 @@ public class ManufacturingExecutionService {
         jdbc.update("UPDATE manufacturing_work_reports SET status='REVERSED',reversal_reason=? WHERE id=?",reason,reportId);
         recalculate(orderId,operationId);
         audit.log("ManufacturingWorkReport",reportId,String.valueOf(report.get("reportNo")),"REVERSE",reason);
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_work_reports",reportId,"UPDATE",
+                ErpChangeLogWriter.changes(
+                        "status","VALID→REVERSED","reversalReason",reason,
+                        "reportedQuantity",report.get("reportedQuantity")),
+                "REVERSAL",reason,requestKey,null));
     }
 
-    @Transactional
-    public long inspect(long orderId,InspectionRequest request) {
+    /**
+     * 人工检验（M0 契约写动作：幂等 + 行级审计）。
+     *
+     * <p>当前 14 道工序 {@code requires_inspection} 全 = 0，故本路径在生产上**不会被触发**
+     * （决策登记 #16：无检验岗，末道工序报工即自动放行，且自动放行**不写本表**）。
+     * 仍然接线，是因为「有岗位时切回来」只需要把开关置 1，届时不能再走无键直通。
+     */
+    public long inspect(long orderId,InspectionRequest request,String requestKey) {
+        ErpActor actor=actors.current();
+        Map<String,Object> payload=ErpChangeLogWriter.changes(
+                "orderId",orderId,"result",clean(request.result()),
+                "qualifiedQuantity",request.qualifiedQuantity(),
+                "unqualifiedQuantity",request.unqualifiedQuantity(),
+                "returnOperationId",request.returnOperationId(),
+                "reworkRequirement",clean(request.reworkRequirement()));
+        return Long.parseLong(idem.execute(actor,requestKey,ACTION_INSPECTION,payload,
+                ()->String.valueOf(doInspect(orderId,request,actor,requestKey))));
+    }
+
+    private long doInspect(long orderId,InspectionRequest request,ErpActor actor,String requestKey) {
         String result=clean(request.result());if(!Set.of("PASSED","FAILED").contains(result))throw new IllegalArgumentException("检验结果无效");
         var order=jdbc.query("SELECT * FROM manufacturing_orders WHERE id=? FOR UPDATE",(r,n)->row(r),orderId).stream().findFirst().orElseThrow();
         if(!Set.of("PENDING_INSPECTION","PENDING_REINSPECTION").contains(String.valueOf(order.get("status"))))throw new IllegalStateException("当前生产任务不在待检验状态");
@@ -493,7 +611,14 @@ public class ManufacturingExecutionService {
             String rt="PENDING-"+UUID.randomUUID();jdbc.update("INSERT INTO manufacturing_reworks(rework_no,manufacturing_order_id,inspection_id,return_operation_id,rework_round,requirement,created_by_employee_id,created_by_name) VALUES(?,?,?,?,?,?,?,?)",rt,orderId,id,request.returnOperationId(),round,requirement,user.employeeId(),user.name());
             long reworkId=jdbc.queryForObject("SELECT id FROM manufacturing_reworks WHERE rework_no=?",Long.class,rt);jdbc.update("UPDATE manufacturing_reworks SET rework_no=? WHERE id=?","RW"+String.format("%08d",reworkId),reworkId);
         }
-        audit.log("ManufacturingInspection",id,no,"CREATE",result+"；合格="+qualified+"；不合格="+unqualified);return id;
+        audit.log("ManufacturingInspection",id,no,"CREATE",result+"；合格="+qualified+"；不合格="+unqualified);
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_inspections",id,"INSERT",
+                ErpChangeLogWriter.changes(
+                        "inspectionNo",no,"manufacturingOrderId",orderId,"inspectionResult",result,
+                        "qualifiedQuantity",qualified,"unqualifiedQuantity",unqualified,
+                        "inspectionSource","MANUAL","orderStatusAfter","PASSED".equals(result)?"PENDING_RECEIPT":"REWORK"),
+                "FAILED".equals(result)?"INSPECTION_FAILED":null,clean(request.issueDescription()),requestKey,null));
+        return id;
     }
 
     private void recalculate(long orderId,long operationId){

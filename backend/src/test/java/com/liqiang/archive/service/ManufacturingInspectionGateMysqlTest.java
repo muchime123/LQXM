@@ -1,5 +1,9 @@
 package com.liqiang.archive.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.liqiang.archive.erp.ErpActorResolver;
+import com.liqiang.archive.erp.ErpChangeLogWriter;
+import com.liqiang.archive.erp.ErpIdempotencyService;
 import com.liqiang.archive.security.CurrentUserService;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.condition.EnabledIfSystemProperty;
@@ -72,6 +76,9 @@ class ManufacturingInspectionGateMysqlTest {
             st.execute("DROP DATABASE IF EXISTS " + SCHEMA);
             st.execute("CREATE DATABASE " + SCHEMA + " DEFAULT CHARSET utf8mb4");
             for (String t : TABLES) st.execute("CREATE TABLE " + SCHEMA + "." + t + " LIKE product_archive." + t);
+            // M0 契约表在 erp schema，测试 schema 里按同款 DDL 复制一份（含唯一键，幂等冲突分支才可测）。
+            st.execute("CREATE TABLE " + SCHEMA + ".idem_request LIKE erp.idem_request");
+            st.execute("CREATE TABLE " + SCHEMA + ".row_change_log LIKE erp.row_change_log");
             for (String t : SEEDED) st.execute("INSERT INTO " + SCHEMA + "." + t + " SELECT * FROM product_archive." + t);
             st.execute("USE " + SCHEMA);
         }
@@ -96,7 +103,10 @@ class ManufacturingInspectionGateMysqlTest {
         when(users.current()).thenReturn(new CurrentUserService.CurrentUser(
                 23L, "李强", "生产部", Set.of(), Set.of("manufacturing.report", "manufacturing.inspect"),
                 "ALL", false, "COMPAT", null, null, Map.of()));
-        execution = new ManufacturingExecutionService(jdbc, users, audit);
+        execution = new ManufacturingExecutionService(jdbc, users, audit,
+                new ErpIdempotencyService(jdbc, txm),
+                new ErpChangeLogWriter(jdbc, new ObjectMapper()),
+                new ErpActorResolver(users));
     }
 
     // ---------- 用例 1：无人工检验工序 → 报工完成即自动放行至待入库 ----------
@@ -140,7 +150,8 @@ class ManufacturingInspectionGateMysqlTest {
             verify(audit, never()).log(anyString(), anyLong(), anyString(), eq("AUTO_CONFIRM"), anyString());
 
             execution.inspect(orderId, new ManufacturingExecutionService.InspectionRequest(
-                    "PASSED", new BigDecimal("10"), BigDecimal.ZERO, null, "人工确认", null, null));
+                    "PASSED", new BigDecimal("10"), BigDecimal.ZERO, null, "人工确认", null, null),
+                    "gate-inspect-" + orderId);
             Map<String, Object> passed = orderRow(orderId);
             assertEquals("PENDING_RECEIPT", passed.get("status"));
             assertEquals("MANUAL", passed.get("inspection_source"), "人工检验必须标记为 MANUAL");
@@ -157,7 +168,8 @@ class ManufacturingInspectionGateMysqlTest {
             long orderId = newOrder("MO-GATE-C", new BigDecimal("10"));
             List<Long> ops = generateOperations(orderId);
             execution.report(orderId, ops.get(0),
-                    new ManufacturingExecutionService.WorkReportRequest(new BigDecimal("10"), null, null, false, null));
+                    new ManufacturingExecutionService.WorkReportRequest(new BigDecimal("10"), null, null, false, null),
+                    "gate-report-" + orderId + "-" + ops.get(0));
 
             Map<String, Object> order = orderRow(orderId);
             assertEquals("IN_PRODUCTION", order.get("status"), "还有工序未完成时不能进入入库环节");
@@ -261,7 +273,8 @@ class ManufacturingInspectionGateMysqlTest {
             reportAll(orderId, ops, new BigDecimal("10"));
         } else {
             execution.report(orderId, ops.get(0),
-                    new ManufacturingExecutionService.WorkReportRequest(new BigDecimal("10"), null, null, false, null));
+                    new ManufacturingExecutionService.WorkReportRequest(new BigDecimal("10"), null, null, false, null),
+                    "gate-report-" + orderId + "-" + ops.get(0));
         }
         jdbc.update("UPDATE manufacturing_orders SET status='PENDING_INSPECTION',inspection_status='PENDING',inspection_source=NULL WHERE id=?", orderId);
         return orderId;
@@ -269,7 +282,7 @@ class ManufacturingInspectionGateMysqlTest {
 
     private List<Long> generateOperations(long orderId) {
         Long templateId = jdbc.queryForObject("SELECT id FROM manufacturing_process_templates WHERE template_code=?", Long.class, TEMPLATE);
-        execution.generateOperations(orderId, templateId);
+        execution.generateOperations(orderId, templateId, "gate-gen-ops-" + orderId);
         return jdbc.queryForList("SELECT id FROM manufacturing_order_operations WHERE manufacturing_order_id=? ORDER BY sequence_no",
                 Long.class, orderId);
     }
@@ -277,7 +290,8 @@ class ManufacturingInspectionGateMysqlTest {
     private void reportAll(long orderId, List<Long> operations, BigDecimal quantity) {
         for (long operationId : operations) {
             execution.report(orderId, operationId,
-                    new ManufacturingExecutionService.WorkReportRequest(quantity, null, null, false, null));
+                    new ManufacturingExecutionService.WorkReportRequest(quantity, null, null, false, null),
+                    "gate-report-" + orderId + "-" + operationId);
         }
     }
 
