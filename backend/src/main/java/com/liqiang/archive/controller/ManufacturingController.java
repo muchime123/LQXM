@@ -15,6 +15,9 @@ public class ManufacturingController {
     private final com.liqiang.archive.service.ManufacturingMaterialService materials;
     @GetMapping("/warehouses") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public List<Map<String,Object>> warehouses(){return service.warehouses();}
+    /** 建单弹窗用：启用中的车间 + 默认制程（读权限即可，勿并入 /master/workshops——那是模板管理权限）。 */
+    @GetMapping("/workshop-options") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    public List<Map<String,Object>> workshopOptions(){return service.workshopOptions();}
     @GetMapping("/orders") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public Map<String,Object> orders(@RequestParam(defaultValue="")String keyword,@RequestParam(defaultValue="")String status,
             @RequestParam(defaultValue="")String priority,@RequestParam(defaultValue="")String scheduled,

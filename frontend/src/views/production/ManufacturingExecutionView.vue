@@ -7,6 +7,7 @@
         <p>车间按工序报工，成品由仓库按「交付收货」办理入库。领料、BOM、材料单位由各车间自行管理，不在本页。</p>
       </div>
       <div class="head-actions">
+        <el-button v-if="canManage" type="primary" :icon="Plus" @click="openCreate">新建工单</el-button>
         <el-button :icon="Refresh" :loading="loading" @click="reload">刷新</el-button>
       </div>
     </header>
@@ -505,20 +506,75 @@
         <el-button type="danger" :loading="submitting" @click="submitReceiptReverse">确认冲销</el-button>
       </template>
     </el-dialog>
+
+    <!-- ==================== 新建工单（manufacturing.manage） ==================== -->
+    <el-dialog v-model="createOpen" title="新建生产任务" width="640px" :close-on-click-modal="false" @closed="createKey = ''">
+      <el-alert type="info" :closable="false" class="kw-alert"
+        title="建单即按所选车间的默认制程展开工序；选「生产车间」后无需再选制程模板，车间没有默认制程时才需要手动指定。" />
+      <el-form label-width="100px">
+        <el-form-item label="任务类型" required>
+          <el-radio-group v-model="createForm.taskType">
+            <el-radio-button v-for="t in TASK_TYPES" :key="t.value" :value="t.value">{{ t.label }}</el-radio-button>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="客户名称" required>
+          <el-input v-model="createForm.customerName" maxlength="300" placeholder="手工输入客户名称" />
+        </el-form-item>
+        <el-form-item label="生产成品" required>
+          <el-input v-model="createForm.productName" maxlength="500" placeholder="生产成品名称" />
+        </el-form-item>
+        <el-form-item label="规格 / 定制要求">
+          <el-input v-model="createForm.specification" maxlength="500" placeholder="选填，如：设备类型：灌装机" />
+        </el-form-item>
+        <el-form-item label="计划数量" required>
+          <div class="qty-row">
+            <el-input-number v-model="createForm.plannedQuantity" :min="0.000001" :max="99999999" :precision="4" :controls="false" class="qty-input" />
+            <el-input v-model="createForm.unit" maxlength="40" class="unit-input" placeholder="单位，如：台" />
+          </div>
+        </el-form-item>
+        <el-form-item label="生产车间" required>
+          <el-select v-model="createForm.workshopId" placeholder="选择车间（决定默认制程）" style="width: 100%"
+            :loading="createOptionsLoading" @change="onCreateWorkshopChange">
+            <el-option v-for="w in workshopOptions" :key="w.id" :value="w.id"
+              :label="w.workshopName + (w.defaultProcessTemplateId ? '（默认制程）' : '（无默认制程）')" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="制程模板">
+          <el-select v-model="createForm.processTemplateId" clearable placeholder="跟随车间默认制程" style="width: 100%"
+            :loading="createOptionsLoading" :disabled="!!createWorkshopDefault">
+            <el-option v-for="t in processTemplates" :key="t.id" :value="t.id" :label="`${t.templateName}（${t.operationCount} 道工序）`" />
+          </el-select>
+          <div v-if="createForm.workshopId && !createWorkshopDefault && !createForm.processTemplateId" class="field-hint field-hint--warn">
+            该车间没有默认制程，必须手动指定制程模板后才能建单
+          </div>
+        </el-form-item>
+        <el-form-item label="交货日期">
+          <el-date-picker v-model="createForm.dueDate" type="date" value-format="YYYY-MM-DD" placeholder="选填" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input v-model="createForm.remark" type="textarea" :rows="2" maxlength="500" placeholder="选填" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createOpen = false">取消</el-button>
+        <el-button type="primary" :loading="submitting" :disabled="!createReady" @click="submitCreate">创建并展开工序</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, Search } from '@element-plus/icons-vue'
+import { Refresh, Search, Plus } from '@element-plus/icons-vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import {
   fetchExecutionBoard, submitWorkReport, reverseWorkReport, fetchAllWorkReports, newRequestKey,
   fetchManufacturingWarehouses, completeManufacturingOrder, fetchCompletionReceipts,
   reverseCompletionReceipt, fetchManufacturingOrders,
+  fetchWorkshopOptions, fetchProcessTemplates, createManufacturingOrder,
   type ExecutionBoardItem, type AllWorkReport, type CompletionReceipt, type ManufacturingOrder,
-  type Warehouse
+  type Warehouse, type WorkshopOption, type ProcessTemplate
 } from '@/api/manufacturing'
 
 const { can } = useCurrentUser()
@@ -526,6 +582,7 @@ const canReport = computed(() => can('manufacturing.report'))
 const canOverride = computed(() => can('manufacturing.report.override'))
 const canReceive = computed(() => can('manufacturing.receive'))
 const canReverseReceipt = computed(() => can('manufacturing.receive.reverse'))
+const canManage = computed(() => can('manufacturing.manage'))
 
 const tab = ref<'board' | 'reports' | 'receipts'>('board')
 const loading = ref(false)
@@ -583,6 +640,102 @@ const priorityTagType = (v?: string): 'success' | 'warning' | 'danger' | 'info' 
   if (v === 'URGENT') return 'danger'
   if (v === 'HIGH') return 'warning'
   return 'info'
+}
+
+// ==================== 新建工单 ====================
+// 后端契约（ManufacturingService.CreateOrder）：customerName/productName/unit/plannedQuantity/taskType 必填；
+// 制程来源二选一 —— workshopId 由车间默认制程解析（同时回写 workshop_type），或显式传 processTemplateId。
+// 与报工/收货同一条请求键纪律：打开弹窗生成，失败保留重试，成功丢弃。
+const TASK_TYPES = [
+  { value: 'SAMPLE', label: '打样' },
+  { value: 'SALES_ORDER', label: '销售排产' },
+  { value: 'REPLACEMENT', label: '返工替换' },
+  { value: 'REWORK', label: '返工' },
+  { value: 'INTERNAL', label: '内部领用' },
+  { value: 'SPECIAL', label: '特殊定制' }
+] as const
+
+const createOpen = ref(false)
+const createKey = ref('')
+const createOptionsLoading = ref(false)
+const workshopOptions = ref<WorkshopOption[]>([])
+const processTemplates = ref<ProcessTemplate[]>([])
+const createForm = ref({
+  taskType: 'SAMPLE',
+  customerName: '',
+  productName: '',
+  specification: '',
+  plannedQuantity: undefined as number | undefined,
+  unit: '台',
+  workshopId: undefined as number | undefined,
+  processTemplateId: undefined as number | undefined,
+  dueDate: '',
+  remark: ''
+})
+const createWorkshopDefault = computed(() =>
+  workshopOptions.value.find(w => w.id === createForm.value.workshopId)?.defaultProcessTemplateId || null)
+
+const createReady = computed(() => {
+  const f = createForm.value
+  return !!(f.taskType && f.customerName.trim() && f.productName.trim()
+    && f.plannedQuantity && Number(f.plannedQuantity) > 0 && f.unit.trim()
+    && f.workshopId && (createWorkshopDefault.value || f.processTemplateId))
+})
+
+async function openCreate() {
+  createForm.value = {
+    taskType: 'SAMPLE', customerName: '', productName: '', specification: '',
+    plannedQuantity: undefined, unit: '台', workshopId: undefined,
+    processTemplateId: undefined, dueDate: '', remark: ''
+  }
+  createKey.value = newRequestKey()
+  createOpen.value = true
+  if (workshopOptions.value.length === 0) {
+    createOptionsLoading.value = true
+    try {
+      const [ws, ts] = await Promise.all([fetchWorkshopOptions(), fetchProcessTemplates()])
+      workshopOptions.value = ws
+      processTemplates.value = ts
+    } catch (e) {
+      ElMessage.error(errText(e))
+    } finally {
+      createOptionsLoading.value = false
+    }
+  }
+}
+
+function onCreateWorkshopChange() {
+  // 车间有默认制程时锁定模板选择，交由后端解析并回写 workshop_type
+  if (createWorkshopDefault.value) createForm.value.processTemplateId = undefined
+}
+
+async function submitCreate() {
+  const f = createForm.value
+  if (!createReady.value) return
+  submitting.value = true
+  try {
+    await createManufacturingOrder({
+      taskType: f.taskType,
+      customerName: f.customerName.trim(),
+      productName: f.productName.trim(),
+      specification: f.specification.trim() || null,
+      plannedQuantity: f.plannedQuantity,
+      unit: f.unit.trim(),
+      workshopId: f.workshopId,
+      processTemplateId: createWorkshopDefault.value ? null : f.processTemplateId,
+      dueDate: f.dueDate || null,
+      remark: f.remark.trim() || null
+    }, createKey.value)
+    ElMessage.success('工单已创建，工序已按制程展开')
+    createOpen.value = false
+    createKey.value = ''
+    loadBoard(1)
+  } catch (e) {
+    // 失败时保留请求键：用户重试即复用同一次动作，不会重复建单
+    ElMessage.error(errText(e))
+  } finally {
+    submitting.value = false
+  }
 }
 
 // ==================== 执行看板 ====================
@@ -1021,6 +1174,13 @@ onMounted(async () => {
 .unit-hint { margin-left: 10px; color: var(--color-text-secondary, #94a3b8); font-size: 12px; }
 .full-width { width: 100%; }
 .kw-alert { margin-bottom: var(--space-md-lg, 12px); }
+
+/* ============ 新建工单弹窗 ============ */
+.qty-row { display: flex; gap: 10px; width: 100%; }
+.qty-input { flex: 1; }
+.unit-input { width: 120px; flex: none; }
+.field-hint { margin-top: 4px; font-size: 12px; color: var(--color-text-secondary, #94a3b8); }
+.field-hint--warn { color: var(--color-warning, #d97706); }
 
 /* ============ 目标卡片 ============ */
 .target-card {

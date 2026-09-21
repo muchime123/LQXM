@@ -109,6 +109,10 @@ export const fetchManufacturingOrder = async (id: number) =>
   (await http.get<ManufacturingDetail>(`/manufacturing/orders/${id}`)).data
 export const fetchManufacturingWarehouses = async () =>
   (await http.get<Warehouse[]>('/manufacturing/warehouses')).data
+/** 建单弹窗用：启用中的车间（defaultProcessTemplateId 为空时需自选制程模板）。 */
+export interface WorkshopOption { id:number; workshopName:string; defaultProcessTemplateId?:number|null }
+export const fetchWorkshopOptions = async () =>
+  (await http.get<WorkshopOption[]>('/manufacturing/workshop-options')).data
 // ============ M0 幂等契约：写动作请求键 ============
 // 后端对报工 / 冲正 / 收货 / 冲销等写动作要求 X-Request-Key（决策 #12「无键不直通」）：
 //  - 同一次提交的重试必须复用同一个键 → 后端认定为「重放」，直接返回首次结果，不会重复落账；

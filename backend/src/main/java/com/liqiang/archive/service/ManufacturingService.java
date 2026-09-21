@@ -75,6 +75,20 @@ public class ManufacturingService {
     public List<Map<String,Object>> warehouses() {
         return jdbc.queryForList("SELECT id,warehouse_code warehouseCode,warehouse_name warehouseName FROM warehouses WHERE active=1 ORDER BY id");
     }
+
+    /**
+     * 建单弹窗的车间下拉选项（读权限即可访问）。
+     *
+     * <p>不放在 {@code ManufacturingTaskConfigController}（/master/workshops）——那个控制器
+     * 类级要求 {@code manufacturing.template.manage}，报工/收货用户没有；建单用户只需要
+     * 「看到有哪些启用中的车间」来让后端解析默认制程。
+     */
+    public List<Map<String,Object>> workshopOptions() {
+        return jdbc.queryForList(
+            "SELECT id,workshop_name workshopName,default_process_template_id defaultProcessTemplateId "
+          + "FROM manufacturing_workshops WHERE enabled=1 ORDER BY id");
+    }
+
     public Map<String,Object> list(String keyword,String status,String priority,String scheduled,String team,
                                    Long responsible,String workshop,String overdue,String orderBy,int page,int size) {
         if(page<1 || size<1 || size>100) throw new IllegalArgumentException("分页范围无效");
