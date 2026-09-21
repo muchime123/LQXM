@@ -407,9 +407,10 @@ public class ManufacturingExecutionService {
                 """,orderId,x.get("id"),x.get("operationId"),x.get("sequenceNo"),x.get("operationName"),coefficient,
                     planned.multiply(coefficient),x.get("required"),x.get("isFinal"),x.get("allowParallel"),i==0?"READY":"PENDING");
         }
-        jdbc.update("UPDATE manufacturing_orders SET process_template_id=?,process_template_name_snapshot=?,workshop_type=?,inspection_status='PENDING',status='RELEASED' WHERE id=?",
-                templateId,template.get("name"),template.get("workshop"),orderId);
-        audit.log("ManufacturingOrder",orderId,String.valueOf(order.get("order_no")),"GENERATE_OPERATIONS","按模板“"+template.get("name")+"”生成"+rows.size()+"道任务工序");
+        boolean needInspection=needsInspection(orderId);
+        jdbc.update("UPDATE manufacturing_orders SET process_template_id=?,process_template_name_snapshot=?,workshop_type=?,inspection_status=?,status='RELEASED' WHERE id=?",
+                templateId,template.get("name"),template.get("workshop"),needInspection?"PENDING":"NOT_REQUIRED",orderId);
+        audit.log("ManufacturingOrder",orderId,String.valueOf(order.get("order_no")),"GENERATE_OPERATIONS","按模板“"+template.get("name")+"”生成"+rows.size()+"道任务工序"+(needInspection?"（含人工检验工序）":"（无人工检验工序，完工后自动确认）"));
     }
 
     @Transactional
@@ -477,7 +478,7 @@ public class ManufacturingExecutionService {
             """,tmp,orderId,result,qualified,unqualified,user.employeeId(),user.name(),now,clean(request.issueDescription()),clean(request.remark()));
         long id=jdbc.queryForObject("SELECT id FROM manufacturing_inspections WHERE inspection_no=?",Long.class,tmp);String no="QI"+String.format("%08d",id);jdbc.update("UPDATE manufacturing_inspections SET inspection_no=? WHERE id=?",no,id);
         String status="PASSED".equals(result)?"PENDING_RECEIPT":"REWORK";
-        jdbc.update("UPDATE manufacturing_orders SET status=?,inspection_status=?,inspection_at=?,inspection_by_employee_id=?,inspection_by_name=?,inspection_remark=? WHERE id=?",
+        jdbc.update("UPDATE manufacturing_orders SET status=?,inspection_status=?,inspection_source='MANUAL',inspection_at=?,inspection_by_employee_id=?,inspection_by_name=?,inspection_remark=? WHERE id=?",
                 status,result,now,user.employeeId(),user.name(),clean(request.remark()),orderId);
         if("REWORK".equals(status)){
             String requirement=clean(request.reworkRequirement());if(requirement==null)requirement=clean(request.issueDescription());
@@ -503,13 +504,46 @@ public class ManufacturingExecutionService {
         if(complete)jdbc.update("UPDATE manufacturing_order_operations SET status='READY' WHERE manufacturing_order_id=? AND sequence_no>? AND status='PENDING' ORDER BY sequence_no LIMIT 1",orderId,op.get("sequence_no"));
         else jdbc.update("UPDATE manufacturing_order_operations SET status='PENDING' WHERE manufacturing_order_id=? AND sequence_no>? AND status='READY'",orderId,op.get("sequence_no"));
         Integer remaining=jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_order_operations WHERE manufacturing_order_id=? AND required=1 AND status<>'COMPLETED'",Integer.class,orderId);
+        boolean allDone=remaining!=null&&remaining==0,needInspection=allDone&&needsInspection(orderId);
         String curStatus=jdbc.queryForObject("SELECT status FROM manufacturing_orders WHERE id=?",String.class,orderId);
         if("REWORK".equals(curStatus)){
-            if(remaining!=null&&remaining==0){jdbc.update("UPDATE manufacturing_orders SET status='PENDING_REINSPECTION' WHERE id=?",orderId);jdbc.update("UPDATE manufacturing_reworks SET status='COMPLETED',completed_at=NOW() WHERE manufacturing_order_id=? AND status='IN_PROGRESS'",orderId);}
+            if(allDone){
+                if(needInspection)jdbc.update("UPDATE manufacturing_orders SET status='PENDING_REINSPECTION' WHERE id=?",orderId);
+                else autoConfirmInspection(orderId,operationId);
+                jdbc.update("UPDATE manufacturing_reworks SET status='COMPLETED',completed_at=NOW() WHERE manufacturing_order_id=? AND status='IN_PROGRESS'",orderId);
+            }
         } else {
-            if(remaining!=null&&remaining==0) jdbc.update("UPDATE manufacturing_orders SET status='PENDING_INSPECTION',inspection_status='PENDING',production_completed_at=NOW() WHERE id=?",orderId);
-            else jdbc.update("UPDATE manufacturing_orders SET status='IN_PRODUCTION' WHERE id=? AND status IN ('RELEASED','SCHEDULED','PENDING_INSPECTION')",orderId);
+            if(!allDone)jdbc.update("UPDATE manufacturing_orders SET status='IN_PRODUCTION' WHERE id=? AND status IN ('RELEASED','SCHEDULED','PENDING_INSPECTION')",orderId);
+            else if(needInspection)jdbc.update("UPDATE manufacturing_orders SET status='PENDING_INSPECTION',inspection_status='PENDING',production_completed_at=NOW() WHERE id=?",orderId);
+            else autoConfirmInspection(orderId,operationId);
         }
+    }
+
+    /** 工单是否存在"需要人工检验"的工序：由 manufacturing_operations.requires_inspection 单点控制（复用既有列，当前 14 道工序全为 0）。 */
+    private boolean needsInspection(long orderId){
+        Integer count=jdbc.queryForObject("""
+            SELECT COUNT(*) FROM manufacturing_order_operations o
+            JOIN manufacturing_operations m ON m.id=o.operation_id
+            WHERE o.manufacturing_order_id=? AND o.required=1 AND m.requires_inspection=1
+            """,Integer.class,orderId);
+        return count!=null&&count>0;
+    }
+
+    /**
+     * 无人工检验工序时的自动确认放行。口径：自动确认 ≠ 检验合格 ——
+     * 不写 manufacturing_inspections（未发生检验事实），inspection_at / inspection_by_* 保持 NULL，
+     * 仅以 inspection_source='AUTO' 标记来源，页面与对外表述应为"末道工序已完成"。
+     */
+    private void autoConfirmInspection(long orderId,long operationId){
+        int updated=jdbc.update("""
+            UPDATE manufacturing_orders SET status='PENDING_RECEIPT',inspection_status='NOT_REQUIRED',
+              inspection_source='AUTO',production_completed_at=NOW()
+            WHERE id=? AND status IN ('RELEASED','SCHEDULED','IN_PRODUCTION','REWORK')
+            """,orderId);
+        if(updated==0)return;
+        String orderNo=jdbc.queryForObject("SELECT order_no FROM manufacturing_orders WHERE id=?",String.class,orderId);
+        String operationName=jdbc.queryForObject("SELECT operation_name_snapshot FROM manufacturing_order_operations WHERE id=?",String.class,operationId);
+        audit.log("ManufacturingOrder",orderId,orderNo,"AUTO_CONFIRM","工序“"+operationName+"”报工完成；本单无人工检验工序，按工序政策自动确认放行至待入库（未执行人工检验）");
     }
 
     private Map<String,Object> row(java.sql.ResultSet r)throws java.sql.SQLException{var m=new LinkedHashMap<String,Object>();ResultSetMetaData md=r.getMetaData();for(int i=1;i<=md.getColumnCount();i++){Object v=r.getObject(i);if(v instanceof java.sql.Date d)v=d.toLocalDate();else if(v instanceof java.sql.Timestamp t)v=t.toLocalDateTime();m.put(camel(md.getColumnLabel(i)),v);}return m;}
