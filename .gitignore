@@ -137,6 +137,7 @@ frontend/*.timestamp-*.mjs
 
 # --- Root-level throwaway probes (AI/diagnostic one-off scripts & dumps, added 2026-09-18) ---
 /_*.ps1
+/_*.java
 /_*.txt
 /_*.sql
 /_*.json
