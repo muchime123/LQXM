@@ -55,18 +55,10 @@ const primaryNavItems: NavItem[] = [
         group: 'h3'
       },
       {
-        to: '/production-task-orders',
-        permission: 'manufacturing.manage',
-        label: '生产任务单',
-        description: '业务员下单：选产线联动产品与配置，提交后自动展开工序进入车间执行。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>',
-        group: 'h3'
-      },
-      {
         to: '/manufacturing-execution',
         permission: ['manufacturing.report', 'manufacturing.receive', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'],
         label: '车间执行',
-        description: '车间接单与报工、仓库交付收货：工单 → 工序报工 → 完工入库，全程无自由文本。',
+        description: '下单与车间接单、报工、交付收货：右上角「新建生产任务单」抽屉下单，工单 → 工序报工 → 完工入库。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M2 20h20"/><path d="M6 20V9l6-4 6 4v11"/><path d="M10 20v-5h4v5"/></svg>',
         group: 'h3'
       },

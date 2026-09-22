@@ -163,13 +163,13 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/production/ManufacturingProcessManagementView.vue'),
     meta: { title: '制程与工序管理', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
   },
-  // 生产任务单（业务员下单入口）：产线 → 产品名称/可选配置联动，提交即展开工序。
-  // 与台账跟单工作台并存：本页产生 ERP 自建单（external_source='ERP'），跟单页看历史台账单。
+  // 下单不是独立页面：入口是「车间执行」页右上角的「新建生产任务单」抽屉
+  // （组件 components/production/ProductionTaskOrderDrawer.vue）。
+  // 旧路径保留为跳转，避免历史书签 404。
   {
     path: '/production-task-orders',
     name: 'productionTaskOrders',
-    component: () => import('../views/production/ProductionTaskOrderView.vue'),
-    meta: { title: '生产任务单', layout: 'list', permission: 'manufacturing.manage', group: 'h3' }
+    redirect: { path: '/manufacturing-execution', query: {} }
   },
   {
     path: '/product-inventory',
