@@ -449,28 +449,49 @@
               <el-option v-for="w in warehouses" :key="w.id" :value="w.id" :label="w.warehouseName" />
             </el-select>
           </el-form-item>
-          <el-form-item label="入库数量" required>
-            <el-input-number v-model="receiptForm.quantity" :min="0" :max="receiptRemaining" :precision="3" :step="1" class="num-input" />
-            <span class="unit-hint">最多 {{ fmtNum(receiptRemaining) }} {{ receiptOrder.unit }}</span>
-          </el-form-item>
           <el-form-item label="收货时间">
             <el-date-picker v-model="receiptForm.completedAt" type="datetime" placeholder="默认当前时间"
               value-format="YYYY-MM-DDTHH:mm:ss" class="full-width" />
-          </el-form-item>
-          <el-form-item label="成品名称" required>
-            <el-input v-model="receiptForm.finishedGoodsName" placeholder="入库成品名称" />
-          </el-form-item>
-          <el-form-item label="规格">
-            <el-input v-model="receiptForm.specification" placeholder="可选" />
-          </el-form-item>
-          <el-form-item label="实际单位成本">
-            <el-input-number v-model="receiptForm.unitCost" :min="0" :precision="2" :step="10" class="num-input" />
-            <span class="unit-hint">元 / {{ receiptOrder.unit }}（可留 0）</span>
           </el-form-item>
           <el-form-item label="备注">
             <el-input v-model="receiptForm.remark" placeholder="可选" />
           </el-form-item>
         </div>
+
+        <el-divider content-position="left">按产出清单逐项确认实际数量</el-divider>
+        <el-alert type="info" :closable="false" class="kw-alert"
+          title="成品身份来自工单产出清单，不再手填名称；未填的行视为本次不收货（差异按「已收 < 计划」显式呈现）。" />
+        <el-table :data="receiptOutputs" v-loading="receiptOutputsLoading" stripe class="receivable-table">
+          <el-table-column label="产出" min-width="220">
+            <template #default="{ row }">
+              <strong class="cell-strong">{{ row.productNameSnapshot }}</strong>
+              <small class="cell-sub">
+                {{ row.productCodeSnapshot || '—' }}
+                <span v-if="row.isMold"> · 模具</span>
+                <span v-if="row.isPrimary"> · 主产品</span>
+              </small>
+            </template>
+          </el-table-column>
+          <el-table-column label="计划 / 已收" width="160" align="right">
+            <template #default="{ row }">
+              {{ fmtNum(row.plannedQuantity) }} / {{ fmtNum(row.receivedQuantity) }} {{ row.unit }}
+            </template>
+          </el-table-column>
+          <el-table-column label="本次收货数量" width="170">
+            <template #default="{ row }">
+              <el-input-number v-model="row.receiptQuantity" :min="0"
+                :max="Math.max(0, Number(row.plannedQuantity) - Number(row.receivedQuantity))"
+                :precision="3" :step="1" :controls="false" style="width: 130px" />
+            </template>
+          </el-table-column>
+          <el-table-column label="单位成本" width="150">
+            <template #default="{ row }">
+              <el-input-number v-model="row.unitCost" :min="0" :precision="2" :step="10" :controls="false" style="width: 110px" />
+            </template>
+          </el-table-column>
+          <template #empty><el-empty description="这张工单还没有产出清单" /></template>
+        </el-table>
+        <div class="field-hint">只有数量 &gt; 0 的行会入账；留 0 表示本次不收该项。</div>
       </el-form>
 
       <template #footer>
@@ -520,8 +541,28 @@
         <el-form-item label="客户名称" required>
           <el-input v-model="createForm.customerName" maxlength="300" placeholder="手工输入客户名称" />
         </el-form-item>
-        <el-form-item label="生产成品" required>
-          <el-input v-model="createForm.productName" maxlength="500" placeholder="生产成品名称" />
+        <el-form-item label="生产车间" required>
+          <el-select v-model="createForm.workshopId" placeholder="选择车间（决定制程品类与默认制程）" style="width: 100%"
+            :loading="createOptionsLoading" @change="onCreateWorkshopChange">
+            <el-option v-for="w in workshopOptions" :key="w.id" :value="w.id"
+              :label="w.workshopName + (w.defaultProcessTemplateId ? '（默认制程）' : '（无默认制程）')" />
+          </el-select>
+        </el-form-item>
+        <!-- 制程品类：决定这张单走哪套工序。只列该车间的配置项，保证「选得到」必然「解析得出制程」。 -->
+        <el-form-item label="制程品类" required>
+          <el-select v-model="createForm.processCategory" filterable placeholder="先选车间，再选制程品类" style="width: 100%"
+            :loading="categoryLoading" :disabled="!createForm.workshopId">
+            <el-option v-for="c in processCategories" :key="c" :value="c" :label="c" />
+          </el-select>
+        </el-form-item>
+        <!-- 主产品：商品身份（SKU），不再手打名称。单位随之带入，避免工单与库存单位分叉。 -->
+        <el-form-item label="主产品 SKU" required>
+          <el-select v-model="createForm.salesProductId" filterable remote reserve-keyword clearable
+            :remote-method="searchProducts" :loading="productSearching" placeholder="输入编码 / 名称搜索产品" style="width: 100%"
+            @change="onPrimaryProductChange">
+            <el-option v-for="p in productOptions" :key="p.id" :value="p.id" :label="productLabel(p)" />
+          </el-select>
+          <div class="field-hint">这是完工时实际产出的商品身份；单位取自主数据（{{ primaryUnit || '—' }}）</div>
         </el-form-item>
         <el-form-item label="规格 / 定制要求">
           <el-input v-model="createForm.specification" maxlength="500" placeholder="选填，如：设备类型：灌装机" />
@@ -529,15 +570,26 @@
         <el-form-item label="计划数量" required>
           <div class="qty-row">
             <el-input-number v-model="createForm.plannedQuantity" :min="0.000001" :max="99999999" :precision="4" :controls="false" class="qty-input" />
-            <el-input v-model="createForm.unit" maxlength="40" class="unit-input" placeholder="单位，如：台" />
+            <span class="unit-hint">{{ primaryUnit || '（由主产品带入）' }}</span>
           </div>
         </el-form-item>
-        <el-form-item label="生产车间" required>
-          <el-select v-model="createForm.workshopId" placeholder="选择车间（决定默认制程）" style="width: 100%"
-            :loading="createOptionsLoading" @change="onCreateWorkshopChange">
-            <el-option v-for="w in workshopOptions" :key="w.id" :value="w.id"
-              :label="w.workshopName + (w.defaultProcessTemplateId ? '（默认制程）' : '（无默认制程）')" />
-          </el-select>
+        <!-- 产出清单：主产品自动成为第 1 行；配套件 / 模具在这里补行（实测 86% 的工单单 SKU）。 -->
+        <el-form-item label="配套产出">
+          <div class="output-lines">
+            <div v-for="(row, idx) in createForm.outputs" :key="idx" class="output-line">
+              <el-select v-model="row.salesProductId" filterable remote reserve-keyword
+                :remote-method="searchProducts" :loading="productSearching" placeholder="配套件 / 模具"
+                style="flex: 1; min-width: 220px">
+                <el-option v-for="p in productOptions" :key="p.id" :value="p.id" :label="productLabel(p)" />
+              </el-select>
+              <el-input-number v-model="row.plannedQuantity" :min="0.000001" :precision="4" :controls="false"
+                style="width: 120px" />
+              <el-checkbox v-model="row.isMold">模具</el-checkbox>
+              <el-button text type="danger" @click="createForm.outputs.splice(idx, 1)">移除</el-button>
+            </div>
+            <el-button text type="primary" @click="addOutputRow">+ 添加配套产出（模具等）</el-button>
+            <div class="field-hint">收货时按这份清单逐项确认实际数量 —— 清单是「这张单该产出什么」的唯一权威</div>
+          </div>
         </el-form-item>
         <el-form-item label="制程模板">
           <el-select v-model="createForm.processTemplateId" clearable placeholder="跟随车间默认制程" style="width: 100%"
@@ -571,10 +623,11 @@ import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import {
   fetchExecutionBoard, submitWorkReport, reverseWorkReport, fetchAllWorkReports, newRequestKey,
   fetchManufacturingWarehouses, completeManufacturingOrder, fetchCompletionReceipts,
-  reverseCompletionReceipt, fetchManufacturingOrders,
+  reverseCompletionReceipt, fetchManufacturingOrders, fetchManufacturingOrder,
   fetchWorkshopOptions, fetchProcessTemplates, createManufacturingOrder,
+  fetchProductOptions, fetchProcessCategories,
   type ExecutionBoardItem, type AllWorkReport, type CompletionReceipt, type ManufacturingOrder,
-  type Warehouse, type WorkshopOption, type ProcessTemplate
+  type Warehouse, type WorkshopOption, type ProcessTemplate, type ProductOption, type ManufacturingOutput
 } from '@/api/manufacturing'
 
 const { can } = useCurrentUser()
@@ -643,8 +696,13 @@ const priorityTagType = (v?: string): 'success' | 'warning' | 'danger' | 'info' 
 }
 
 // ==================== 新建工单 ====================
-// 后端契约（ManufacturingService.CreateOrder）：customerName/productName/unit/plannedQuantity/taskType 必填；
-// 制程来源二选一 —— workshopId 由车间默认制程解析（同时回写 workshop_type），或显式传 processTemplateId。
+// 后端契约（ManufacturingService.CreateOrder，P3 ①）：
+//   customerName / processCategory / salesProductId / plannedQuantity / taskType 必填；
+//   outputs 是**附加产出**（配套件 / 模具），可空 —— 实测 86% 的工单只产 1 个 SKU。
+// ⚠️ 「制程品类」与「主产品 SKU」是两个独立维度，必须都给：
+//   制程解析按 manufacturing_task_config_items.config_name（**品类级**）精确匹配，
+//   而产品身份必须是 SKU（**商品级**）。拿 SKU 名反推品类实测只有 25% 可用
+//   （74.5% 零命中 + 13% 命中多个）→ 不存在自动推导，只能分别选。
 // 与报工/收货同一条请求键纪律：打开弹窗生成，失败保留重试，成功丢弃。
 const TASK_TYPES = [
   { value: 'SAMPLE', label: '打样' },
@@ -660,34 +718,73 @@ const createKey = ref('')
 const createOptionsLoading = ref(false)
 const workshopOptions = ref<WorkshopOption[]>([])
 const processTemplates = ref<ProcessTemplate[]>([])
+/** 该车间可选的制程品类（随车间切换重新加载；与后端制程解析读同一张配置表）。 */
+const processCategories = ref<string[]>([])
+const categoryLoading = ref(false)
+/** 产品选择器候选（主产品行与配套产出行**共用**一份，按关键词远程搜索）。 */
+const productOptions = ref<ProductOption[]>([])
+const productSearching = ref(false)
 const createForm = ref({
   taskType: 'SAMPLE',
   customerName: '',
-  productName: '',
+  processCategory: '',
+  salesProductId: undefined as number | undefined,
   specification: '',
   plannedQuantity: undefined as number | undefined,
-  unit: '台',
   workshopId: undefined as number | undefined,
   processTemplateId: undefined as number | undefined,
   dueDate: '',
-  remark: ''
+  remark: '',
+  outputs: [] as Array<{ salesProductId: number | undefined; plannedQuantity: number | undefined; isMold: boolean }>
 })
+/** 主产品单位：由所选 SKU 带入，界面只读展示（不允许在工单上另写一个单位）。 */
+const primaryUnit = computed(() =>
+  productOptions.value.find(x => x.id === createForm.value.salesProductId)?.unit || '')
+const productLabel = (p: ProductOption) =>
+  `${p.productCode} ${p.productName}${p.specification ? ' · ' + p.specification : ''}${p.custom ? '（自建）' : ''}`
 const createWorkshopDefault = computed(() =>
   workshopOptions.value.find(w => w.id === createForm.value.workshopId)?.defaultProcessTemplateId || null)
 
+let productSearchTimer: ReturnType<typeof setTimeout> | undefined
+/** 远程搜索产品（节流 250ms，避免每敲一个字符打一次接口）。 */
+function searchProducts(keyword: string) {
+  if (productSearchTimer) clearTimeout(productSearchTimer)
+  productSearchTimer = setTimeout(async () => {
+    productSearching.value = true
+    try {
+      productOptions.value = await fetchProductOptions(keyword || '')
+    } catch (e) {
+      ElMessage.error(errText(e))
+    } finally {
+      productSearching.value = false
+    }
+  }, 250)
+}
+function addOutputRow() {
+  createForm.value.outputs.push({ salesProductId: undefined, plannedQuantity: undefined, isMold: false })
+}
+function onPrimaryProductChange() {
+  // 换产品必须重新填数量：沿用上一件货的数量是最典型的"看起来填了其实错了"
+  createForm.value.plannedQuantity = undefined
+}
+
 const createReady = computed(() => {
   const f = createForm.value
-  return !!(f.taskType && f.customerName.trim() && f.productName.trim()
-    && f.plannedQuantity && Number(f.plannedQuantity) > 0 && f.unit.trim()
-    && f.workshopId && (createWorkshopDefault.value || f.processTemplateId))
+  // 配套产出只要开了行就必须填全 —— 半填的行提交后被静默丢掉，是最难查的一类"我明明填了"
+  const outputsOk = f.outputs.every(r => !!r.salesProductId && Number(r.plannedQuantity) > 0)
+  return !!(f.taskType && f.customerName.trim() && f.processCategory
+    && f.salesProductId && f.plannedQuantity && Number(f.plannedQuantity) > 0
+    && f.workshopId && (createWorkshopDefault.value || f.processTemplateId) && outputsOk)
 })
 
 async function openCreate() {
   createForm.value = {
-    taskType: 'SAMPLE', customerName: '', productName: '', specification: '',
-    plannedQuantity: undefined, unit: '台', workshopId: undefined,
-    processTemplateId: undefined, dueDate: '', remark: ''
+    taskType: 'SAMPLE', customerName: '', processCategory: '', salesProductId: undefined,
+    specification: '', plannedQuantity: undefined, workshopId: undefined,
+    processTemplateId: undefined, dueDate: '', remark: '', outputs: []
   }
+  processCategories.value = []
+  productOptions.value = []
   createKey.value = newRequestKey()
   createOpen.value = true
   if (workshopOptions.value.length === 0) {
@@ -702,11 +799,25 @@ async function openCreate() {
       createOptionsLoading.value = false
     }
   }
+  // 先铺一批候选，否则用户不输入关键词时下拉是空的、看起来像"没有产品"
+  searchProducts('')
 }
 
-function onCreateWorkshopChange() {
+async function onCreateWorkshopChange() {
   // 车间有默认制程时锁定模板选择，交由后端解析并回写 workshop_type
   if (createWorkshopDefault.value) createForm.value.processTemplateId = undefined
+  // 制程品类来自该车间的配置：换车间必须重取，并清掉上一个车间的选择
+  createForm.value.processCategory = ''
+  processCategories.value = []
+  if (!createForm.value.workshopId) return
+  categoryLoading.value = true
+  try {
+    processCategories.value = await fetchProcessCategories(createForm.value.workshopId)
+  } catch (e) {
+    ElMessage.error(errText(e))
+  } finally {
+    categoryLoading.value = false
+  }
 }
 
 async function submitCreate() {
@@ -717,16 +828,19 @@ async function submitCreate() {
     await createManufacturingOrder({
       taskType: f.taskType,
       customerName: f.customerName.trim(),
-      productName: f.productName.trim(),
+      processCategory: f.processCategory,
+      salesProductId: f.salesProductId,
       specification: f.specification.trim() || null,
       plannedQuantity: f.plannedQuantity,
-      unit: f.unit.trim(),
       workshopId: f.workshopId,
       processTemplateId: createWorkshopDefault.value ? null : f.processTemplateId,
       dueDate: f.dueDate || null,
-      remark: f.remark.trim() || null
+      remark: f.remark.trim() || null,
+      outputs: f.outputs
+        .filter(r => r.salesProductId && Number(r.plannedQuantity) > 0)
+        .map(r => ({ salesProductId: r.salesProductId, plannedQuantity: r.plannedQuantity, isMold: r.isMold }))
     }, createKey.value)
-    ElMessage.success('工单已创建，工序已按制程展开')
+    ElMessage.success('工单已创建，产出清单与工序已展开')
     createOpen.value = false
     createKey.value = ''
     loadBoard(1)
@@ -961,23 +1075,18 @@ const receivableOrders = ref<ManufacturingOrder[]>([])
 const receiptOrder = ref<ManufacturingOrder | null>(null)
 const receiptForm = ref({
   warehouseId: undefined as number | undefined,
-  quantity: 0,
   completedAt: '',
-  finishedGoodsName: '',
-  specification: '',
-  unitCost: 0,
   remark: ''
 })
+/** 产出清单行 + 本次收货输入（P3 ②：收货按清单逐项确认，不再手填成品名）。 */
+type ReceiptOutputRow = ManufacturingOutput & { receiptQuantity: number; unitCost: number }
+const receiptOutputs = ref<ReceiptOutputRow[]>([])
+const receiptOutputsLoading = ref(false)
 const receiptKey = ref('')
-
-const receiptRemaining = computed(() => {
-  const o = receiptOrder.value
-  if (!o) return 0
-  return Math.max(0, Number(o.plannedQuantity) - Number(o.completedQuantity))
-})
 
 function openReceiptCreate() {
   receiptOrder.value = null
+  receiptOutputs.value = []
   receivableKeyword.value = ''
   receivableOrders.value = []
   receiptKey.value = newRequestKey()
@@ -1003,18 +1112,28 @@ async function loadReceivableOrders() {
   }
 }
 
-function pickReceivableOrder(row: ManufacturingOrder | null) {
+async function pickReceivableOrder(row: ManufacturingOrder | null) {
   if (!row) return
   receiptOrder.value = row
-  const remaining = Math.max(0, Number(row.plannedQuantity) - Number(row.completedQuantity))
   receiptForm.value = {
     warehouseId: warehouses.value[0]?.id,
-    quantity: remaining,
     completedAt: '',
-    finishedGoodsName: row.productNameSnapshot || '',
-    specification: row.specificationSnapshot || '',
-    unitCost: 0,
     remark: ''
+  }
+  // 产出清单是收货的唯一入口：选中工单后立刻取清单，默认把「剩余未收」整批填入
+  receiptOutputsLoading.value = true
+  receiptOutputs.value = []
+  try {
+    const detail = await fetchManufacturingOrder(row.id)
+    receiptOutputs.value = (detail.outputs || []).map(o => ({
+      ...o,
+      receiptQuantity: Math.max(0, Number(o.plannedQuantity) - Number(o.receivedQuantity)),
+      unitCost: 0
+    }))
+  } catch (e) {
+    ElMessage.error(errText(e))
+  } finally {
+    receiptOutputsLoading.value = false
   }
 }
 
@@ -1022,21 +1141,17 @@ async function submitReceipt() {
   const o = receiptOrder.value
   if (!o) { ElMessage.warning('请先选择工单'); return }
   if (!receiptForm.value.warehouseId) { ElMessage.warning('请选择入库仓库'); return }
-  if (!(Number(receiptForm.value.quantity) > 0)) { ElMessage.warning('入库数量必须大于 0'); return }
-  if (Number(receiptForm.value.quantity) > receiptRemaining.value) {
-    ElMessage.warning(`入库数量不能超过待入数量 ${fmtNum(receiptRemaining.value)} ${o.unit}`)
-    return
-  }
-  if (!receiptForm.value.finishedGoodsName.trim()) { ElMessage.warning('请填写入库成品名称'); return }
+  // 只提交数量 > 0 的行；留 0 表示本次不收该项（不是"收 0 件"）
+  const items = receiptOutputs.value
+    .filter(r => Number(r.receiptQuantity) > 0)
+    .map(r => ({ outputId: r.id, quantity: r.receiptQuantity, unitCost: r.unitCost || 0, remark: null }))
+  if (!items.length) { ElMessage.warning('请至少填写一项收货数量'); return }
   submitting.value = true
   try {
     await completeManufacturingOrder(o.id, {
       warehouseId: receiptForm.value.warehouseId,
-      quantity: receiptForm.value.quantity,
       completedAt: receiptForm.value.completedAt || null,
-      finishedGoodsName: receiptForm.value.finishedGoodsName.trim(),
-      specification: receiptForm.value.specification || null,
-      unitCost: receiptForm.value.unitCost,
+      items,
       remark: receiptForm.value.remark || null
     }, receiptKey.value)
     ElMessage.success('交付收货已入账')

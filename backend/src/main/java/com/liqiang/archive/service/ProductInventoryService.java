@@ -29,6 +29,22 @@ public class ProductInventoryService {
      * <p>匹配刻意保守：命中 0 个或多个一律不归一（{@link #findCanonicalProduct}）。
      * 错合并两件不同的货是不可逆的，各自独立只是暂时没聚合——两者代价不对称。
      */
+    /**
+     * 取（或建立）工单的产出产品身份。
+     *
+     * <p>⚠️ <b>P3（V322）起，收货路径不再经过这里</b>。原因见
+     * {@code 完工入库到销售出库的身份断链与闭环设计-20260921.md} §4.3：本方法按
+     * {@code MFG-<工单号>} <b>给每张工单造一个独立产品身份</b>，而 V320 的归一策略是
+     * 「按 (名称,规格,单位) 精确匹配唯一的 H3-」，实测历史 4 个 {@code MFG-}
+     * <b>全部匹配 0 个</b>（名字来自自由文本，与 SKU 规范名不一致）→ 归一实际不会发生，
+     * 库存仍会按单号分裂。现在收货按<b>工单产出清单</b>取 SKU，身份在建单时就已经是标准 SKU。
+     *
+     * <p><b>保留原因</b>（Q1 拍板「保留 {@code MFG-} 编码机制」）：它是「主数据里确实没有这件货」
+     * （新品 / 非标订做件）时**唯一**能产生新身份的入口，未来由「清单项建档」场景调用，
+     * 且必须伴随 {@code PENDING_REVIEW} 审批。删掉它会让非标件无路可走 —— 于是又回到自由文本。
+     *
+     * <p>当前无调用点（保留待接线），**不要因为 grep 不到调用方就直接删除**。
+     */
     @Transactional
     public long ensureManufacturingProduct(long orderId,String orderNo,String name,String specification,String unit){
         Long linked=jdbc.queryForObject("SELECT sales_product_id FROM manufacturing_orders WHERE id=?",Long.class,orderId);if(linked!=null)return linked;

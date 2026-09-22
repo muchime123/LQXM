@@ -18,6 +18,19 @@ public class ManufacturingController {
     /** 建单弹窗用：启用中的车间 + 默认制程（读权限即可，勿并入 /master/workshops——那是模板管理权限）。 */
     @GetMapping("/workshop-options") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public List<Map<String,Object>> workshopOptions(){return service.workshopOptions();}
+    /**
+     * 建单弹窗用：产品选择器（P3 ①：产品身份必须从主数据里选，不再打名字）。
+     * 读权限即可 —— 建单用户只有 manufacturing.manage，没有产品档案的管理权限。
+     */
+    @GetMapping("/product-options") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.manage"})
+    public List<Map<String,Object>> productOptions(@RequestParam(defaultValue="")String keyword,@RequestParam(defaultValue="50")int limit){
+        return service.productOptions(keyword,limit);
+    }
+    /**
+     * 建单弹窗用：该车间可选的制程品类（来源与制程解析同一张表，保证选了一定能解析出制程）。
+     */
+    @GetMapping("/process-categories") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.manage"})
+    public List<String> processCategories(@RequestParam long workshopId){return service.processCategories(workshopId);}
     @GetMapping("/orders") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public Map<String,Object> orders(@RequestParam(defaultValue="")String keyword,@RequestParam(defaultValue="")String status,
             @RequestParam(defaultValue="")String priority,@RequestParam(defaultValue="")String scheduled,

@@ -55,8 +55,45 @@ export interface FinishedGoodsLot {
 }
 export interface Warehouse { id: number; warehouseCode: string; warehouseName: string }
 export interface PageResult<T> { items: T[]; total: number; page: number; size: number }
+/**
+ * 工单产出清单行（P3 ①）。
+ *
+ * 建单时声明「这张单要做哪几个 SKU、各多少」，收货时按它逐项确认实际数量。
+ * `isPrimary=1` 有且仅有一行（主产品）—— 工单状态机按它判定"做完没有"。
+ */
+export interface ManufacturingOutput {
+  id: number
+  manufacturingOrderId: number
+  lineNo: number
+  isPrimary: boolean
+  salesProductId: number
+  canonicalProductId: number
+  productCodeSnapshot?: string
+  productNameSnapshot: string
+  specificationSnapshot?: string
+  unit: string
+  plannedQuantity: number
+  receivedQuantity: number
+  isMold: boolean
+  remark?: string
+}
+/**
+ * 产品选择器选项（P3 ①：产品身份只能从主数据选，不再手打名称）。
+ * `custom=1` 表示自建 / 非标件（`MFG-`），界面上要能一眼看出来。
+ */
+export interface ProductOption {
+  id: number
+  productCode: string
+  productName: string
+  specification?: string
+  unit?: string
+  custom: number
+}
+/** 收货明细行（P3 ②）：按产出清单逐项填实际数量（outputId 指向清单行）。 */
+export interface ReceiptItem { outputId: number; quantity: number; unitCost?: number; remark?: string }
 export interface ManufacturingDetail {
   order: ManufacturingOrder
+  outputs: ManufacturingOutput[]
   receipts: Record<string, unknown>[]
   lots: FinishedGoodsLot[]
   operations: ManufacturingOperation[]
@@ -133,6 +170,21 @@ export const completeManufacturingOrder = async (id: number, payload: Record<str
   (await http.post<number>(`/manufacturing/orders/${id}/completion-receipts`, payload, idemConfig(requestKey))).data
 export const fetchProcessTemplates = async () =>
   (await http.get<ProcessTemplate[]>('/manufacturing/process-templates')).data
+/**
+ * 建单：按关键词搜产品主数据（P3 ①）。
+ *
+ * 不走「可售库存」—— 建单是**要生产**，库存本来就可能没有；候选必须是全部产品身份。
+ */
+export const fetchProductOptions = async (keyword: string, limit = 50) =>
+  (await http.get<ProductOption[]>('/manufacturing/product-options', { params: { keyword, limit } })).data
+/**
+ * 建单：该车间可选的制程品类。
+ *
+ * 与后端制程解析读同一张配置表（`manufacturing_task_config_items`），
+ * 所以「选得到」必然「解析得出制程」—— 不存在选了个解析不了的品类。
+ */
+export const fetchProcessCategories = async (workshopId: number) =>
+  (await http.get<string[]>('/manufacturing/process-categories', { params: { workshopId } })).data
 export const generateManufacturingOperations = async (id:number,templateId:number,requestKey?:string) =>
   { await http.post(`/manufacturing/orders/${id}/operations/generate`,{templateId},idemConfig(requestKey)) }
 export const submitWorkReport = async (orderId:number,operationId:number,payload:Record<string,unknown>,requestKey?:string) =>
