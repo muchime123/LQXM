@@ -55,6 +55,14 @@ const primaryNavItems: NavItem[] = [
         group: 'h3'
       },
       {
+        to: '/production-task-orders',
+        permission: 'manufacturing.manage',
+        label: '生产任务单',
+        description: '业务员下单：选产线联动产品与配置，提交后自动展开工序进入车间执行。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>',
+        group: 'h3'
+      },
+      {
         to: '/production-followups',
         permission: ['manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'],
         label: '生产跟单',
