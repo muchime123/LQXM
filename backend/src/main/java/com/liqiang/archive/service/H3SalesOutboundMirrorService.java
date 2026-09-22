@@ -49,12 +49,19 @@ import java.util.*;
  *       {@code customers}（含 209 行为空 = 氚云没匹配上，镜像留空）。</li>
  * </ol>
  *
- * <h3>状态为什么一律落 DRAFT</h3>
- * ERP 出库单的 {@code POSTED} 语义是<b>扣减当前库存</b>。这 18,966 张是 2025-11 ~ 2026-09 的
- * <b>历史已发生事实</b>，若按氚云原状态（已生效）映射成 POSTED，会在镜像的瞬间把当前库存
- * 冲成巨额负数。所以：<b>一律 DRAFT</b>，氚云原状态存 {@code source_status_raw} 备查，
- * 由业务侧自行决定要不要过账。这也正好把「历史单该不该补扣库存」这个问题
- * <b>显式暴露</b>在业务侧，而不是悄悄替用户做一个危险的决定。
+ * <h3>状态：沿用氚云原状态（LQ 2026-09-22 拍板）</h3>
+ * 镜像单的 {@code status} <b>如实带出氚云原状态</b>，且用的就是项目既有的那套归一词表
+ * （见 {@link #businessStatus(String)}）：已生效 → {@code CONFIRMED}、进行中 → {@code PROCESSING}、
+ * 草稿 → {@code DRAFT}、已取消 → {@code CANCELLED}。氚云原文另存 {@code source_status_raw}，不做加工。
+ *
+ * <p>为什么不映射成 {@code POSTED}：{@code POSTED} 的语义是<b>扣减当前库存</b>。
+ * 这 18,966 张是 2025-11 ~ 2026-09 的<b>历史已发生事实</b>——按氚云「已生效」直接落
+ * {@code POSTED}，会在镜像的瞬间把当前库存冲成巨额负数。所以 {@code EFFECTIVE}
+ * 被定义成<b>非库存态</b>：它表达的是「这单在氚云里已生效」，<b>不</b>表达「库存已扣」。
+ *
+ * <p>「历史单要不要补过账、过账会不会扣库存」是<b>另一套设计</b>（待商榷，本阶段不涉及）。
+ * 在此之前纪律是：<b>氚云镜像单不参与过账</b>（{@code SalesOutboundService.doPost} 显式拒绝），
+ * 要按当前库存出库就新建一张单。
  */
 @Service
 public class H3SalesOutboundMirrorService {
@@ -77,6 +84,31 @@ public class H3SalesOutboundMirrorService {
 
     /** 缺值占位：氚云可能整单没有产品名（实测 18 行），页面上要能一眼看出是源里就没有。 */
     private static final String BLANK_PRODUCT = "（氚云未填产品名）";
+
+    /**
+     * ⭐ 源状态 → 业务状态：**直接复用台账侧既有的归一器**
+     * （{@link SalesOutboundSettlementService#normalizeOutboundStatus(String)}）。
+     *
+     * <p>为什么不自己写一份 Map：那是同一个源字段（{@code sales_outbounds.status}）的
+     * <b>第二套词表</b>，而权威的一份项目里早就有——已生效→{@code CONFIRMED}、
+     * 进行中→{@code PROCESSING}、已取消→{@code CANCELLED}，并覆盖「生效 / 完结 / 生产中 / 加工中…」
+     * 等同义写法（{@code SalesOutboundSettlementServiceTest} 已钉死）。
+     *
+     * <p>自造词表的代价在本次实现里当场显形：第一版只写了「已生效 / 进行中 / 草稿」三条，
+     * <b>漏了「已取消」</b>——而它的兜底是「未识别 → 草稿」，于是一个已取消的单会<b>静默</b>
+     * 显示成草稿（源表当前恰好 0 行已取消，所以这个洞不会在实测里暴露，只会在未来某次重导后爆发）。
+     *
+     * <p>⚠️ 复用带来的既定行为：归一器对「未识别 / 空值」的兜底是 {@code CONFIRMED}
+     * （台账侧的假设是「默认这张单有效」）。本类<b>沿用</b>，不另立规则——
+     * 同一个源字段在页面两处显示成不同状态，比兜底方向的取舍更危险。
+     * 实测源状态 100% 落在词表内（已生效 18,813 / 草稿 111 / 进行中 42）。
+     */
+    static String businessStatus(String raw) {
+        return SalesOutboundSettlementService.normalizeOutboundStatus(raw);
+    }
+
+    /** V324 时期镜像单被一律写成的初始状态——{@link #repairMirroredStatuses()} 的回填范围。 */
+    private static final String MIRROR_INITIAL_STATUS = "DRAFT";
 
     private final JdbcTemplate jdbc;
     private final ErpChangeLogWriter changeLog;
@@ -109,6 +141,10 @@ public class H3SalesOutboundMirrorService {
      * @return 统计：{@code scanned/created/failed/pendingData/pendingSamples/errors/remaining}
      */
     public Map<String, Object> mirrorSalesOutbounds(int limit) {
+        // 先补齐历史镜像单的状态（V324 时期一律落成了 DRAFT），再接入新单。
+        // 放在这里而不是写进迁移：状态口径只有一份实现（STATUS_MAP）。
+        int statusSynced = repairMirroredStatuses();
+
         List<Map<String, Object>> heads = pendingSourceRows(limit);
         int created = 0, pendingData = 0, failed = 0;
         List<String> errors = new ArrayList<>();
@@ -142,8 +178,45 @@ public class H3SalesOutboundMirrorService {
         out.put("pendingData", pendingData);
         out.put("pendingSamples", pendingSamples);
         out.put("errors", errors);
+        out.put("statusSynced", statusSynced);
         out.put("remaining", remainingSourceCount());
         return out;
+    }
+
+    /**
+     * 把已镜像但状态仍停在「草稿」的镜像单，按氚云原状态纠正过来。
+     *
+     * <p>为什么需要它：V324 时期镜像单一律落 {@code DRAFT}，而拍板口径是「沿用氚云原状态」
+     * （已生效 18,813 张 → {@code CONFIRMED}）。这些行**已经镜像过了**，
+     * 而接入只扫「源表连不上的」——不主动回填，它们会永远停在草稿。
+     *
+     * <p>为什么限定 {@code eo.status='DRAFT'}：只纠正「还停在镜像初始态」的行。
+     * 一旦业务侧把某张单移出了草稿，本方法<b>不会再碰它</b>——不替业务侧做决定，
+     * 也不和业务动作抢写（氚云镜像单目前不可过账、不可编辑，所以这个边界很干净）。
+     */
+    private int repairMirroredStatuses() {
+        // 只取这批行实际出现过的源状态（实测 2 个：已生效 / 进行中），逐个求解后回填。
+        // 用 DISTINCT 而不是遍历一张硬编码表：源状态全集不归本类定义（它归归一器管），
+        // 硬编码一张表就等于又写了一份会过期的词表。
+        List<String> raws = jdbc.queryForList("""
+            SELECT DISTINCT so.status FROM erp_sales_outbounds eo
+            JOIN sales_outbounds so ON so.external_id = eo.external_id
+            WHERE eo.external_source='H3YUN' AND eo.status=?
+            """, String.class, MIRROR_INITIAL_STATUS);
+        int changed = 0;
+        for (String raw : raws) {
+            String mapped = businessStatus(raw);
+            // 源「草稿」本来就该是 DRAFT，回填等于空跑，跳过。
+            if (MIRROR_INITIAL_STATUS.equals(mapped)) continue;
+            // `so.status <=> ?` 是 NULL 安全等值：源侧 status 为空时也能匹配上（普通 `=` 匹配不到 NULL）。
+            changed += jdbc.update("""
+                UPDATE erp_sales_outbounds eo
+                JOIN sales_outbounds so ON so.external_id = eo.external_id
+                SET eo.status = ?
+                WHERE eo.external_source='H3YUN' AND eo.status=? AND so.status <=> ?
+                """, mapped, MIRROR_INITIAL_STATUS, raw);
+        }
+        return changed;
     }
 
     /** 已镜像 / 未镜像计数：页面用来显示进度。 */
@@ -238,6 +311,11 @@ public class H3SalesOutboundMirrorService {
         java.sql.Date outboundDate = date(head.get("business_date"));
         if (outboundDate == null) outboundDate = date(head.get("ship_date"));
 
+        // ⭐ 状态沿用氚云原状态（已生效 → EFFECTIVE / 进行中 → IN_PROGRESS / 草稿 → DRAFT）。
+        // ⚠️ EFFECTIVE 是**非库存态**：既不扣库存，也不代表已过账——只是如实反映「源里已生效」。
+        // 氚云状态原文仍原样进 source_status_raw。
+        String status = businessStatus(str(head.get("status")));
+
         PendingSum pending = evaluatePending(customerName, warehouseId, salespersonId, lines);
 
         jdbc.update("""
@@ -249,7 +327,7 @@ public class H3SalesOutboundMirrorService {
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())
             """,
                 clip(sourceNo, MAX_OUTBOUND_NO),
-                "DRAFT",
+                status,
                 customerId,
                 clip(customerName, MAX_NAME),
                 salespersonId,
@@ -318,12 +396,13 @@ public class H3SalesOutboundMirrorService {
 
         changeLog.write(ErpChangeLogWriter.of(actor, "product_archive.erp_sales_outbounds", outboundId, "INSERT",
                 ErpChangeLogWriter.changes(
-                        "outboundNo", sourceNo, "sourceOutboundNo", sourceNo, "status", "DRAFT",
+                        "outboundNo", sourceNo, "sourceOutboundNo", sourceNo,
+                        "status", status, "sourceStatusRaw", str(head.get("status")),
                         "customerNameSnapshot", customerName, "warehouseId", warehouseId,
                         "salespersonId", salespersonId, "outboundDate", outboundDate,
                         "lineCount", lines.size(), "totalAmount", salesAmount,
                         "pendingReason", pending.reason()),
-                null, "氚云销售出库单镜像为 ERP 出库单（草稿）", null, null));
+                null, "氚云销售出库单镜像为 ERP 出库单（状态沿用氚云原状态：" + str(head.get("status")) + "）", null, null));
 
         return new MirrorResult(outboundId, sourceNo, pending.reason() != null, pending.reason());
     }

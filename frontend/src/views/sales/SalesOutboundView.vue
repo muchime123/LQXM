@@ -12,12 +12,13 @@
         <span class="stat-card__value">¥{{ fmtMoney(pageAmount) }}</span>
       </div>
       <div class="stat-card">
-        <span class="stat-card__label">已过账</span>
-        <span class="stat-card__value">{{ postedCount }}</span>
+        <span class="stat-card__label">本页已生效</span>
+        <span class="stat-card__value">{{ effectiveCount }}</span>
+        <span class="stat-card__hint" v-if="postedCount > 0">已过账 {{ postedCount }}</span>
       </div>
       <div class="stat-card">
-        <span class="stat-card__label">已冲销</span>
-        <span class="stat-card__value">{{ reversedCount }}</span>
+        <span class="stat-card__label">本页待补</span>
+        <span class="stat-card__value">{{ pendingCount }}</span>
       </div>
     </section>
 
@@ -26,7 +27,8 @@
       <div class="mirror-bar__text">
         <b>氚云销售出库 → ERP 出库单</b>
         <span class="mirror-bar__note">
-          氚云台账的源数据原样留在「导入中心」（只读）；这里接入的是<b>可编辑、可过账</b>的业务单。
+          氚云台账的源数据原样留在「导入中心」（只读）；这里接入的是<b>可操作</b>的业务单，
+          状态<b>沿用氚云原状态</b>（已生效 / 进行中 / 草稿），镜像本身不做任何库存动作。
           已接入 <b>{{ mirror.mirrored }}</b> / {{ mirror.sourceTotal }} 张、明细 {{ mirror.itemsMirrored }} 行
           <template v-if="mirror.pendingData > 0">，其中 <b>{{ mirror.pendingData }}</b> 张有客观缺失待补</template>。
         </span>
@@ -50,7 +52,10 @@
             <el-option value="H3YUN" label="氚云镜像" />
             <el-option value="LOCAL" label="ERP 自建" />
           </el-select>
-          <el-select v-model="statusFilter" clearable placeholder="全部状态" style="width:120px" @change="load(1)">
+          <el-select v-model="statusFilter" clearable placeholder="全部状态" style="width:130px" @change="load(1)">
+            <el-option value="CONFIRMED" label="已生效" />
+            <el-option value="PROCESSING" label="进行中" />
+            <el-option value="CANCELLED" label="已取消" />
             <el-option value="DRAFT" label="草稿" />
             <el-option value="POSTED" label="已过账" />
             <el-option value="REVERSED" label="已冲销" />
@@ -74,11 +79,11 @@
 
       <!-- 口径说明：镜像后一张列表里同时有「历史怎么发生的」和「新单怎么办」 -->
       <div class="scope-note">
-        <span><b>ERP 正式出库单</b>（<code>erp_sales_outbounds</code>）：可录单、过账即扣库存、冲销回补</span>
+        <span><b>氚云镜像单</b>＝从导入中心台账接入的历史单，源数据一字不改，状态<b>沿用氚云原状态</b>（已生效 / 进行中 / 草稿）</span>
         <span class="scope-note__sep">·</span>
-        <span class="scope-note__quiet"><b>氚云镜像</b>＝从导入中心台账接入的历史单，源数据一字不改，接入后一律为<b>草稿</b>（不自动扣库存）</span>
+        <span class="scope-note__quiet"><b>已生效 / 进行中</b>是<b>非库存态</b>：只表示「源里是什么状态」，不代表已过账、不影响库存</span>
         <span class="scope-note__sep">·</span>
-        <span class="scope-note__quiet">流程：草稿 → 过账（扣减库存）→ 冲销（回补库存，终态）</span>
+        <span class="scope-note__quiet"><b>ERP 自建单</b>才走过账：草稿 → 过账（扣减库存）→ 冲销（回补库存，终态）；镜像单不参与过账</span>
       </div>
 
       <el-table :data="items" v-loading="loading" stripe style="width:100%">
@@ -134,8 +139,8 @@
         <el-table-column label="操作" width="210" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="canManage && row.status === 'DRAFT'" link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button v-if="canManage && row.status === 'DRAFT'" link type="success" @click="doPost(row)">过账</el-button>
+            <el-button v-if="canManage && canEdit(row)" link type="primary" @click="openEdit(row)">编辑</el-button>
+            <el-button v-if="canManage && canPost(row)" link type="success" @click="doPost(row)">过账</el-button>
             <el-button v-if="canManage && row.status === 'POSTED'" link type="danger" @click="doReverse(row)">冲销</el-button>
           </template>
         </el-table-column>
@@ -353,7 +358,7 @@
           </el-table>
         </div>
 
-        <div class="detail__block" v-if="detail.head.status !== 'DRAFT'">
+        <div class="detail__block" v-if="detail.head.postedAt || detail.head.reversedAt">
           <h4>流程留痕</h4>
           <el-descriptions :column="1" border size="small">
             <el-descriptions-item label="过账" v-if="detail.head.postedAt">
@@ -369,7 +374,7 @@
         </div>
 
         <div class="detail__actions" v-if="canManage">
-          <el-button v-if="detail.head.status === 'DRAFT'" type="success" @click="doPost(detail.head)">过账</el-button>
+          <el-button v-if="canPost(detail.head)" type="success" @click="doPost(detail.head)">过账</el-button>
           <el-button v-if="detail.head.status === 'POSTED'" type="danger" @click="doReverse(detail.head)">冲销</el-button>
         </div>
       </div>
@@ -393,8 +398,26 @@ import {
 const auth = useCurrentUser()
 const canManage = computed(() => auth.can('sales_order.manage'))
 
-const STATUS_TEXT: Record<string, string> = { DRAFT: '草稿', POSTED: '已过账', REVERSED: '已冲销' }
-const STATUS_TAG: Record<string, 'info' | 'success' | 'danger'> = { DRAFT: 'info', POSTED: 'success', REVERSED: 'danger' }
+/**
+ * 可编辑 / 可过账 = **仅 ERP 自建草稿**。
+ *
+ * 氚云镜像单不给这两个动作，两个理由都很硬：
+ * ① 它是历史事实，改它就等于改历史（源台账才是忠实记录，这里改了也不回写氚云）；
+ * ② 它的明细含运费/服务费行（没有产品身份），而编辑表单是按「商品行」整体替换明细的 ——
+ *    放开编辑会让这类行在保存时被判成「产品不能为空」，整单保存失败。
+ * 要按当前库存出库，就新建一张 ERP 自建单。
+ */
+const canEdit = (row: SalesOutbound) => row.status === 'DRAFT' && row.externalSource !== 'H3YUN'
+const canPost = (row: SalesOutbound) => row.status === 'DRAFT' && row.externalSource !== 'H3YUN'
+
+// 状态词表（V326）：CONFIRMED/PROCESSING 等是氚云镜像单的原状态，属**非库存态**——不代表已过账、不影响库存。
+// 词表与后端台账归一器同源（SalesOutboundSettlementService.normalizeOutboundStatus），不另造词。
+const STATUS_TEXT: Record<string, string> = {
+  DRAFT: '草稿', CONFIRMED: '已生效', PROCESSING: '进行中', CANCELLED: '已取消', POSTED: '已过账', REVERSED: '已冲销'
+}
+const STATUS_TAG: Record<string, 'info' | 'primary' | 'success' | 'warning' | 'danger'> = {
+  DRAFT: 'info', CONFIRMED: 'primary', PROCESSING: 'warning', CANCELLED: 'danger', POSTED: 'success', REVERSED: 'danger'
+}
 /** 非商品行的中文名（与氚云台账 line_type 同名口径）。 */
 const LINE_TYPE_TEXT: Record<string, string> = { FREIGHT: '运费', SERVICE: '服务费' }
 
@@ -413,7 +436,8 @@ const loading = ref(false)
 
 const draftCount = computed(() => items.value.filter(r => r.status === 'DRAFT').length)
 const postedCount = computed(() => items.value.filter(r => r.status === 'POSTED').length)
-const reversedCount = computed(() => items.value.filter(r => r.status === 'REVERSED').length)
+const effectiveCount = computed(() => items.value.filter(r => r.status === 'CONFIRMED').length)
+const pendingCount = computed(() => items.value.filter(r => !!r.sourceMirrorPending).length)
 const pageAmount = computed(() => items.value.reduce((s, r) => s + (Number(r.totalAmount) || 0), 0))
 
 const load = async (p = page.value) => {
@@ -456,10 +480,14 @@ const runMirror = async (limit: number) => {
   mirroring.value = true
   try {
     const r = await mirrorH3SalesOutbounds(limit)
+    // statusSynced：V324 时期历史单被一律落成了「草稿」，接入时会顺带更正为氚云原状态。
+    const synced = r.statusSynced > 0 ? `，并更正 ${r.statusSynced} 张已接入单的状态为氚云原状态` : ''
     if (r.failed > 0) {
       notify.error(`接入完成但有 ${r.failed} 张失败：${r.errors.slice(0, 3).join('；')}`)
+    } else if (r.created === 0 && r.statusSynced === 0) {
+      notify.success('已全部接入，没有需要处理的单')
     } else {
-      notify.success(`已接入 ${r.created} 张，剩余 ${r.remaining}${r.pendingData > 0 ? `，其中 ${r.pendingData} 张待补数据` : ''}`)
+      notify.success(`已接入 ${r.created} 张${synced}，剩余 ${r.remaining}${r.pendingData > 0 ? `，其中 ${r.pendingData} 张待补数据` : ''}`)
     }
     await Promise.all([loadMirror(), load(1)])
   } catch (e) {
@@ -677,10 +705,9 @@ const openDetail = async (row: SalesOutbound) => {
 }
 
 const doPost = async (row: SalesOutbound) => {
-  // 镜像单是历史事实，扣的是「当前」库存 —— 措辞必须把这一点说破，否则过账完库存变负才反应过来
-  const msg = row.externalSource === 'H3YUN'
-    ? `这是一张氚云镜像的历史出库单（${shortDate(row.outboundDate)}）。过账会按明细扣减「${row.warehouseName || '所选仓库'}」的当前库存并写入流水 —— 历史单扣当前库存通常会让库存变成负数。确定继续？`
-    : `过账后将按明细扣减「${row.warehouseName || '所选仓库'}」的库存并写入库存流水，且不能直接修改（只能冲销）。确定过账？`
+  // 只有 ERP 自建草稿能到这儿（canPost 兜着）。氚云镜像的历史单不参与过账：
+  // 历史单扣的是「当前」库存，两者的关系尚未定案 —— 见 V326 与双轨制接线文档。
+  const msg = `过账后将按明细扣减「${row.warehouseName || '所选仓库'}」的库存并写入库存流水，且不能直接修改（只能冲销）。确定过账？`
   try {
     await ElMessageBox.confirm(msg, '过账确认', { type: 'warning', confirmButtonText: '确定过账', cancelButtonText: '取消' })
   } catch { return }

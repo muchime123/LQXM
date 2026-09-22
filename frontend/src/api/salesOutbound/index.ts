@@ -27,10 +27,19 @@ export interface SalesOutboundItem {
   remark?: string
 }
 
+/**
+ * 业务状态词表（V326）：
+ * - 库存态（只属于 ERP 自建单）：DRAFT 草稿 → POSTED 已过账 → REVERSED 已冲销
+ * - 非库存态（氚云镜像单如实带出的原状态）：CONFIRMED 已生效 / PROCESSING 进行中 / CANCELLED 已取消 / DRAFT 源草稿
+ *   ⚠️ CONFIRMED/PROCESSING 不表示已过账、不影响库存——它们只说「这单在氚云里是什么状态」。
+ *   词表与后端台账归一器（SalesOutboundSettlementService.normalizeOutboundStatus）同源，不另造词。
+ */
+export type SalesOutboundStatus = 'DRAFT' | 'CONFIRMED' | 'PROCESSING' | 'CANCELLED' | 'POSTED' | 'REVERSED'
+
 export interface SalesOutbound {
   id: number
   outboundNo: string
-  status: 'DRAFT' | 'POSTED' | 'REVERSED'
+  status: SalesOutboundStatus
   customerId?: number | null
   customerName: string
   salespersonId?: number | null
@@ -76,6 +85,8 @@ export interface H3SalesMirrorResult {
   pendingData: number
   pendingSamples: string[]
   errors: string[]
+  /** 本次顺带纠正为「氚云原状态」的历史镜像单条数（V324 时期一律落成了草稿） */
+  statusSynced: number
   remaining: number
 }
 

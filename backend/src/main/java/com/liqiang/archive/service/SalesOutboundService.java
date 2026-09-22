@@ -28,9 +28,19 @@ import java.util.*;
  * 幂等表以 {@code erp.idem_request} 限定名走同一条连接）。**选错绑定不报错、只静默失效**
  * （见 {@code ErpContractConfig} 的绑定纪律）。
  *
- * <p><b>状态机</b>：{@code DRAFT}（草稿，不动库存）→ {@code POSTED}（已过账，扣库存+写流水）
- * → {@code REVERSED}（已冲销，回补库存）。{@code REVERSED} 是终态：冲销后要重发就新建一张，
- * 不提供「反冲销」，避免单号复用与流水口径歧义。
+ * <p><b>状态词表</b>（双轨制之后，一张表里同时容两类单）：
+ * <ul>
+ *   <li><b>库存态（只属于 ERP 自建单）</b>：{@code DRAFT}（草稿，不动库存）
+ *       → {@code POSTED}（已过账，扣库存 + 写流水）→ {@code REVERSED}（已冲销，回补库存，终态）。
+ *       不提供「反冲销」——冲销后要重发就新建一张，避免单号复用与流水口径歧义。</li>
+ *   <li><b>非库存态（氚云镜像单的原状态）</b>：{@code CONFIRMED}（已生效）/ {@code PROCESSING}（进行中）/
+ *       {@code CANCELLED}（已取消）/ 源草稿的 {@code DRAFT}。它们如实反映氚云里的状态，
+ *       <b>不做任何库存动作、也不代表已过账</b>。词表直接复用台账侧的归一器
+ *       （{@code SalesOutboundSettlementService.normalizeOutboundStatus}），
+ *       映射见 {@code H3SalesOutboundMirrorService.businessStatus}，列注释见 V326。</li>
+ * </ul>
+ * ⚠️ <b>镜像单不参与过账</b>（{@link #doPost} 显式拒绝）：历史单扣的是当前库存，
+ * 两者关系尚未定案（待商榷），宁可显式拒绝也不顺手扣。
  *
  * <p><b>库存口径</b>：过账按 {@code canonical_product_id} 扣减（#28 Q1）——
  * 这样 {@code MFG-<工单号>} 产出的货与标准 SKU 的分录累加在同一余额行，业务员看到的
@@ -323,6 +333,14 @@ public class SalesOutboundService {
         if (!"DRAFT".equals(status))
             throw new IllegalStateException("REVERSED".equals(status) ? "已冲销的出库单不能重新过账，请新建一张"
                     : "该出库单已过账，不能重复过账");
+        // ⭐ 氚云镜像的历史单**不参与过账**（LQ 2026-09-22 口径）：
+        // 过账的语义是「扣减**当前**库存」，而这批单是 2025-11~2026-09 已发生的事实。
+        // 两者的关系（历史单要不要补扣库存）属于**另一套设计，待商榷** ——
+        // 在此之前宁可显式拒绝，也不能让镜像动作顺手扣掉当前库存。
+        // 前端也不会给镜像单出过账按钮，这里挡的是绕过 UI 的直接调用。
+        if ("H3YUN".equals(head.get("externalSource")))
+            throw new IllegalStateException("这是氚云镜像进来的历史出库单，不参与过账（它只如实反映氚云原状态）。"
+                    + "如需按当前库存出库，请新建一张出库单。");
         long warehouseId = requireWarehouseForPost(head);
         String no = String.valueOf(head.get("outboundNo"));
         var lines = jdbc.queryForList("SELECT id,line_no lineNo,sales_product_id salesProductId,"
@@ -444,7 +462,8 @@ public class SalesOutboundService {
 
     /** 锁定并读取单头（并发下过账/冲销串行化）。字段名统一转 camelCase 以便下游按名取值。 */
     private Map<String, Object> lockHead(long id) {
-        var rows = jdbc.queryForList("SELECT id,outbound_no outboundNo,status,warehouse_id warehouseId "
+        var rows = jdbc.queryForList("SELECT id,outbound_no outboundNo,status,warehouse_id warehouseId,"
+                + "external_source externalSource "
                 + "FROM erp_sales_outbounds WHERE id=? FOR UPDATE", id);
         if (rows.isEmpty()) throw new IllegalArgumentException("销售出库单不存在");
         return rows.getFirst();
