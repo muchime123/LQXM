@@ -31,6 +31,10 @@ public class ManufacturingController {
      */
     @GetMapping("/process-categories") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.manage"})
     public List<String> processCategories(@RequestParam long workshopId){return service.processCategories(workshopId);}
+
+    /** 下单联动选项：该产线可选的产品名称与可选配置（读「任务单产品与配置」，与制程解析同源）。 */
+    @GetMapping("/task-config-options") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.manage"})
+    public Map<String,Object> taskConfigOptions(@RequestParam long workshopId){return service.taskConfigOptions(workshopId);}
     @GetMapping("/orders") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public Map<String,Object> orders(@RequestParam(defaultValue="")String keyword,@RequestParam(defaultValue="")String status,
             @RequestParam(defaultValue="")String priority,@RequestParam(defaultValue="")String scheduled,
@@ -42,6 +46,34 @@ public class ManufacturingController {
     }
     @GetMapping("/schedule-summary") @RequirePermission("manufacturing.schedule")
     public Map<String,Object> scheduleSummary(){return service.scheduleSummary();}
+    /**
+     * 跟单工作台（跟单进度表的线上版）：一行一单，带工序进度与最新跟进。
+     *
+     * <p>可见性 = 既有生产域数据范围 ∪「我是跟单员」；{@code mine=1} 只看我跟的单。
+     */
+    @GetMapping("/followup-board") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    public Map<String,Object> followUpBoard(@RequestParam(defaultValue="")String keyword,@RequestParam(defaultValue="")String status,
+            @RequestParam(defaultValue="")String workshop,@RequestParam(defaultValue="")String overdue,
+            @RequestParam(defaultValue="0")int mine,@RequestParam(defaultValue="due")String orderBy,
+            @RequestParam(defaultValue="1")int page,@RequestParam(defaultValue="20")int size){
+        return service.followUpBoard(keyword,status,workshop,overdue,mine==1,orderBy,page,size);
+    }
+    @GetMapping("/orders/{id}/follow-ups") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.followup"})
+    public List<Map<String,Object>> followUps(@PathVariable long id){return service.followUps(id);}
+    /** 新增跟进记录（跟单员日常动作）：内容必填，预计完成日期/延期原因/跟单员可选前滚。 */
+    @PostMapping("/orders/{id}/follow-ups") @RequirePermission("manufacturing.followup")
+    public long addFollowUp(@PathVariable long id,@RequestBody com.liqiang.archive.service.ManufacturingService.FollowUpRequest request,
+            @RequestHeader(value="X-Request-Key",required=false) String requestKey){return service.addFollowUp(id,request,requestKey);}
+    /** 补录工序完成日期：车间做完但忘了报工时用，只补日期、不改报工数量与工序状态。 */
+    @PutMapping("/orders/{orderId}/operations/{operationId}/manual-completion") @RequirePermission("manufacturing.followup")
+    public Map<String,Object> manualComplete(@PathVariable long orderId,@PathVariable long operationId,
+            @RequestBody Map<String,Object> request,
+            @RequestHeader(value="X-Request-Key",required=false) String requestKey){
+        Object raw=request.get("completedDate");
+        java.time.LocalDate date=raw==null||String.valueOf(raw).isBlank()?null:java.time.LocalDate.parse(String.valueOf(raw));
+        service.manualCompleteOperation(orderId,operationId,date,requestKey);
+        return Map.of("ok",true);
+    }
     @GetMapping("/orders/{id}") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public Map<String,Object> detail(@PathVariable long id){return service.detail(id);}
     @GetMapping("/orders/{id}/materials") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.material.manage"}) public Map<String,Object> materials(@PathVariable long id){service.requireVisible(id);return materials.detail(id);}

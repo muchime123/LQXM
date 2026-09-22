@@ -55,25 +55,11 @@ const primaryNavItems: NavItem[] = [
         group: 'h3'
       },
       {
-        to: '/manufacturing-execution',
-        permission: [
-          'manufacturing.report',
-          'manufacturing.receive',
-          'manufacturing.read.self',
-          'manufacturing.read.department',
-          'manufacturing.read.all'
-        ],
-        label: '车间执行',
-        description: '车间按工序报工，成品由仓库办理交付收货。含执行看板、报工记录、入库冲销。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
-        group: 'h3'
-      },
-      {
-        to: '/manufacturing-process-management',
-        permission: 'manufacturing.template.manage',
-        label: '制程与工序管理',
-        description: '整理氚云生产任务相关的配置项、零部件制程、制程模板和工序。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 6h16M7 12h10M10 18h4"/><circle cx="4" cy="6" r="1"/><circle cx="7" cy="12" r="1"/><circle cx="10" cy="18" r="1"/></svg>',
+        to: '/production-followups',
+        permission: ['manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'],
+        label: '生产跟单',
+        description: '按车间跟进已导入的生产任务，记录阶段日期、交期变化及跟进历史。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
         group: 'h3'
       },
       {
@@ -295,4 +281,3 @@ const primaryNavItems: NavItem[] = [
 ]
 
 export const navItems: NavItem[] = primaryNavItems
-

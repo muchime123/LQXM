@@ -185,6 +185,14 @@ export const fetchProductOptions = async (keyword: string, limit = 50) =>
  */
 export const fetchProcessCategories = async (workshopId: number) =>
   (await http.get<string[]>('/manufacturing/process-categories', { params: { workshopId } })).data
+/**
+ * 生产任务单下单的联动选项：该产线可选的产品名称与可选配置。
+ *
+ * 与制程解析读同一张「任务单产品与配置」表 —— 选得到的必然解析得出制程。
+ */
+export interface TaskConfigOptions { productNames: string[]; optionalConfigs: string[] }
+export const fetchTaskConfigOptions = async (workshopId: number) =>
+  (await http.get<TaskConfigOptions>('/manufacturing/task-config-options', { params: { workshopId } })).data
 export const generateManufacturingOperations = async (id:number,templateId:number,requestKey?:string) =>
   { await http.post(`/manufacturing/orders/${id}/operations/generate`,{templateId},idemConfig(requestKey)) }
 export const submitWorkReport = async (orderId:number,operationId:number,payload:Record<string,unknown>,requestKey?:string) =>

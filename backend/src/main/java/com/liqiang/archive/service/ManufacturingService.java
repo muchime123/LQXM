@@ -88,7 +88,7 @@ public class ManufacturingService {
                               String specification,String customRequirement,
                               BigDecimal plannedQuantity,LocalDate dueDate,String remark,
                               String taskType,Long processTemplateId,Long workshopId,
-                              List<OutputLine> outputs) {}
+                              List<OutputLine> outputs,Map<String,Object> productConfig) {}
     /** 附加产出项（主产品不走这里；它由建单头部的 {@code salesProductId} + {@code plannedQuantity} 表达）。 */
     public record OutputLine(Long salesProductId,BigDecimal plannedQuantity,Boolean isMold,String remark) {}
     /** 收货明细项（P3 ②：按产出清单逐项确认实际数量，不再手打名称）。 */
@@ -163,6 +163,24 @@ public class ManufacturingService {
         return jdbc.queryForList("SELECT DISTINCT config_name FROM manufacturing_task_config_items"
                 + " WHERE workshop_id=? AND config_type='PRODUCT_NAME' AND active=1 ORDER BY config_name",
                 String.class,workshopId);
+    }
+
+    /**
+     * 生产任务单下单的联动选项（复刻氚云《生产任务单》的「先选产线，再选产品名称与可选配置」）。
+     *
+     * <p>两者都读 {@code manufacturing_task_config_items}（制程与工序管理里的「任务单产品与配置」），
+     * 与制程解析同源 —— 选得到的必然解析得出，不存在两处口径。
+     */
+    public Map<String,Object> taskConfigOptions(Long workshopId) {
+        var m=new LinkedHashMap<String,Object>();
+        if(workshopId==null){ m.put("productNames",List.of()); m.put("optionalConfigs",List.of()); return m; }
+        m.put("productNames",jdbc.queryForList("SELECT config_name FROM manufacturing_task_config_items"
+                +" WHERE workshop_id=? AND config_type='PRODUCT_NAME' AND active=1 ORDER BY config_name",
+                String.class,workshopId));
+        m.put("optionalConfigs",jdbc.queryForList("SELECT config_name FROM manufacturing_task_config_items"
+                +" WHERE workshop_id=? AND config_type='OPTIONAL_CONFIG' AND active=1 ORDER BY config_name",
+                String.class,workshopId));
+        return m;
     }
 
     public Map<String,Object> list(String keyword,String status,String priority,String scheduled,String team,
@@ -267,14 +285,21 @@ public class ManufacturingService {
             throw new IllegalArgumentException("请选择有效的手工任务类型");
         var user=users.current();
         String temporary="PENDING-"+UUID.randomUUID();
+        String productConfigJson=null;
+        if(request.productConfig()!=null && !request.productConfig().isEmpty()){
+            try{ productConfigJson=new com.fasterxml.jackson.databind.ObjectMapper()
+                    .writeValueAsString(request.productConfig()); }
+            catch(Exception e){ throw new IllegalArgumentException("产品配置参数无法序列化"); }
+        }
         jdbc.update("""
             INSERT INTO manufacturing_orders(order_no,sales_order_ref,customer_id,customer_name_snapshot,
               salesperson_id,salesperson_name_snapshot,product_name_snapshot,sales_product_id,specification_snapshot,
-              custom_requirement,planned_quantity,unit,due_date,remark,task_type,created_by_employee_id,created_by_name)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+              custom_requirement,planned_quantity,unit,due_date,remark,task_type,created_by_employee_id,created_by_name,
+              product_config_json)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """,temporary,clean(request.salesOrderRef()),request.customerId(),customer,user.employeeId(),user.name(),
                 product,primaryId,clean(request.specification()),clean(request.customRequirement()),planned,unit,
-                request.dueDate(),clean(request.remark()),taskType,user.employeeId(),user.name());
+                request.dueDate(),clean(request.remark()),taskType,user.employeeId(),user.name(),productConfigJson);
         long id=jdbc.queryForObject("SELECT id FROM manufacturing_orders WHERE order_no=?",Long.class,temporary);
         String no="MO"+String.format("%08d",id);jdbc.update("UPDATE manufacturing_orders SET order_no=? WHERE id=?",no,id);
         // 产出清单：第 1 行恒为主产品（P3 ①），附加产出按行追加。清单是后续收货的唯一入口。
@@ -644,6 +669,196 @@ public class ManufacturingService {
                         "reversedReceiptNo",receipt.get("receiptNo")),
                 "REVERSAL",r,requestKey,null));
     }
+    // ==================== 生产跟单（跟进日志 + 工序完成日期补录） ====================
+
+    private static final String ACTION_FOLLOW_UP = "manufacturing.followup.submit";
+    private static final String ACTION_OPERATION_MANUAL_COMPLETE = "manufacturing.operation.manualComplete";
+
+    /**
+     * 跟进入参。
+     *
+     * <p>{@code content} 必填；{@code expectedFinishDate} / {@code delayReason} /
+     * {@code merchandiserEmployeeId} 可选 —— 传了就前滚到订单快照列，不传维持原值
+     * （对应跟单进度表「预计完成日期 / 延期原因」两列的"最新一次跟进有效"语义）。
+     */
+    public record FollowUpRequest(String content, LocalDate expectedFinishDate, String delayReason, Long merchandiserEmployeeId) {}
+
+    /** 某生产任务的跟进日志（新 → 旧）。 */
+    public List<Map<String,Object>> followUps(long orderId){
+        requireVisible(orderId);
+        return jdbc.query("SELECT * FROM manufacturing_order_follow_ups WHERE manufacturing_order_id=? ORDER BY id DESC",
+                (r,n)->row(r),orderId);
+    }
+
+    /**
+     * 新增跟进记录（M0 契约写动作：幂等 + 行级审计）。
+     *
+     * <p>每次跟进落一条日志（只增不改），同时把可选项前滚到 {@code manufacturing_orders}
+     * 的快照列。跟单记录对已完工/已收货的任务同样允许（跟单收尾说明是正常业务），
+     * 仅要求任务可见。
+     */
+    public long addFollowUp(long orderId, FollowUpRequest request, String requestKey){
+        ErpActor actor=actors.current();
+        Map<String,Object> payload=ErpChangeLogWriter.changes("orderId",orderId,
+                "content",clean(request.content()),"expectedFinishDate",request.expectedFinishDate(),
+                "delayReason",clean(request.delayReason()),"merchandiserEmployeeId",request.merchandiserEmployeeId());
+        return Long.parseLong(idem.execute(actor,requestKey,ACTION_FOLLOW_UP,payload,
+                ()->String.valueOf(doAddFollowUp(orderId,request,actor,requestKey))));
+    }
+
+    /** 跟进业务体：不加 {@code @Transactional}，事务边界由幂等模板提供。 */
+    private long doAddFollowUp(long orderId, FollowUpRequest request, ErpActor actor, String requestKey){
+        requireVisible(orderId);
+        String content=required(request.content(),"跟进内容",1000);
+        String delayReason=request.delayReason()==null||request.delayReason().isBlank()
+                ?null:required(request.delayReason(),"延期原因",300);
+        Long merchandiserId=request.merchandiserEmployeeId();
+        String merchandiserName=null;
+        if(merchandiserId!=null){
+            merchandiserName=jdbc.query("SELECT name FROM employees WHERE id=? AND status='ACTIVE'",
+                    (r,n)->r.getString(1),merchandiserId).stream().findFirst()
+                    .orElseThrow(()->new IllegalArgumentException("跟单员不存在或已停用"));
+        }
+        jdbc.update("""
+            UPDATE manufacturing_orders SET
+              expected_finish_date=COALESCE(?,expected_finish_date),
+              delay_reason=COALESCE(?,delay_reason),
+              merchandiser_employee_id=COALESCE(?,merchandiser_employee_id),
+              merchandiser_name=COALESCE(?,merchandiser_name)
+            WHERE id=?
+            """,request.expectedFinishDate(),delayReason,merchandiserId,merchandiserName,orderId);
+        jdbc.update("""
+            INSERT INTO manufacturing_order_follow_ups(manufacturing_order_id,content,expected_finish_date,
+              delay_reason,created_by_employee_id,created_by_name)
+            VALUES(?,?,?,?,?,?)
+            """,orderId,content,request.expectedFinishDate(),delayReason,actor.employeeId(),actor.name());
+        long id=jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class);
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_order_follow_ups",id,"INSERT",
+                ErpChangeLogWriter.changes("orderId",orderId,"content",content,
+                        "expectedFinishDate",request.expectedFinishDate(),"delayReason",delayReason,
+                        "merchandiserEmployeeId",merchandiserId),
+                "FOLLOW_UP",content,requestKey,null));
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_orders",orderId,"UPDATE",
+                ErpChangeLogWriter.changes("expectedFinishDate",request.expectedFinishDate(),
+                        "delayReason",delayReason,"merchandiserEmployeeId",merchandiserId),
+                "FOLLOW_UP","跟进记录",requestKey,null));
+        return id;
+    }
+
+    /**
+     * 跟单工作台列表：在 {@link #list} 的数据范围之上叠加「我是跟单员」可见性
+     * （被指定为跟单员的人永远能看到自己跟的单，不受业务员轴范围收窄影响），并为每行带出
+     * 工序进度（报工完成日期优先，补录日期兜底）与最新一条跟进。
+     */
+    public Map<String,Object> followUpBoard(String keyword,String status,String workshop,String overdue,
+                                            boolean mineOnly,String orderBy,int page,int size){
+        if(page<1||size<1||size>100)throw new IllegalArgumentException("分页范围无效");
+        var scopeWhere=new StringBuilder();var scopeParams=new ArrayList<>();
+        scope.appendByEmployeeId(scopeWhere,scopeParams,"m.salesperson_id","e.department", FeatureCode.MANUFACTURING);
+        var where=new StringBuilder(" WHERE (");
+        var params=new ArrayList<>();
+        if(scopeParams.isEmpty()){
+            where.append("1=1");
+        }else{
+            // scope 帮助器拼出的是 " AND <cond>"，剥掉前缀后与跟单员条件做 OR
+            where.append(scopeWhere.substring(5));
+            params.addAll(scopeParams);
+        }
+        where.append(" OR m.merchandiser_employee_id=?)");
+        params.add(actors.current().employeeId());
+        if(mineOnly){where.append(" AND m.merchandiser_employee_id=?");params.add(actors.current().employeeId());}
+        if(keyword!=null&&!keyword.isBlank()){
+            where.append(" AND (m.order_no LIKE ? OR m.customer_name_snapshot LIKE ? OR m.product_name_snapshot LIKE ?)");
+            String k="%"+keyword.trim()+"%";for(int i=0;i<3;i++)params.add(k);
+        }
+        if(status!=null&&!status.isBlank()){where.append(" AND m.status=?");params.add(status);}
+        else{where.append(" AND m.status<>'CANCELLED'");}
+        if(workshop!=null&&!workshop.isBlank()){where.append(" AND m.workshop_type=?");params.add(workshop.trim());}
+        if("Y".equalsIgnoreCase(overdue)){
+            // 超期判定：原交期与修订预计完成都过期、且未完工（与跟单进度表「已超期」口径一致）
+            where.append(" AND m.status NOT IN ('COMPLETED','CLOSED','CANCELLED') AND COALESCE(m.expected_finish_date,m.due_date,m.planned_finish_date) IS NOT NULL");
+            where.append(" AND COALESCE(m.expected_finish_date,m.due_date,m.planned_finish_date)<CURDATE()");
+        }
+        Long total=jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_orders m LEFT JOIN employees e ON e.id=m.salesperson_id"+where,Long.class,params.toArray());
+        params.add(size);params.add((page-1)*size);
+        String orderClause="ORDER BY m.id DESC";
+        if("due".equalsIgnoreCase(orderBy))orderClause="ORDER BY COALESCE(m.expected_finish_date,m.due_date) IS NULL ASC, COALESCE(m.expected_finish_date,m.due_date) ASC, m.id ASC";
+        var items=jdbc.query("SELECT m.* FROM manufacturing_orders m LEFT JOIN employees e ON e.id=m.salesperson_id"+where+
+                " "+orderClause+" LIMIT ? OFFSET ?",(r,n)->row(r),params.toArray());
+        enrichFollowUpBoard(items);
+        return Map.of("items",items,"total",total==null?0:total,"page",page,"size",size);
+    }
+
+    /** 为看板行批量带出工序进度与最新跟进（一次查询一批，避免每行一查）。 */
+    private void enrichFollowUpBoard(List<Map<String,Object>> items){
+        if(items.isEmpty())return;
+        List<Long> ids=items.stream().map(m->((Number)m.get("id")).longValue()).toList();
+        var byOrder=new LinkedHashMap<Long,List<Map<String,Object>>>();
+        String inIds=ids.stream().map(id->"?").collect(java.util.stream.Collectors.joining(","));
+        jdbc.query("SELECT manufacturing_order_id,sequence_no,operation_name_snapshot,status,"
+                        +"completed_at,manual_completed_date FROM manufacturing_order_operations "
+                        +"WHERE manufacturing_order_id IN ("+inIds+") ORDER BY manufacturing_order_id,sequence_no",
+                (r,n)->{
+            var op=new LinkedHashMap<String,Object>();
+            op.put("sequenceNo",r.getInt("sequence_no"));
+            op.put("operationName",r.getString("operation_name_snapshot"));
+            op.put("status",r.getString("status"));
+            Object completed=r.getObject("completed_at");if(completed instanceof java.sql.Timestamp t)completed=t.toLocalDateTime();
+            Object manual=r.getObject("manual_completed_date");if(manual instanceof java.sql.Date d)manual=d.toLocalDate();
+            op.put("completedAt",completed);
+            op.put("manualCompletedDate",manual);
+            byOrder.computeIfAbsent(r.getLong("manufacturing_order_id"),k->new ArrayList<>()).add(op);
+            return null;
+        },ids.toArray());
+        var latest=new LinkedHashMap<Long,Map<String,Object>>();
+        jdbc.query("SELECT f.* FROM manufacturing_order_follow_ups f "
+                        +"JOIN (SELECT manufacturing_order_id,MAX(id) max_id FROM manufacturing_order_follow_ups "
+                        +"WHERE manufacturing_order_id IN ("+inIds+") GROUP BY manufacturing_order_id) x "
+                        +"ON x.manufacturing_order_id=f.manufacturing_order_id AND x.max_id=f.id",
+                (r,n)->latest.put(r.getLong("manufacturing_order_id"),row(r)),ids.toArray());
+        for(var item:items){
+            long id=((Number)item.get("id")).longValue();
+            item.put("operations",byOrder.getOrDefault(id,List.of()));
+            item.put("latestFollowUp",latest.get(id));
+        }
+    }
+
+    /**
+     * 补录工序完成日期（车间实际做完但忘了报工的场景）。
+     *
+     * <p>只补日期，<b>不改</b> status / completed_at / reported_quantity —— 不虚构报工数量、
+     * 不触发下游工序解锁；报工仍是工序完成的唯一权威来源。已由报工确认完成的工序不允许补录。
+     */
+    public void manualCompleteOperation(long orderId,long operationId,LocalDate completedDate,String requestKey){
+        ErpActor actor=actors.current();
+        Map<String,Object> payload=ErpChangeLogWriter.changes("orderId",orderId,"operationId",operationId,
+                "completedDate",completedDate);
+        idem.execute(actor,requestKey,ACTION_OPERATION_MANUAL_COMPLETE,payload,
+                ()->doManualCompleteOperation(orderId,operationId,completedDate,actor,requestKey));
+    }
+
+    private String doManualCompleteOperation(long orderId,long operationId,LocalDate completedDate,ErpActor actor,String requestKey){
+        requireVisible(orderId);
+        if(completedDate==null)throw new IllegalArgumentException("请选择工序完成日期");
+        if(completedDate.isAfter(LocalDate.now()))throw new IllegalArgumentException("工序完成日期不能是未来");
+        var op=jdbc.query("""
+            SELECT * FROM manufacturing_order_operations WHERE id=? AND manufacturing_order_id=?
+            """,(r,n)->row(r),operationId,orderId).stream().findFirst()
+            .orElseThrow(()->new IllegalArgumentException("工序不存在或不属于该生产任务"));
+        if("COMPLETED".equals(op.get("status")))
+            throw new IllegalStateException("该工序已由报工确认完成，完成日期以报工为准，不能补录");
+        jdbc.update("""
+            UPDATE manufacturing_order_operations SET manual_completed_date=?,manual_completed_at=NOW(),
+              manual_completed_by_employee_id=?,manual_completed_by_name=?
+            WHERE id=?
+            """,completedDate,actor.employeeId(),actor.name(),operationId);
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_order_operations",operationId,"UPDATE",
+                ErpChangeLogWriter.changes("orderId",orderId,"operationName",op.get("operationNameSnapshot"),
+                        "manualCompletedDate",completedDate),
+                "MANUAL_COMPLETION",actor.name()+"补录工序完成日期",requestKey,null));
+        return "ok";
+    }
+
     private Long defaultTemplateId(String code){return jdbc.query("SELECT id FROM manufacturing_process_templates WHERE template_code=? AND active=1",(r,n)->r.getLong(1),code).stream().findFirst().orElseThrow(()->new IllegalStateException("缺少默认制程模板："+code));}
     public void requireVisible(long id) {
         var where=new StringBuilder(" WHERE m.id=?");var params=new ArrayList<>();params.add(id);

@@ -149,7 +149,7 @@ class ManufacturingExecutionContractMysqlTest {
 
             // 1) 建单：同键重放必须返回同一个工单，而不是再建一张
             var createRequest = new ManufacturingService.CreateOrder(null, null, "契约验证客户", "契约验证产品",
-                    product("CTL-SKU-1"), "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null);
+                    product("CTL-SKU-1"), "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null);
             long orderId = manufacturing.create(createRequest, "ctl-loop-order-create");
             assertEquals(orderId, (long) manufacturing.create(createRequest, "ctl-loop-order-create"),
                     "同键重放必须复用首次结果，不得重复建单");
@@ -276,7 +276,7 @@ class ManufacturingExecutionContractMysqlTest {
             long templateId = template(TEMPLATE);
             long warehouseId = jdbc.queryForObject("SELECT id FROM warehouses WHERE warehouse_code='VERIFY-WH'", Long.class);
             var createRequest = new ManufacturingService.CreateOrder(null, null, "契约重试客户", "契约重试产品",
-                    product("CTL-SKU-1"), null, null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null);
+                    product("CTL-SKU-1"), null, null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null);
             long orderId = manufacturing.create(createRequest, "ctl-retry-create");
             for (long opId : jdbc.queryForList("SELECT id FROM manufacturing_order_operations WHERE manufacturing_order_id=? ORDER BY sequence_no",
                     Long.class, orderId)) {
@@ -320,7 +320,7 @@ class ManufacturingExecutionContractMysqlTest {
             // 建单：主产品 10 台 + 配套模具 2 套（实测 14.0% 的工单产出多个 SKU）
             var createRequest = new ManufacturingService.CreateOrder(null, null, "多产出客户", "契约验证产品",
                     primarySku, "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null,
-                    List.of(new ManufacturingService.OutputLine(moldSku, new BigDecimal("2"), true, "配套模具")));
+                    List.of(new ManufacturingService.OutputLine(moldSku, new BigDecimal("2"), true, "配套模具")), null);
             long orderId = manufacturing.create(createRequest, "ctl-multi-create");
 
             assertEquals(2, count("SELECT COUNT(*) FROM manufacturing_order_outputs WHERE manufacturing_order_id=" + orderId),

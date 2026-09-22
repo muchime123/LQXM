@@ -131,31 +131,28 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/governance/H3OutboundRelationView.vue'),
     meta: { title: '销售出库关联工作台', layout: 'list', permission: 'integration.h3', group: 'h3' }
   },
-  // 车间执行（工单 → 报工 → 交付收货）：报工段与收货段的唯一操作入口。
-  // 权限取并集：生产侧看报工（manufacturing.report），仓库侧看收货（manufacturing.receive），
-  // 只读角色（manufacturing.read.*）可看板与记录但不能写。领料/BOM 由车间自管，本页不含任何领料入口。
+  {
+    path: '/production-followups',
+    name: 'productionFollowups',
+    component: () => import('../views/production/ProductionFollowUpView.vue'),
+    meta: { title: '生产跟单', layout: 'list', group: 'h3', permission: ['manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'] }
+  },
+  // 当前生产入口只基于氚云导入工单；旧自建制造页面暂停开放。
+  // 不透传旧页面的 id 参数，避免把制造单 ID 当成氚云工单 ID。
+  {
+    path: '/production-task-orders',
+    name: 'productionTaskOrders',
+    redirect: { path: '/production-followups', query: {} }
+  },
   {
     path: '/manufacturing-execution',
     name: 'manufacturingExecution',
-    component: () => import('../views/production/ManufacturingExecutionView.vue'),
-    meta: {
-      title: '车间执行',
-      layout: 'list',
-      permission: [
-        'manufacturing.report',
-        'manufacturing.receive',
-        'manufacturing.read.self',
-        'manufacturing.read.department',
-        'manufacturing.read.all'
-      ],
-      group: 'h3'
-    }
+    redirect: { path: '/production-followups', query: {} }
   },
   {
     path: '/manufacturing-process-management',
     name: 'manufacturingProcessManagement',
-    component: () => import('../views/production/ManufacturingProcessManagementView.vue'),
-    meta: { title: '制程与工序管理', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
+    redirect: { path: '/production-followups', query: {} }
   },
   {
     path: '/product-inventory',
