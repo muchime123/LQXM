@@ -123,6 +123,8 @@ frontend/*.timestamp-*.mjs
 /backend/test-business-backup-*.sql
 /backend/src/main/houduan.zip
 *.sql.bak
+# 迁移前的库备份（本轮双轨制接线引入）：4MB 级 dump，属一次性快照，不入库
+/backups/
 
 # --- Chinese-named one-off docs at root (sessions snapshots, ad-hoc reports) ---
 /氚云数据全链路串联文档.md

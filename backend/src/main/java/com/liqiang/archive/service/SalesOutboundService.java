@@ -115,9 +115,16 @@ public class SalesOutboundService {
      *
      * <p>数据范围复用 {@link FeatureCode#SALES_OUTBOUND}——与制造域
      * {@code FeatureCode.MANUFACTURING} 同款机制，不另造一套。
+     *
+     * <p>{@code source} 是**双轨制**留下的区分维度：{@code H3YUN}=氚云镜像进来的历史单，
+     * {@code LOCAL}=ERP 自建单（{@code external_source IS NULL}）。不传则两者混排——
+     * 这是刻意的：用户要在一张列表里同时看到「历史怎么发生的」和「新单怎么办」。
+     *
+     * @param pendingOnly 只看有客观缺失、待业务侧补齐的单（氚云镜像单才有此标记）
      */
     public Map<String, Object> list(String keyword, String status, Long warehouseId, Long customerId,
-                                    String dateFrom, String dateTo, int page, int size) {
+                                    String dateFrom, String dateTo, int page, int size,
+                                    String source, Boolean pendingOnly) {
         if (page < 1 || size < 1 || size > 100) throw new IllegalArgumentException("分页范围无效");
         var where = new StringBuilder(" WHERE 1=1");
         var params = new ArrayList<>();
@@ -134,6 +141,9 @@ public class SalesOutboundService {
         if (customerId != null) { where.append(" AND o.customer_id=?"); params.add(customerId); }
         if (dateFrom != null && !dateFrom.isBlank()) { where.append(" AND o.outbound_date>=?"); params.add(dateFrom.trim()); }
         if (dateTo != null && !dateTo.isBlank()) { where.append(" AND o.outbound_date<=?"); params.add(dateTo.trim()); }
+        if ("H3YUN".equals(source)) where.append(" AND o.external_source='H3YUN'");
+        else if ("LOCAL".equals(source)) where.append(" AND o.external_source IS NULL");
+        if (Boolean.TRUE.equals(pendingOnly)) where.append(" AND o.source_mirror_pending IS NOT NULL");
 
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM erp_sales_outbounds o "
                 + "LEFT JOIN employees e ON e.id=o.salesperson_id" + where, Long.class, params.toArray());
@@ -146,6 +156,8 @@ public class SalesOutboundService {
                         + " o.sales_order_ref salesOrderRef,o.outbound_date outboundDate,o.total_amount totalAmount,"
                         + " o.remark,o.posted_at postedAt,o.reversed_at reversedAt,o.reversal_reason reversalReason,"
                         + " o.created_by_name createdByName,o.created_at createdAt,"
+                        + " o.external_source externalSource,o.source_outbound_no sourceOutboundNo,"
+                        + " o.source_status_raw sourceStatusRaw,o.source_mirror_pending sourceMirrorPending,"
                         + " (SELECT COUNT(*) FROM erp_sales_outbound_items i WHERE i.outbound_id=o.id) itemCount"
                         + " FROM erp_sales_outbounds o"
                         + " LEFT JOIN employees e ON e.id=o.salesperson_id"
@@ -159,7 +171,13 @@ public class SalesOutboundService {
         return result;
     }
 
-    /** 出库单详情（含明细）。无权限或不存在统一抛「不存在或无权查看」，不泄露单号是否存在。 */
+    /**
+     * 出库单详情（含明细）。无权限或不存在统一抛「不存在或无权查看」，不泄露单号是否存在。
+     *
+     * <p>明细里的 {@code line_type} 与来源列是**双轨制的必要信息**：氚云镜像单的明细含运费/服务费行
+     * （没有 SKU、没有单位），且可能带待补原因。不返回这些字段，前端就无法区分
+     * 「这行是缺数据」还是「这行本来就不是商品」。
+     */
     public Map<String, Object> detail(long id) {
         requireVisible(id);
         var head = jdbc.queryForList(
@@ -170,12 +188,17 @@ public class SalesOutboundService {
                         + " o.outbound_date outboundDate,o.total_amount totalAmount,o.remark,"
                         + " o.posted_at postedAt,o.posted_by_name postedByName,"
                         + " o.reversed_at reversedAt,o.reversed_by_name reversedByName,"
-                        + " o.reversal_reason reversalReason,o.created_by_name createdByName,o.created_at createdAt"
+                        + " o.reversal_reason reversalReason,o.created_by_name createdByName,o.created_at createdAt,"
+                        + " o.external_source externalSource,o.source_outbound_no sourceOutboundNo,"
+                        + " o.source_status_raw sourceStatusRaw,o.source_warehouse_name sourceWarehouseName,"
+                        + " o.source_ship_date sourceShipDate,o.source_sales_amount sourceSalesAmount,"
+                        + " o.source_mirror_pending sourceMirrorPending"
                         + " FROM erp_sales_outbounds o LEFT JOIN warehouses w ON w.id=o.warehouse_id WHERE o.id=?",
                 id).stream().findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("销售出库单不存在或无权查看"));
         var items = jdbc.queryForList(
-                "SELECT id,line_no lineNo,sales_product_id salesProductId,canonical_product_id canonicalProductId,"
+                "SELECT id,line_no lineNo,line_type lineType,external_id externalId,source_category sourceCategory,"
+                        + " sales_product_id salesProductId,canonical_product_id canonicalProductId,"
                         + " product_code_snapshot productCode,product_name_snapshot productName,"
                         + " specification_snapshot specification,unit,quantity,unit_price unitPrice,amount,remark"
                         + " FROM erp_sales_outbound_items WHERE outbound_id=? ORDER BY line_no", id);
@@ -300,12 +323,14 @@ public class SalesOutboundService {
         if (!"DRAFT".equals(status))
             throw new IllegalStateException("REVERSED".equals(status) ? "已冲销的出库单不能重新过账，请新建一张"
                     : "该出库单已过账，不能重复过账");
-        long warehouseId = ((Number) head.get("warehouseId")).longValue();
+        long warehouseId = requireWarehouseForPost(head);
         String no = String.valueOf(head.get("outboundNo"));
         var lines = jdbc.queryForList("SELECT id,line_no lineNo,sales_product_id salesProductId,"
                 + " product_name_snapshot productName,specification_snapshot specification,unit,quantity,remark"
                 + " FROM erp_sales_outbound_items WHERE outbound_id=? ORDER BY line_no", id);
         if (lines.isEmpty()) throw new IllegalStateException("出库单没有明细，不能过账");
+
+        assertLinesDeductible(id);
 
         String warehouseName = jdbc.queryForObject("SELECT warehouse_name FROM warehouses WHERE id=?", String.class, warehouseId);
         for (var line : lines) {
@@ -338,7 +363,7 @@ public class SalesOutboundService {
         var head = lockHead(id);
         if (!"POSTED".equals(String.valueOf(head.get("status"))))
             throw new IllegalStateException("只有已过账的销售出库单可以冲销");
-        long warehouseId = ((Number) head.get("warehouseId")).longValue();
+        long warehouseId = requireWarehouseForPost(head);
         String no = String.valueOf(head.get("outboundNo"));
         var lines = jdbc.queryForList("SELECT line_no lineNo,sales_product_id salesProductId,"
                 + " product_name_snapshot productName,specification_snapshot specification,unit,quantity"
@@ -361,6 +386,62 @@ public class SalesOutboundService {
 
     // ==================== 内部工具 ====================
 
+    /**
+     * 过账前的「明细可扣减性」预检。
+     *
+     * <p>V324 / V325 放开了业务表明细的若干 NOT NULL（为了让氚云源数据如实镜像进来：
+     * 运费/服务费行没有产品身份、57 行没有数量、4,295 行没有单位……）。
+     * 代价是**原来安全的解箱写法会 NPE**——业务员只会看到「系统错误」，不知道哪一行缺什么。
+     *
+     * <p>所以把校验集中在这里：**一行不能扣，整单就拒绝过账**，并把每一行的缺项讲清楚。
+     * 这也是双轨制的必然要求——历史镜像单本来就带着客观缺失进来，
+     * 能不能过账要在业务动作发生前回答，而不是在扣库存的半路上炸掉。
+     */
+    private void assertLinesDeductible(long id) {
+        var bad = jdbc.queryForList(
+                "SELECT line_no lineNo,line_type lineType,product_name_snapshot productName,"
+                        + " canonical_product_id canonicalProductId,unit,quantity"
+                        + " FROM erp_sales_outbound_items WHERE outbound_id=? AND ("
+                        + "   canonical_product_id IS NULL OR quantity IS NULL OR quantity <= 0 OR unit IS NULL"
+                        + " ) ORDER BY line_no LIMIT 5", id);
+        if (bad.isEmpty()) return;
+        Long total = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM erp_sales_outbound_items WHERE outbound_id=? AND ("
+                        + " canonical_product_id IS NULL OR quantity IS NULL OR quantity <= 0 OR unit IS NULL)",
+                Long.class, id);
+        StringBuilder b = new StringBuilder("以下明细无法扣减库存，不能过账");
+        if (total != null && total > 5) b.append("（共 ").append(total).append(" 行，列出前 5 行）");
+        b.append("：");
+        for (var r : bad) {
+            Object pn = r.get("productName");
+            b.append("\n第 ").append(r.get("lineNo")).append(" 行「")
+                    .append(pn == null ? "无名称" : pn).append("」");
+            List<String> why = new ArrayList<>();
+            if (r.get("canonicalProductId") == null) why.add("没有产品身份");
+            if (r.get("unit") == null) why.add("没有单位");
+            if (r.get("quantity") == null) why.add("没有数量");
+            else if (((BigDecimal) r.get("quantity")).signum() <= 0)
+                why.add("数量 " + strip((BigDecimal) r.get("quantity")) + " 不是正数");
+            b.append("：").append(String.join("、", why));
+        }
+        b.append("\n请在编辑本单时补齐或删除这些行，再过账。");
+        throw new IllegalStateException(b.toString());
+    }
+
+    /**
+     * 取单头仓库并保证非空。
+     *
+     * <p>{@code warehouse_id} 在 V324 之前是 NOT NULL，解箱写法是安全的；放开之后
+     * 氚云镜像单有 2 张没有仓库，解箱会直接 NPE（业务员只看到「系统错误」，不知道是缺仓库）。
+     * 所以统一走这里，把「缺仓库」变成一句能读懂的话。
+     */
+    private long requireWarehouseForPost(Map<String, Object> head) {
+        Object whId = head.get("warehouseId");
+        if (whId == null)
+            throw new IllegalStateException("该出库单没有发货仓库，不能过账。请先编辑补齐仓库。");
+        return ((Number) whId).longValue();
+    }
+
     /** 锁定并读取单头（并发下过账/冲销串行化）。字段名统一转 camelCase 以便下游按名取值。 */
     private Map<String, Object> lockHead(long id) {
         var rows = jdbc.queryForList("SELECT id,outbound_no outboundNo,status,warehouse_id warehouseId "
@@ -369,8 +450,7 @@ public class SalesOutboundService {
         return rows.getFirst();
     }
 
-    /** 校验并规整明细；返回带快照的完整行（快照在建单时固定，不随主数据改名而变）。 */
-    private List<Map<String, Object>> validateLines(List<OutboundLine> input) {
+    /** 校验并规整明细；返回带快照的完整行（快照在建单时固定，不随主数据改名而变）。 */    private List<Map<String, Object>> validateLines(List<OutboundLine> input) {
         if (input == null || input.isEmpty()) throw new IllegalArgumentException("请至少添加一行出库明细");
         if (input.size() > MAX_LINES) throw new IllegalArgumentException("出库明细不能超过 " + MAX_LINES + " 行");
         List<Map<String, Object>> result = new ArrayList<>();
