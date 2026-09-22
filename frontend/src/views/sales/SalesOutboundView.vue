@@ -12,50 +12,19 @@
         <span class="stat-card__value">¥{{ fmtMoney(pageAmount) }}</span>
       </div>
       <div class="stat-card">
-        <span class="stat-card__label">本页已生效</span>
-        <span class="stat-card__value">{{ effectiveCount }}</span>
-        <span class="stat-card__hint" v-if="postedCount > 0">已过账 {{ postedCount }}</span>
+        <span class="stat-card__label">已过账</span>
+        <span class="stat-card__value">{{ postedCount }}</span>
       </div>
       <div class="stat-card">
-        <span class="stat-card__label">本页待补</span>
-        <span class="stat-card__value">{{ pendingCount }}</span>
-      </div>
-    </section>
-
-    <!-- 双轨制接线：源台账（只读）→ 业务单（可操作） -->
-    <section class="mirror-bar" v-if="mirror">
-      <div class="mirror-bar__text">
-        <b>氚云销售出库 → ERP 出库单</b>
-        <span class="mirror-bar__note">
-          氚云台账的源数据原样留在「导入中心」（只读）；这里接入的是<b>可操作</b>的业务单，
-          状态<b>沿用氚云原状态</b>（已生效 / 进行中 / 草稿），镜像本身不做任何库存动作。
-          已接入 <b>{{ mirror.mirrored }}</b> / {{ mirror.sourceTotal }} 张、明细 {{ mirror.itemsMirrored }} 行
-          <template v-if="mirror.pendingData > 0">，其中 <b>{{ mirror.pendingData }}</b> 张有客观缺失待补</template>。
-        </span>
-      </div>
-      <div class="mirror-bar__actions">
-        <el-button size="small" v-if="canManage && mirror.remaining > 0" :loading="mirroring" @click="runMirror(500)">
-          接入 500 张
-        </el-button>
-        <el-button size="small" type="primary" v-if="canManage" :loading="mirroring" :disabled="mirror.remaining === 0"
-          @click="runMirror(0)">
-          {{ mirror.remaining === 0 ? '已全部接入' : `全部接入（剩 ${mirror.remaining}）` }}
-        </el-button>
-        <span class="mirror-bar__stat" v-if="!canManage">只读</span>
+        <span class="stat-card__label">已冲销</span>
+        <span class="stat-card__value">{{ reversedCount }}</span>
       </div>
     </section>
 
     <section class="panel">
       <div class="toolbar">
         <div class="toolbar__left">
-          <el-select v-model="sourceFilter" clearable placeholder="全部来源" style="width:120px" @change="load(1)">
-            <el-option value="H3YUN" label="氚云镜像" />
-            <el-option value="LOCAL" label="ERP 自建" />
-          </el-select>
           <el-select v-model="statusFilter" clearable placeholder="全部状态" style="width:130px" @change="load(1)">
-            <el-option value="CONFIRMED" label="已生效" />
-            <el-option value="PROCESSING" label="进行中" />
-            <el-option value="CANCELLED" label="已取消" />
             <el-option value="DRAFT" label="草稿" />
             <el-option value="POSTED" label="已过账" />
             <el-option value="REVERSED" label="已冲销" />
@@ -69,7 +38,6 @@
             @keyup.enter="load(1)" @clear="load(1)">
             <template #prefix><el-icon><Search /></el-icon></template>
           </el-input>
-          <el-checkbox v-model="pendingOnly" label="只看待补" @change="load(1)" />
           <el-button type="primary" plain @click="load(1)">查询</el-button>
         </div>
         <div class="toolbar__right">
@@ -77,23 +45,17 @@
         </div>
       </div>
 
-      <!-- 口径说明：镜像后一张列表里同时有「历史怎么发生的」和「新单怎么办」 -->
+      <!-- 口径说明：这张表是 ERP 自建单据，与氚云台账不是同一批数据 -->
       <div class="scope-note">
-        <span><b>氚云镜像单</b>＝从导入中心台账接入的历史单，源数据一字不改，状态<b>沿用氚云原状态</b>（已生效 / 进行中 / 草稿）</span>
+        <span><b>ERP 正式出库单</b>（<code>erp_sales_outbounds</code>）：可录单、过账即扣库存、冲销回补</span>
         <span class="scope-note__sep">·</span>
-        <span class="scope-note__quiet"><b>已生效 / 进行中</b>是<b>非库存态</b>：只表示「源里是什么状态」，不代表已过账、不影响库存</span>
+        <span class="scope-note__quiet">与「氚云导入中心 → 销售出库关联」里的历史台账<b>不是同一批数据</b>，两者不混算</span>
         <span class="scope-note__sep">·</span>
-        <span class="scope-note__quiet"><b>ERP 自建单</b>才走过账：草稿 → 过账（扣减库存）→ 冲销（回补库存，终态）；镜像单不参与过账</span>
+        <span class="scope-note__quiet">流程：草稿 → 过账（扣减库存）→ 冲销（回补库存，终态）</span>
       </div>
 
       <el-table :data="items" v-loading="loading" stripe style="width:100%">
         <el-table-column prop="outboundNo" label="出库单号" width="150" />
-        <el-table-column label="来源" width="100">
-          <template #default="{ row }">
-            <el-tag v-if="row.externalSource === 'H3YUN'" size="small" type="warning" effect="plain">氚云镜像</el-tag>
-            <el-tag v-else size="small" type="info" effect="plain">ERP 自建</el-tag>
-          </template>
-        </el-table-column>
         <el-table-column label="状态" width="90">
           <template #default="{ row }">
             <el-tag size="small" :type="STATUS_TAG[row.status] || 'info'" effect="plain">
@@ -128,19 +90,11 @@
             <span>{{ row.itemCount ?? 0 }}</span>
           </template>
         </el-table-column>
-        <el-table-column label="待补" width="80">
-          <template #default="{ row }">
-            <el-tooltip v-if="row.sourceMirrorPending" :content="row.sourceMirrorPending" placement="top">
-              <el-tag size="small" type="danger" effect="plain">待补</el-tag>
-            </el-tooltip>
-            <span v-else class="cell-muted">—</span>
-          </template>
-        </el-table-column>
         <el-table-column label="操作" width="210" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="canManage && canEdit(row)" link type="primary" @click="openEdit(row)">编辑</el-button>
-            <el-button v-if="canManage && canPost(row)" link type="success" @click="doPost(row)">过账</el-button>
+            <el-button v-if="canManage && row.status === 'DRAFT'" link type="primary" @click="openEdit(row)">编辑</el-button>
+            <el-button v-if="canManage && row.status === 'DRAFT'" link type="success" @click="doPost(row)">过账</el-button>
             <el-button v-if="canManage && row.status === 'POSTED'" link type="danger" @click="doReverse(row)">冲销</el-button>
           </template>
         </el-table-column>
@@ -304,50 +258,15 @@
           <el-descriptions-item label="创建人">{{ detail.head.createdByName || '—' }}</el-descriptions-item>
         </el-descriptions>
 
-        <div class="detail__block" v-if="detail.head.externalSource === 'H3YUN'">
-          <h4>来源（氚云台账）</h4>
-          <el-descriptions :column="2" border size="small">
-            <el-descriptions-item label="氚云单号">{{ detail.head.sourceOutboundNo || '—' }}</el-descriptions-item>
-            <el-descriptions-item label="氚云状态">{{ detail.head.sourceStatusRaw || '—' }}</el-descriptions-item>
-            <el-descriptions-item label="氚云仓库">{{ detail.head.sourceWarehouseName || '—' }}</el-descriptions-item>
-            <el-descriptions-item label="发货日期">{{ shortDate(detail.head.sourceShipDate) }}</el-descriptions-item>
-            <el-descriptions-item label="氚云金额" :span="2">
-              <span v-if="detail.head.sourceSalesAmount != null">¥{{ fmtMoney(detail.head.sourceSalesAmount) }}</span>
-              <span v-else class="cell-muted">—</span>
-            </el-descriptions-item>
-          </el-descriptions>
-          <el-alert v-if="detail.head.sourceMirrorPending" type="warning" :closable="false" show-icon
-            :title="'待补数据：' + detail.head.sourceMirrorPending" style="margin-top:8px" />
-          <p class="detail__hint">
-            本单由氚云台账镜像而来，<b>源数据一字未改</b>（原件仍在「氚云导入中心」）；接入时为草稿，不自动扣库存。
-          </p>
-        </div>
-
         <div class="detail__block">
           <h4>明细</h4>
           <el-table :data="detail.items" size="small" border>
             <el-table-column prop="lineNo" label="#" width="46" />
-            <el-table-column label="类型" width="72">
-              <template #default="{ row }">
-                <el-tag v-if="row.lineType && row.lineType !== 'PRODUCT'" size="small" type="info" effect="plain">
-                  {{ LINE_TYPE_TEXT[row.lineType] || row.lineType }}
-                </el-tag>
-                <span v-else class="cell-muted">商品</span>
-              </template>
-            </el-table-column>
             <el-table-column prop="productName" label="产品" min-width="160" show-overflow-tooltip />
             <el-table-column prop="specification" label="规格" width="100" show-overflow-tooltip />
-            <el-table-column label="单位" width="60">
-              <template #default="{ row }">
-                <span v-if="row.unit">{{ row.unit }}</span>
-                <span v-else class="cell-muted">—</span>
-              </template>
-            </el-table-column>
+            <el-table-column prop="unit" label="单位" width="60" />
             <el-table-column label="数量" width="90" align="right">
-              <template #default="{ row }">
-                <span v-if="row.quantity == null" class="cell-muted">—</span>
-                <span v-else :class="{ 'qty-low': Number(row.quantity) < 0 }">{{ fmtNum(row.quantity) }}</span>
-              </template>
+              <template #default="{ row }">{{ fmtNum(row.quantity) }}</template>
             </el-table-column>
             <el-table-column label="单价" width="90" align="right">
               <template #default="{ row }">
@@ -358,7 +277,7 @@
           </el-table>
         </div>
 
-        <div class="detail__block" v-if="detail.head.postedAt || detail.head.reversedAt">
+        <div class="detail__block" v-if="detail.head.status !== 'DRAFT'">
           <h4>流程留痕</h4>
           <el-descriptions :column="1" border size="small">
             <el-descriptions-item label="过账" v-if="detail.head.postedAt">
@@ -374,7 +293,7 @@
         </div>
 
         <div class="detail__actions" v-if="canManage">
-          <el-button v-if="canPost(detail.head)" type="success" @click="doPost(detail.head)">过账</el-button>
+          <el-button v-if="detail.head.status === 'DRAFT'" type="success" @click="doPost(detail.head)">过账</el-button>
           <el-button v-if="detail.head.status === 'POSTED'" type="danger" @click="doReverse(detail.head)">冲销</el-button>
         </div>
       </div>
@@ -391,41 +310,18 @@ import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import {
   fetchSalesOutbounds, fetchSalesOutbound, fetchSalesOutboundWarehouses, fetchAvailableStock,
   createSalesOutbound, updateSalesOutbound, postSalesOutbound, reverseSalesOutbound, newRequestKey,
-  fetchH3SalesMirrorProgress, mirrorH3SalesOutbounds,
-  type SalesOutbound, type SalesOutboundItem, type AvailableStock, type H3SalesMirrorProgress
+  type SalesOutbound, type SalesOutboundItem, type AvailableStock
 } from '@/api/salesOutbound'
 
 const auth = useCurrentUser()
 const canManage = computed(() => auth.can('sales_order.manage'))
 
-/**
- * 可编辑 / 可过账 = **仅 ERP 自建草稿**。
- *
- * 氚云镜像单不给这两个动作，两个理由都很硬：
- * ① 它是历史事实，改它就等于改历史（源台账才是忠实记录，这里改了也不回写氚云）；
- * ② 它的明细含运费/服务费行（没有产品身份），而编辑表单是按「商品行」整体替换明细的 ——
- *    放开编辑会让这类行在保存时被判成「产品不能为空」，整单保存失败。
- * 要按当前库存出库，就新建一张 ERP 自建单。
- */
-const canEdit = (row: SalesOutbound) => row.status === 'DRAFT' && row.externalSource !== 'H3YUN'
-const canPost = (row: SalesOutbound) => row.status === 'DRAFT' && row.externalSource !== 'H3YUN'
-
-// 状态词表（V326）：CONFIRMED/PROCESSING 等是氚云镜像单的原状态，属**非库存态**——不代表已过账、不影响库存。
-// 词表与后端台账归一器同源（SalesOutboundSettlementService.normalizeOutboundStatus），不另造词。
-const STATUS_TEXT: Record<string, string> = {
-  DRAFT: '草稿', CONFIRMED: '已生效', PROCESSING: '进行中', CANCELLED: '已取消', POSTED: '已过账', REVERSED: '已冲销'
-}
-const STATUS_TAG: Record<string, 'info' | 'primary' | 'success' | 'warning' | 'danger'> = {
-  DRAFT: 'info', CONFIRMED: 'primary', PROCESSING: 'warning', CANCELLED: 'danger', POSTED: 'success', REVERSED: 'danger'
-}
-/** 非商品行的中文名（与氚云台账 line_type 同名口径）。 */
-const LINE_TYPE_TEXT: Record<string, string> = { FREIGHT: '运费', SERVICE: '服务费' }
+const STATUS_TEXT: Record<string, string> = { DRAFT: '草稿', POSTED: '已过账', REVERSED: '已冲销' }
+const STATUS_TAG: Record<string, 'info' | 'success' | 'danger'> = { DRAFT: 'info', POSTED: 'success', REVERSED: 'danger' }
 
 const keyword = ref('')
 const statusFilter = ref<string>()
 const warehouseId = ref<number>()
-const sourceFilter = ref<string>()
-const pendingOnly = ref(false)
 const dateRange = ref<[string, string] | null>(null)
 const page = ref(1)
 const size = ref(20)
@@ -436,8 +332,7 @@ const loading = ref(false)
 
 const draftCount = computed(() => items.value.filter(r => r.status === 'DRAFT').length)
 const postedCount = computed(() => items.value.filter(r => r.status === 'POSTED').length)
-const effectiveCount = computed(() => items.value.filter(r => r.status === 'CONFIRMED').length)
-const pendingCount = computed(() => items.value.filter(r => !!r.sourceMirrorPending).length)
+const reversedCount = computed(() => items.value.filter(r => r.status === 'REVERSED').length)
 const pageAmount = computed(() => items.value.reduce((s, r) => s + (Number(r.totalAmount) || 0), 0))
 
 const load = async (p = page.value) => {
@@ -448,8 +343,6 @@ const load = async (p = page.value) => {
       keyword: keyword.value,
       status: statusFilter.value || '',
       warehouseId: warehouseId.value,
-      source: sourceFilter.value || '',
-      pendingOnly: pendingOnly.value || undefined,
       dateFrom: dateRange.value?.[0] || '',
       dateTo: dateRange.value?.[1] || '',
       page: p,
@@ -463,37 +356,6 @@ const load = async (p = page.value) => {
     total.value = 0
   } finally {
     loading.value = false
-  }
-}
-
-// ==================== 双轨制：氚云台账 → 业务单 接线 ====================
-
-const mirror = ref<H3SalesMirrorProgress | null>(null)
-const mirroring = ref(false)
-
-const loadMirror = async () => {
-  try { mirror.value = await fetchH3SalesMirrorProgress() } catch { mirror.value = null }
-}
-
-/** limit=0 全量；已接入的天然跳过，可反复点。 */
-const runMirror = async (limit: number) => {
-  mirroring.value = true
-  try {
-    const r = await mirrorH3SalesOutbounds(limit)
-    // statusSynced：V324 时期历史单被一律落成了「草稿」，接入时会顺带更正为氚云原状态。
-    const synced = r.statusSynced > 0 ? `，并更正 ${r.statusSynced} 张已接入单的状态为氚云原状态` : ''
-    if (r.failed > 0) {
-      notify.error(`接入完成但有 ${r.failed} 张失败：${r.errors.slice(0, 3).join('；')}`)
-    } else if (r.created === 0 && r.statusSynced === 0) {
-      notify.success('已全部接入，没有需要处理的单')
-    } else {
-      notify.success(`已接入 ${r.created} 张${synced}，剩余 ${r.remaining}${r.pendingData > 0 ? `，其中 ${r.pendingData} 张待补数据` : ''}`)
-    }
-    await Promise.all([loadMirror(), load(1)])
-  } catch (e) {
-    notify.errorWithDetail('接入氚云出库单失败', e)
-  } finally {
-    mirroring.value = false
   }
 }
 
@@ -559,26 +421,20 @@ const openEdit = async (row: SalesOutbound) => {
     const d = await fetchSalesOutbound(row.id)
     editingId.value = row.id
     form.customerName = d.head.customerName || ''
-    form.warehouseId = d.head.warehouseId ?? undefined
+    form.warehouseId = d.head.warehouseId
     form.outboundDate = shortDate(d.head.outboundDate) === '—' ? today() : shortDate(d.head.outboundDate)
     form.salesOrderRef = d.head.salesOrderRef || ''
     form.remark = d.head.remark || ''
     form.lines = (d.items || []).map((it: SalesOutboundItem) => ({
-      productId: it.salesProductId ?? undefined,
+      productId: it.salesProductId,
       productCode: it.productCode,
       productName: it.productName,
       specification: it.specification,
-      unit: it.unit || '',
+      unit: it.unit,
       quantity: Number(it.quantity),
       unitPrice: it.unitPrice ?? null,
       remark: it.remark
     }))
-    // 镜像单的明细含运费/服务费行（无产品身份）。ERP 建单口径的明细只有商品行，
-    // 保存即整体替换明细 —— 这些行不会保留。提前说清楚，避免用户以为改完还在。
-    const dropped = (d.items || []).filter((it: SalesOutboundItem) => it.lineType && it.lineType !== 'PRODUCT').length
-    if (d.head.externalSource === 'H3YUN' && dropped > 0) {
-      notify.warning(`本单来自氚云镜像，含 ${dropped} 行运费/服务费。ERP 明细口径只收商品行，保存后这些行不会保留（原件仍在导入中心台账）。`)
-    }
     formKey.value = newRequestKey()
     formOpen.value = true
   } catch (e) {
@@ -705,11 +561,11 @@ const openDetail = async (row: SalesOutbound) => {
 }
 
 const doPost = async (row: SalesOutbound) => {
-  // 只有 ERP 自建草稿能到这儿（canPost 兜着）。氚云镜像的历史单不参与过账：
-  // 历史单扣的是「当前」库存，两者的关系尚未定案 —— 见 V326 与双轨制接线文档。
-  const msg = `过账后将按明细扣减「${row.warehouseName || '所选仓库'}」的库存并写入库存流水，且不能直接修改（只能冲销）。确定过账？`
   try {
-    await ElMessageBox.confirm(msg, '过账确认', { type: 'warning', confirmButtonText: '确定过账', cancelButtonText: '取消' })
+    await ElMessageBox.confirm(
+      `过账后将按明细扣减「${row.warehouseName || '所选仓库'}」的库存并写入库存流水，且不能直接修改（只能冲销）。确定过账？`,
+      '过账确认', { type: 'warning', confirmButtonText: '确定过账', cancelButtonText: '取消' }
+    )
   } catch { return }
   const key = newRequestKey()
   try {
@@ -749,7 +605,6 @@ const fmtMoney = (v: unknown) => Number(v || 0).toLocaleString('zh-CN', { minimu
 const shortDate = (s?: string | null) => (s ? String(s).slice(0, 10) : '—')
 const shortTime = (s?: string | null) => (s ? String(s).replace('T', ' ').slice(0, 16) : '—')
 
-loadMirror()
 loadWarehouses().then(() => load(1))
 </script>
 
@@ -764,17 +619,8 @@ loadWarehouses().then(() => load(1))
 .stat-card__value { font-size: 20px; font-weight: 600; color: var(--lq-text, #111827); }
 .stat-card__hint { font-size: 12px; color: var(--lq-text-secondary, #6b7280); }
 
-/* 双轨制接线条：源台账 → 业务单 */
-.mirror-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
-  background: var(--lq-surface-subtle, #f9fafb); border: 1px solid var(--lq-border, #e5e7eb);
-  border-left: 3px solid var(--lq-primary, #2563eb); border-radius: 10px; padding: 10px 14px; }
-.mirror-bar__text { display: flex; flex-direction: column; gap: 2px; font-size: 13px;
-  color: var(--lq-text, #111827); }
-.mirror-bar__note { font-size: 12px; color: var(--lq-text-secondary, #6b7280); line-height: 1.7; }
-.mirror-bar__actions { display: flex; align-items: center; gap: 8px; }
-.mirror-bar__stat { font-size: 12px; color: var(--lq-text-secondary, #6b7280); }
-
-.panel { background: var(--lq-surface, #fff); border: 1px solid var(--lq-border, #e5e7eb); border-radius: 10px; padding: 14px; }.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
+.panel { background: var(--lq-surface, #fff); border: 1px solid var(--lq-border, #e5e7eb); border-radius: 10px; padding: 14px; }
+.toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 10px; }
 .toolbar__left { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .toolbar__right { display: flex; align-items: center; gap: 8px; }
 
@@ -802,6 +648,5 @@ loadWarehouses().then(() => load(1))
 
 .detail { display: flex; flex-direction: column; gap: 14px; }
 .detail__block h4 { margin: 0 0 8px; font-size: 14px; }
-.detail__hint { margin: 8px 0 0; font-size: 12px; line-height: 1.7; color: var(--lq-text-secondary, #6b7280); }
 .detail__actions { display: flex; gap: 10px; }
 </style>

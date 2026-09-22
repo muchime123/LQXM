@@ -36,8 +36,7 @@ import java.util.*;
  *   <li><b>非库存态（氚云镜像单的原状态）</b>：{@code CONFIRMED}（已生效）/ {@code PROCESSING}（进行中）/
  *       {@code CANCELLED}（已取消）/ 源草稿的 {@code DRAFT}。它们如实反映氚云里的状态，
  *       <b>不做任何库存动作、也不代表已过账</b>。词表直接复用台账侧的归一器
- *       （{@code SalesOutboundSettlementService.normalizeOutboundStatus}），
- *       映射见 {@code H3SalesOutboundMirrorService.businessStatus}，列注释见 V326。</li>
+ *       （{@code SalesOutboundSettlementService.normalizeOutboundStatus}），列注释见 V326。</li>
  * </ul>
  * ⚠️ <b>镜像单不参与过账</b>（{@link #doPost} 显式拒绝）：历史单扣的是当前库存，
  * 两者关系尚未定案（待商榷），宁可显式拒绝也不顺手扣。

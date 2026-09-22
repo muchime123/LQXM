@@ -33,16 +33,6 @@ export interface ManufacturingOrder {
   inspectionStatus?: string
   remark?: string
   createdAt: string
-  // === 氚云镜像来源（双轨制：源台账只读、业务工单可写） ===
-  /** 氚云生产任务单号；为空表示是 ERP 自建单 */
-  h3WorkOrderNo?: string
-  externalSource?: string
-  /** 氚云原状态原文（已生效 / 进行中 / 草稿 / 已取消） */
-  sourceStatusRaw?: string
-  /** 氚云生产进度原文，如 33.33% */
-  sourceProgressRaw?: string
-  /** 镜像待补原因；非空表示这条镜像数据缺东西（如没定到制程），需人工补 */
-  sourceMirrorPending?: string
 }
 export interface FinishedGoodsLot {
   id: number
@@ -273,56 +263,3 @@ export const replaceTemplateOperations=async(id:number,rows:Record<string,unknow
 export const fetchTemplateRules=async(id:number)=>(await http.get<TemplateProductRule[]>(`/manufacturing/master/templates/${id}/rules`)).data
 export const saveTemplateRule=async(templateId:number,id:number|undefined,payload:Record<string,unknown>)=>(await (id?http.put<number>(`/manufacturing/master/templates/${templateId}/rules/${id}`,payload):http.post<number>(`/manufacturing/master/templates/${templateId}/rules`,payload))).data
 export const deleteTemplateRule=async(templateId:number,id:number)=>{await http.delete(`/manufacturing/master/templates/${templateId}/rules/${id}`)}
-
-// ========== 氚云生产任务单镜像（双轨制的生产侧接线） ==========
-// 源轨道 production_orders（氚云台账，只读）→ 业务轨道 manufacturing_orders（可写）。
-// 镜像只读源表、只写业务表，源台账内容不动；可反复调用，已镜像的自动跳过。
-export interface H3MirrorProgress {
-  /** 氚云源工单总数（只读台账） */
-  sourceTotal:number
-  /** 已镜像成业务工单的条数 */
-  mirrored:number
-  /** 尚未镜像 */
-  remaining:number
-  /** 已镜像但缺产品身份等、待人工补数据的条数 */
-  pendingData:number
-  /** 已镜像、无工序、带待补原因 → 补完制程配置后可供重试的条数 */
-  retryable?:number
-}
-
-/** 「补完制程配置后重试展开工序」的结果。 */
-export interface H3RetryResult {
-  scanned:number
-  /** 本次补全工序的条数 */
-  fixed:number
-  /** 仍缺配置、保持待补的条数 */
-  stillPending:number
-  failed:number
-  stillSamples:string[]
-  errors:string[]
-  retryable:number
-}
-export interface H3MirrorResult {
-  scanned:number; created:number; failed:number; pendingData:number
-  /** 待补数据的样例（最多 10 条）：「工单号 → 原因」 */
-  pendingSamples:string[]
-  /** 失败明细（最多 20 条） */
-  errors:string[]
-  /** 本批跑完后还剩多少未镜像 */
-  remaining:number
-}
-export const fetchH3MirrorProgress = async () =>
-  (await http.get<H3MirrorProgress>('/manufacturing/mirror/h3-progress')).data
-/** @param limit 0 = 本批不限量；建议页面分批点，便于观察每批结果 */
-export const mirrorH3ProductionOrders = async (limit = 0) =>
-  (await http.post<H3MirrorResult>('/manufacturing/mirror/h3-orders', null, { params: { limit } })).data
-
-/**
- * 补完制程配置后，给「已镜像但工序没展开」的工单重试展开工序。
- *
- * 为什么需要单独一步：镜像只取「源表连不上业务表」的单，已镜像的不会被重扫 ——
- * 所以因缺配置落 pending 的单不会自己好起来，必须显式重试。
- * 只补工序（不重建工单），且只碰还没有工序行的单。
- */
-export const retryH3PendingOperations = async (limit = 0) =>
-  (await http.post<H3RetryResult>('/manufacturing/mirror/h3-retry-pending', null, { params: { limit } })).data

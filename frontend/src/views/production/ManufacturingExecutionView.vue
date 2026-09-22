@@ -13,107 +13,6 @@
     </header>
 
     <el-tabs v-model="tab" class="exec-tabs" @tab-change="onTabChange">
-      <!-- ==================== 生产任务（氚云源台账 → 业务工单） ==================== -->
-      <el-tab-pane label="生产任务" name="tasks">
-        <section v-if="canManage" class="mirror-bar">
-          <div class="mirror-bar__text">
-            <b>氚云生产任务单</b>
-            <span class="mirror-bar__stat">源台账 <b>{{ mirror.sourceTotal }}</b> 张</span>
-            <span class="mirror-bar__stat">已接入业务 <b>{{ mirror.mirrored }}</b> 张</span>
-            <span class="mirror-bar__stat" :class="{ 'is-warn': mirror.remaining > 0 }">待接入 <b>{{ mirror.remaining }}</b> 张</span>
-            <span class="mirror-bar__stat" :class="{ 'is-warn': mirror.pendingData > 0 }">待补数据 <b>{{ mirror.pendingData }}</b> 张</span>
-            <span v-if="(mirror.retryable ?? 0) > 0" class="mirror-bar__stat is-warn">可重试 <b>{{ mirror.retryable }}</b> 张</span>
-          </div>
-          <div class="mirror-bar__actions">
-            <el-button size="small" :loading="mirroring" :disabled="mirror.remaining === 0" @click="runMirror(200)">接入 200 张</el-button>
-            <el-button size="small" type="primary" :loading="mirroring" :disabled="mirror.remaining === 0" @click="runMirror(0)">全部接入</el-button>
-            <el-button size="small" type="warning" plain :loading="retrying" :disabled="(mirror.retryable ?? 0) === 0"
-              @click="runRetry(0)">重试展开工序</el-button>
-          </div>
-        </section>
-        <p v-if="canManage" class="mirror-bar__note">
-          氚云台账（<b>只读</b>）→ 业务工单（<b>可写</b>）。接入后可在这里报工、完工、交付收货；
-          台账始终保持氚云原样，业务侧的补数据与状态流转<b>不会</b>回写台账。
-          <br />
-          「待补数据」里绝大多数是<b>制程未配置</b>（车型车间的默认制程或品类绑制程没设）——
-          去「制程与工序管理」补完配置后，点<b>「重试展开工序」</b>即可把这些单的工序补上（接入动作只扫没接过的，不会自己重来）。
-        </p>
-
-        <section class="panel">
-          <div class="toolbar">
-            <el-input v-model="taskKeyword" clearable placeholder="工单号 / 客户 / 产品品类" class="kw-input"
-              @keyup.enter="loadTasks(1)" @clear="loadTasks(1)">
-              <template #prefix><el-icon><Search /></el-icon></template>
-            </el-input>
-            <el-select v-model="taskStatus" clearable placeholder="全部业务状态" class="sel-state" @change="loadTasks(1)">
-              <el-option v-for="(label, value) in ORDER_STATUS" :key="value" :value="value" :label="label" />
-            </el-select>
-            <el-select v-model="taskOnly" clearable placeholder="全部数据" class="sel-state" @change="loadTasks(1)">
-              <el-option value="pendingData" label="只看待补数据" />
-              <el-option value="fromH3" label="只看氚云接入" />
-            </el-select>
-            <el-button type="primary" plain @click="loadTasks(1)">查询</el-button>
-          </div>
-
-          <el-table :data="taskItems" v-loading="loading" stripe class="wide-table">
-            <el-table-column label="工单号" width="160" fixed>
-              <template #default="{ row }">
-                <strong class="cell-strong">{{ row.orderNo }}</strong>
-                <small class="cell-sub">{{ row.h3WorkOrderNo ? '氚云接入' : 'ERP 自建' }}</small>
-              </template>
-            </el-table-column>
-            <el-table-column label="客户" min-width="150" show-overflow-tooltip>
-              <template #default="{ row }">
-                <span>{{ row.customerNameSnapshot || '—' }}</span>
-                <small v-if="!row.customerNameSnapshot" class="cell-sub">氚云未填客户</small>
-              </template>
-            </el-table-column>
-            <el-table-column label="产品品类" min-width="150" show-overflow-tooltip>
-              <template #default="{ row }">
-                <span>{{ row.productNameSnapshot }}</span>
-                <small class="cell-sub">{{ row.workshopType || '未定车间' }}</small>
-              </template>
-            </el-table-column>
-            <el-table-column label="数量" width="140">
-              <template #default="{ row }">
-                <span>{{ fmtNum(row.plannedQuantity) }} {{ row.unit || '(单位待补)' }}</span>
-                <small class="cell-sub">已完工 {{ fmtNum(row.completedQuantity) }}</small>
-              </template>
-            </el-table-column>
-            <el-table-column label="业务状态" width="105">
-              <template #default="{ row }">
-                <el-tag size="small" effect="plain" :type="orderTagType(row.status)">{{ orderLabel(row.status) }}</el-tag>
-              </template>
-            </el-table-column>
-            <el-table-column label="氚云原状态" width="115">
-              <template #default="{ row }">
-                <span>{{ row.sourceStatusRaw || '—' }}</span>
-                <small class="cell-sub">进度 {{ row.sourceProgressRaw || '—' }}</small>
-              </template>
-            </el-table-column>
-            <el-table-column label="待补数据" min-width="180" show-overflow-tooltip>
-              <template #default="{ row }">
-                <template v-if="row.sourceMirrorPending">
-                  <el-tag size="small" type="warning" effect="plain">待补</el-tag>
-                  <small class="cell-sub">{{ row.sourceMirrorPending }}</small>
-                </template>
-                <span v-else class="cell-muted">—</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="交付期" width="105">
-              <template #default="{ row }">{{ row.dueDate || '—' }}</template>
-            </el-table-column>
-            <template #empty><el-empty description="没有生产任务" /></template>
-          </el-table>
-
-          <div class="pager">
-            <el-pagination v-model:current-page="taskPage" v-model:page-size="taskSize" :total="taskTotal"
-              :page-sizes="[20, 50, 100]" layout="total,sizes,prev,pager,next"
-              @current-change="loadTasks()" @size-change="loadTasks(1)" />
-          </div>
-        </section>
-      </el-tab-pane>
-
       <!-- ==================== 执行看板 ==================== -->
       <el-tab-pane label="执行看板" name="board">
         <section class="stats-grid">
@@ -727,10 +626,8 @@ import {
   reverseCompletionReceipt, fetchManufacturingOrders, fetchManufacturingOrder,
   fetchWorkshopOptions, fetchProcessTemplates, createManufacturingOrder,
   fetchProductOptions, fetchProcessCategories,
-  fetchH3MirrorProgress, mirrorH3ProductionOrders, retryH3PendingOperations,
   type ExecutionBoardItem, type AllWorkReport, type CompletionReceipt, type ManufacturingOrder,
-  type Warehouse, type WorkshopOption, type ProcessTemplate, type ProductOption, type ManufacturingOutput,
-  type H3MirrorProgress
+  type Warehouse, type WorkshopOption, type ProcessTemplate, type ProductOption, type ManufacturingOutput
 } from '@/api/manufacturing'
 
 const { can } = useCurrentUser()
@@ -740,93 +637,10 @@ const canReceive = computed(() => can('manufacturing.receive'))
 const canReverseReceipt = computed(() => can('manufacturing.receive.reverse'))
 const canManage = computed(() => can('manufacturing.manage'))
 
-const tab = ref<'tasks' | 'board' | 'reports' | 'receipts'>('tasks')
+const tab = ref<'board' | 'reports' | 'receipts'>('board')
 const loading = ref(false)
 const submitting = ref(false)
 const loadedTabs = ref<Set<string>>(new Set())
-
-// ==================== 生产任务（氚云源台账 → 业务工单） ====================
-// 双轨制：源表 production_orders 只读、业务表 manufacturing_orders 可写。
-// 镜像动作只读源表、只写业务表，可反复调用（已接入的自动跳过）。
-const mirror = ref<H3MirrorProgress>({ sourceTotal: 0, mirrored: 0, remaining: 0, pendingData: 0 })
-const mirroring = ref(false)
-const retrying = ref(false)
-const taskKeyword = ref('')
-const taskStatus = ref('')
-const taskOnly = ref('')
-const taskItems = ref<ManufacturingOrder[]>([])
-const taskTotal = ref(0)
-const taskPage = ref(1)
-const taskSize = ref(20)
-
-async function loadMirror() {
-  try { mirror.value = await fetchH3MirrorProgress() } catch { /* 进度条失败不该挡住列表 */ }
-}
-
-async function loadTasks(p?: number) {
-  if (p) taskPage.value = p
-  loading.value = true
-  try {
-    const params: Record<string, unknown> = {
-      keyword: taskKeyword.value || '',
-      status: taskStatus.value || '',
-      page: taskPage.value,
-      size: taskSize.value
-    }
-    if (taskOnly.value === 'fromH3') params.keyword = taskKeyword.value || 'SCGD'
-    const res = await fetchManufacturingOrders(params)
-    let items = res.items || []
-    if (taskOnly.value === 'pendingData') items = items.filter(r => !!r.sourceMirrorPending)
-    taskItems.value = items
-    taskTotal.value = res.total || 0
-  } catch (e) {
-    ElMessage.error(errText(e))
-  } finally {
-    loading.value = false
-  }
-}
-
-async function runMirror(limit: number) {
-  mirroring.value = true
-  try {
-    const r = await mirrorH3ProductionOrders(limit)
-    await loadMirror()
-    if (r.failed > 0) {
-      ElMessage.warning(`本批处理 ${r.scanned} 张：接入 ${r.created} 张、失败 ${r.failed} 张。已接入的有 ${r.pendingData} 张待补数据。`)
-    } else {
-      ElMessage.success(`本批接入 ${r.created} 张，剩余 ${r.remaining} 张未接入。`)
-    }
-    await loadTasks(1)
-  } catch (e) {
-    ElMessage.error(errText(e))
-  } finally {
-    mirroring.value = false
-  }
-}
-
-/**
- * 补完制程配置后重试展开工序。
- *
- * 存在的理由：接入动作只扫「源表连不上业务表」的单 —— 因缺配置而落「待补」的单
- * 不会被重扫，所以补完配置必须显式点这一步，否则它们永远是死数据。
- */
-async function runRetry(limit: number) {
-  retrying.value = true
-  try {
-    const r = await retryH3PendingOperations(limit)
-    await loadMirror()
-    if (r.fixed > 0) {
-      ElMessage.success(`本次补全 ${r.fixed} 张的工序${r.stillPending > 0 ? `；仍有 ${r.stillPending} 张缺配置未补全` : '，已全部补全'}。`)
-    } else {
-      ElMessage.warning(`本次扫描 ${r.scanned} 张，均仍缺制程配置。请先到「制程与工序管理」给对应车间设默认制程、或给品类绑制程。`)
-    }
-    await loadTasks(1)
-  } catch (e) {
-    ElMessage.error(errText(e))
-  } finally {
-    retrying.value = false
-  }
-}
 
 function errText(e: unknown) {
   const m = (e as { message?: string })?.message
@@ -1383,7 +1197,6 @@ async function submitReceiptReverse() {
 
 // ==================== 调度 ====================
 function reload() {
-  if (tab.value === 'tasks') return Promise.all([loadMirror(), loadTasks()])
   if (tab.value === 'board') return loadBoard()
   if (tab.value === 'reports') return loadReports()
   return loadReceipts()
@@ -1392,14 +1205,13 @@ function reload() {
 function onTabChange(name: string) {
   if (loadedTabs.value.has(name)) return
   loadedTabs.value.add(name)
-  if (name === 'tasks') { loadMirror(); loadTasks(1) }
-  else if (name === 'reports') loadReports(1)
+  if (name === 'reports') loadReports(1)
   else if (name === 'receipts') { loadWarehouses(); loadReceipts(1) }
 }
 
 onMounted(async () => {
-  loadedTabs.value.add('tasks')
-  await Promise.all([loadMirror(), loadTasks(1)])
+  loadedTabs.value.add('board')
+  await loadBoard(1)
   // 收货 tab 需要仓库下拉，先静默预取（无权限时静默降级为空列表）
   loadWarehouses()
 })
@@ -1407,20 +1219,6 @@ onMounted(async () => {
 
 <style scoped>
 .exec-page { display: grid; gap: var(--space-section-gap-wide, 16px); padding: var(--space-2xl, 24px); min-width: 0; }
-
-/* 氚云源台账 → 业务工单的接入条（双轨制的可视化） */
-.mirror-bar {
-  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
-  padding: 12px 16px; margin-bottom: 8px;
-  border: 1px solid var(--el-color-primary-light-7); border-radius: 10px;
-  background: var(--el-color-primary-light-9);
-}
-.mirror-bar__text { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; font-size: 13px; }
-.mirror-bar__stat { color: var(--el-text-color-regular); }
-.mirror-bar__stat b { color: var(--el-color-primary); font-variant-numeric: tabular-nums; }
-.mirror-bar__stat.is-warn b { color: var(--el-color-warning); }
-.mirror-bar__actions { display: flex; gap: 8px; }
-.mirror-bar__note { margin: 0 0 4px; font-size: 12px; color: var(--el-text-color-secondary); line-height: 1.7; }
 .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-lg-xl, 16px); flex-wrap: wrap; }
 .page-head h1 { margin: 2px 0 6px; font-size: 26px; line-height: 1.2; }
 .page-head p { margin: 0; color: var(--color-text-secondary, #5f6f82); }

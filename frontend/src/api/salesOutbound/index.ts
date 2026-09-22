@@ -11,41 +11,27 @@ import { http } from '../http'
 export interface SalesOutboundItem {
   id?: number
   lineNo?: number
-  /** 行类型：PRODUCT 商品 / FREIGHT 运费 / SERVICE 服务费（与氚云台账同名口径） */
-  lineType?: 'PRODUCT' | 'FREIGHT' | 'SERVICE'
-  externalId?: string | null
-  sourceCategory?: string | null
-  salesProductId?: number | null
-  canonicalProductId?: number | null
+  salesProductId: number
+  canonicalProductId?: number
   productCode?: string
   productName: string
   specification?: string
-  unit?: string | null
-  quantity?: number | null
+  unit: string
+  quantity: number
   unitPrice?: number | null
   amount?: number | null
   remark?: string
 }
 
-/**
- * 业务状态词表（V326）：
- * - 库存态（只属于 ERP 自建单）：DRAFT 草稿 → POSTED 已过账 → REVERSED 已冲销
- * - 非库存态（氚云镜像单如实带出的原状态）：CONFIRMED 已生效 / PROCESSING 进行中 / CANCELLED 已取消 / DRAFT 源草稿
- *   ⚠️ CONFIRMED/PROCESSING 不表示已过账、不影响库存——它们只说「这单在氚云里是什么状态」。
- *   词表与后端台账归一器（SalesOutboundSettlementService.normalizeOutboundStatus）同源，不另造词。
- */
-export type SalesOutboundStatus = 'DRAFT' | 'CONFIRMED' | 'PROCESSING' | 'CANCELLED' | 'POSTED' | 'REVERSED'
-
 export interface SalesOutbound {
   id: number
   outboundNo: string
-  status: SalesOutboundStatus
+  status: 'DRAFT' | 'POSTED' | 'REVERSED'
   customerId?: number | null
   customerName: string
   salespersonId?: number | null
   salespersonName?: string | null
-  /** 发货仓库；氚云镜像单有 2 张没填仓库 → 可能为 null */
-  warehouseId?: number | null
+  warehouseId: number
   warehouseName?: string
   salesOrderRef?: string | null
   outboundDate: string
@@ -59,35 +45,6 @@ export interface SalesOutbound {
   createdByName?: string | null
   createdAt: string
   itemCount?: number
-  // ---- 双轨制：来源与待补（H3YUN = 氚云镜像单；对自建单为 null）----
-  externalSource?: string | null
-  sourceOutboundNo?: string | null
-  sourceStatusRaw?: string | null
-  sourceWarehouseName?: string | null
-  sourceShipDate?: string | null
-  sourceSalesAmount?: number | null
-  sourceMirrorPending?: string | null
-}
-
-/** 氚云销售出库 → ERP 出库单的镜像进度。 */
-export interface H3SalesMirrorProgress {
-  sourceTotal: number
-  mirrored: number
-  remaining: number
-  pendingData: number
-  itemsMirrored: number
-}
-
-export interface H3SalesMirrorResult {
-  scanned: number
-  created: number
-  failed: number
-  pendingData: number
-  pendingSamples: string[]
-  errors: string[]
-  /** 本次顺带纠正为「氚云原状态」的历史镜像单条数（V324 时期一律落成了草稿） */
-  statusSynced: number
-  remaining: number
 }
 
 /** 可售库存行（canonical 口径）：业务员按「有没有货」选品。 */
@@ -161,14 +118,3 @@ export const postSalesOutbound = async (id: number, requestKey?: string) => {
 export const reverseSalesOutbound = async (id: number, reason: string, requestKey?: string) => {
   await http.post(`/sales-outbounds/${id}/reverse`, { reason }, idemConfig(requestKey))
 }
-
-// ============ 双轨制：氚云销售出库 → ERP 出库单 镜像 ============
-// 台账（sales_outbounds，只读）与业务单（erp_sales_outbounds，可写）是两套数据，
-// 镜像把它们接上：源数据一字不改，业务侧拿到可操作的单。
-
-export const fetchH3SalesMirrorProgress = async () =>
-  (await http.get<H3SalesMirrorProgress>('/sales-outbounds/mirror/h3-progress')).data
-
-/** limit=0 表示全部接入；已镜像的天然跳过，可反复调用。 */
-export const mirrorH3SalesOutbounds = async (limit = 0) =>
-  (await http.post<H3SalesMirrorResult>('/sales-outbounds/mirror/h3-orders', null, { params: { limit } })).data

@@ -13,36 +13,11 @@ public class ManufacturingController {
     private final ManufacturingService service;
     private final com.liqiang.archive.service.ManufacturingExecutionService execution;
     private final com.liqiang.archive.service.ManufacturingMaterialService materials;
-    private final com.liqiang.archive.service.H3ManufacturingMirrorService mirror;
     @GetMapping("/warehouses") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public List<Map<String,Object>> warehouses(){return service.warehouses();}
     /** 建单弹窗用：启用中的车间 + 默认制程（读权限即可，勿并入 /master/workshops——那是模板管理权限）。 */
     @GetMapping("/workshop-options") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public List<Map<String,Object>> workshopOptions(){return service.workshopOptions();}
-    /** 氚云生产任务单镜像进度：源工单总数 / 已镜像 / 未镜像 / 待补数据。 */
-    @GetMapping("/mirror/h3-progress") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.manage"})
-    public Map<String,Object> mirrorProgress(){return mirror.mirrorProgress();}
-    /**
-     * 把氚云生产任务单批量镜像成业务工单（双轨制的生产侧接线）。
-     *
-     * <p>只读源表 {@code production_orders}、只写业务表 {@code manufacturing_orders}，
-     * 源台账内容不动（仅回写反向指针）。可反复调用：已镜像的天然跳过。
-     * {@code limit=0} 表示本批不限量；失败明细随返回值带出，单张失败不影响其余。
-     */
-    @PostMapping("/mirror/h3-orders") @RequirePermission("manufacturing.manage")
-    public Map<String,Object> mirrorH3Orders(@RequestParam(defaultValue="0") int limit){return mirror.mirrorProductionOrders(limit);}
-
-    /**
-     * 补完制程配置后，给「已镜像但工序没展开」的工单重试展开工序。
-     *
-     * <p>必须单独一个端点：镜像的选取条件是「源表左连业务表、只取连不上的」，
-     * 已镜像的单永远不会被重扫 —— 没有这个入口，因缺配置而落 pending 的单就是死数据。
-     * 只补工序（不重建工单），且只碰还没有工序行的单。
-     */
-    @PostMapping("/mirror/h3-retry-pending") @RequirePermission("manufacturing.manage")
-    public Map<String,Object> retryPendingOperations(@RequestParam(defaultValue="0") int limit){
-        return mirror.retryPendingOperations(limit);
-    }
     /**
      * 建单弹窗用：产品选择器（P3 ①：产品身份必须从主数据里选，不再打名字）。
      * 读权限即可 —— 建单用户只有 manufacturing.manage，没有产品档案的管理权限。
