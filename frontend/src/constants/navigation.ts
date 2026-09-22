@@ -63,11 +63,27 @@ const primaryNavItems: NavItem[] = [
         group: 'h3'
       },
       {
+        to: '/manufacturing-execution',
+        permission: ['manufacturing.report', 'manufacturing.receive', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'],
+        label: '车间执行',
+        description: '车间接单与报工、仓库交付收货：工单 → 工序报工 → 完工入库，全程无自由文本。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M2 20h20"/><path d="M6 20V9l6-4 6 4v11"/><path d="M10 20v-5h4v5"/></svg>',
+        group: 'h3'
+      },
+      {
         to: '/production-followups',
         permission: ['manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'],
         label: '生产跟单',
         description: '按车间跟进已导入的生产任务，记录阶段日期、交期变化及跟进历史。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+        group: 'h3'
+      },
+      {
+        to: '/manufacturing-process-management',
+        permission: 'manufacturing.template.manage',
+        label: '制程与工序管理',
+        description: '维护工序模板、产线产品名称与可选配置（生产任务单的联动数据源）。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></svg>',
         group: 'h3'
       },
       {
