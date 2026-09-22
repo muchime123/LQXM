@@ -32,7 +32,9 @@ import static org.mockito.Mockito.*;
  *   <li><b>状态机与库存同生共死</b>：草稿不动库存；过账才扣；冲销回补；终态不可再过账；</li>
  *   <li><b>M0 契约</b>：{@code X-Request-Key} 重放复用首次结果、同键换内容报冲突、每次动作在
  *       {@code row_change_log} 留行且携带操作人与请求键；</li>
- *   <li><b>审计实体名隔离</b>：必须是 {@code ErpSalesOutbound}，不得写成氚云侧在用的 {@code SalesOutbound}。</li>
+ *   <li><b>审计单通道（方案 A）</b>：只写 {@code row_change_log}，身份 = {@code target_table}
+ *       （schema 限定表名，物理唯一）；不再写 {@code audit_logs} —— 后者以自由字符串 {@code entity_type}
+ *       作身份，两个模块对同名概念用同一个词就会静默撞名。</li>
  * </ol>
  *
  * <p><b>隔离边界</b>：只操作专用测试 schema {@code so_contract_test}（建/删由本测试自管），
@@ -64,7 +66,6 @@ class SalesOutboundContractMysqlTest {
 
     private JdbcTemplate jdbc;
     private DataSourceTransactionManager txm;
-    private AuditLogService audit;
     private SalesOutboundService service;
     private long warehouseId;
     private long h3ProductId;
@@ -132,11 +133,10 @@ class SalesOutboundContractMysqlTest {
                 "ALL", false, "COMPAT", null, null, Map.of()));
         // 数据范围过滤用 mock 置空：本测试只验证契约与落账，范围过滤另有归属
         var scope = mock(DataScopeSupport.class);
-        audit = mock(AuditLogService.class);
         var idem = new ErpIdempotencyService(jdbc, txm, "idem_request");
         var changeLog = new ErpChangeLogWriter(jdbc, new ObjectMapper(), "row_change_log");
         var actors = new ErpActorResolver(users);
-        service = new SalesOutboundService(jdbc, new ProductInventoryService(jdbc, users), users, scope, audit, idem,
+        service = new SalesOutboundService(jdbc, new ProductInventoryService(jdbc, users), users, scope, idem,
                 changeLog, actors);
 
         warehouseId = jdbc.queryForObject("SELECT id FROM warehouses WHERE warehouse_code='SO-CTL-WH'", Long.class);
@@ -242,11 +242,21 @@ class SalesOutboundContractMysqlTest {
                             + " WHERE JSON_EXTRACT(changed_fields,'$._serializationError') IS NOT NULL"),
                     "审计载荷不得静默降级为序列化失败摘要");
 
-            // ---- 8) 审计实体名隔离：不得占用氚云台账在用的 SalesOutbound ----
-            verify(audit, times(1)).log(eq("ErpSalesOutbound"), any(), any(), eq("CREATE"), anyString());
-            verify(audit, times(1)).log(eq("ErpSalesOutbound"), any(), any(), eq("POST"), anyString());
-            verify(audit, times(1)).log(eq("ErpSalesOutbound"), any(), any(), eq("REVERSE"), anyString());
-            verify(audit, never()).log(eq("SalesOutbound"), any(), any(), any(), any());
+            // ---- 8) 审计单通道（方案 A）：只写 row_change_log，身份 = schema 限定表名 ----
+            // 旧写法断言 audit.log("ErpSalesOutbound", …) 被调用 —— 那是「改名避让」时代的产物：
+            // 靠加前缀躲开与氚云台账在 SalesOutbound 这个实体名下的撞名。正解是不写那个通道，
+            // 身份改由 target_table 表达（表名物理唯一，撞不了）。
+            // 见 docs/审计实体身份治理与撞名防治-20260921.md
+            assertEquals(1, count("SELECT COUNT(DISTINCT target_table) FROM row_change_log"
+                            + " WHERE target_table LIKE '%erp_sales_outbounds'"),
+                    "出库单审计只能有一个身份（target_table = schema 限定表名）");
+            assertTrue(count("SELECT COUNT(*) FROM row_change_log"
+                            + " WHERE target_table='product_archive.erp_sales_outbounds'") >= 3,
+                    "建单 / 改单 / 过账 / 冲销各应留下一条审计");
+            assertTrue(count("SELECT COUNT(*) FROM row_change_log"
+                            + " WHERE target_table='product_archive.erp_sales_outbounds'"
+                            + " AND operator_id IS NOT NULL AND operator_id > 0") >= 3,
+                    "每条 ERP 审计必须带操作人（决策 #14：不接受可空操作人）");
         });
     }
 

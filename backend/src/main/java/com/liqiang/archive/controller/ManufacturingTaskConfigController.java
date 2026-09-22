@@ -1,7 +1,9 @@
 package com.liqiang.archive.controller;
 
+import com.liqiang.archive.erp.ErpActorResolver;
+import com.liqiang.archive.erp.ErpChangeLogWriter;
 import com.liqiang.archive.security.RequirePermission;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -9,13 +11,33 @@ import org.springframework.web.server.ResponseStatusException;
 import org.springframework.http.HttpStatus;
 import java.util.*;
 
+/**
+ * 制造域主数据维护（生产车间 / 任务单配置）。
+ *
+ * <p><b>本类不写 {@code audit_logs}</b>：审计身份走 {@code row_change_log.target_table}
+ * （schema 限定表名，物理唯一），不再依赖自由字符串 {@code entity_type}——
+ * 后者一个字段要同时表达「哪张表」和「什么业务对象」，两个模块对同名概念用同一个词就会撞。
+ * 见 {@code docs/审计实体身份治理与撞名防治-20260921.md}。
+ *
+ * <p>⚠️ 构造器必须显式书写并带 {@code @Qualifier("archiveAuditWriter")}：
+ * 容器里有 {@code archiveAuditWriter} / {@code erpAuditWriter} 两个同类型 bean，
+ * 靠 Lombok 生成构造器会丢掉 {@code @Qualifier}（默认不复制到构造参数）→ 注入歧义。
+ */
 @RestController
 @RequestMapping("/api/manufacturing/master")
 @RequirePermission("manufacturing.template.manage")
-@RequiredArgsConstructor
 public class ManufacturingTaskConfigController {
     private final JdbcTemplate jdbc;
-    private final com.liqiang.archive.service.AuditLogService audit;
+    private final ErpChangeLogWriter changeLog;
+    private final ErpActorResolver actors;
+
+    public ManufacturingTaskConfigController(JdbcTemplate jdbc,
+                                             @Qualifier("archiveAuditWriter") ErpChangeLogWriter changeLog,
+                                             ErpActorResolver actors) {
+        this.jdbc = jdbc;
+        this.changeLog = changeLog;
+        this.actors = actors;
+    }
 
     @GetMapping("/task-configs")
     public List<Map<String,Object>> list() {
@@ -42,7 +64,11 @@ public class ManufacturingTaskConfigController {
         jdbc.update("INSERT INTO manufacturing_workshops(external_source,external_id,workshop_name,enabled,order_receiver_name,warehouse_clerk_name) VALUES('MANUAL',?,?,?,?,?)",
                 externalId,name,request.enabled()==null||request.enabled(),clean(request.orderReceiverName()),clean(request.warehouseClerkName()));
         long id=jdbc.queryForObject("SELECT id FROM manufacturing_workshops WHERE external_source='MANUAL' AND external_id=?",Long.class,externalId);
-        audit.log("ManufacturingWorkshop",id,name,"CREATE","新增生产车间");
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_workshops",id,"INSERT",
+                ErpChangeLogWriter.changes("workshopName",name,"enabled",request.enabled(),
+                        "orderReceiverName",clean(request.orderReceiverName()),
+                        "warehouseClerkName",clean(request.warehouseClerkName())),
+                null,"新增生产车间",null,null));
         return id;
     }
 
@@ -59,7 +85,11 @@ public class ManufacturingTaskConfigController {
                 name,request.enabled()==null||request.enabled(),clean(request.orderReceiverName()),clean(request.warehouseClerkName()),id);
         jdbc.update("UPDATE manufacturing_task_config_items SET workshop_name=? WHERE workshop_id=?",name,id);
         jdbc.update("UPDATE manufacturing_process_templates SET workshop_type=? WHERE workshop_type=?",name,oldName);
-        audit.log("ManufacturingWorkshop",id,name,"UPDATE","维护生产车间主数据");
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_workshops",id,"UPDATE",
+                ErpChangeLogWriter.changes("workshopName",name,"oldWorkshopName",oldName,"enabled",request.enabled(),
+                        "orderReceiverName",clean(request.orderReceiverName()),
+                        "warehouseClerkName",clean(request.warehouseClerkName())),
+                null,"维护生产车间主数据",null,null));
     }
 
     @PutMapping("/workshops/{id}/default-template")
@@ -69,7 +99,9 @@ public class ManufacturingTaskConfigController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"请选择启用的制程模板");
         if(jdbc.update("UPDATE manufacturing_workshops SET default_process_template_id=? WHERE id=?",request.defaultProcessTemplateId(),id)==0)
             throw new ResponseStatusException(HttpStatus.NOT_FOUND,"车间不存在");
-        audit.log("ManufacturingWorkshop",id,String.valueOf(id),"UPDATE","修改车间默认制程="+request.defaultProcessTemplateId());
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_workshops",id,"UPDATE",
+                ErpChangeLogWriter.changes("defaultProcessTemplateId",request.defaultProcessTemplateId()),
+                null,"修改车间默认制程",null,null));
     }
 
     public record ConfigCreate(String configName, Long workshopId, String configType, Boolean active, Long processTemplateId) {}
@@ -92,7 +124,11 @@ public class ManufacturingTaskConfigController {
         jdbc.update("INSERT INTO manufacturing_task_config_items(external_source,external_id,config_name,workshop_name,workshop_id,config_type,active,process_template_id) VALUES('MANUAL',?,?,?,?,?,?,?)",
                 externalId,name,workshops.getFirst().get("workshop_name"),request.workshopId(),request.configType(),request.active()==null||request.active(),request.processTemplateId());
         long id=jdbc.queryForObject("SELECT id FROM manufacturing_task_config_items WHERE external_source='MANUAL' AND external_id=?",Long.class,externalId);
-        audit.log("ManufacturingTaskConfig",id,name,"CREATE","新增任务单配置");
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_task_config_items",id,"INSERT",
+                ErpChangeLogWriter.changes("configName",name,"workshopId",request.workshopId(),
+                        "configType",request.configType(),"active",request.active(),
+                        "processTemplateId",request.processTemplateId()),
+                null,"新增任务单配置",null,null));
         return id;
     }
 
@@ -109,7 +145,10 @@ public class ManufacturingTaskConfigController {
             validateTemplate(request.processTemplateId());
         }
         jdbc.update("UPDATE manufacturing_task_config_items SET config_name=?,active=?,process_template_id=? WHERE id=?",request.configName().trim(),request.active(),request.processTemplateId(),id);
-        audit.log("ManufacturingTaskConfig",id,request.configName().trim(),"UPDATE","维护任务单配置，制程="+request.processTemplateId()+"，启用="+request.active());
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_task_config_items",id,"UPDATE",
+                ErpChangeLogWriter.changes("configName",request.configName().trim(),"active",request.active(),
+                        "processTemplateId",request.processTemplateId()),
+                null,"维护任务单配置",null,null));
     }
 
     private void validateTemplate(Long id) {

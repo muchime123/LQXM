@@ -125,12 +125,11 @@ class ManufacturingExecutionContractMysqlTest {
                 "ALL", false, "COMPAT", null, null, Map.of()));
         // 数据范围过滤用 mock 置空：本测试只验证契约与落账，范围过滤另有归属。
         var scope = mock(DataScopeSupport.class);
-        var audit = mock(AuditLogService.class);
         var idem = new ErpIdempotencyService(jdbc, txm, "idem_request");
         var changeLog = new ErpChangeLogWriter(jdbc, new ObjectMapper(), "row_change_log");
         var actors = new ErpActorResolver(users);
-        execution = new ManufacturingExecutionService(jdbc, users, audit, idem, changeLog, actors);
-        manufacturing = new ManufacturingService(jdbc, new ProductInventoryService(jdbc, users), users, scope, audit,
+        execution = new ManufacturingExecutionService(jdbc, users, idem, changeLog, actors);
+        manufacturing = new ManufacturingService(jdbc, new ProductInventoryService(jdbc, users), users, scope,
                 execution, new ManufacturingTaskTemplateResolver(jdbc), idem, changeLog, actors);
     }
 
@@ -241,8 +240,9 @@ class ManufacturingExecutionContractMysqlTest {
             assertEquals(0, count("SELECT COUNT(*) FROM row_change_log"
                             + " WHERE JSON_EXTRACT(changed_fields,'$._serializationError') IS NOT NULL"),
                     "审计载荷不得静默降级为序列化失败摘要");
-            // 工单表被写 4 次：建单 INSERT + 展开工序 UPDATE + 收货 UPDATE + 冲销 UPDATE
-            assertEquals(4, count("SELECT COUNT(*) FROM row_change_log WHERE target_table='product_archive.manufacturing_orders'"),
+            // 工单表被写 5 次：建单 INSERT + 展开工序 UPDATE + 自动放行 UPDATE + 收货 UPDATE + 冲销 UPDATE
+            // （方案 A 之后补上了「自动放行」这条 —— 它原先只写 audit_logs，不在这本账里）
+            assertEquals(5, count("SELECT COUNT(*) FROM row_change_log WHERE target_table='product_archive.manufacturing_orders'"),
                     "工单的每一次状态/数量变更都必须留痕");
             assertNotNull(orderNo);
         });

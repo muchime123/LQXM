@@ -52,30 +52,25 @@ public class SalesOutboundService {
     private static final int MAX_LINES = 200;
 
     /**
-     * 操作审计的实体类型。
+     * <p><b>本类不写 {@code audit_logs}（勿加回 {@code AuditLogService}）</b>：
+     * 审计统一走 {@link ErpChangeLogWriter}，身份 = {@code target_table}
+     * （{@code product_archive.erp_sales_outbounds}，schema 限定表名 = 物理唯一）。
      *
-     * <p><b>必须带 {@code Erp} 前缀（勿改回 {@code SalesOutbound}）</b>：
-     * {@code SalesOutbound} 这个实体名早就被氚云侧的治理动作占用了
-     * （{@code OutboundRelationGovernanceService} 的产品归类/客户关联、
-     * {@code SalesOutboundNatureService} 的退换货类型确认），那些行的
-     * {@code entity_id} 是**氚云销售出库台账行 id**（量级 10 万+）。
-     * 本类是 ERP 自建单据，{@code entity_id} 是 {@code erp_sales_outbounds.id}（从 1 起）。
+     * <p>为什么不用 {@code audit_logs}：它的身份字段 {@code entity_type} 是**自由字符串**，
+     * 一个字段要同时表达「哪张表」和「什么业务对象」——两个模块对同名概念用同一个词就会撞，
+     * 且撞了**不报错**。2026-09-21 实测该表 48 个 {@code entity_type} 里确有真撞名：
+     * {@code SalesOutbound} 早被氚云侧治理动作占用（{@code H3_OUTBOUND_RELATION_AUTO} /
+     * {@code HISTORICAL_ORGANIZATION_ASSIGN}，660 行，{@code entity_id} 是台账行 id 量级 10 万+），
+     * 而 ERP 自建出库单的 id 从 1 起 → 同一实体名下两套 id 空间。
      *
-     * <p>若沿用同名，操作日志页按「实体类型 = SalesOutbound」筛选会同时命中
-     * 「氚云台账行的归类动作」和「ERP 出库单的建单/过账/冲销」，而 {@code entity_id}
-     * 在两套 id 空间里含义不同——审计时无法区分，且随着两套 id 增长存在数值撞车可能。
-     * 2026-09-21 端到端验证后清理残留时实测发现（当时库内 660 行是氚云侧、5 行是本次 ERP 单）。
-     *
-     * <p>命名规则：**ERP 自建单据 → {@code Erp*} 实体名 + {@code erp_*} 表名**，
-     * 与制造域 {@code Manufacturing*} 同款「领域前缀」写法。
+     * <p>当时靠改名为 {@code ErpSalesOutbound} 规避，但**改名只是治标**：根因是同一动作
+     * 写了两份审计（强身份 {@code row_change_log} + 弱身份 {@code audit_logs}）。
+     * 正解是**不写后者**。详见 {@code docs/审计实体身份治理与撞名防治-20260921.md}。
      */
-    private static final String AUDIT_ENTITY = "ErpSalesOutbound";
-
     private final JdbcTemplate jdbc;
     private final ProductInventoryService productInventory;
     private final CurrentUserService users;
     private final DataScopeSupport scope;
-    private final AuditLogService audit;
     private final ErpIdempotencyService idem;
     private final ErpChangeLogWriter changeLog;
     private final ErpActorResolver actors;
@@ -84,7 +79,6 @@ public class SalesOutboundService {
                                 ProductInventoryService productInventory,
                                 CurrentUserService users,
                                 DataScopeSupport scope,
-                                AuditLogService audit,
                                 @Qualifier("archiveIdempotencyService") ErpIdempotencyService idem,
                                 @Qualifier("archiveAuditWriter") ErpChangeLogWriter changeLog,
                                 ErpActorResolver actors) {
@@ -92,7 +86,6 @@ public class SalesOutboundService {
         this.productInventory = productInventory;
         this.users = users;
         this.scope = scope;
-        this.audit = audit;
         this.idem = idem;
         this.changeLog = changeLog;
         this.actors = actors;
@@ -264,8 +257,6 @@ public class SalesOutboundService {
         String no = "XSCK" + String.format("%08d", id);
         jdbc.update("UPDATE erp_sales_outbounds SET outbound_no=? WHERE id=?", no, id);
         writeLines(id, lines);
-        audit.log(AUDIT_ENTITY, id, no, "CREATE",
-                "创建销售出库单（草稿）；客户=" + customer + "；明细 " + lines.size() + " 行");
         changeLog.write(ErpChangeLogWriter.of(actor, "product_archive.erp_sales_outbounds", id, "INSERT",
                 ErpChangeLogWriter.changes("outboundNo", no, "status", "DRAFT", "customerNameSnapshot", customer,
                         "warehouseId", warehouseId, "outboundDate", date, "lineCount", lines.size(),
@@ -288,8 +279,6 @@ public class SalesOutboundService {
                 clean(request.remark()), totalOf(lines), id);
         jdbc.update("DELETE FROM erp_sales_outbound_items WHERE outbound_id=?", id);
         writeLines(id, lines);
-        audit.log(AUDIT_ENTITY, id, String.valueOf(head.get("outboundNo")), "UPDATE",
-                "修改销售出库单（草稿）；明细 " + lines.size() + " 行");
         changeLog.write(ErpChangeLogWriter.of(actor, "product_archive.erp_sales_outbounds", id, "UPDATE",
                 ErpChangeLogWriter.changes("status", "DRAFT", "customerNameSnapshot", customer,
                         "warehouseId", warehouseId, "outboundDate", date, "lineCount", lines.size(),
@@ -336,7 +325,6 @@ public class SalesOutboundService {
         }
         jdbc.update("UPDATE erp_sales_outbounds SET status='POSTED',posted_at=?,posted_by_employee_id=?,"
                 + "posted_by_name=? WHERE id=?", at, user.employeeId(), user.name(), id);
-        audit.log(AUDIT_ENTITY, id, no, "POST", "销售出库过账；仓库=" + warehouseName + "；明细 " + lines.size() + " 行");
         changeLog.write(ErpChangeLogWriter.of(actor, "product_archive.erp_sales_outbounds", id, "UPDATE",
                 ErpChangeLogWriter.changes("status", "DRAFT→POSTED", "postedAt", at, "warehouseId", warehouseId,
                         "lineCount", lines.size()),
@@ -366,7 +354,6 @@ public class SalesOutboundService {
         jdbc.update("UPDATE erp_sales_outbounds SET status='REVERSED',reversed_at=?,reversed_by_employee_id=?,"
                         + "reversed_by_name=?,reversal_reason=? WHERE id=?",
                 at, user.employeeId(), user.name(), r, id);
-        audit.log(AUDIT_ENTITY, id, no, "REVERSE", "销售出库冲销；原因=" + r);
         changeLog.write(ErpChangeLogWriter.of(actor, "product_archive.erp_sales_outbounds", id, "UPDATE",
                 ErpChangeLogWriter.changes("status", "POSTED→REVERSED", "reversalReason", r, "reversedAt", at),
                 "REVERSAL", r, requestKey, null));

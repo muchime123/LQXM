@@ -37,7 +37,6 @@ public class ManufacturingService {
     private final ProductInventoryService productInventory;
     private final CurrentUserService users;
     private final DataScopeSupport scope;
-    private final AuditLogService audit;
     private final ManufacturingExecutionService execution;
     private final ManufacturingTaskTemplateResolver taskTemplateResolver;
     private final ErpIdempotencyService idem;
@@ -48,7 +47,6 @@ public class ManufacturingService {
                                 ProductInventoryService productInventory,
                                 CurrentUserService users,
                                 DataScopeSupport scope,
-                                AuditLogService audit,
                                 ManufacturingExecutionService execution,
                                 ManufacturingTaskTemplateResolver taskTemplateResolver,
                                 @Qualifier("archiveIdempotencyService") ErpIdempotencyService idem,
@@ -58,7 +56,6 @@ public class ManufacturingService {
         this.productInventory = productInventory;
         this.users = users;
         this.scope = scope;
-        this.audit = audit;
         this.execution = execution;
         this.taskTemplateResolver = taskTemplateResolver;
         this.idem = idem;
@@ -201,7 +198,6 @@ public class ManufacturingService {
         execution.doGenerateOperations(id,templateId,actor,requestKey);
         // 产线由下单选择决定，不能被制程模板上的历史车间标签覆盖。
         if(selection!=null) jdbc.update("UPDATE manufacturing_orders SET workshop_type=? WHERE id=?",selection.workshopName(),id);
-        audit.log("ManufacturingOrder",id,no,"CREATE","创建手工生产任务；类型="+taskType+"；计划数量="+request.plannedQuantity()+unit);
         changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_orders",id,"INSERT",
                 ErpChangeLogWriter.changes(
                         "orderNo",no,"taskType",taskType,"customerNameSnapshot",customer,
@@ -281,8 +277,6 @@ public class ManufacturingService {
         productInventory.post(request.warehouseId(),salesProductId,lotId,name,clean(request.specification()),String.valueOf(order.get("unit")),"PRODUCTION_RECEIPT",qty,"COMPLETION_RECEIPT",receiptId,receiptNo,at,clean(request.remark()));
         BigDecimal total=completed.add(qty);String status=total.compareTo(planned)==0?"COMPLETED":(operationCount!=null&&operationCount>0?"PARTIALLY_RECEIVED":"IN_PRODUCTION");
         jdbc.update("UPDATE manufacturing_orders SET completed_quantity=?,status=? WHERE id=?",total,status,orderId);
-        audit.log("ManufacturingOrder",orderId,String.valueOf(order.get("orderNo")),"COMPLETE_RECEIPT",
-                receiptNo+"生成成品批次"+lotNo+"；入库"+qty+order.get("unit")+"；实际单位成本="+unitCost);
         changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_completion_receipts",receiptId,"INSERT",
                 ErpChangeLogWriter.changes(
                         "receiptNo",receiptNo,"manufacturingOrderId",orderId,"warehouseId",request.warehouseId(),
@@ -424,8 +418,6 @@ public class ManufacturingService {
             newStatus="IN_PRODUCTION";
         }
         jdbc.update("UPDATE manufacturing_orders SET completed_quantity=?,status=? WHERE id=?",newCompleted,newStatus,orderId);
-        audit.log("ManufacturingOrder",orderId,String.valueOf(order.get("orderNo")),"RECEIPT_REVERSE",
-                "反入库"+receipt.get("receiptNo")+"；抵消"+qty+receipt.get("unit")+"；原因="+r);
         changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_completion_receipts",receiptId,"UPDATE",
                 ErpChangeLogWriter.changes(
                         "status","POSTED→REVERSED","reversalReason",r,"quantity",qty,

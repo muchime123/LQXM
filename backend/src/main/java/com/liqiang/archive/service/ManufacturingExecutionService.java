@@ -35,7 +35,6 @@ public class ManufacturingExecutionService {
 
     private final JdbcTemplate jdbc;
     private final CurrentUserService users;
-    private final AuditLogService audit;
     /** 主库绑定的幂等模板（制造域在主库；选错绑定会让 B15 静默失效）。 */
     private final ErpIdempotencyService idem;
     /** 主库绑定的行级审计写入器。 */
@@ -44,13 +43,11 @@ public class ManufacturingExecutionService {
 
     public ManufacturingExecutionService(JdbcTemplate jdbc,
                                          CurrentUserService users,
-                                         AuditLogService audit,
                                          @Qualifier("archiveIdempotencyService") ErpIdempotencyService idem,
                                          @Qualifier("archiveAuditWriter") ErpChangeLogWriter changeLog,
                                          ErpActorResolver actors) {
         this.jdbc = jdbc;
         this.users = users;
-        this.audit = audit;
         this.idem = idem;
         this.changeLog = changeLog;
         this.actors = actors;
@@ -109,18 +106,27 @@ public class ManufacturingExecutionService {
         int priority=request.priority()==null?100:request.priority();if(priority<0||priority>999)throw new IllegalArgumentException("推荐优先级应在0到999之间");
         Integer duplicate=jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_process_template_rules WHERE template_id=? AND product_model_id=? AND COALESCE(customization_mode,'')=COALESCE(?,'') AND id<>COALESCE(?,0)",Integer.class,templateId,request.productModelId(),mode,id);
         if(duplicate!=null&&duplicate>0)throw new IllegalArgumentException("该产品和订单方式已经配置过推荐规则");
+        boolean creating=(id==null);
         if(id==null){jdbc.update("INSERT INTO manufacturing_process_template_rules(template_id,product_model_id,customization_mode,priority,active,remark) VALUES(?,?,?,?,?,?)",templateId,request.productModelId(),mode,priority,request.active(),clean(request.remark()));id=jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class);}
         else{if(jdbc.update("UPDATE manufacturing_process_template_rules SET product_model_id=?,customization_mode=?,priority=?,active=?,remark=? WHERE id=? AND template_id=?",request.productModelId(),mode,priority,request.active(),clean(request.remark()),id,templateId)!=1)throw new IllegalArgumentException("推荐规则不存在");}
-        audit.log("ManufacturingTemplateRule",id,String.valueOf(templateId),"SAVE","维护产品制程推荐规则");return id;
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_process_template_rules",id,
+                creating?"INSERT":"UPDATE",
+                ErpChangeLogWriter.changes("templateId",templateId,"productModelId",request.productModelId(),
+                        "customizationMode",mode,"priority",priority,"active",request.active(),
+                        "remark",clean(request.remark())),
+                null,"维护产品制程推荐规则",null,null));
+        return id;
     }
     @Transactional public void deleteTemplateRule(long templateId,long id){
         if(jdbc.update("DELETE FROM manufacturing_process_template_rules WHERE id=? AND template_id=?",id,templateId)!=1)throw new IllegalArgumentException("推荐规则不存在");
-        audit.log("ManufacturingTemplateRule",id,String.valueOf(templateId),"DELETE","删除产品制程推荐规则");
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_process_template_rules",id,"DELETE",
+                ErpChangeLogWriter.changes("templateId",templateId),null,"删除产品制程推荐规则",null,null));
     }
 
     @Transactional public long saveOperation(Long id,OperationMasterRequest request){
         String code=masterCode(request.operationCode()),name=requiredText(request.operationName(),"工序名称"),category=requiredText(request.operationCategory(),"工序分类");
         if(request.standardHours()!=null&&request.standardHours().signum()<0)throw new IllegalArgumentException("标准工时不能小于0");int sort=request.sortOrder()==null?0:request.sortOrder();
+        boolean creating=(id==null);
         if(id==null){jdbc.update("INSERT INTO manufacturing_operations(operation_code,operation_name,operation_category,default_workshop,standard_hours,reporting_unit,requires_inspection,description,active,sort_order) VALUES(?,?,?,?,?,?,?,?,?,?)",code,name,category,clean(request.defaultWorkshop()),request.standardHours(),clean(request.reportingUnit()),request.requiresInspection(),clean(request.description()),request.active(),sort);id=jdbc.queryForObject("SELECT id FROM manufacturing_operations WHERE operation_code=?",Long.class,code);}
         else{
             String existingCode=jdbc.queryForList("SELECT operation_code FROM manufacturing_operations WHERE id=?",String.class,id).stream().findFirst().orElseThrow(()->new IllegalArgumentException("工序不存在"));
@@ -131,11 +137,19 @@ public class ManufacturingExecutionService {
             }
             jdbc.update("UPDATE manufacturing_operations SET operation_name=?,operation_category=?,default_workshop=?,standard_hours=?,reporting_unit=?,requires_inspection=?,description=?,active=?,sort_order=? WHERE id=?",name,category,clean(request.defaultWorkshop()),request.standardHours(),clean(request.reportingUnit()),request.requiresInspection(),clean(request.description()),request.active(),sort,id);
         }
-        audit.log("ManufacturingOperation",id,code,"SAVE_MASTER","维护工序“"+name+"”");return id;
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_operations",id,
+                creating?"INSERT":"UPDATE",
+                ErpChangeLogWriter.changes("operationCode",code,"operationName",name,"operationCategory",category,
+                        "defaultWorkshop",clean(request.defaultWorkshop()),"standardHours",request.standardHours(),
+                        "reportingUnit",clean(request.reportingUnit()),"requiresInspection",request.requiresInspection(),
+                        "active",request.active()),
+                null,"维护工序主数据",null,null));
+        return id;
     }
 
     @Transactional public long saveTemplate(Long id,TemplateMasterRequest request){
         String code=masterCode(request.templateCode()),name=requiredText(request.templateName(),"模板名称");
+        boolean creating=(id==null);
         if(id==null){jdbc.update("INSERT INTO manufacturing_process_templates(template_code,template_name,workshop_type,applicable_product_keyword,description,active) VALUES(?,?,?,?,?,?)",code,name,clean(request.workshopType()),clean(request.applicableProductKeyword()),clean(request.description()),request.active());id=jdbc.queryForObject("SELECT id FROM manufacturing_process_templates WHERE template_code=?",Long.class,code);}
         else{
             String existingCode=jdbc.queryForList("SELECT template_code FROM manufacturing_process_templates WHERE id=?",String.class,id).stream().findFirst().orElseThrow(()->new IllegalArgumentException("制程模板不存在"));
@@ -155,7 +169,14 @@ public class ManufacturingExecutionService {
             if(jdbc.update("UPDATE manufacturing_workshops SET default_process_template_id=? WHERE workshop_name=? AND enabled=1",id,workshop)==0)
                 throw new IllegalArgumentException("所选车间不存在或已停用");
         }
-        audit.log("ManufacturingProcessTemplate",id,code,"SAVE_MASTER","维护制程模板“"+name+"”；车间默认="+request.defaultForWorkshop());return id;
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_process_templates",id,
+                creating?"INSERT":"UPDATE",
+                ErpChangeLogWriter.changes("templateCode",code,"templateName",name,
+                        "workshopType",clean(request.workshopType()),
+                        "applicableProductKeyword",clean(request.applicableProductKeyword()),
+                        "active",request.active(),"defaultForWorkshop",request.defaultForWorkshop()),
+                null,"维护制程模板",null,null));
+        return id;
     }
 
     @Transactional public void replaceTemplateOperations(long id,List<TemplateOperationRequest> rows){
@@ -163,7 +184,10 @@ public class ManufacturingExecutionService {
         var ids=new HashSet<Long>();int finals=0;for(var x:rows){if(x.operationId()==null||!ids.add(x.operationId()))throw new IllegalArgumentException("模板中存在重复或无效工序");if(x.requirementCoefficient()==null||x.requirementCoefficient().signum()<=0)throw new IllegalArgumentException("工序数量系数必须大于0");if(x.finalOperation())finals++;}
         if(finals!=1)throw new IllegalArgumentException("制程模板必须且只能设置一道最终工序");Integer valid=jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_operations WHERE id IN ("+String.join(",",Collections.nCopies(ids.size(),"?"))+") AND active=1",Integer.class,ids.toArray());if(valid==null||valid!=ids.size())throw new IllegalArgumentException("模板包含不存在或已停用的工序");
         jdbc.update("DELETE FROM manufacturing_process_template_operations WHERE template_id=?",id);int sequence=1;for(var x:rows)jdbc.update("INSERT INTO manufacturing_process_template_operations(template_id,operation_id,sequence_no,requirement_coefficient,required,is_final,allow_parallel,remark) VALUES(?,?,?,?,?,?,?,?)",id,x.operationId(),sequence++,x.requirementCoefficient(),x.required(),x.finalOperation(),x.allowParallel(),clean(x.remark()));
-        jdbc.update("UPDATE manufacturing_process_templates SET version=version+1 WHERE id=?",id);audit.log("ManufacturingProcessTemplate",id,String.valueOf(template.get("template_code")),"REPLACE_OPERATIONS","更新模板工序，共"+rows.size()+"道");
+        jdbc.update("UPDATE manufacturing_process_templates SET version=version+1 WHERE id=?",id);
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_process_templates",id,"UPDATE",
+                ErpChangeLogWriter.changes("templateCode",template.get("template_code"),"operationCount",rows.size()),
+                null,"更新模板工序（整组替换）",null,null));
     }
 
     public List<Map<String,Object>> operations(long orderId) {
@@ -248,7 +272,13 @@ public class ManufacturingExecutionService {
             UPDATE manufacturing_orders SET priority=?,planned_start_date=?,planned_finish_date=?,production_team_name=?,
               responsible_employee_id=?,responsible_employee_name=? WHERE id=?
             """,priority,request.plannedStartDate(),request.plannedFinishDate(),clean(request.productionTeamName()),request.responsibleEmployeeId(),employeeName,orderId);
-        audit.log("ManufacturingOrder",orderId,String.valueOf(order.get("order_no")),"SCHEDULE","优先级="+priority+"；班组="+clean(request.productionTeamName())+"；负责人="+employeeName);
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_orders",orderId,"UPDATE",
+                ErpChangeLogWriter.changes("priority",priority,"plannedStartDate",request.plannedStartDate(),
+                        "plannedFinishDate",request.plannedFinishDate(),
+                        "productionTeamName",clean(request.productionTeamName()),
+                        "responsibleEmployeeId",request.responsibleEmployeeId(),
+                        "responsibleEmployeeName",employeeName),
+                null,"排产",null,null));
     }
 
     @Transactional
@@ -261,7 +291,10 @@ public class ManufacturingExecutionService {
         String employeeName=employeeName(request.assignedEmployeeId());
         jdbc.update("UPDATE manufacturing_order_operations SET assigned_team_name=?,assigned_employee_id=?,assigned_employee_name=? WHERE id=?",
                 clean(request.assignedTeamName()),request.assignedEmployeeId(),employeeName,operationId);
-        audit.log("ManufacturingOrderOperation",operationId,String.valueOf(operation.get("operationNameSnapshot")),"ASSIGN","班组="+clean(request.assignedTeamName())+"；负责人="+employeeName);
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_order_operations",operationId,"UPDATE",
+                ErpChangeLogWriter.changes("assignedTeamName",clean(request.assignedTeamName()),
+                        "assignedEmployeeId",request.assignedEmployeeId(),"assignedEmployeeName",employeeName),
+                null,"指派工序负责人",null,null));
     }
 
     @Transactional
@@ -278,7 +311,13 @@ public class ManufacturingExecutionService {
             """,tmp,orderId,request.operationId(),type,severity,description,user.employeeId(),user.name());
         long id=jdbc.queryForObject("SELECT id FROM manufacturing_issues WHERE issue_no=?",Long.class,tmp);String no="MI"+String.format("%08d",id);jdbc.update("UPDATE manufacturing_issues SET issue_no=? WHERE id=?",no,id);
         if(request.operationId()!=null)jdbc.update("UPDATE manufacturing_order_operations SET status='BLOCKED' WHERE id=? AND status IN ('READY','IN_PROGRESS')",request.operationId());
-        audit.log("ManufacturingIssue",id,no,"REPORT",type+"；"+description);return id;
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_issues",id,"INSERT",
+                ErpChangeLogWriter.changes("issueNo",no,"manufacturingOrderId",orderId,
+                        "manufacturingOrderOperationId",request.operationId(),"issueType",type,
+                        "severity",severity,"description",description,
+                        "reporterEmployeeId",user.employeeId()),
+                null,"上报生产异常",null,null));
+        return id;
     }
 
     @Transactional
@@ -292,7 +331,10 @@ public class ManufacturingExecutionService {
             Integer open=jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_issues WHERE manufacturing_order_operation_id=? AND status='OPEN'",Integer.class,operationId);
             if(open!=null&&open==0)jdbc.update("UPDATE manufacturing_order_operations SET status=CASE WHEN reported_quantity>0 THEN 'IN_PROGRESS' ELSE 'READY' END WHERE id=? AND status='BLOCKED'",operationId);
         }
-        audit.log("ManufacturingIssue",issueId,String.valueOf(issue.get("issueNo")),"RESOLVE",resolution);
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_issues",issueId,"UPDATE",
+                ErpChangeLogWriter.changes("issueNo",issue.get("issueNo"),"status","OPEN→RESOLVED",
+                        "resolverEmployeeId",user.employeeId(),"resolution",resolution),
+                null,"处理生产异常",null,null));
     }
 
     public Map<String,Object> executionBoard(String keyword,String workshop,String state,int page,int size) {
@@ -460,7 +502,6 @@ public class ManufacturingExecutionService {
         boolean needInspection=needsInspection(orderId);
         jdbc.update("UPDATE manufacturing_orders SET process_template_id=?,process_template_name_snapshot=?,workshop_type=?,inspection_status=?,status='RELEASED' WHERE id=?",
                 templateId,template.get("name"),template.get("workshop"),needInspection?"PENDING":"NOT_REQUIRED",orderId);
-        audit.log("ManufacturingOrder",orderId,String.valueOf(order.get("order_no")),"GENERATE_OPERATIONS","按模板“"+template.get("name")+"”生成"+rows.size()+"道任务工序"+(needInspection?"（含人工检验工序）":"（无人工检验工序，完工后自动确认）"));
         changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_orders",orderId,"UPDATE",
                 ErpChangeLogWriter.changes(
                         "processTemplateId",templateId,"processTemplateNameSnapshot",template.get("name"),
@@ -511,8 +552,7 @@ public class ManufacturingExecutionService {
                 clean(request.overproductionReason()),clean(request.remark()));
         long id=jdbc.queryForObject("SELECT id FROM manufacturing_work_reports WHERE report_no=?",Long.class,temp);
         String no="WR"+String.format("%08d",id);jdbc.update("UPDATE manufacturing_work_reports SET report_no=? WHERE id=?",no,id);
-        recalculate(orderId,operationId);
-        audit.log("ManufacturingWorkReport",id,no,"CREATE","工序“"+operation.get("operationNameSnapshot")+"”报工"+request.quantity());
+        recalculate(orderId,operationId,requestKey);
         changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_work_reports",id,"INSERT",
                 ErpChangeLogWriter.changes(
                         "reportNo",no,"manufacturingOrderId",orderId,"manufacturingOrderOperationId",operationId,
@@ -552,8 +592,7 @@ public class ManufacturingExecutionService {
             """,Integer.class,operationId,orderId);
         if(laterReports!=null&&laterReports>0)throw new IllegalStateException("后续工序已经报工，请先冲正后续工序记录");
         jdbc.update("UPDATE manufacturing_work_reports SET status='REVERSED',reversal_reason=? WHERE id=?",reason,reportId);
-        recalculate(orderId,operationId);
-        audit.log("ManufacturingWorkReport",reportId,String.valueOf(report.get("reportNo")),"REVERSE",reason);
+        recalculate(orderId,operationId,requestKey);
         changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_work_reports",reportId,"UPDATE",
                 ErpChangeLogWriter.changes(
                         "status","VALID→REVERSED","reversalReason",reason,
@@ -611,7 +650,6 @@ public class ManufacturingExecutionService {
             String rt="PENDING-"+UUID.randomUUID();jdbc.update("INSERT INTO manufacturing_reworks(rework_no,manufacturing_order_id,inspection_id,return_operation_id,rework_round,requirement,created_by_employee_id,created_by_name) VALUES(?,?,?,?,?,?,?,?)",rt,orderId,id,request.returnOperationId(),round,requirement,user.employeeId(),user.name());
             long reworkId=jdbc.queryForObject("SELECT id FROM manufacturing_reworks WHERE rework_no=?",Long.class,rt);jdbc.update("UPDATE manufacturing_reworks SET rework_no=? WHERE id=?","RW"+String.format("%08d",reworkId),reworkId);
         }
-        audit.log("ManufacturingInspection",id,no,"CREATE",result+"；合格="+qualified+"；不合格="+unqualified);
         changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_inspections",id,"INSERT",
                 ErpChangeLogWriter.changes(
                         "inspectionNo",no,"manufacturingOrderId",orderId,"inspectionResult",result,
@@ -621,7 +659,14 @@ public class ManufacturingExecutionService {
         return id;
     }
 
-    private void recalculate(long orderId,long operationId){
+    /**
+     * 重算工序与工单进度。
+     *
+     * @param requestKey 触发本次重算的请求键。自动放行是「报工」的副作用，审计行必须能凭
+     *                   同一个请求键与 {@code idem_request} 对账；传 null 会在审计账里
+     *                   留下「有幂等键、无对应审计」的断链（2026-09-21 契约测试实证）。
+     */
+    private void recalculate(long orderId,long operationId,String requestKey){
         var op=jdbc.queryForMap("SELECT required_quantity,sequence_no,execution_round FROM manufacturing_order_operations WHERE id=?",operationId);
         BigDecimal total=jdbc.queryForObject("SELECT COALESCE(SUM(reported_quantity),0) FROM manufacturing_work_reports WHERE manufacturing_order_operation_id=? AND execution_round=? AND status='VALID'",BigDecimal.class,operationId,op.get("execution_round"));
         BigDecimal required=(BigDecimal)op.get("required_quantity");boolean complete=total.compareTo(required)>=0;
@@ -634,13 +679,13 @@ public class ManufacturingExecutionService {
         if("REWORK".equals(curStatus)){
             if(allDone){
                 if(needInspection)jdbc.update("UPDATE manufacturing_orders SET status='PENDING_REINSPECTION' WHERE id=?",orderId);
-                else autoConfirmInspection(orderId,operationId);
+                else autoConfirmInspection(orderId,operationId,requestKey);
                 jdbc.update("UPDATE manufacturing_reworks SET status='COMPLETED',completed_at=NOW() WHERE manufacturing_order_id=? AND status='IN_PROGRESS'",orderId);
             }
         } else {
             if(!allDone)jdbc.update("UPDATE manufacturing_orders SET status='IN_PRODUCTION' WHERE id=? AND status IN ('RELEASED','SCHEDULED','PENDING_INSPECTION')",orderId);
             else if(needInspection)jdbc.update("UPDATE manufacturing_orders SET status='PENDING_INSPECTION',inspection_status='PENDING',production_completed_at=NOW() WHERE id=?",orderId);
-            else autoConfirmInspection(orderId,operationId);
+            else autoConfirmInspection(orderId,operationId,requestKey);
         }
     }
 
@@ -659,16 +704,19 @@ public class ManufacturingExecutionService {
      * 不写 manufacturing_inspections（未发生检验事实），inspection_at / inspection_by_* 保持 NULL，
      * 仅以 inspection_source='AUTO' 标记来源，页面与对外表述应为"末道工序已完成"。
      */
-    private void autoConfirmInspection(long orderId,long operationId){
+    private void autoConfirmInspection(long orderId,long operationId,String requestKey){
         int updated=jdbc.update("""
             UPDATE manufacturing_orders SET status='PENDING_RECEIPT',inspection_status='NOT_REQUIRED',
               inspection_source='AUTO',production_completed_at=NOW()
             WHERE id=? AND status IN ('RELEASED','SCHEDULED','IN_PRODUCTION','REWORK')
             """,orderId);
         if(updated==0)return;
-        String orderNo=jdbc.queryForObject("SELECT order_no FROM manufacturing_orders WHERE id=?",String.class,orderId);
         String operationName=jdbc.queryForObject("SELECT operation_name_snapshot FROM manufacturing_order_operations WHERE id=?",String.class,operationId);
-        audit.log("ManufacturingOrder",orderId,orderNo,"AUTO_CONFIRM","工序“"+operationName+"”报工完成；本单无人工检验工序，按工序政策自动确认放行至待入库（未执行人工检验）");
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_orders",orderId,"UPDATE",
+                ErpChangeLogWriter.changes("status","→PENDING_RECEIPT","inspectionStatus","NOT_REQUIRED",
+                        "inspectionSource","AUTO","autoConfirmedOperationName",operationName,
+                        "note","本单无人工检验工序，按工序政策自动确认放行（未执行人工检验）"),
+                null,"末道工序报工完成，自动确认放行",requestKey,null));
     }
 
     private Map<String,Object> row(java.sql.ResultSet r)throws java.sql.SQLException{var m=new LinkedHashMap<String,Object>();ResultSetMetaData md=r.getMetaData();for(int i=1;i<=md.getColumnCount();i++){Object v=r.getObject(i);if(v instanceof java.sql.Date d)v=d.toLocalDate();else if(v instanceof java.sql.Timestamp t)v=t.toLocalDateTime();m.put(camel(md.getColumnLabel(i)),v);}return m;}

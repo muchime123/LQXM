@@ -59,7 +59,6 @@ class ManufacturingInspectionGateMysqlTest {
     private static JdbcTemplate jdbc;
 
     private ManufacturingExecutionService execution;
-    private AuditLogService audit;
     private DataSourceTransactionManager txm;
 
     @BeforeAll
@@ -98,12 +97,11 @@ class ManufacturingInspectionGateMysqlTest {
         var source = new SingleConnectionDataSource(conn, true);
         jdbc = new JdbcTemplate(source);
         txm = new DataSourceTransactionManager(source);
-        audit = mock(AuditLogService.class);
         var users = mock(CurrentUserService.class);
         when(users.current()).thenReturn(new CurrentUserService.CurrentUser(
                 23L, "李强", "生产部", Set.of(), Set.of("manufacturing.report", "manufacturing.inspect"),
                 "ALL", false, "COMPAT", null, null, Map.of()));
-        execution = new ManufacturingExecutionService(jdbc, users, audit,
+        execution = new ManufacturingExecutionService(jdbc, users,
                 new ErpIdempotencyService(jdbc, txm),
                 new ErpChangeLogWriter(jdbc, new ObjectMapper()),
                 new ErpActorResolver(users));
@@ -129,7 +127,8 @@ class ManufacturingInspectionGateMysqlTest {
 
             assertEquals(0, count("SELECT COUNT(*) FROM manufacturing_inspections"),
                     "未发生检验事实，不得写入检验记录表");
-            verify(audit).log(eq("ManufacturingOrder"), eq(orderId), anyString(), eq("AUTO_CONFIRM"), contains("未执行人工检验"));
+            assertTrue(hasAutoConfirmAudit(orderId),
+                    "自动确认必须留下可追溯审计（row_change_log，方案 A）：" + changeLogsOf(orderId));
         });
     }
 
@@ -147,7 +146,7 @@ class ManufacturingInspectionGateMysqlTest {
             assertEquals("PENDING_INSPECTION", pending.get("status"), "存在检验工序时应维持既有闸门");
             assertEquals("PENDING", pending.get("inspection_status"));
             assertNull(pending.get("inspection_source"), "尚未检验，来源应为空");
-            verify(audit, never()).log(anyString(), anyLong(), anyString(), eq("AUTO_CONFIRM"), anyString());
+            assertFalse(hasAutoConfirmAudit(orderId), "不该产生自动确认审计：" + changeLogsOf(orderId));
 
             execution.inspect(orderId, new ManufacturingExecutionService.InspectionRequest(
                     "PASSED", new BigDecimal("10"), BigDecimal.ZERO, null, "人工确认", null, null),
@@ -174,7 +173,7 @@ class ManufacturingInspectionGateMysqlTest {
             Map<String, Object> order = orderRow(orderId);
             assertEquals("IN_PRODUCTION", order.get("status"), "还有工序未完成时不能进入入库环节");
             assertNull(order.get("inspection_source"));
-            verify(audit, never()).log(anyString(), anyLong(), anyString(), eq("AUTO_CONFIRM"), anyString());
+            assertFalse(hasAutoConfirmAudit(orderId), "不该产生自动确认审计：" + changeLogsOf(orderId));
         });
     }
 
@@ -302,5 +301,36 @@ class ManufacturingInspectionGateMysqlTest {
     private int count(String sql) {
         Integer value = jdbc.queryForObject(sql, Integer.class);
         return value == null ? -1 : value;
+    }
+
+    // ---------- 审计单通道（方案 A）辅助：不再断言 audit_logs，改查 row_change_log ----------
+
+    /**
+     * 某工单在 {@code row_change_log} 里的变更行。
+     *
+     * <p>审计身份取 {@code target_table}（schema 限定表名，物理唯一），不是自由字符串
+     * {@code entity_type} —— 后者会让两个模块对同名概念用同一个词时**静默撞名**
+     * （见 {@code docs/审计实体身份治理与撞名防治-20260921.md}）。
+     * {@code changed_fields} 是 json 列，显式 CAST 成文本再断言，避免驱动按二进制返回。
+     */
+    private List<Map<String, Object>> changeLogsOf(long orderId) {
+        return jdbc.queryForList(
+                "SELECT action, CAST(changed_fields AS CHAR) AS changed_fields, change_reason"
+                        + " FROM row_change_log"
+                        + " WHERE target_table='product_archive.manufacturing_orders' AND target_id=?",
+                orderId);
+    }
+
+    /**
+     * 是否留下了「无检验工序自动确认放行」的审计（识别标志 = {@code inspectionSource=AUTO}）。
+     *
+     * <p>先压掉全部空白再比对：{@code changed_fields} 是 json 列，序列化时键值之间带空格
+     * （{@code "inspectionSource": "AUTO"}），按紧凑写法 {@code contains} 会**假失败**
+     * （2026-09-21 实证）。
+     */
+    private boolean hasAutoConfirmAudit(long orderId) {
+        return changeLogsOf(orderId).stream().anyMatch(row ->
+                String.valueOf(row.get("changed_fields")).replaceAll("\\s+", "")
+                        .contains("\"inspectionSource\":\"AUTO\""));
     }
 }
