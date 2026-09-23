@@ -79,6 +79,7 @@
               <el-select v-model="selectedWorkshop" clearable placeholder="全部车间" class="workshop-filter" @change="currentTemplate=null">
                 <el-option v-for="w in workshopRows.filter(item=>item.enabled)" :key="w.id" :label="w.workshopName" :value="w.workshopName" />
               </el-select>
+              <el-switch v-model="tplOnlyActive" inline-prompt active-text="在用" inactive-text="全部" class="active-switch" />
               <el-button :icon="Refresh" @click="loadTemplates">刷新</el-button>
             </div>
             <el-alert title="车间默认制程在模板侧设置。产品没有专属制程时，生产任务自动使用对应车间的默认模板。" type="info" :closable="false" class="kw-alert" />
@@ -335,7 +336,7 @@ const operationDrawerOpen=ref(false)
 // ============ 工序主数据 ============
 const opKeyword = ref('')
 const opCategoryFilter = ref('')
-const opActiveFilter = ref<boolean | ''>('')
+const opActiveFilter = ref<boolean | ''>(true)
 const opLoading = ref(false)
 const operations = ref<OperationMaster[]>([])
 
@@ -401,7 +402,13 @@ async function toggleOp(row: OperationMaster) {
 const tplLoading = ref(false)
 const templates = ref<ProcessTemplateMaster[]>([])
 const selectedWorkshop=ref('')
-const filteredTemplates=computed(()=>selectedWorkshop.value?templates.value.filter(t=>t.workshopType===selectedWorkshop.value):templates.value)
+/** 默认只看在用：按氚云对齐后库里保留了停用的旧制程（同名的「半自动气调机」等），
+ *  混在一起显示会出现两条同名模板、看起来像脏数据。切到「全部」可审计停用项。 */
+const tplOnlyActive=ref(true)
+const filteredTemplates=computed(()=>{
+  const base=selectedWorkshop.value?templates.value.filter(t=>t.workshopType===selectedWorkshop.value):templates.value
+  return tplOnlyActive.value?base.filter(t=>t.active):base
+})
 interface WorkshopRow { id:number; workshopName:string; enabled:boolean; defaultProcessTemplateId:number|null }
 const workshopRows=ref<WorkshopRow[]>([])
 const isWorkshopDefault=(templateId:number)=>workshopRows.value.some(w=>w.defaultProcessTemplateId===templateId)
@@ -581,6 +588,7 @@ await Promise.allSettled([loadOps(), loadTemplates()])
 .workspace-intro strong { font-size:18px; color:var(--color-text-heading, #0f172a); }
 .workspace-intro span { color:var(--color-text-secondary, #5f6f82); font-size:13px; }
 .workshop-filter { width:220px; }
+.active-switch { flex: none; }
 
 /* ============ 面板卡片 ============ */
 .panel { background: var(--color-surface, #fff); border: 1px solid var(--color-border, #e2e8f0); border-radius: var(--radius-2xl, 12px); padding: var(--space-xl-2xl, 20px); box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,0.04)); min-width: 0; }
