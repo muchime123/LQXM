@@ -363,6 +363,8 @@ public class ManufacturingExecutionService {
               m.task_type,m.salesperson_name_snapshot,m.status order_status,m.priority,m.planned_start_date,m.planned_finish_date,
               m.production_team_name,m.responsible_employee_id,m.responsible_employee_name,
               op.assigned_team_name,op.assigned_employee_id,op.assigned_employee_name,
+              (SELECT COUNT(*) FROM manufacturing_order_operations steps WHERE steps.manufacturing_order_id=m.id AND steps.required=1) required_operation_count,
+              (SELECT COUNT(*) FROM manufacturing_order_operations steps WHERE steps.manufacturing_order_id=m.id AND steps.required=1 AND steps.status='COMPLETED') completed_operation_count,
               (SELECT COUNT(*) FROM manufacturing_issues i WHERE i.manufacturing_order_operation_id=op.id AND i.status='OPEN') open_issue_count
             """+from+where+" ORDER BY FIELD(m.priority,'URGENT','HIGH','NORMAL','LOW'),CASE WHEN m.planned_finish_date IS NULL THEN 1 ELSE 0 END,m.planned_finish_date,CASE WHEN m.due_date IS NULL THEN 1 ELSE 0 END,m.due_date,m.id LIMIT ? OFFSET ?",
                 (r,n)->row(r),listParams.toArray());
@@ -499,15 +501,32 @@ public class ManufacturingExecutionService {
                 """,orderId,x.get("id"),x.get("operationId"),x.get("sequenceNo"),x.get("operationName"),coefficient,
                     planned.multiply(coefficient),x.get("required"),x.get("isFinal"),x.get("allowParallel"),i==0?"READY":"PENDING");
         }
-        boolean needInspection=needsInspection(orderId);
         jdbc.update("UPDATE manufacturing_orders SET process_template_id=?,process_template_name_snapshot=?,workshop_type=?,inspection_status=?,status='RELEASED' WHERE id=?",
-                templateId,template.get("name"),template.get("workshop"),needInspection?"PENDING":"NOT_REQUIRED",orderId);
+                templateId,template.get("name"),template.get("workshop"),"PENDING",orderId);
         changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_orders",orderId,"UPDATE",
                 ErpChangeLogWriter.changes(
                         "processTemplateId",templateId,"processTemplateNameSnapshot",template.get("name"),
                         "workshopType",template.get("workshop"),"operationCount",rows.size(),
-                        "inspectionStatus",needInspection?"PENDING":"NOT_REQUIRED","status","→RELEASED"),
+                        "inspectionStatus","PENDING","status","→RELEASED"),
                 null,"按制程模板展开工序",requestKey,null));
+    }
+
+    /**
+     * 无制程产线建单：不展开工序，直接进入人工完工检验。
+     *
+     * <p>对应氚云《产品零部件制程》里标「是否有制程=否」的产线（称重机车间）与「无需报工」制程 ——
+     * 无工序不等于免检；质检或跟单人员仍须核验并办理完工入库。
+     *
+     * <p>与 {@link #doGenerateOperations} 一致：**不加 {@code @Transactional}**，事务边界由调用方（建单）提供。
+     */
+    void markNoProcessOrder(long orderId, String workshopName, ErpActor actor, String requestKey) {
+        jdbc.update("UPDATE manufacturing_orders SET process_template_id=NULL,process_template_name_snapshot=NULL,"
+                +"workshop_type=?,inspection_status='PENDING',status='PENDING_INSPECTION',production_completed_at=NOW() WHERE id=?",workshopName,orderId);
+        changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_orders",orderId,"UPDATE",
+                ErpChangeLogWriter.changes(
+                        "processTemplateId",null,"workshopType",workshopName,"operationCount",0,
+                        "inspectionStatus","PENDING","status","→PENDING_INSPECTION（该产线无制程，免报工）"),
+                null,"该产线无制程，建单不展开工序，进入完工检验",requestKey,null));
     }
 
     /**
@@ -521,6 +540,7 @@ public class ManufacturingExecutionService {
         Map<String,Object> payload=ErpChangeLogWriter.changes(
                 "orderId",orderId,"operationId",operationId,
                 "quantity",request.quantity(),"reportedAt",request.reportedAt(),
+                "remark",clean(request.remark()),
                 "allowOverproduction",request.allowOverproduction(),
                 "overproductionReason",clean(request.overproductionReason()));
         return Long.parseLong(idem.execute(actor,requestKey,ACTION_WORK_REPORT,payload,
@@ -533,6 +553,8 @@ public class ManufacturingExecutionService {
      */
     private long doReport(long orderId,long operationId,WorkReportRequest request,ErpActor actor,String requestKey) {
         if(request.quantity()==null||request.quantity().signum()<=0||request.quantity().scale()>6) throw new IllegalArgumentException("报工数量必须大于0且最多6位小数");
+        if(request.reportedAt()!=null && request.reportedAt().isAfter(LocalDateTime.now())) throw new IllegalArgumentException("实际报工时间不能晚于当前时间");
+        if(request.remark()!=null && request.remark().length()>1000) throw new IllegalArgumentException("完成内容最多1000字");
         var operation=jdbc.query("SELECT * FROM manufacturing_order_operations WHERE id=? AND manufacturing_order_id=? FOR UPDATE",
                 (r,n)->row(r),operationId,orderId).stream().findFirst().orElseThrow(()->new IllegalArgumentException("任务工序不存在"));
         if(!Set.of("READY","IN_PROGRESS").contains(String.valueOf(operation.get("status")))) throw new IllegalStateException("当前工序尚不可报工或已经完成");
@@ -584,6 +606,9 @@ public class ManufacturingExecutionService {
         if(!"VALID".equals(report.get("status")))throw new IllegalStateException("该报工已冲正");
         long orderId=((Number)report.get("manufacturingOrderId")).longValue();
         long operationId=((Number)report.get("manufacturingOrderOperationId")).longValue();
+        Integer inspections=jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_inspections WHERE manufacturing_order_id=?",Integer.class,orderId);
+        if(inspections!=null&&inspections>0)
+            throw new IllegalStateException("该任务已有完工检验记录，不能直接冲正报工；请先处理检验及入库纠错");
         Integer laterReports=jdbc.queryForObject("""
             SELECT COUNT(*) FROM manufacturing_work_reports r
             JOIN manufacturing_order_operations current_op ON current_op.id=?
@@ -603,9 +628,7 @@ public class ManufacturingExecutionService {
     /**
      * 人工检验（M0 契约写动作：幂等 + 行级审计）。
      *
-     * <p>当前 14 道工序 {@code requires_inspection} 全 = 0，故本路径在生产上**不会被触发**
-     * （决策登记 #16：无检验岗，末道工序报工即自动放行，且自动放行**不写本表**）。
-     * 仍然接线，是因为「有岗位时切回来」只需要把开关置 1，届时不能再走无键直通。
+     * <p>全部必做工序完成后必须由质检或跟单人员提交；检验合格与入库由上层合并为一个事务。
      */
     public long inspect(long orderId,InspectionRequest request,String requestKey) {
         ErpActor actor=actors.current();
@@ -674,49 +697,25 @@ public class ManufacturingExecutionService {
         if(complete)jdbc.update("UPDATE manufacturing_order_operations SET status='READY' WHERE manufacturing_order_id=? AND sequence_no>? AND status='PENDING' ORDER BY sequence_no LIMIT 1",orderId,op.get("sequence_no"));
         else jdbc.update("UPDATE manufacturing_order_operations SET status='PENDING' WHERE manufacturing_order_id=? AND sequence_no>? AND status='READY'",orderId,op.get("sequence_no"));
         Integer remaining=jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_order_operations WHERE manufacturing_order_id=? AND required=1 AND status<>'COMPLETED'",Integer.class,orderId);
-        boolean allDone=remaining!=null&&remaining==0,needInspection=allDone&&needsInspection(orderId);
+        boolean allDone=remaining!=null&&remaining==0;
         String curStatus=jdbc.queryForObject("SELECT status FROM manufacturing_orders WHERE id=?",String.class,orderId);
         if("REWORK".equals(curStatus)){
             if(allDone){
-                if(needInspection)jdbc.update("UPDATE manufacturing_orders SET status='PENDING_REINSPECTION' WHERE id=?",orderId);
-                else autoConfirmInspection(orderId,operationId,requestKey);
+                jdbc.update("UPDATE manufacturing_orders SET status='PENDING_REINSPECTION',inspection_status='PENDING',production_completed_at=NOW() WHERE id=?",orderId);
                 jdbc.update("UPDATE manufacturing_reworks SET status='COMPLETED',completed_at=NOW() WHERE manufacturing_order_id=? AND status='IN_PROGRESS'",orderId);
+                changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_orders",orderId,"UPDATE",
+                        ErpChangeLogWriter.changes("status","REWORK→PENDING_REINSPECTION","inspectionStatus","PENDING"),
+                        null,"返工工序全部完成，待复检",requestKey,null));
             }
         } else {
             if(!allDone)jdbc.update("UPDATE manufacturing_orders SET status='IN_PRODUCTION' WHERE id=? AND status IN ('RELEASED','SCHEDULED','PENDING_INSPECTION')",orderId);
-            else if(needInspection)jdbc.update("UPDATE manufacturing_orders SET status='PENDING_INSPECTION',inspection_status='PENDING',production_completed_at=NOW() WHERE id=?",orderId);
-            else autoConfirmInspection(orderId,operationId,requestKey);
+            else if(!"PENDING_INSPECTION".equals(curStatus)){
+                jdbc.update("UPDATE manufacturing_orders SET status='PENDING_INSPECTION',inspection_status='PENDING',production_completed_at=NOW() WHERE id=?",orderId);
+                changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_orders",orderId,"UPDATE",
+                        ErpChangeLogWriter.changes("status",curStatus+"→PENDING_INSPECTION","inspectionStatus","PENDING"),
+                        null,"全部必做工序完成，待人工检验",requestKey,null));
+            }
         }
-    }
-
-    /** 工单是否存在"需要人工检验"的工序：由 manufacturing_operations.requires_inspection 单点控制（复用既有列，当前 14 道工序全为 0）。 */
-    private boolean needsInspection(long orderId){
-        Integer count=jdbc.queryForObject("""
-            SELECT COUNT(*) FROM manufacturing_order_operations o
-            JOIN manufacturing_operations m ON m.id=o.operation_id
-            WHERE o.manufacturing_order_id=? AND o.required=1 AND m.requires_inspection=1
-            """,Integer.class,orderId);
-        return count!=null&&count>0;
-    }
-
-    /**
-     * 无人工检验工序时的自动确认放行。口径：自动确认 ≠ 检验合格 ——
-     * 不写 manufacturing_inspections（未发生检验事实），inspection_at / inspection_by_* 保持 NULL，
-     * 仅以 inspection_source='AUTO' 标记来源，页面与对外表述应为"末道工序已完成"。
-     */
-    private void autoConfirmInspection(long orderId,long operationId,String requestKey){
-        int updated=jdbc.update("""
-            UPDATE manufacturing_orders SET status='PENDING_RECEIPT',inspection_status='NOT_REQUIRED',
-              inspection_source='AUTO',production_completed_at=NOW()
-            WHERE id=? AND status IN ('RELEASED','SCHEDULED','IN_PRODUCTION','REWORK')
-            """,orderId);
-        if(updated==0)return;
-        String operationName=jdbc.queryForObject("SELECT operation_name_snapshot FROM manufacturing_order_operations WHERE id=?",String.class,operationId);
-        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_orders",orderId,"UPDATE",
-                ErpChangeLogWriter.changes("status","→PENDING_RECEIPT","inspectionStatus","NOT_REQUIRED",
-                        "inspectionSource","AUTO","autoConfirmedOperationName",operationName,
-                        "note","本单无人工检验工序，按工序政策自动确认放行（未执行人工检验）"),
-                null,"末道工序报工完成，自动确认放行",requestKey,null));
     }
 
     private Map<String,Object> row(java.sql.ResultSet r)throws java.sql.SQLException{var m=new LinkedHashMap<String,Object>();ResultSetMetaData md=r.getMetaData();for(int i=1;i<=md.getColumnCount();i++){Object v=r.getObject(i);if(v instanceof java.sql.Date d)v=d.toLocalDate();else if(v instanceof java.sql.Timestamp t)v=t.toLocalDateTime();m.put(camel(md.getColumnLabel(i)),v);}return m;}

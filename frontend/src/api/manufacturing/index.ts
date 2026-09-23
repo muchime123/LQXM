@@ -1,6 +1,10 @@
 import { http } from '../http'
 
 export interface ManufacturingOrder {
+  externalSource?: string
+  externalId?: string
+  h3WorkOrderNo?: string
+  productConfigJson?: string | Record<string, unknown>
   id: number
   orderNo: string
   salesOrderRef?: string
@@ -54,6 +58,9 @@ export interface FinishedGoodsLot {
   createdAt: string
 }
 export interface Warehouse { id: number; warehouseCode: string; warehouseName: string }
+export interface InventoryProductOption { id:number; productCode:string; productName:string; specification?:string; unit:string; custom:number }
+export const fetchManufacturingProductOptions = async (keyword:string) =>
+  (await http.get<InventoryProductOption[]>('/manufacturing/product-options',{ params:{ keyword,limit:100 } })).data
 export interface PageResult<T> { items: T[]; total: number; page: number; size: number }
 /**
  * 工单产出清单行（P3 ①）。
@@ -77,18 +84,9 @@ export interface ManufacturingOutput {
   isMold: boolean
   remark?: string
 }
-/**
- * 产品选择器选项（P3 ①：产品身份只能从主数据选，不再手打名称）。
- * `custom=1` 表示自建 / 非标件（`MFG-`），界面上要能一眼看出来。
- */
-export interface ProductOption {
-  id: number
-  productCode: string
-  productName: string
-  specification?: string
-  unit?: string
-  custom: number
-}
+// 09-22：`ProductOption` / `fetchProductOptions` 已删除 —— 建单抽屉取消「可售产品（SKU）」选择后
+//        前端再无消费方，保持「下单链路无 SKU 痕迹」。后端 `GET /api/manufacturing/product-options`
+//        与建单入参的可选 `salesProductId` 都保留，待 SKU 主数据重新设计后可直接复用。
 /** 收货明细行（P3 ②）：按产出清单逐项填实际数量（outputId 指向清单行）。 */
 export interface ReceiptItem { outputId: number; quantity: number; unitCost?: number; remark?: string }
 export interface ManufacturingDetail {
@@ -103,10 +101,11 @@ export interface ManufacturingDetail {
   reworks: ManufacturingRework[]
 }
 export interface ProcessTemplate { id:number; templateCode:string; templateName:string; workshopType?:string; operationCount:number }
-export interface ManufacturingOperation { id:number; sequenceNo:number; operationNameSnapshot:string; requiredQuantity:number; reportedQuantity:number; progressPercent:number; status:string; isFinal:boolean; assignedTeamName?:string; assignedEmployeeId?:number; assignedEmployeeName?:string }
+export interface ManufacturingOperation { id:number; sequenceNo:number; operationNameSnapshot:string; requiredQuantity:number; reportedQuantity:number; progressPercent:number; status:string; isFinal:boolean; required?:boolean | number; startedAt?:string; completedAt?:string; executionRound?:number; assignedTeamName?:string; assignedEmployeeId?:number; assignedEmployeeName?:string }
 export interface WorkReport { id:number; reportNo:string; manufacturingOrderOperationId:number; operationNameSnapshot:string; reportedQuantity:number; reporterNameSnapshot?:string; reportedAt:string; status:string; reversalReason?:string; remark?:string }
 export interface InspectionRecord { id:number; inspectionNo:string; inspectionResult:string; qualifiedQuantity:number; unqualifiedQuantity:number; inspectorNameSnapshot?:string; inspectedAt:string; issueDescription?:string; remark?:string }
 export interface ExecutionBoardItem {
+  requiredOperationCount?: number; completedOperationCount?: number
   operationId:number; manufacturingOrderId:number; sequenceNo:number; operationNameSnapshot:string
   requiredQuantity:number; reportedQuantity:number; operationStatus:string; startedAt?:string
   orderNo:string; salesOrderRef?:string; customerNameSnapshot:string; productNameSnapshot:string
@@ -166,17 +165,8 @@ function idemConfig(requestKey?: string) {
 }
 export const createManufacturingOrder = async (payload: Record<string, unknown>, requestKey?: string) =>
   (await http.post<number>('/manufacturing/orders', payload, idemConfig(requestKey))).data
-export const completeManufacturingOrder = async (id: number, payload: Record<string, unknown>, requestKey?: string) =>
-  (await http.post<number>(`/manufacturing/orders/${id}/completion-receipts`, payload, idemConfig(requestKey))).data
 export const fetchProcessTemplates = async () =>
   (await http.get<ProcessTemplate[]>('/manufacturing/process-templates')).data
-/**
- * 建单：按关键词搜产品主数据（P3 ①）。
- *
- * 不走「可售库存」—— 建单是**要生产**，库存本来就可能没有；候选必须是全部产品身份。
- */
-export const fetchProductOptions = async (keyword: string, limit = 50) =>
-  (await http.get<ProductOption[]>('/manufacturing/product-options', { params: { keyword, limit } })).data
 /**
  * 建单：该车间可选的制程品类。
  *
@@ -201,6 +191,8 @@ export const reverseWorkReport = async (id:number,reason:string,requestKey?:stri
   { await http.post(`/manufacturing/work-reports/${id}/reverse`,{reason},idemConfig(requestKey)) }
 export const submitManufacturingInspection = async (orderId:number,payload:Record<string,unknown>,requestKey?:string) =>
   (await http.post<number>(`/manufacturing/orders/${orderId}/inspections`,payload,idemConfig(requestKey))).data
+export const submitQualityCompletion = async (orderId:number,payload:Record<string,unknown>,requestKey?:string) =>
+  (await http.post<number>(`/manufacturing/orders/${orderId}/quality-completion`,payload,idemConfig(requestKey))).data
 export const fetchExecutionBoard = async (params:Record<string,unknown>) =>
   (await http.get<ExecutionBoardResult>('/manufacturing/execution-board',{ params })).data
 export const fetchMyWorkReports = async (params:Record<string,unknown>) =>

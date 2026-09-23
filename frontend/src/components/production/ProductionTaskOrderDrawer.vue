@@ -2,14 +2,16 @@
   <!--
     生产任务单（业务员下单）—— 抽屉形态。
     形态纪律：下单是「车间执行页右上角按钮」调出的抽屉，不是独立侧边栏页面。
-    联动纪律：先选产线 → 该产线的「产品名称 / 可选配置」才可选（数据源 = 制程与工序管理 → 任务单产品与配置）。
-    建单纪律：产品名称即后端制程解析的 processCategory（同读 manufacturing_task_config_items.config_name）；
-              制程跟随产线 —— 解析顺序 = 产品在配置里指定的制程 → 车间默认制程（见 ManufacturingTaskTemplateResolver.resolve）。
+    联动纪律（09-23 LQ 定「制程先行」）：先选制程 → 制程唯一对应产线时产线自动带出并锁定；
+              通用制程（无需报工，workshop_type 为空）产线任选 → 该产线的「产品名称 / 可选配置」才可选
+              （数据源 = 制程与工序管理 → 任务单产品与配置）。
+    建单纪律：产品名称即后端的 processCategory；显式 processTemplateId 随单提交，后端以它为准
+              （车间默认制程只在未显式给制程时兜底，见 ManufacturingService.doCreate）。
               09-22 起**不再要求选可售产品（SKU）** —— SKU 是完工入库的库存身份键，
               不是下单字段，且该主数据要重新设计；下单只带 产线 + 产品名称 + 配置 + 数量，
               单位默认「台」（后端兜底）。无 SKU 的工单完工收货时不落库存账，只登记收货事实。
   -->
-  <el-drawer v-model="visible" title="生产任务单" :size="drawerSize" :close-on-click-modal="false"
+  <el-drawer v-model="visible" title="生产任务单" :size="drawerSize" :close-on-click-modal="!submitting"
     :close-on-press-escape="!submitting" :show-close="!submitting" :before-close="beforeClose" @open="onOpen">
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="to-form">
       <section class="to-block">
@@ -29,8 +31,15 @@
               <el-option v-for="t in TASK_TYPES" :key="t.value" :value="t.value" :label="t.label" />
             </el-select>
           </el-form-item>
+          <el-form-item label="制程选择" prop="processTemplateId">
+            <el-select v-model="form.processTemplateId" placeholder="请选择制程" class="full" @change="onProcessChange">
+              <el-option v-for="t in processTemplates" :key="t.id" :value="t.id"
+                :label="t.operationCount === 0 ? `${t.templateName}（不展开工序）` : t.templateName" />
+            </el-select>
+          </el-form-item>
           <el-form-item label="产线选择（生产车间）" prop="workshopId">
-            <el-select v-model="form.workshopId" placeholder="请选择产线（生产车间）" class="full" @change="onWorkshopChange">
+            <el-select v-model="form.workshopId" :disabled="workshopLocked" class="full"
+              :placeholder="workshopLocked ? '随制程自动带出' : '请选择产线（生产车间）'" @change="onWorkshopChange">
               <el-option v-for="w in workshops" :key="w.id" :value="w.id" :label="w.workshopName" />
             </el-select>
           </el-form-item>
@@ -58,8 +67,10 @@
 
       <section class="to-block">
         <h3>产品配置</h3>
+        <el-alert v-if="noOpsTemplate" type="warning" :closable="false" show-icon class="to-tip"
+          :title="`制程「${noOpsTemplate}」不展开任何工序：本单建后直接进入待收货，办完车间交付收货即完成（免报工）。产线可任选。`" />
         <el-alert type="info" :closable="false" show-icon class="to-tip"
-          title="产品名称与可选配置来自「制程与工序管理 → 任务单产品与配置」，按所选产线联动。本单展开的制程跟随产线：默认用车间的制程，仅当配置里给该产品名称单独指定了制程时才按产品覆盖。" />
+          title="先选制程，再定产线：制程只对应一条产线时自动带出并锁定；「无需报工」这类通用制程可任选产线。产品名称与可选配置来自「制程与工序管理 → 任务单产品与配置」，按所选产线联动。" />
         <div class="to-grid">
           <el-form-item label="产品名称" prop="productName" class="span-2">
             <el-select v-model="form.productName" :disabled="!form.workshopId" class="full"
@@ -137,8 +148,8 @@ import { computed, reactive, ref } from 'vue'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { fetchCustomers } from '@/api/customer/customer'
 import {
-  createManufacturingOrder, fetchProductOptions, fetchTaskConfigOptions, fetchWorkshopOptions,
-  newRequestKey, type ProductOption, type WorkshopOption
+  createManufacturingOrder, fetchProcessTemplates, fetchTaskConfigOptions, fetchWorkshopOptions,
+  newRequestKey, type ProcessTemplate, type WorkshopOption
 } from '@/api/manufacturing'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 
@@ -175,18 +186,28 @@ const visible = computed({
 const today = new Date().toISOString().slice(0, 10)
 
 const workshops = ref<WorkshopOption[]>([])
+const processTemplates = ref<ProcessTemplate[]>([])
 const productNames = ref<string[]>([])
 const configOptions = ref<string[]>([])
+
+/**
+ * 制程先行（09-23 LQ 定）：先选制程，再定产线。
+ * - 制程的 workshop_type 对得上某条产线 → 唯一对应，产线自动带出并锁定（下拉禁用）；
+ * - workshop_type 为空（「无需报工」这类通用制程）→ 产线放开任选。
+ */
+const selectedTemplate = computed(() => processTemplates.value.find(t => t.id === form.processTemplateId))
+const workshopLocked = computed(() => !!selectedTemplate.value?.workshopType && workshops.value.some(w => w.workshopName === selectedTemplate.value?.workshopType))
+/** 选中的制程是 0 道工序（免报工）→ 当场讲清楚这张单不会有工序。 */
+const noOpsTemplate = computed(() =>
+  selectedTemplate.value && selectedTemplate.value.operationCount === 0 ? selectedTemplate.value.templateName : '')
 const customerOptions = ref<CustomerOption[]>([])
-const productOptions = ref<ProductOption[]>([])
 const customerLoading = ref(false)
-const productLoading = ref(false)
 const submitting = ref(false)
-const selectedProduct = ref<ProductOption | null>(null)
 /** 请求键：打开抽屉时生成，提交失败保留（重试复用同一次动作），提交成功作废。 */
 let requestKey = ''
 
 const blankForm = () => ({
+  processTemplateId: null as number | null,
   dueDate: '',
   taskType: 'SALES_ORDER',
   customerId: null as number | null,
@@ -194,7 +215,6 @@ const blankForm = () => ({
   workshopId: null as number | null,
   plannedQuantity: undefined as number | undefined,
   extraMold: 'no',
-  salesProductId: null as number | null,
   productName: '',
   boxSize: '',
   boxHeight: '',
@@ -215,10 +235,10 @@ const rules: FormRules = {
   dueDate: required,
   taskType: required,
   customerName: required,
+  processTemplateId: required,
   workshopId: required,
   plannedQuantity: { required: true, message: '必填且大于 0', trigger: ['blur', 'change'] },
   extraMold: required,
-  salesProductId: required,
   productName: required,
   boxSize: required,
   boxHeight: required,
@@ -234,7 +254,6 @@ function resetForm() {
   Object.assign(form, blankForm())
   productNames.value = []
   configOptions.value = []
-  selectedProduct.value = null
   customerOptions.value = []
   formRef.value?.clearValidate()
 }
@@ -243,15 +262,32 @@ function resetForm() {
 async function onOpen() {
   resetForm()
   requestKey = newRequestKey()
-  if (!workshops.value.length) {
-    try {
-      workshops.value = await fetchWorkshopOptions()
-    } catch {
-      ElMessage.error('产线（生产车间）加载失败，请关闭后重试')
-    }
+  try {
+    const [ws, ts] = await Promise.all([
+      workshops.value.length ? Promise.resolve(workshops.value) : fetchWorkshopOptions(),
+      processTemplates.value.length ? Promise.resolve(processTemplates.value) : fetchProcessTemplates()
+    ])
+    workshops.value = ws
+    processTemplates.value = ts
+  } catch {
+    ElMessage.error('制程 / 产线加载失败，请关闭后重试')
   }
-  // 先铺一批产品候选：可售产品是远程搜索下拉，不铺的话点开是空的、看起来像「产品档案里没有货」。
-  if (!productOptions.value.length) await searchProducts('')
+}
+
+/**
+ * 制程 → 产线联动：
+ * - 制程唯一对应一条产线（workshop_type 对得上）→ 自动带出并锁定，产品名称/可选配置随之按该产线加载；
+ * - 通用制程（无需报工）→ 产线放开。换产线必须重取该产线的产品名称与可选配置。
+ */
+async function onProcessChange() {
+  const type = selectedTemplate.value?.workshopType
+  const hit = type ? workshops.value.find(w => w.workshopName === type) : undefined
+  const nextWorkshop = hit ? hit.id : null
+  if (nextWorkshop !== form.workshopId) {
+    form.workshopId = nextWorkshop
+    if (nextWorkshop) await onWorkshopChange(nextWorkshop)
+    else { form.productName = ''; form.optionalConfigs = []; productNames.value = []; configOptions.value = [] }
+  }
 }
 
 /** 产线联动：换产线必须清掉上一个产线的产品名称与可选配置，并重取本产线可选项。 */
@@ -290,19 +326,6 @@ function onCustomerChange(name: string) {
   form.customerId = hit ? hit.id : null
 }
 
-async function searchProducts(keyword: string) {
-  productLoading.value = true
-  try {
-    productOptions.value = await fetchProductOptions(keyword || '', 30)
-  } catch {
-    ElMessage.error('产品档案搜索失败，请重试')
-  } finally { productLoading.value = false }
-}
-
-function onProductChange(id: number | null) {
-  selectedProduct.value = productOptions.value.find(p => p.id === id) ?? null
-}
-
 async function submit(createNext: boolean) {
   try {
     await formRef.value?.validate()
@@ -316,13 +339,13 @@ async function submit(createNext: boolean) {
     const payload = {
       customerName: form.customerName,
       customerId: form.customerId,
-      // 产品名称 = processCategory（品类级身份）；制程解析以产线为主：车间默认制程兜底，
-      // 该产线下此产品在配置里单独指定 process_template_id 时才按产品覆盖（见 ManufacturingTaskTemplateResolver.resolve）
+      // 产品名称 = processCategory（品类级身份）；制程由用户显式选择（processTemplateId 随单提交）
       processCategory: form.productName,
-      salesProductId: form.salesProductId,
       plannedQuantity: form.plannedQuantity,
       dueDate: form.dueDate || null,
       taskType: form.taskType,
+      // 制程先行（09-23）：显式制程随单提交，后端以它为准（车间默认只在未传时兜底）
+      processTemplateId: form.processTemplateId,
       workshopId: form.workshopId,
       specification: specParts.length ? specParts.join('，') : '',
       remark: form.remark || '',
@@ -346,8 +369,8 @@ async function submit(createNext: boolean) {
     ElMessage.success(`生产任务单已创建：MO${String(id).padStart(8, '0')}`)
     emit('created', id)
     if (createNext) {
-      // 连续下单：保留产线与交期，产品/客户/数量清空重新填
-      const keep = { workshopId: form.workshopId, dueDate: form.dueDate, taskType: form.taskType }
+      // 连续下单：保留制程/产线/交期，产品/客户/数量清空重新填
+      const keep = { processTemplateId: form.processTemplateId, workshopId: form.workshopId, dueDate: form.dueDate, taskType: form.taskType }
       resetForm()
       Object.assign(form, keep)
       if (keep.workshopId) await onWorkshopChange(keep.workshopId)

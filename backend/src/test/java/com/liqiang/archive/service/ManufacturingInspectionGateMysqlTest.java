@@ -45,8 +45,23 @@ import static org.mockito.Mockito.*;
 class ManufacturingInspectionGateMysqlTest {
 
     private static final String SCHEMA = "mfg_gate_test";
-    /** 3 道工序的短模板，末道为检验类工序（DEBUG_INSPECTION），覆盖闸门两侧。 */
-    private static final String TEMPLATE = "STANDARD_SEALER";
+    /**
+     * 闸门测试**自建**的 3 道工序制程（末道 {@link #INSPECT_OP} 为检验类工序，覆盖闸门两侧）。
+     *
+     * <p>⚠️ 不再借用正式库在用模板：09-23 氚云对齐（V332）把 STANDARD_SEALER 等旧模板整批停用，
+     * 借用真实模板会让**整类测试随业务改主数据而假失败**（实测已发生一次）。本类验证的是**闸门逻辑**，
+     * 与哪条真实产线在用哪条制程无关，因此在隔离 schema 里自建一套最稳。
+     */
+    private static final String TEMPLATE = "GATE_TEST_TPL";
+    /**
+     * 自建检验工序的 code。
+     *
+     * <p>⚠️ **不能复用正式库已有的 {@code DEBUG_INSPECTION}**：{@code SEEDED} 会把
+     * {@code product_archive.manufacturing_operations} 整表复制进隔离 schema，其中已含 V224 种下的
+     * {@code DEBUG_INSPECTION}，再 INSERT 同名会撞唯一键 {@code uk_manufacturing_operation_code}
+     * （2026-09-23 实证 Duplicate entry）。故用本类专属前缀，与正式库主数据天然不碰撞。
+     */
+    private static final String INSPECT_OP = "GATE_INSPECT";
 
     private static final List<String> TABLES = List.of(
             "manufacturing_orders", "manufacturing_operations", "manufacturing_process_templates",
@@ -80,6 +95,20 @@ class ManufacturingInspectionGateMysqlTest {
             st.execute("CREATE TABLE " + SCHEMA + ".row_change_log LIKE erp.row_change_log");
             for (String t : SEEDED) st.execute("INSERT INTO " + SCHEMA + "." + t + " SELECT * FROM product_archive." + t);
             st.execute("USE " + SCHEMA);
+            // 自建闸门测试制程（见 TEMPLATE 字段注释）：3 道工序，末道是检验类工序。
+            // 全部 requires_inspection=0 起步；用例 2 自行把它翻成 1 来验证「有检验工序则维持闸门」。
+            st.execute("INSERT INTO manufacturing_operations(operation_code,operation_name,operation_category,active,sort_order,requires_inspection)"
+                    + " VALUES('GATE_CUT','闸门测试下料','FABRICATION',1,10,0),"
+                    + "('GATE_ASSEMBLE','闸门测试装配','ASSEMBLY',1,20,0),"
+                    + "('" + INSPECT_OP + "','闸门测试检验','INSPECTION',1,30,0)");
+            st.execute("INSERT INTO manufacturing_process_templates(template_code,template_name,workshop_type,active,version)"
+                    + " VALUES('" + TEMPLATE + "','闸门测试制程','闸门测试车间',1,1)");
+            st.execute("INSERT INTO manufacturing_process_template_operations(template_id,operation_id,sequence_no,requirement_coefficient,required,is_final)"
+                    + " SELECT t.id,o.id,CASE o.operation_code WHEN 'GATE_CUT' THEN 1 WHEN 'GATE_ASSEMBLE' THEN 2 ELSE 3 END,"
+                    + " 1.000000,1,CASE WHEN o.operation_code='" + INSPECT_OP + "' THEN 1 ELSE 0 END"
+                    + " FROM manufacturing_process_templates t"
+                    + " JOIN manufacturing_operations o ON o.operation_code IN ('GATE_CUT','GATE_ASSEMBLE','" + INSPECT_OP + "')"
+                    + " WHERE t.template_code='" + TEMPLATE + "'");
         }
     }
 
@@ -114,21 +143,20 @@ class ManufacturingInspectionGateMysqlTest {
         runInRollbackTransaction(() -> {
             long orderId = newOrder("MO-GATE-A", new BigDecimal("10"));
             List<Long> ops = generateOperations(orderId);
-            assertEquals(3, ops.size(), "STANDARD_SEALER 应为 3 道工序");
+            assertEquals(3, ops.size(), TEMPLATE + " 应为 3 道工序");
             reportAll(orderId, ops, new BigDecimal("10"));
 
             Map<String, Object> order = orderRow(orderId);
-            assertEquals("PENDING_RECEIPT", order.get("status"), "无检验工序时应直接进待入库，而不是停在待检验");
-            assertEquals("NOT_REQUIRED", order.get("inspection_status"));
-            assertEquals("AUTO", order.get("inspection_source"), "必须标记来源为 AUTO，供审计区分");
+            assertEquals("PENDING_INSPECTION", order.get("status"), "全部工序完成后仍须人工检验");
+            assertEquals("PENDING", order.get("inspection_status"));
+            assertNull(order.get("inspection_source"), "尚未检验，来源应为空");
             assertNull(order.get("inspection_at"), "自动确认 ≠ 检验合格：不得产生检验时间");
             assertNull(order.get("inspection_by_name"), "自动确认 ≠ 检验合格：不得产生检验人");
             assertNull(order.get("inspection_remark"));
 
             assertEquals(0, count("SELECT COUNT(*) FROM manufacturing_inspections"),
                     "未发生检验事实，不得写入检验记录表");
-            assertTrue(hasAutoConfirmAudit(orderId),
-                    "自动确认必须留下可追溯审计（row_change_log，方案 A）：" + changeLogsOf(orderId));
+            assertFalse(hasAutoConfirmAudit(orderId), "不得自动放行：" + changeLogsOf(orderId));
         });
     }
 
@@ -137,7 +165,7 @@ class ManufacturingInspectionGateMysqlTest {
     @Test
     void staysPendingInspectionWhenAnOperationRequiresInspection() {
         runInRollbackTransaction(() -> {
-            jdbc.update("UPDATE manufacturing_operations SET requires_inspection=1 WHERE operation_code='DEBUG_INSPECTION'");
+            jdbc.update("UPDATE manufacturing_operations SET requires_inspection=1 WHERE operation_code='" + INSPECT_OP + "'");
             long orderId = newOrder("MO-GATE-B", new BigDecimal("10"));
             List<Long> ops = generateOperations(orderId);
             reportAll(orderId, ops, new BigDecimal("10"));
@@ -182,18 +210,18 @@ class ManufacturingInspectionGateMysqlTest {
     @Test
     void switchIsReversibleOnAlreadyGeneratedOrder() {
         runInRollbackTransaction(() -> {
-            jdbc.update("UPDATE manufacturing_operations SET requires_inspection=1 WHERE operation_code='DEBUG_INSPECTION'");
+            jdbc.update("UPDATE manufacturing_operations SET requires_inspection=1 WHERE operation_code='" + INSPECT_OP + "'");
             long orderId = newOrder("MO-GATE-D", new BigDecimal("10"));
             List<Long> ops = generateOperations(orderId);
             assertEquals("PENDING", orderRow(orderId).get("inspection_status"), "生成工序时按政策预判为待检验");
 
             // 政策改回「不设人工检验」——不需要重建工单，末道工序报工即自动放行
-            jdbc.update("UPDATE manufacturing_operations SET requires_inspection=0 WHERE operation_code='DEBUG_INSPECTION'");
+            jdbc.update("UPDATE manufacturing_operations SET requires_inspection=0 WHERE operation_code='" + INSPECT_OP + "'");
             reportAll(orderId, ops, new BigDecimal("10"));
 
             Map<String, Object> order = orderRow(orderId);
-            assertEquals("PENDING_RECEIPT", order.get("status"));
-            assertEquals("AUTO", order.get("inspection_source"));
+            assertEquals("PENDING_INSPECTION", order.get("status"));
+            assertNull(order.get("inspection_source"));
         });
     }
 
@@ -229,7 +257,7 @@ class ManufacturingInspectionGateMysqlTest {
     @Test
     void backfillLeavesStuckOrderWithInspectionOperationUntouched() {
         runInRollbackTransaction(() -> {
-            jdbc.update("UPDATE manufacturing_operations SET requires_inspection=1 WHERE operation_code='DEBUG_INSPECTION'");
+            jdbc.update("UPDATE manufacturing_operations SET requires_inspection=1 WHERE operation_code='" + INSPECT_OP + "'");
             long orderId = stuckOrder("MO-GATE-F2", true);
             assertEquals(0, jdbc.update(BACKFILL), "存在检验工序的滞留单不得被自动放行");
             assertEquals("PENDING_INSPECTION", orderRow(orderId).get("status"));

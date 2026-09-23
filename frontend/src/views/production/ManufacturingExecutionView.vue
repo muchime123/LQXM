@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">MANUFACTURING EXECUTION</p>
         <h1>车间执行</h1>
-        <p>车间按工序报工，成品由仓库按「交付收货」办理入库。领料、BOM、材料单位由各车间自行管理，不在本页。</p>
+        <p>车间按工序报工；质检或跟单复核报工，全部工序完成后检验，合格即办理完工入库。</p>
       </div>
       <div class="head-actions">
         <el-button v-if="canManage" type="primary" :icon="Plus" @click="createOpen = true">新建生产任务单</el-button>
@@ -13,6 +13,31 @@
     </header>
 
     <el-tabs v-model="tab" class="exec-tabs" @tab-change="onTabChange">
+      <el-tab-pane v-if="canReadTasks" label="任务单总览" name="tasks">
+        <section class="panel">
+          <div class="toolbar">
+            <el-input v-model="taskKeyword" clearable class="kw-input" placeholder="任务单号 / 客户 / 产品" @keyup.enter="loadTasks(1)" @clear="loadTasks(1)" />
+            <el-select v-model="taskStatus" clearable placeholder="全部任务状态" class="sel-state" @change="loadTasks(1)"><el-option v-for="(label, value) in ORDER_STATUS" :key="value" :value="value" :label="label" /></el-select>
+            <el-button type="primary" @click="loadTasks(1)">查询</el-button>
+          </div>
+          <p class="scope-note">一行一张任务单。全部工序完成后进入人工检验；检验合格与入库同次办理。</p>
+          <el-table :data="taskItems" v-loading="tasksLoading" stripe>
+            <el-table-column label="任务单号" width="170"><template #default="{ row }"><el-button link type="primary" @click="openTaskDetail(row.id)">{{ row.orderNo }}</el-button></template></el-table-column>
+            <el-table-column prop="productNameSnapshot" label="产品" min-width="180" />
+            <el-table-column prop="customerNameSnapshot" label="客户" min-width="130" />
+            <el-table-column prop="workshopType" label="车间" width="130" />
+            <el-table-column prop="processTemplateNameSnapshot" label="制程" min-width="140" />
+            <el-table-column prop="plannedQuantity" label="任务数量" width="95" />
+            <el-table-column prop="dueDate" label="交期" width="120" />
+            <el-table-column label="任务状态" width="110"><template #default="{ row }">{{ orderLabel(row.status) }}</template></el-table-column>
+            <el-table-column label="操作" width="170"><template #default="{ row }">
+              <el-button link type="primary" @click="openTaskDetail(row.id)">详情</el-button>
+              <el-button v-if="canInspect && ['PENDING_INSPECTION','PENDING_REINSPECTION'].includes(row.status)" link type="success" @click="openQuality(row.id)">检验入库</el-button>
+            </template></el-table-column>
+          </el-table>
+          <el-pagination v-model:current-page="taskPage" :page-size="20" :total="taskTotal" layout="total, prev, pager, next" @current-change="loadTasks" />
+        </section>
+      </el-tab-pane>
       <!-- ==================== 执行看板 ==================== -->
       <el-tab-pane label="执行看板" name="board">
         <section class="stats-grid">
@@ -51,7 +76,7 @@
           <el-table :data="boardItems" v-loading="loading" stripe class="wide-table">
             <el-table-column label="工单 / 销售单号" width="190" fixed>
               <template #default="{ row }">
-                <strong class="cell-strong">{{ row.orderNo }}</strong>
+                <el-button link type="primary" @click="openTaskDetail(row.manufacturingOrderId)">{{ row.orderNo }}</el-button>
                 <small class="cell-sub">{{ row.salesOrderRef || '无销售单号' }}</small>
               </template>
             </el-table-column>
@@ -70,7 +95,15 @@
                 <small class="cell-sub">{{ row.processTemplateNameSnapshot || '无制程模板' }}</small>
               </template>
             </el-table-column>
-            <el-table-column label="工序进度" width="170">
+            <el-table-column label="整单制程进度" width="175">
+              <template #default="{ row }">
+                <template v-if="stepPercent(row.completedOperationCount, row.requiredOperationCount) !== null">
+                  <span>{{ row.completedOperationCount }} / {{ row.requiredOperationCount }} 道必做工序完成</span>
+                  <el-progress :percentage="stepPercent(row.completedOperationCount, row.requiredOperationCount) || 0" :stroke-width="6" />
+                </template><span v-else>暂无必做工序进度</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="本工序数量进度" width="170">
               <template #default="{ row }">
                 <div class="progress-cell">
                   <span>{{ fmtNum(row.reportedQuantity) }} / {{ fmtNum(row.requiredQuantity) }} {{ row.unit }}</span>
@@ -120,10 +153,10 @@
                 <span v-else class="cell-muted">—</span>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="100" fixed="right">
+            <el-table-column label="操作" width="135" fixed="right">
               <template #default="{ row }">
-                <el-button v-if="canReport" link type="primary" @click="openReport(row)">报工</el-button>
-                <span v-else class="cell-muted">无报工权限</span>
+                <el-button link type="primary" @click="openTaskDetail(row.manufacturingOrderId)">详情</el-button>
+                <el-button v-if="canReport" link type="primary" :disabled="reportLoading || !['READY','IN_PROGRESS'].includes(row.operationStatus)" @click="openReport(row)">报工</el-button>
               </template>
             </el-table-column>
             <template #empty><el-empty description="没有待执行的工序" /></template>
@@ -163,11 +196,11 @@
           </div>
 
           <div class="scope-note">
-            <span><b>报工记录</b> = 氚云生产报工的本地落账，数量进入工序已报数并推进工单进度</span>
+            <span><b>报工记录</b> = 本系统记录的工序完成数量；与氚云导入报工台账分别留存</span>
             <span class="scope-note__sep">·</span>
             <span>冲正不回删原记录，而是标注 <b>已冲正</b> 并回退进度；须先冲正后续工序</span>
             <span class="scope-note__sep">·</span>
-            <span v-if="!canOverride" class="scope-note__quiet">当前账号无冲正权限（需「超额报工与报工冲正」）</span>
+            <span v-if="!canOverride" class="scope-note__quiet">当前账号无冲正权限，请由质检或跟单人员处理</span>
           </div>
 
           <el-table :data="reportItems" v-loading="loading" stripe class="wide-table">
@@ -233,8 +266,27 @@
         </section>
       </el-tab-pane>
 
-      <!-- ==================== 交付收货 ==================== -->
-      <el-tab-pane label="交付收货" name="receipts">
+      <el-tab-pane v-if="canInspect" label="待完工检验" name="quality">
+        <section class="panel">
+          <div class="toolbar">
+            <el-input v-model="qualityKeyword" clearable placeholder="工单号 / 客户 / 产品" class="kw-input" @keyup.enter="loadQuality(1)" @clear="loadQuality(1)" />
+            <el-button type="primary" @click="loadQuality(1)">查询</el-button>
+          </div>
+          <p class="scope-note">必做工序全部完成后在此核验。合格与入库一次提交；不合格退回指定工序返工。</p>
+          <el-table :data="qualityItems" v-loading="qualityLoading" stripe>
+            <el-table-column prop="orderNo" label="任务单号" width="155" />
+            <el-table-column prop="customerNameSnapshot" label="客户" min-width="140" />
+            <el-table-column prop="productNameSnapshot" label="产品" min-width="180" />
+            <el-table-column prop="plannedQuantity" label="计划数量" width="100" />
+            <el-table-column prop="productionCompletedAt" label="工序完成时间" width="170" />
+            <el-table-column label="状态" width="110"><template #default="{ row }">{{ orderLabel(row.status) }}</template></el-table-column>
+            <el-table-column label="操作" width="110"><template #default="{ row }"><el-button link type="primary" @click="openQuality(row.id)">检验入库</el-button></template></el-table-column>
+          </el-table>
+          <el-pagination v-model:current-page="qualityPage" :page-size="20" :total="qualityTotal" layout="total, prev, pager, next" @current-change="loadQuality" />
+        </section>
+      </el-tab-pane>
+      <!-- ==================== 完工入库记录 ==================== -->
+      <el-tab-pane label="完工入库记录" name="receipts">
         <section class="panel">
           <div class="toolbar">
             <el-input v-model="receiptKeyword" clearable placeholder="入库单号 / 工单号 / 客户 / 成品名称" class="kw-input"
@@ -249,16 +301,15 @@
               <el-option value="REVERSED" label="已冲销" />
             </el-select>
             <el-date-picker v-model="receiptRange" type="daterange" unlink-panels range-separator="至"
-              start-placeholder="收货开始" end-placeholder="收货结束" value-format="YYYY-MM-DD"
+              start-placeholder="入库开始" end-placeholder="入库结束" value-format="YYYY-MM-DD"
               class="sel-range" @change="loadReceipts()" />
             <el-button type="primary" plain @click="loadReceipts()">查询</el-button>
-            <el-button v-if="canReceive" type="primary" @click="openReceiptCreate">办理收货</el-button>
           </div>
 
           <div class="scope-note">
-            <span><b>交付收货</b> = 车间把完工成品交给公司仓库，落成品批次 + 仓库库存流水 + 工单入库数量</span>
+            <span><b>完工入库记录</b> = 检验合格后形成的入库事实；历史单据也在此查询</span>
             <span class="scope-note__sep">·</span>
-            <span>这是「车间自治」下替代领料段的接口：车间与公司之间是<b>收货 / 交付</b>关系，不是领料关系</span>
+            <span>新任务从「待完工检验」办理，不再单独创建收货单</span>
             <span class="scope-note__sep">·</span>
             <span>冲销只允许在批次未被出库消耗时执行</span>
           </div>
@@ -284,8 +335,8 @@
               </template>
             </el-table-column>
             <el-table-column prop="warehouseName" label="仓库" width="110" show-overflow-tooltip />
-            <el-table-column prop="completedAt" label="收货时间" width="160" />
-            <el-table-column prop="operatorName" label="收货人" width="110" show-overflow-tooltip />
+            <el-table-column prop="completedAt" label="入库时间" width="160" />
+            <el-table-column prop="operatorName" label="办理人" width="110" show-overflow-tooltip />
             <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
             <el-table-column label="状态" width="140">
               <template #default="{ row }">
@@ -303,7 +354,7 @@
                 <span v-else class="cell-muted">—</span>
               </template>
             </el-table-column>
-            <template #empty><el-empty description="没有收货单" /></template>
+            <template #empty><el-empty description="没有完工入库记录" /></template>
           </el-table>
 
           <div class="pager">
@@ -316,7 +367,7 @@
     </el-tabs>
 
     <!-- ==================== 报工弹窗 ==================== -->
-    <el-dialog v-model="reportDialogOpen" title="工序报工" width="min(560px, calc(100vw - 32px))" :close-on-click-modal="false">
+    <el-dialog v-model="reportDialogOpen" title="工序报工" width="min(720px, calc(100vw - 32px))" :close-on-click-modal="false" :close-on-press-escape="!submitting" :show-close="!submitting">
       <template v-if="reportTarget">
         <div class="target-card">
           <div class="target-card__main">
@@ -331,15 +382,17 @@
             ｜ <b>剩余 {{ fmtNum(reportRemaining) }} {{ reportTarget.unit }}</b>
           </div>
         </div>
-        <el-form :model="reportForm" label-width="100px">
-          <el-form-item label="报工数量" required>
-            <el-input-number v-model="reportForm.quantity" :min="0" :precision="3" :step="1" class="num-input" />
+        <el-alert :title="reportPreview" type="info" :closable="false" class="over-alert" />
+        <el-form :model="reportForm" label-width="100px" :disabled="submitting">
+          <el-form-item label="本次完成数量" required>
+            <el-input-number v-model="reportForm.quantity" :min="0" :precision="6" :step="1" class="num-input" />
             <span class="unit-hint">{{ reportTarget.unit }}</span>
+            <el-button link type="primary" @click="reportForm.quantity = Math.max(0, reportRemaining)">填入全部剩余量</el-button>
           </el-form-item>
           <el-form-item v-if="reportOver > 0" label="超额报工">
             <el-alert type="warning" :closable="false" class="over-alert"
               :title="`超出剩余数量 ${fmtNum(reportOver)} ${reportTarget.unit}`"
-              :description="canOverride ? '勾选后需填写超额原因，将按超额登记入库。' : '当前账号没有「超额报工与报工冲正」权限，无法超额报工。'" />
+              :description="canOverride ? '勾选后需填写超额原因，仅登记本工序完成数量，不会自动入库。' : '当前账号没有「超额报工与报工冲正」权限，无法超额报工。'" />
             <el-checkbox v-model="reportForm.allowOverproduction" :disabled="!canOverride" class="over-check">
               允许超额报工
             </el-checkbox>
@@ -352,13 +405,21 @@
             <el-date-picker v-model="reportForm.reportedAt" type="datetime" placeholder="默认当前时间"
               value-format="YYYY-MM-DDTHH:mm:ss" class="full-width" />
           </el-form-item>
-          <el-form-item label="备注">
-            <el-input v-model="reportForm.remark" type="textarea" :rows="2" placeholder="可选" />
+          <el-form-item label="完成内容">
+            <el-input v-model="reportForm.remark" type="textarea" :rows="3" maxlength="1000" show-word-limit placeholder="说明本次完成的部件、工作内容及需要交接的事项" />
           </el-form-item>
         </el-form>
+        <h4>本工序最近报工</h4>
+        <el-table :data="reportHistory" size="small" max-height="200" empty-text="本工序尚无报工">
+          <el-table-column prop="reportedAt" label="时间" min-width="155" />
+          <el-table-column prop="reportedQuantity" label="数量" width="80" />
+          <el-table-column prop="reporterNameSnapshot" label="人员" width="100" />
+          <el-table-column label="状态" width="80"><template #default="{ row }">{{ row.status === 'VALID' ? '有效' : '已冲正' }}</template></el-table-column>
+          <el-table-column prop="remark" label="完成内容" min-width="130" />
+        </el-table>
       </template>
       <template #footer>
-        <el-button @click="reportDialogOpen = false">取消</el-button>
+        <el-button :disabled="submitting" @click="reportDialogOpen = false">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="submitReport">提交报工</el-button>
       </template>
     </el-dialog>
@@ -390,116 +451,6 @@
       </template>
     </el-dialog>
 
-    <!-- ==================== 办理收货弹窗 ==================== -->
-    <el-dialog v-model="receiptCreateOpen" title="办理交付收货" width="min(980px, calc(100vw - 32px))"
-      :close-on-click-modal="false" @opened="loadReceivableOrders()">
-      <div class="toolbar">
-        <el-input v-model="receivableKeyword" clearable placeholder="工单号 / 销售单号 / 客户 / 产品" class="kw-input"
-          @keyup.enter="loadReceivableOrders()" @clear="loadReceivableOrders()">
-          <template #prefix><el-icon><Search /></el-icon></template>
-        </el-input>
-        <el-button :icon="Refresh" @click="loadReceivableOrders()">刷新可收货工单</el-button>
-        <span class="toolbar-hint">仅列出<b>待入库 / 部分入库</b>的工单（工序未全部完成或检验未通过的工单不会出现在这里）</span>
-      </div>
-
-      <el-table :data="receivableOrders" v-loading="receivableLoading" stripe highlight-current-row
-        class="receivable-table" @current-change="pickReceivableOrder">
-        <el-table-column label="工单" width="150">
-          <template #default="{ row }">
-            <strong class="cell-strong">{{ row.orderNo }}</strong>
-            <small class="cell-sub">{{ row.salesOrderRef || '无销售单号' }}</small>
-          </template>
-        </el-table-column>
-        <el-table-column prop="customerNameSnapshot" label="客户" min-width="130" show-overflow-tooltip />
-        <el-table-column label="产品" min-width="170" show-overflow-tooltip>
-          <template #default="{ row }">
-            <span>{{ row.productNameSnapshot }}</span>
-            <small class="cell-sub">{{ row.specificationSnapshot || '无规格' }}</small>
-          </template>
-        </el-table-column>
-        <el-table-column label="计划 / 已入" width="140" align="right">
-          <template #default="{ row }">
-            {{ fmtNum(row.completedQuantity) }} / {{ fmtNum(row.plannedQuantity) }} {{ row.unit }}
-          </template>
-        </el-table-column>
-        <el-table-column label="待入" width="100" align="right">
-          <template #default="{ row }">
-            <b>{{ fmtNum(Number(row.plannedQuantity) - Number(row.completedQuantity)) }}</b>
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="110">
-          <template #default="{ row }">
-            <el-tag size="small" effect="plain" :type="orderTagType(row.status)">{{ orderLabel(row.status) }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="workshopType" label="车间" width="110" show-overflow-tooltip />
-        <template #empty><el-empty description="没有待收货的工单" /></template>
-      </el-table>
-
-      <el-divider content-position="left">收货信息</el-divider>
-      <el-alert v-if="!receiptOrder" type="info" :closable="false" class="kw-alert"
-        title="请先在上表点选一张工单，再填写收货信息。" />
-      <el-form v-else :model="receiptForm" label-width="110px">
-        <div class="form-grid">
-          <el-form-item label="工单">
-            <span class="readonly-text">{{ receiptOrder.orderNo }} · {{ receiptOrder.customerNameSnapshot }}</span>
-          </el-form-item>
-          <el-form-item label="入库仓库" required>
-            <el-select v-model="receiptForm.warehouseId" placeholder="选择仓库" class="full-width">
-              <el-option v-for="w in warehouses" :key="w.id" :value="w.id" :label="w.warehouseName" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="收货时间">
-            <el-date-picker v-model="receiptForm.completedAt" type="datetime" placeholder="默认当前时间"
-              value-format="YYYY-MM-DDTHH:mm:ss" class="full-width" />
-          </el-form-item>
-          <el-form-item label="备注">
-            <el-input v-model="receiptForm.remark" placeholder="可选" />
-          </el-form-item>
-        </div>
-
-        <el-divider content-position="left">按产出清单逐项确认实际数量</el-divider>
-        <el-alert type="info" :closable="false" class="kw-alert"
-          title="成品身份来自工单产出清单，不再手填名称；未填的行视为本次不收货（差异按「已收 < 计划」显式呈现）。" />
-        <el-table :data="receiptOutputs" v-loading="receiptOutputsLoading" stripe class="receivable-table">
-          <el-table-column label="产出" min-width="220">
-            <template #default="{ row }">
-              <strong class="cell-strong">{{ row.productNameSnapshot }}</strong>
-              <small class="cell-sub">
-                {{ row.productCodeSnapshot || '—' }}
-                <span v-if="row.isMold"> · 模具</span>
-                <span v-if="row.isPrimary"> · 主产品</span>
-              </small>
-            </template>
-          </el-table-column>
-          <el-table-column label="计划 / 已收" width="160" align="right">
-            <template #default="{ row }">
-              {{ fmtNum(row.plannedQuantity) }} / {{ fmtNum(row.receivedQuantity) }} {{ row.unit }}
-            </template>
-          </el-table-column>
-          <el-table-column label="本次收货数量" width="170">
-            <template #default="{ row }">
-              <el-input-number v-model="row.receiptQuantity" :min="0"
-                :max="Math.max(0, Number(row.plannedQuantity) - Number(row.receivedQuantity))"
-                :precision="3" :step="1" :controls="false" style="width: 130px" />
-            </template>
-          </el-table-column>
-          <el-table-column label="单位成本" width="150">
-            <template #default="{ row }">
-              <el-input-number v-model="row.unitCost" :min="0" :precision="2" :step="10" :controls="false" style="width: 110px" />
-            </template>
-          </el-table-column>
-          <template #empty><el-empty description="这张工单还没有产出清单" /></template>
-        </el-table>
-        <div class="field-hint">只有数量 &gt; 0 的行会入账；留 0 表示本次不收该项。</div>
-      </el-form>
-
-      <template #footer>
-        <el-button @click="receiptCreateOpen = false">取消</el-button>
-        <el-button type="primary" :loading="submitting" :disabled="!receiptOrder" @click="submitReceipt">确认收货</el-button>
-      </template>
-    </el-dialog>
-
     <!-- ==================== 收货冲销弹窗 ==================== -->
     <el-dialog v-model="receiptReverseOpen" title="入库冲销（反入库）" width="min(520px, calc(100vw - 32px))" :close-on-click-modal="false">
       <template v-if="receiptReverseTarget">
@@ -511,7 +462,7 @@
           <div class="target-card__qty">
             入库 {{ fmtNum(receiptReverseTarget.quantity) }} {{ receiptReverseTarget.unit || receiptReverseTarget.orderUnit }}
             ｜ 仓库 {{ receiptReverseTarget.warehouseName || '—' }}
-            ｜ 收货 {{ receiptReverseTarget.completedAt }}
+            ｜ 入库 {{ receiptReverseTarget.completedAt }}
           </div>
         </div>
         <el-alert type="warning" :closable="false" class="kw-alert"
@@ -531,6 +482,8 @@
     <!-- ==================== 新建生产任务单（manufacturing.manage） ==================== -->
     <!-- 形态纪律：下单是抽屉，不是独立侧边栏页面；旧的手工建单弹窗已废弃并删除。 -->
     <ProductionTaskOrderDrawer v-model="createOpen" @created="onOrderCreated" />
+    <ProductionTaskDetailDrawer v-model="taskDetailOpen" :order-id="taskDetailId" :refresh-key="taskDetailRefresh" @report="openReport" @reverse="openReportReverse" />
+    <ManufacturingQualityDialog v-model="qualityOpen" :order-id="qualityOrderId" @completed="onQualityCompleted" />
   </div>
 </template>
 
@@ -540,22 +493,26 @@ import { ElMessage } from 'element-plus'
 import { Refresh, Search, Plus } from '@element-plus/icons-vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import ProductionTaskOrderDrawer from '@/components/production/ProductionTaskOrderDrawer.vue'
+import ProductionTaskDetailDrawer from '@/components/production/ProductionTaskDetailDrawer.vue'
+import ManufacturingQualityDialog from '@/components/production/ManufacturingQualityDialog.vue'
+import { stepPercent } from '@/utils/manufacturingProgress'
 import {
   fetchExecutionBoard, submitWorkReport, reverseWorkReport, fetchAllWorkReports, newRequestKey,
-  fetchManufacturingWarehouses, completeManufacturingOrder, fetchCompletionReceipts,
-  reverseCompletionReceipt, fetchManufacturingOrders, fetchManufacturingOrder,
+  fetchManufacturingWarehouses, fetchCompletionReceipts,
+  reverseCompletionReceipt, fetchManufacturingOrders, fetchManufacturingOrder, fetchPendingInspections,
   type ExecutionBoardItem, type AllWorkReport, type CompletionReceipt, type ManufacturingOrder,
-  type Warehouse, type ManufacturingOutput
+  type Warehouse, type WorkReport, type PendingInspectionItem
 } from '@/api/manufacturing'
 
 const { can } = useCurrentUser()
 const canReport = computed(() => can('manufacturing.report'))
 const canOverride = computed(() => can('manufacturing.report.override'))
-const canReceive = computed(() => can('manufacturing.receive'))
+const canInspect = computed(() => can('manufacturing.inspect'))
 const canReverseReceipt = computed(() => can('manufacturing.receive.reverse'))
 const canManage = computed(() => can('manufacturing.manage'))
+const canReadTasks = computed(() => can(['manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all']))
 
-const tab = ref<'board' | 'reports' | 'receipts'>('board')
+const tab = ref<'board' | 'reports' | 'receipts' | 'tasks' | 'quality'>('board')
 const loading = ref(false)
 const submitting = ref(false)
 const loadedTabs = ref<Set<string>>(new Set())
@@ -582,14 +539,15 @@ const STATE_OPTIONS = [
 
 const ORDER_STATUS: Record<string, string> = {
   DRAFT: '草稿', RELEASED: '已下达', SCHEDULED: '已排产', IN_PRODUCTION: '生产中',
-  REWORK: '返工中', PENDING_RECEIPT: '待入库', PARTIALLY_RECEIVED: '部分入库',
+  REWORK: '返工中', PENDING_INSPECTION: '待完工检验', PENDING_REINSPECTION: '待复检',
+  PENDING_RECEIPT: '历史待入库', PARTIALLY_RECEIVED: '历史部分入库',
   COMPLETED: '已完成', CANCELLED: '已取消', CLOSED: '已关闭'
 }
 const orderLabel = (v?: string) => (v ? ORDER_STATUS[v] || v : '—')
 const orderTagType = (v?: string): 'success' | 'warning' | 'danger' | 'info' | 'primary' => {
   if (v === 'COMPLETED') return 'success'
   if (v === 'REWORK' || v === 'CANCELLED') return 'danger'
-  if (v === 'PENDING_RECEIPT' || v === 'PARTIALLY_RECEIVED') return 'warning'
+  if (v === 'PENDING_INSPECTION' || v === 'PENDING_REINSPECTION' || v === 'PENDING_RECEIPT' || v === 'PARTIALLY_RECEIVED') return 'warning'
   if (v === 'IN_PRODUCTION') return 'primary'
   return 'info'
 }
@@ -619,9 +577,41 @@ const priorityTagType = (v?: string): 'success' | 'warning' | 'danger' | 'info' 
 //   产品名称即后端制程解析的 processCategory（同读 manufacturing_task_config_items.config_name）。
 // 本页只负责「打开抽屉」与「建单成功后刷新看板」；旧的手工建单弹窗（字段少、无配置联动）已删除。
 const createOpen = ref(false)
+const taskDetailOpen = ref(false), taskDetailId = ref<number | null>(null), taskDetailRefresh = ref(0)
+function openTaskDetail(id: number) { taskDetailId.value = id; taskDetailOpen.value = true }
+const qualityOpen = ref(false), qualityOrderId = ref<number | null>(null)
+const qualityKeyword = ref(''), qualityItems = ref<PendingInspectionItem[]>([])
+const qualityPage = ref(1), qualityTotal = ref(0), qualityLoading = ref(false)
+function openQuality(id: number) { qualityOrderId.value = id; qualityOpen.value = true }
+async function loadQuality(page = qualityPage.value) {
+  qualityPage.value = page; qualityLoading.value = true
+  try {
+    const data = await fetchPendingInspections({ keyword: qualityKeyword.value, page, size: 20 })
+    qualityItems.value = data.items; qualityTotal.value = data.total
+  } catch (e) { ElMessage.error(errText(e)) }
+  finally { qualityLoading.value = false }
+}
+function onQualityCompleted() {
+  taskDetailRefresh.value++
+  loadedTabs.value.delete('tasks')
+  void Promise.all([loadQuality(), loadBoard(), loadReceipts(1)])
+}
+const taskItems = ref<ManufacturingOrder[]>([]), taskKeyword = ref(''), taskStatus = ref('')
+const taskPage = ref(1), taskTotal = ref(0), tasksLoading = ref(false)
+let taskLoadSequence = 0
+async function loadTasks(page = taskPage.value) {
+  const sequence = ++taskLoadSequence
+  taskPage.value = page; tasksLoading.value = true
+  try {
+    const result = await fetchManufacturingOrders({ keyword: taskKeyword.value, status: taskStatus.value, page, size: 20 })
+    if (sequence === taskLoadSequence) { taskItems.value = result.items; taskTotal.value = result.total }
+  } catch (e) { if (sequence === taskLoadSequence) ElMessage.error(errText(e)) }
+  finally { if (sequence === taskLoadSequence) tasksLoading.value = false }
+}
 
 function onOrderCreated() {
   loadBoard(1)
+  if (canReadTasks.value) void loadTasks(1)
 }
 
 // ==================== 执行看板 ====================
@@ -678,10 +668,12 @@ async function loadBoard(page?: number) {
 
 // ==================== 报工 ====================
 const reportDialogOpen = ref(false)
+const reportLoading = ref(false), reportHistory = ref<WorkReport[]>([])
 const reportTarget = ref<ExecutionBoardItem | null>(null)
 const reportForm = ref({ quantity: 1, reportedAt: '', remark: '', allowOverproduction: false, overproductionReason: '' })
 /** 本次提交的请求键：弹窗打开时生成，失败重试沿用，成功后丢弃（同键重放不会重复落账）。 */
 const reportKey = ref('')
+let reportLoadSequence = 0, reportPayloadSignature = ''
 
 const reportRemaining = computed(() => {
   const t = reportTarget.value
@@ -689,24 +681,43 @@ const reportRemaining = computed(() => {
   return Number(t.requiredQuantity) - Number(t.reportedQuantity)
 })
 const reportOver = computed(() => Math.max(0, Number(reportForm.value.quantity || 0) - reportRemaining.value))
+const reportPreview = computed(() => {
+  const target = reportTarget.value
+  if (!target) return ''
+  const after = Number(target.reportedQuantity) + Number(reportForm.value.quantity || 0)
+  return `提交后本工序累计 ${fmtNum(after)} / ${fmtNum(target.requiredQuantity)}；${after >= Number(target.requiredQuantity) ? '本工序达到完成条件，整单按必做工序完成状态推进' : '本工序仍在进行中'}。报工不会自动入库。`
+})
 
-function openReport(row: ExecutionBoardItem) {
+async function openReport(row: ExecutionBoardItem) {
+  if (submitting.value) return
+  const sequence = ++reportLoadSequence
+  reportLoading.value = true
+  try {
+    const current = await fetchManufacturingOrder(row.manufacturingOrderId)
+    if (sequence !== reportLoadSequence) return
+    const op = current.operations.find(op => op.id === row.operationId)
+    if (!op || !['READY','IN_PROGRESS'].includes(op.status)) { ElMessage.warning('该工序当前不可报工，请刷新任务详情'); return }
+    row = { ...row, requiredQuantity: op.requiredQuantity, reportedQuantity: op.reportedQuantity, operationStatus: op.status }
+    reportHistory.value = current.workReports.filter(report => report.manufacturingOrderOperationId === op.id).slice(0, 10)
+  } catch (e) { ElMessage.error(errText(e)); return }
+  finally { if (sequence === reportLoadSequence) reportLoading.value = false }
   reportTarget.value = row
   const remaining = Number(row.requiredQuantity) - Number(row.reportedQuantity)
   reportForm.value = {
-    quantity: remaining > 0 ? remaining : 0,
+    quantity: remaining > 0 ? Math.min(1, remaining) : 0,
     reportedAt: '',
     remark: '',
     allowOverproduction: false,
     overproductionReason: ''
   }
   reportKey.value = newRequestKey()
+  reportPayloadSignature = ''
   reportDialogOpen.value = true
 }
 
 async function submitReport() {
   const t = reportTarget.value
-  if (!t) return
+  if (!t || submitting.value) return
   if (!(Number(reportForm.value.quantity) > 0)) { ElMessage.warning('报工数量必须大于 0'); return }
   const over = reportOver.value > 0
   if (over) {
@@ -716,16 +727,23 @@ async function submitReport() {
   }
   submitting.value = true
   try {
-    await submitWorkReport(t.manufacturingOrderId, t.operationId, {
+    const payload = {
       quantity: reportForm.value.quantity,
       reportedAt: reportForm.value.reportedAt || null,
       remark: reportForm.value.remark || null,
       allowOverproduction: over && reportForm.value.allowOverproduction,
       overproductionReason: over ? reportForm.value.overproductionReason.trim() : null
-    }, reportKey.value)
+    }
+    const signature = JSON.stringify(payload)
+    if (reportPayloadSignature && signature !== reportPayloadSignature) reportKey.value = newRequestKey()
+    reportPayloadSignature = signature
+    await submitWorkReport(t.manufacturingOrderId, t.operationId, payload, reportKey.value)
     ElMessage.success('报工已提交')
     reportDialogOpen.value = false
     reportKey.value = ''
+    taskDetailRefresh.value++
+    loadedTabs.value.delete('reports')
+    loadedTabs.value.delete('tasks')
     await loadBoard()
   } catch (e) {
     // 失败时保留请求键：用户重试即复用同一次动作，避免「服务端已成功但响应丢失」被重复落账
@@ -795,6 +813,8 @@ async function submitReportReverse() {
     ElMessage.success('报工已冲正')
     reportReverseOpen.value = false
     reportReverseKey.value = ''
+    taskDetailRefresh.value++
+    loadedTabs.value.delete('tasks')
     await Promise.all([loadReports(), loadBoard()])
   } catch (e) {
     ElMessage.error(errText(e))
@@ -803,7 +823,7 @@ async function submitReportReverse() {
   }
 }
 
-// ==================== 交付收货 ====================
+// ==================== 完工入库历史 ====================
 const receiptKeyword = ref('')
 const receiptWarehouseId = ref<number | undefined>(undefined)
 const receiptStatus = ref('')
@@ -840,103 +860,6 @@ async function loadReceipts(page?: number) {
   }
 }
 
-const receiptCreateOpen = ref(false)
-const receivableLoading = ref(false)
-const receivableKeyword = ref('')
-const receivableOrders = ref<ManufacturingOrder[]>([])
-const receiptOrder = ref<ManufacturingOrder | null>(null)
-const receiptForm = ref({
-  warehouseId: undefined as number | undefined,
-  completedAt: '',
-  remark: ''
-})
-/** 产出清单行 + 本次收货输入（P3 ②：收货按清单逐项确认，不再手填成品名）。 */
-type ReceiptOutputRow = ManufacturingOutput & { receiptQuantity: number; unitCost: number }
-const receiptOutputs = ref<ReceiptOutputRow[]>([])
-const receiptOutputsLoading = ref(false)
-const receiptKey = ref('')
-
-function openReceiptCreate() {
-  receiptOrder.value = null
-  receiptOutputs.value = []
-  receivableKeyword.value = ''
-  receivableOrders.value = []
-  receiptKey.value = newRequestKey()
-  receiptCreateOpen.value = true
-  if (!warehouses.value.length) loadWarehouses()
-}
-
-/** 可收货工单 = 待入库 + 部分入库（后端 complete() 只接受这两个状态）。 */
-async function loadReceivableOrders() {
-  receivableLoading.value = true
-  try {
-    const base = { keyword: receivableKeyword.value, page: 1, size: 50 }
-    const [pending, partial] = await Promise.all([
-      fetchManufacturingOrders({ ...base, status: 'PENDING_RECEIPT' }),
-      fetchManufacturingOrders({ ...base, status: 'PARTIALLY_RECEIVED' })
-    ])
-    receivableOrders.value = [...pending.items, ...partial.items]
-  } catch (e) {
-    ElMessage.error(errText(e))
-    receivableOrders.value = []
-  } finally {
-    receivableLoading.value = false
-  }
-}
-
-async function pickReceivableOrder(row: ManufacturingOrder | null) {
-  if (!row) return
-  receiptOrder.value = row
-  receiptForm.value = {
-    warehouseId: warehouses.value[0]?.id,
-    completedAt: '',
-    remark: ''
-  }
-  // 产出清单是收货的唯一入口：选中工单后立刻取清单，默认把「剩余未收」整批填入
-  receiptOutputsLoading.value = true
-  receiptOutputs.value = []
-  try {
-    const detail = await fetchManufacturingOrder(row.id)
-    receiptOutputs.value = (detail.outputs || []).map(o => ({
-      ...o,
-      receiptQuantity: Math.max(0, Number(o.plannedQuantity) - Number(o.receivedQuantity)),
-      unitCost: 0
-    }))
-  } catch (e) {
-    ElMessage.error(errText(e))
-  } finally {
-    receiptOutputsLoading.value = false
-  }
-}
-
-async function submitReceipt() {
-  const o = receiptOrder.value
-  if (!o) { ElMessage.warning('请先选择工单'); return }
-  if (!receiptForm.value.warehouseId) { ElMessage.warning('请选择入库仓库'); return }
-  // 只提交数量 > 0 的行；留 0 表示本次不收该项（不是"收 0 件"）
-  const items = receiptOutputs.value
-    .filter(r => Number(r.receiptQuantity) > 0)
-    .map(r => ({ outputId: r.id, quantity: r.receiptQuantity, unitCost: r.unitCost || 0, remark: null }))
-  if (!items.length) { ElMessage.warning('请至少填写一项收货数量'); return }
-  submitting.value = true
-  try {
-    await completeManufacturingOrder(o.id, {
-      warehouseId: receiptForm.value.warehouseId,
-      completedAt: receiptForm.value.completedAt || null,
-      items,
-      remark: receiptForm.value.remark || null
-    }, receiptKey.value)
-    ElMessage.success('交付收货已入账')
-    receiptCreateOpen.value = false
-    receiptKey.value = ''
-    await Promise.all([loadReceipts(1), loadBoard()])
-  } catch (e) {
-    ElMessage.error(errText(e))
-  } finally {
-    submitting.value = false
-  }
-}
-
 const receiptReverseOpen = ref(false)
 const receiptReverseTarget = ref<CompletionReceipt | null>(null)
 const receiptReverseReason = ref('')
@@ -969,6 +892,8 @@ async function submitReceiptReverse() {
 
 // ==================== 调度 ====================
 function reload() {
+  if (tab.value === 'tasks') return loadTasks()
+  if (tab.value === 'quality') return loadQuality()
   if (tab.value === 'board') return loadBoard()
   if (tab.value === 'reports') return loadReports()
   return loadReceipts()
@@ -978,13 +903,15 @@ function onTabChange(name: string) {
   if (loadedTabs.value.has(name)) return
   loadedTabs.value.add(name)
   if (name === 'reports') loadReports(1)
+  else if (name === 'tasks') loadTasks(1)
+  else if (name === 'quality') loadQuality(1)
   else if (name === 'receipts') { loadWarehouses(); loadReceipts(1) }
 }
 
 onMounted(async () => {
   loadedTabs.value.add('board')
   await loadBoard(1)
-  // 收货 tab 需要仓库下拉，先静默预取（无权限时静默降级为空列表）
+  // 入库记录页需要仓库下拉，先静默预取（无权限时静默降级为空列表）
   loadWarehouses()
 })
 </script>

@@ -155,9 +155,10 @@
         <el-table-column prop="requiredCompletionDate" label="要求完成" width="120" :formatter="dateCell" />
         <el-table-column prop="salespersonName" label="业务员" width="100" show-overflow-tooltip />
         <el-table-column prop="componentCount" label="制程明细" width="100" align="center" />
-        <el-table-column label="操作" width="72" fixed="right" align="center">
+        <el-table-column label="操作" width="125" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
+            <el-button v-if="canFollowUp" link type="primary" size="small" @click="followUpRouter.push({ path: '/production-followups', query: { sourceId: String(row.id) } })">跟单</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -817,6 +818,8 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { Search } from '@element-plus/icons-vue'
 import H3LedgerDetailDrawer from './H3LedgerDetailDrawer.vue'
 import {
@@ -846,6 +849,10 @@ import {
 import { fetchProductCatalogLedger, fetchWarehouseStockLedger, fetchDealerLedger } from '@/api/productInventory'
 import { notify } from '@/composables/ui/useToast'
 import type { H3LedgerKind, LedgerDetailResult, LedgerRow } from '@/api/business/orders'
+
+const followUpRouter = useRouter()
+const { can: canFollowUpPermission } = useCurrentUser()
+const canFollowUp = computed(() => ['manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'].some(canFollowUpPermission))
 
 /** initialKeyword：从外部深链（如出库单详情 → 本页台账）带入的初始搜索词，仅挂载时生效一次 */
 const props = defineProps<{ ledgerType: H3LedgerKind; initialKeyword?: string }>()
@@ -879,7 +886,7 @@ const META: Record<H3LedgerKind, { placeholder: string; hint: string }> = {
   },
   production: {
     placeholder: '搜索工单号 / 客户 / 产品',
-    hint: '氚云生产任务工单原始历史台账；当前不与后续重建的正式生产模块建立关联。'
+    hint: '保留氚云生产任务工单原始数据；点击“跟单”维护本地进度，重新导入不覆盖跟单记录。'
   },
   receipt: {
     placeholder: '搜索收款单号 / 客户 / 业务员',

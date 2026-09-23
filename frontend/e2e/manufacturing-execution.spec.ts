@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test'
 
 /**
- * 「车间执行」页验证（工单 → 报工 → 交付收货）。
+ * 「车间执行」页验证（工单 → 报工 → 人工检验并入库）。
  *
  * 两个层次：
  * 1. 页面与写动作契约（**全 mock，确定性**）：三个页签各自加载、空态正确；
@@ -60,14 +60,14 @@ async function mockManufacturingApis(page: Page, writes: Array<{ path: string; k
   })
 }
 
-test('车间执行页：三页签逐段加载，且没有任何领料入口', async ({ page }) => {
+test('车间执行页：报工与完工检验分开，且没有独立收货入口', async ({ page }) => {
   const writes: Array<{ path: string; key?: string }> = []
   await mockManufacturingApis(page, writes)
   await page.addInitScript(EMPLOYEE_INIT)
   await page.goto('/#/manufacturing-execution')
 
   await expect(page.getByRole('heading', { level: 1, name: '车间执行' })).toBeVisible()
-  for (const tab of ['执行看板', '报工记录', '交付收货']) {
+  for (const tab of ['执行看板', '报工记录', '待完工检验', '完工入库记录']) {
     await expect(page.getByRole('tab', { name: tab })).toBeVisible()
   }
   // 执行看板：统计卡与空态
@@ -80,9 +80,9 @@ test('车间执行页：三页签逐段加载，且没有任何领料入口', as
   await page.getByRole('tab', { name: '报工记录' }).click()
   await expect(page.getByText('没有报工记录')).toBeVisible()
 
-  await page.getByRole('tab', { name: '交付收货' }).click()
-  await expect(page.getByText('没有收货单')).toBeVisible()
-  await expect(page.getByRole('button', { name: '办理收货' })).toBeVisible()
+  await page.getByRole('tab', { name: '完工入库记录' }).click()
+  await expect(page.getByText('没有完工入库记录')).toBeVisible()
+  await expect(page.getByRole('button', { name: '办理收货' })).toHaveCount(0)
 
   await page.screenshot({ path: 'e2e/__screenshots__/manufacturing-execution-receipts.png', fullPage: true })
 })
@@ -104,8 +104,8 @@ test('车间执行页：每个写动作都带请求键，同一次提交的重�
     await api.reverseWorkReport(31, '报错冲正', api.newRequestKey())
     await api.createManufacturingOrder({ productName: 'x' }, api.newRequestKey())
     await api.generateManufacturingOperations(11, 5, api.newRequestKey())
-    await api.submitManufacturingInspection(11, { result: 'PASSED' }, api.newRequestKey())
-    await api.completeManufacturingOrder(11, { warehouseId: 1, quantity: 1 }, api.newRequestKey())
+    await api.submitManufacturingInspection(11, { result: 'FAILED' }, api.newRequestKey())
+    await api.submitQualityCompletion(11, { inspection: { result: 'PASSED' }, inventory: { warehouseId: 1 } }, api.newRequestKey())
     await api.reverseCompletionReceipt(41, '反入库', api.newRequestKey())
     // 未显式给键的调用也不能漏带（兜底新生成一个）
     await api.reverseWorkReport(32, '兜底')

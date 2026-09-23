@@ -26,11 +26,7 @@ http.interceptors.response.use(
     const data = response.data as BackendApiResponse | unknown
     if (isApiResponse(data)) {
       if (data.code !== 0 && data.code !== 200) {
-        const error: ApiError = {
-          message: data.message,
-          timestamp: data.timestamp
-        }
-        return Promise.reject(error)
+        return Promise.reject(apiRejection(data.message, data.timestamp, null))
       }
       return { ...response, data: data.data }
     }
@@ -59,10 +55,29 @@ http.interceptors.response.use(
       }
     }
 
-    const apiError: ApiError = { message, timestamp }
+    const apiError = apiRejection(message, timestamp, error)
     return Promise.reject(apiError)
   }
 )
+
+/**
+ * 把错误的拒绝值做成**真正的 Error 实例**（字段仍是 {@link ApiError} 的 message + timestamp）。
+ *
+ * <p>为什么必须是 Error：拦截器原先 reject 的是纯对象 `{message,timestamp}`，而各页面取消息
+ * 普遍写成 `err instanceof Error ? err.message : '通用兜底'`（建单抽屉、证书页、公司信息页等
+ * 十余处），对象过不了 `instanceof` 判断 —— 服务端给的具体原因（例如「产品未关联制程，且车间
+ * 未设置默认制程」）就被吞掉，用户只看到「创建失败，请重试」和浏览器控制台的 400。
+ * 2026-09-23 建单失败即由该缺陷导致无法自解释，故统一改为 Error 实例。
+ *
+ * <p>`name` 沿用原错误名（axios 取消请求叫 CanceledError/AbortError），以免打断
+ * `err.name === 'AbortError'` 这类静默取消判断。
+ */
+function apiRejection(message: string, timestamp: string, original: unknown): Error & ApiError {
+  const apiError = new Error(message) as Error & ApiError
+  apiError.name = original instanceof Error && original.name ? original.name : 'ApiError'
+  apiError.timestamp = timestamp
+  return apiError
+}
 
 function isApiResponse(data: unknown): data is BackendApiResponse {
   if (!data || typeof data !== 'object') return false

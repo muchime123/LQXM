@@ -39,7 +39,7 @@
       <el-pagination v-model:current-page="page" :page-size="30" :total="total" layout="total, prev, pager, next" @current-change="load" />
     </section>
 
-    <el-drawer v-model="drawer" title="生产工单跟单" size="min(780px, 96vw)" :close-on-click-modal="false" :before-close="beforeClose" :close-on-press-escape="!saving" :show-close="!saving">
+    <el-drawer v-model="drawer" title="生产工单跟单" size="min(780px, 96vw)" :close-on-click-modal="!saving" :before-close="beforeClose" :close-on-press-escape="!saving" :show-close="!saving">
       <div v-loading="detailLoading">
         <el-alert v-if="detailError" :title="detailError" type="error" :closable="false" show-icon />
         <template v-if="detail && form">

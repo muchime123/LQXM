@@ -54,8 +54,13 @@ import static org.mockito.Mockito.*;
 class ManufacturingExecutionContractMysqlTest {
 
     private static final String SCHEMA = "mfg_contract_test";
-    /** 3 道工序的短模板。V318 后全部工序 requires_inspection=0 → 报工完成即自动放行。 */
-    private static final String TEMPLATE = "STANDARD_SEALER";
+    /**
+     * 在用制程模板 code —— **不写死**：09-23 氚云对齐（V332）把 STANDARD_SEALER / 订做封口机 等旧模板停用，
+     * 写死会让整个测试类在业务调整主数据后**整类假失败**（实测已发生一次，2026-09-23）。
+     * 改为在 {@link #prepareSchema()} 里取「启用中工序数最多」的模板：既保住多工序顺序报工 +
+     * 末道自动放行的覆盖，又不会因为业务换模板而失效。工序数断言一律从模板现算，不写死数字。
+     */
+    private static String TEMPLATE;
     private static final long ACTOR_ID = 23L;
     private static final String ACTOR_NAME = "李强";
 
@@ -108,6 +113,13 @@ class ManufacturingExecutionContractMysqlTest {
             st.execute("INSERT INTO " + SCHEMA + ".sales_products(product_code,product_name,specification,unit) VALUES"
                     + "('CTL-SKU-1','契约验证产品','X1','台'),('CTL-SKU-2','契约验证模具','M1','套')");
             st.execute("USE " + SCHEMA);
+            // 选在用制程模板（见 TEMPLATE 字段注释）：USE 之后用非限定名，与种子同一连接，避免看到未完成的 DDL。
+            try (var rs = st.executeQuery("SELECT t.template_code FROM manufacturing_process_templates t"
+                    + " JOIN manufacturing_process_template_operations x ON x.template_id=t.id"
+                    + " WHERE t.active=1 GROUP BY t.id,t.template_code ORDER BY COUNT(x.id) DESC, t.id LIMIT 1")) {
+                assertTrue(rs.next(), "正式库里没有「启用且带工序」的制程模板，本类测试的前提不成立");
+                TEMPLATE = rs.getString(1);
+            }
         }
     }
 
@@ -148,8 +160,9 @@ class ManufacturingExecutionContractMysqlTest {
             long warehouseId = jdbc.queryForObject("SELECT id FROM warehouses WHERE warehouse_code='VERIFY-WH'", Long.class);
 
             // 1) 建单：同键重放必须返回同一个工单，而不是再建一张
+            //    （09-22 起 unit 是新增形参，此处传 null → 回落到 SKU 主数据上的单位，行为与改造前一致）
             var createRequest = new ManufacturingService.CreateOrder(null, null, "契约验证客户", "契约验证产品",
-                    product("CTL-SKU-1"), "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null);
+                    product("CTL-SKU-1"), null, "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null);
             long orderId = manufacturing.create(createRequest, "ctl-loop-order-create");
             assertEquals(orderId, (long) manufacturing.create(createRequest, "ctl-loop-order-create"),
                     "同键重放必须复用首次结果，不得重复建单");
@@ -157,11 +170,11 @@ class ManufacturingExecutionContractMysqlTest {
                     "重放不得产生第二张工单");
             String orderNo = jdbc.queryForObject("SELECT order_no FROM manufacturing_orders WHERE id=?", String.class, orderId);
 
-            // 2) 工序随建单展开（同一请求键内），共 3 道
+            // 2) 工序随建单展开（同一请求键内），条数 = 该模板的工序数
             List<Long> ops = jdbc.queryForList(
                     "SELECT id FROM manufacturing_order_operations WHERE manufacturing_order_id=? ORDER BY sequence_no",
                     Long.class, orderId);
-            assertEquals(3, ops.size(), TEMPLATE + " 应为 3 道工序");
+            assertEquals(templateOperationCount(), ops.size(), TEMPLATE + " 的工序数应与模板一致");
 
             // 3) 报工：同键重放不重复落账；同键换载荷报冲突（不能借旧键拿到旧结果）
             long reportId = execution.report(orderId, ops.get(0), report(10), "ctl-loop-report-01");
@@ -177,13 +190,14 @@ class ManufacturingExecutionContractMysqlTest {
             assertEquals(1, count("SELECT COUNT(*) FROM manufacturing_work_reports WHERE manufacturing_order_operation_id=" + ops.get(0)),
                     "冲突请求不得落任何行");
 
-            // 4) 收尾两道工序 → 无检验工序，自动放行至待入库（V318 闸门）
-            execution.report(orderId, ops.get(1), report(10), "ctl-loop-report-02");
-            execution.report(orderId, ops.get(2), report(10), "ctl-loop-report-03");
+            // 4) 报完剩余全部工序 → 无检验工序，自动放行至待入库（V318 闸门）
+            //    ⚠️ 不写死「收尾两道」：工序数随在用模板变（见 TEMPLATE 字段注释），一律按实际清单顺序报完
+            for (int i = 1; i < ops.size(); i++) {
+                execution.report(orderId, ops.get(i), report(10), "ctl-loop-report-" + String.format("%02d", i + 1));
+            }
             Map<String, Object> released = order(orderId);
-            assertEquals("PENDING_RECEIPT", released.get("status"), "工序全部报工且无检验工序时应直接进待入库");
-            assertEquals("AUTO", released.get("inspection_source"));
-            assertEquals(0, count("SELECT COUNT(*) FROM manufacturing_inspections"), "自动确认不得伪造检验事实");
+            assertEquals("PENDING_INSPECTION", released.get("status"), "全部工序完成后必须人工检验");
+            assertEquals(0, count("SELECT COUNT(*) FROM manufacturing_inspections"), "报工不得伪造检验事实");
 
             // 5) 交付收货：同键重放不得重复入库（否则会多出成品批次与库存流水）
             //    P3 起收货按产出清单逐项确认，不再手打成品名
@@ -193,9 +207,13 @@ class ManufacturingExecutionContractMysqlTest {
             var receiptRequest = new ManufacturingService.CompleteOrder(warehouseId, null,
                     List.of(new ManufacturingService.ReceiptLine(outputId, new BigDecimal("10"), new BigDecimal("100"), "契约验证")),
                     "契约验证");
-            long receiptId = manufacturing.complete(orderId, receiptRequest, "ctl-loop-receipt-post");
-            assertEquals(receiptId, (long) manufacturing.complete(orderId, receiptRequest, "ctl-loop-receipt-post"),
+            var qualityRequest = new ManufacturingService.QualityCompletion(
+                    new ManufacturingExecutionService.InspectionRequest("PASSED",new BigDecimal("10"),BigDecimal.ZERO,null,"人工检验合格",null,null),
+                    receiptRequest,null);
+            long receiptId = manufacturing.inspectAndComplete(orderId, qualityRequest, "ctl-loop-receipt-post");
+            assertEquals(receiptId, (long) manufacturing.inspectAndComplete(orderId, qualityRequest, "ctl-loop-receipt-post"),
                     "同键重放必须复用首次入库单");
+            assertEquals(1, count("SELECT COUNT(*) FROM manufacturing_inspections WHERE manufacturing_order_id=" + orderId));
             assertEquals(1, count("SELECT COUNT(*) FROM manufacturing_completion_receipts WHERE manufacturing_order_id=" + orderId));
             assertEquals(1, count("SELECT COUNT(*) FROM finished_goods_lots WHERE manufacturing_order_id=" + orderId));
             assertEquals(1, count("SELECT COUNT(*) FROM manufacturing_completion_receipt_items WHERE receipt_id=" + receiptId),
@@ -223,19 +241,23 @@ class ManufacturingExecutionContractMysqlTest {
             assertEquals(0, new BigDecimal("0").compareTo((BigDecimal) order(orderId).get("completed_quantity")),
                     "反入库必须回退工单已入库数量");
 
-            // 7) 幂等键：6 个动作各 1 行，操作人必填且落到发起人
+            // 7) 幂等键：每个唯一动作各 1 行 = 建单 1 + 每道工序报工 1 + 收货 1 + 冲销 1，重放不新增
             //    按 ctl-loop- 前缀计数：本类的另一用例会用独立连接真实提交键行，不能全表计数
-            assertEquals(6, count("SELECT COUNT(*) FROM idem_request WHERE request_key LIKE 'ctl-loop-%'"),
-                    "6 次唯一动作 = 6 个幂等键，重放不新增");
+            //    ⚠️ 不写死 6：工序数随在用模板变（见 TEMPLATE 字段注释）
+            int expectedKeys = 3 + ops.size();
+            assertEquals(expectedKeys, count("SELECT COUNT(*) FROM idem_request WHERE request_key LIKE 'ctl-loop-%'"),
+                    expectedKeys + " 次唯一动作 = " + expectedKeys + " 个幂等键，重放不新增");
             assertEquals(0, count("SELECT COUNT(*) FROM idem_request WHERE request_key LIKE 'ctl-loop-%'"
                     + " AND (created_by IS NULL OR created_by<>" + ACTOR_ID + ")"), "幂等键必须记录发起人");
             List<String> actions = jdbc.queryForList(
                     "SELECT DISTINCT action FROM idem_request WHERE request_key LIKE 'ctl-loop-%' ORDER BY action", String.class);
             assertEquals(List.of(
-                    "manufacturing.completionReceipt.post",
                     "manufacturing.completionReceipt.reverse",
                     "manufacturing.order.create",
+                    "manufacturing.qualityCompletion.post",
                     "manufacturing.workReport.submit"), actions);
+            assertEquals(1, count("SELECT COUNT(*) FROM idem_request WHERE action='manufacturing.inspection.submit'"));
+            assertEquals(1, count("SELECT COUNT(*) FROM idem_request WHERE action='manufacturing.completionReceipt.post'"));
 
             // 8) 行级审计：动作齐全、带原因码与操作人姓名快照
             assertEquals(0, count("SELECT COUNT(*) FROM row_change_log WHERE operator_id IS NULL OR operator_id<>" + ACTOR_ID
@@ -276,7 +298,7 @@ class ManufacturingExecutionContractMysqlTest {
             long templateId = template(TEMPLATE);
             long warehouseId = jdbc.queryForObject("SELECT id FROM warehouses WHERE warehouse_code='VERIFY-WH'", Long.class);
             var createRequest = new ManufacturingService.CreateOrder(null, null, "契约重试客户", "契约重试产品",
-                    product("CTL-SKU-1"), null, null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null);
+                    product("CTL-SKU-1"), null, null, null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null);
             long orderId = manufacturing.create(createRequest, "ctl-retry-create");
             for (long opId : jdbc.queryForList("SELECT id FROM manufacturing_order_operations WHERE manufacturing_order_id=? ORDER BY sequence_no",
                     Long.class, orderId)) {
@@ -289,8 +311,9 @@ class ManufacturingExecutionContractMysqlTest {
                     Long.class, orderId);
             var tooMany = new ManufacturingService.CompleteOrder(warehouseId, null,
                     List.of(new ManufacturingService.ReceiptLine(retryOutput, new BigDecimal("999"), BigDecimal.ZERO, null)), null);
+            var inspection = new ManufacturingExecutionService.InspectionRequest("PASSED",new BigDecimal("10"),BigDecimal.ZERO,null,null,null,null);
             assertThrows(IllegalArgumentException.class,
-                    () -> manufacturing.complete(orderId, tooMany, "ctl-retry-receipt"));
+                    () -> manufacturing.inspectAndComplete(orderId, new ManufacturingService.QualityCompletion(inspection,tooMany,null), "ctl-retry-receipt"));
 
             assertEquals(0, count("SELECT COUNT(*) FROM manufacturing_completion_receipts WHERE manufacturing_order_id=" + orderId),
                     "校验失败不得留下任何入库单");
@@ -302,8 +325,36 @@ class ManufacturingExecutionContractMysqlTest {
             // 同一个请求键重试（换内容）必须成功，而不是被判定为「同键异载荷冲突」
             var ok = new ManufacturingService.CompleteOrder(warehouseId, null,
                     List.of(new ManufacturingService.ReceiptLine(retryOutput, new BigDecimal("10"), BigDecimal.ZERO, null)), null);
-            long receiptId = manufacturing.complete(orderId, ok, "ctl-retry-receipt");
+            long receiptId = manufacturing.inspectAndComplete(orderId, new ManufacturingService.QualityCompletion(inspection,ok,null), "ctl-retry-receipt");
             assertTrue(receiptId > 0, "回滚后的请求键必须可再次使用");
+        });
+    }
+
+    @Test
+    void qualityCompletionRequiresInventoryIdentityAndPostsAtomically() {
+        runInRollbackTransaction(() -> {
+            long orderId=manufacturing.create(new ManufacturingService.CreateOrder(null,null,"质检客户","契约验证产品",
+                    null,"台",null,null,new BigDecimal("10"),null,null,"SAMPLE",template(TEMPLATE),null,null,null),
+                    "ctl-quality-create");
+            for(long opId:jdbc.queryForList("SELECT id FROM manufacturing_order_operations WHERE manufacturing_order_id=? ORDER BY sequence_no",Long.class,orderId))
+                execution.report(orderId,opId,report(10),"ctl-quality-report-"+opId);
+            long outputId=jdbc.queryForObject("SELECT id FROM manufacturing_order_outputs WHERE manufacturing_order_id=? AND is_primary=1",Long.class,orderId);
+            long warehouseId=jdbc.queryForObject("SELECT id FROM warehouses WHERE warehouse_code='VERIFY-WH'",Long.class);
+            var inspection=new ManufacturingExecutionService.InspectionRequest("PASSED",new BigDecimal("10"),BigDecimal.ZERO,null,null,null,null);
+            var inventory=new ManufacturingService.CompleteOrder(warehouseId,null,
+                    List.of(new ManufacturingService.ReceiptLine(outputId,new BigDecimal("10"),BigDecimal.ZERO,null)),null);
+            assertThrows(IllegalStateException.class,()->manufacturing.inspectAndComplete(orderId,
+                    new ManufacturingService.QualityCompletion(inspection,inventory,null),"ctl-quality-post"));
+            assertEquals(0,count("SELECT COUNT(*) FROM manufacturing_inspections WHERE manufacturing_order_id="+orderId));
+            assertEquals(0,count("SELECT COUNT(*) FROM manufacturing_completion_receipts WHERE manufacturing_order_id="+orderId));
+            var match=List.of(new ManufacturingService.OutputMatch(outputId,product("CTL-SKU-1")));
+            long receiptId=manufacturing.inspectAndComplete(orderId,
+                    new ManufacturingService.QualityCompletion(inspection,inventory,match),"ctl-quality-post");
+            assertTrue(receiptId>0);
+            assertEquals("COMPLETED",order(orderId).get("status"));
+            assertEquals(1,count("SELECT COUNT(*) FROM manufacturing_inspections WHERE manufacturing_order_id="+orderId));
+            assertEquals(1,count("SELECT COUNT(*) FROM finished_goods_lots WHERE manufacturing_order_id="+orderId));
+            assertEquals(1,count("SELECT COUNT(*) FROM product_inventory_transactions WHERE source_type='COMPLETION_RECEIPT' AND source_id="+receiptId));
         });
     }
 
@@ -319,7 +370,7 @@ class ManufacturingExecutionContractMysqlTest {
 
             // 建单：主产品 10 台 + 配套模具 2 套（实测 14.0% 的工单产出多个 SKU）
             var createRequest = new ManufacturingService.CreateOrder(null, null, "多产出客户", "契约验证产品",
-                    primarySku, "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null,
+                    primarySku, null, "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null,
                     List.of(new ManufacturingService.OutputLine(moldSku, new BigDecimal("2"), true, "配套模具")), null);
             long orderId = manufacturing.create(createRequest, "ctl-multi-create");
 
@@ -338,10 +389,12 @@ class ManufacturingExecutionContractMysqlTest {
             }
 
             // 收货：两项一次收完
-            long receiptId = manufacturing.complete(orderId, new ManufacturingService.CompleteOrder(warehouseId, null,
+            long receiptId = manufacturing.inspectAndComplete(orderId, new ManufacturingService.QualityCompletion(
+                    new ManufacturingExecutionService.InspectionRequest("PASSED",new BigDecimal("10"),BigDecimal.ZERO,null,null,null,null),
+                    new ManufacturingService.CompleteOrder(warehouseId, null,
                     List.of(new ManufacturingService.ReceiptLine(primaryOutput, new BigDecimal("10"), new BigDecimal("50"), null),
                             new ManufacturingService.ReceiptLine(moldOutput, new BigDecimal("2"), new BigDecimal("8"), null)),
-                    "多产出收货"), "ctl-multi-receipt");
+                    "多产出收货"),null), "ctl-multi-receipt");
 
             assertEquals(2, count("SELECT COUNT(*) FROM finished_goods_lots WHERE manufacturing_order_id=" + orderId),
                     "每个产出各落一个批次");
@@ -441,6 +494,11 @@ class ManufacturingExecutionContractMysqlTest {
         Long id = jdbc.queryForObject("SELECT id FROM manufacturing_process_templates WHERE template_code=?", Long.class, code);
         assertNotNull(id, "正式库缺少制程模板 " + code + "，本用例的主数据假定不成立");
         return id;
+    }
+
+    /** 该模板应有的工序数 —— 从模板现算，不写死数字（主数据按氚云调整时不会假失败）。 */
+    private int templateOperationCount() {
+        return count("SELECT COUNT(*) FROM manufacturing_process_template_operations WHERE template_id=" + template(TEMPLATE));
     }
 
     /**

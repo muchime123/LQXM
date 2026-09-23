@@ -13,7 +13,7 @@ public class ManufacturingController {
     private final ManufacturingService service;
     private final com.liqiang.archive.service.ManufacturingExecutionService execution;
     private final com.liqiang.archive.service.ManufacturingMaterialService materials;
-    @GetMapping("/warehouses") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    @GetMapping("/warehouses") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.inspect"})
     public List<Map<String,Object>> warehouses(){return service.warehouses();}
     /** 建单弹窗用：启用中的车间 + 默认制程（读权限即可，勿并入 /master/workshops——那是模板管理权限）。 */
     @GetMapping("/workshop-options") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
@@ -22,7 +22,7 @@ public class ManufacturingController {
      * 建单弹窗用：产品选择器（P3 ①：产品身份必须从主数据里选，不再打名字）。
      * 读权限即可 —— 建单用户只有 manufacturing.manage，没有产品档案的管理权限。
      */
-    @GetMapping("/product-options") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.manage"})
+    @GetMapping("/product-options") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.manage","manufacturing.inspect"})
     public List<Map<String,Object>> productOptions(@RequestParam(defaultValue="")String keyword,@RequestParam(defaultValue="50")int limit){
         return service.productOptions(keyword,limit);
     }
@@ -74,7 +74,7 @@ public class ManufacturingController {
         service.manualCompleteOperation(orderId,operationId,date,requestKey);
         return Map.of("ok",true);
     }
-    @GetMapping("/orders/{id}") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    @GetMapping("/orders/{id}") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.report","manufacturing.inspect","manufacturing.receive"})
     public Map<String,Object> detail(@PathVariable long id){return service.detail(id);}
     @GetMapping("/orders/{id}/materials") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.material.manage"}) public Map<String,Object> materials(@PathVariable long id){service.requireVisible(id);return materials.detail(id);}
     @PostMapping("/orders/{id}/materials") @RequirePermission("manufacturing.material.manage") public long createMaterial(@PathVariable long id,@RequestBody com.liqiang.archive.service.ManufacturingMaterialService.RequirementRequest request){service.requireVisible(id);return materials.saveRequirement(id,null,request);}
@@ -149,13 +149,16 @@ public class ManufacturingController {
             @RequestHeader(value="X-Request-Key",required=false) String requestKey){execution.reverse(id,request.get("reason"),requestKey);}
     @PostMapping("/orders/{id}/inspections") @RequirePermission("manufacturing.inspect")
     public long inspect(@PathVariable long id,@RequestBody com.liqiang.archive.service.ManufacturingExecutionService.InspectionRequest request,
-            @RequestHeader(value="X-Request-Key",required=false) String requestKey){return execution.inspect(id,request,requestKey);}
+            @RequestHeader(value="X-Request-Key",required=false) String requestKey){
+        if("PASSED".equals(request.result()))throw new IllegalArgumentException("检验合格请使用完工检验入库，一次提交检验与入库");
+        return execution.inspect(id,request,requestKey);
+    }
+    @PostMapping("/orders/{id}/quality-completion") @RequirePermission("manufacturing.inspect")
+    public long qualityCompletion(@PathVariable long id,@RequestBody ManufacturingService.QualityCompletion request,
+            @RequestHeader(value="X-Request-Key",required=false) String requestKey){return service.inspectAndComplete(id,request,requestKey);}
     @PostMapping("/orders") @RequirePermission("manufacturing.manage")
     public long create(@RequestBody ManufacturingService.CreateOrder request,
             @RequestHeader(value="X-Request-Key",required=false) String requestKey){return service.create(request,requestKey);}
-    @PostMapping("/orders/{id}/completion-receipts") @RequirePermission("manufacturing.receive")
-    public long complete(@PathVariable long id,@RequestBody ManufacturingService.CompleteOrder request,
-            @RequestHeader(value="X-Request-Key",required=false) String requestKey){return service.complete(id,request,requestKey);}
     @GetMapping("/completion-receipts") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.receive","manufacturing.receive.reverse"})
     public Map<String,Object> completionReceipts(@RequestParam(defaultValue="")String keyword,@RequestParam(defaultValue="")String status,
             @RequestParam(required=false)Long warehouseId,@RequestParam(defaultValue="")String operatorName,
