@@ -3,7 +3,8 @@
     生产任务单（业务员下单）—— 抽屉形态。
     形态纪律：下单是「车间执行页右上角按钮」调出的抽屉，不是独立侧边栏页面。
     联动纪律：先选产线 → 该产线的「产品名称 / 可选配置」才可选（数据源 = 制程与工序管理 → 任务单产品与配置）。
-    建单纪律：产品名称即后端制程解析的 processCategory（同读 manufacturing_task_config_items.config_name）。
+    建单纪律：产品名称即后端制程解析的 processCategory（同读 manufacturing_task_config_items.config_name）；
+              制程跟随产线 —— 解析顺序 = 产品在配置里指定的制程 → 车间默认制程（见 ManufacturingTaskTemplateResolver.resolve）。
               09-22 起**不再要求选可售产品（SKU）** —— SKU 是完工入库的库存身份键，
               不是下单字段，且该主数据要重新设计；下单只带 产线 + 产品名称 + 配置 + 数量，
               单位默认「台」（后端兜底）。无 SKU 的工单完工收货时不落库存账，只登记收货事实。
@@ -58,7 +59,7 @@
       <section class="to-block">
         <h3>产品配置</h3>
         <el-alert type="info" :closable="false" show-icon class="to-tip"
-          title="产品名称与可选配置来自「制程与工序管理 → 任务单产品与配置」，按所选产线联动。产品名称即制程品类，决定本单展开哪些工序。" />
+          title="产品名称与可选配置来自「制程与工序管理 → 任务单产品与配置」，按所选产线联动。本单展开的制程跟随产线：默认用车间的制程，仅当配置里给该产品名称单独指定了制程时才按产品覆盖。" />
         <div class="to-grid">
           <el-form-item label="产品名称" prop="productName" class="span-2">
             <el-select v-model="form.productName" :disabled="!form.workshopId" class="full"
@@ -315,7 +316,8 @@ async function submit(createNext: boolean) {
     const payload = {
       customerName: form.customerName,
       customerId: form.customerId,
-      // 产品名称即制程品类：后端按 manufacturing_task_config_items.config_name 精确匹配展开工序
+      // 产品名称 = processCategory（品类级身份）；制程解析以产线为主：车间默认制程兜底，
+      // 该产线下此产品在配置里单独指定 process_template_id 时才按产品覆盖（见 ManufacturingTaskTemplateResolver.resolve）
       processCategory: form.productName,
       salesProductId: form.salesProductId,
       plannedQuantity: form.plannedQuantity,
