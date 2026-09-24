@@ -10,9 +10,8 @@ export interface NavItem {
   group?: RouteGroup
 }
 
-// ========== 设计参考：ChatGPT 总体架构 §第 三、四、九、十条 + §第二十六条执行顺序
-// 一级模块：氚云数据管理 / 产品中心 / 官网运营 / 公司管理 / 系统管理。
-// 客户、产品库存、氚云生产主数据和月度提成均依赖氚云来源事实，统一归入氚云数据管理。
+// 氚云导入与历史台账独立于自建订单履约；销售订单至出库在同一导航组。
+// 客户、产品库存、氚云生产主数据和月度提成依赖氚云来源事实，归入氚云数据管理。
 // 氚云导入的历史台账已并入氚云导入中心页内 Tab（/h3-imports?tab=ledger&ledger=xxx），旧路径全部在 router 中保留 redirect，兼容历史书签和已开 Tab
 const primaryNavItems: NavItem[] = [
   // ==================== 氚云数据管理（统一数据链入口） ====================
@@ -55,19 +54,11 @@ const primaryNavItems: NavItem[] = [
         group: 'h3'
       },
       {
-        to: '/manufacturing-execution',
-        permission: ['manufacturing.report', 'manufacturing.receive', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'],
+        to: '/h3-production-execution',
+        permission: ['manufacturing.report', 'manufacturing.report.override', 'manufacturing.inspect', 'manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'],
         label: '车间执行',
-        description: '下单与车间接单、报工、交付收货：右上角「新建生产任务单」抽屉下单，工单 → 工序报工 → 完工入库。',
+        description: '氚云任务的制程进度、本地报工与冲正、来源报工记录。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M2 20h20"/><path d="M6 20V9l6-4 6 4v11"/><path d="M10 20v-5h4v5"/></svg>',
-        group: 'h3'
-      },
-      {
-        to: '/production-followups',
-        permission: ['manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'],
-        label: '生产跟单',
-        description: '按车间跟进已导入的生产任务，记录阶段日期、交期变化及跟进历史。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
         group: 'h3'
       },
       {
@@ -76,6 +67,14 @@ const primaryNavItems: NavItem[] = [
         label: '制程与工序管理',
         description: '维护工序模板、产线产品名称与可选配置（生产任务单的联动数据源）。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></svg>',
+        group: 'h3'
+      },
+      {
+        to: '/manufacturing-task-configs',
+        permission: 'manufacturing.template.manage',
+        label: '任务单产品与配置',
+        description: '维护各产线可下单的产品名称与可选配置，是新建任务单的联动数据源与产品身份锚点。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="15" width="18" height="5" rx="1.5"/><circle cx="8" cy="7.5" r="1.2"/></svg>',
         group: 'h3'
       },
       {
@@ -88,16 +87,48 @@ const primaryNavItems: NavItem[] = [
       }
     ]
   },
-  // ==================== 销售管理 ====================
-  // ERP 自建单据的第一块：与「氚云数据管理」并列，因为它是**正式业务**而不是台账参考。
-  // 台账出库在「氚云数据管理 → 销售出库关联」，只读历史；这里的单子可录、可扣库存、可追溯。
+  // ==================== 订单与生产交付 ====================
+  // 自建销售订单、待接生产需求、本地生产任务、外采采购订单和销售出库按履约顺序排列。
+  // 独立的展会、展厅和打样任务仍可直接从本地生产任务创建。
   {
-    to: '/sales-outbounds',
-    label: '销售管理',
-    description: '有货直接出库：按可售库存选货，过账即扣减库存并留痕。',
+    to: '/sales-orders',
+    label: '订单与生产交付',
+    description: '销售订单 → 待接生产需求 → 本地生产任务 / 采购订单 → 销售出库；也可直接新建独立生产任务。',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>',
     group: 'sales',
     children: [
+      {
+        to: '/sales-orders',
+        permission: ['sales_order.read.self', 'sales_order.read.department', 'sales_order.read.all'],
+        label: '销售订单',
+        description: '记录客户需求，确认后按明细办理现货、生产或外采。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M8 3h9l4 4v14H8z"/><path d="M17 3v5h4M11 12h7M11 16h7"/></svg>',
+        group: 'sales'
+      },
+      {
+        to: '/production-demands',
+        permission: 'manufacturing.manage',
+        label: '待接生产需求',
+        description: '核对已确认销售订单的自产产品配置并接单生成生产任务。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 4h16v16H4zM8 9h8M8 13h8M8 17h5"/></svg>',
+        group: 'sales'
+      },
+      {
+        to: '/local-manufacturing-execution',
+        permission: ['manufacturing.manage', 'manufacturing.report', 'manufacturing.inspect', 'manufacturing.report.override', 'manufacturing.receive', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'],
+        label: '本地生产任务',
+        description: '承接销售需求，也可直接新建展会、展厅、打样等独立任务。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M2 20h20M5 20V8l7-4 7 4v12M9 20v-6h6v6"/></svg>',
+        group: 'sales'
+      },
+      {
+        to: '/purchase-orders',
+        permission: ['purchase_order.read.self', 'purchase_order.read.department', 'purchase_order.read.all'],
+        label: '采购订单',
+        description: '销售订单的外采明细在这里落地：到货入本地库存账，或由供应商直发客户（代发）。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M3 6h2l2.4 10.4a2 2 0 0 0 2 1.6h7.6a2 2 0 0 0 2-1.6L21 8H6"/><circle cx="10" cy="20" r="1"/><circle cx="18" cy="20" r="1"/></svg>',
+        group: 'sales'
+      },
       {
         to: '/sales-outbounds',
         permission: ['sales_order.read.self', 'sales_order.read.department', 'sales_order.read.all'],

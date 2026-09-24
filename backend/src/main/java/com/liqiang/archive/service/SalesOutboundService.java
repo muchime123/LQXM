@@ -49,13 +49,27 @@ import java.util.*;
 public class SalesOutboundService {
 
     private static final String ACTION_CREATE = "sales.outbound.create";
+    private static final String ACTION_CREATE_DROP_SHIP = "sales.outbound.create-dropship";
     private static final String ACTION_UPDATE = "sales.outbound.update";
     private static final String ACTION_POST = "sales.outbound.post";
     private static final String ACTION_REVERSE = "sales.outbound.reverse";
+    private static final String ACTION_CANCEL = "sales.outbound.cancel";
 
     /** 库存流水来源标识：正向出库 / 冲销回补。 */
     private static final String SOURCE_OUTBOUND = "ERP_SALES_OUTBOUND";
     private static final String SOURCE_REVERSAL = "ERP_SALES_OUTBOUND_REVERSAL";
+
+    /**
+     * 履约来源：代发（供应商直发客户）。
+     *
+     * <p>代发的货**从未进过本地仓库**，所以过账时豁免扣减 {@code product_inventory_balances}。
+     * 这不是「少做一步」，而是这批货本来就不在本地库存账上——照普通单扣会因余额不足整单失败，
+     * 或扣到同期别的货上、凭空造出负库存。
+     *
+     * <p>标记落在**出库单自己身上**（{@code erp_sales_outbounds.fulfillment_source}，见 V345），
+     * 而不是过账时反查采购订单：过账的语义边界是这张单，反查会随 PO 事后变更而漂移。
+     */
+    private static final String FULFILLMENT_DROP_SHIP = "DROP_SHIP";
 
     /** 单行最大行数：一张出库单手录明细的现实上限，防前端异常提交。 */
     private static final int MAX_LINES = 200;
@@ -106,6 +120,22 @@ public class SalesOutboundService {
     /** 建单/改单入参。 */
     public record OutboundRequest(Long customerId, String customerName, Long warehouseId, String salesOrderRef,
                                   LocalDate outboundDate, String remark, List<OutboundLine> lines) {}
+
+    /**
+     * 代发明细行入参：**带快照**，产品身份可缺省。
+     *
+     * <p>与 {@link OutboundLine} 的差别就是「可缺省产品身份」：外采对象常是临时品
+     * （片膜/卷膜/盒子），还没有 {@code sales_products} 档案。没有身份就无法进本地库存账
+     * （余额的键含产品 id），但代发本来也不进库存账，所以这里允许只带名称/规格/单位快照。
+     * 有档案时仍带 id，便于后续按身份下钻。
+     */
+    public record DropShipLine(Long productId, String productName, String specification, String unit,
+                               BigDecimal quantity, BigDecimal unitPrice, String remark) {}
+
+    /** 代发建单入参：无仓库（直发客户），业务员取销售订单归属，保证订单侧可见。 */
+    public record DropShipRequest(Long customerId, String customerName, Long salespersonId, String salespersonName,
+                                  String salesOrderRef, LocalDate outboundDate, String remark,
+                                  List<DropShipLine> lines) {}
 
     // ==================== 读 ====================
 
@@ -162,7 +192,8 @@ public class SalesOutboundService {
                 "SELECT o.id,o.outbound_no outboundNo,o.status,o.customer_id customerId,"
                         + " o.customer_name_snapshot customerName,o.salesperson_name_snapshot salespersonName,"
                         + " o.warehouse_id warehouseId,w.warehouse_name warehouseName,"
-                        + " o.sales_order_ref salesOrderRef,o.outbound_date outboundDate,o.total_amount totalAmount,"
+                        + " o.sales_order_ref salesOrderRef,o.sales_order_id salesOrderId,"
+                        + " o.outbound_date outboundDate,o.total_amount totalAmount,"
                         + " o.remark,o.posted_at postedAt,o.reversed_at reversedAt,o.reversal_reason reversalReason,"
                         + " o.created_by_name createdByName,o.created_at createdAt,"
                         + " o.external_source externalSource,o.source_outbound_no sourceOutboundNo,"
@@ -194,6 +225,7 @@ public class SalesOutboundService {
                         + " o.customer_name_snapshot customerName,o.salesperson_id salespersonId,"
                         + " o.salesperson_name_snapshot salespersonName,o.warehouse_id warehouseId,"
                         + " w.warehouse_name warehouseName,o.sales_order_ref salesOrderRef,"
+                        + " o.sales_order_id salesOrderId,"
                         + " o.outbound_date outboundDate,o.total_amount totalAmount,o.remark,"
                         + " o.posted_at postedAt,o.posted_by_name postedByName,"
                         + " o.reversed_at reversedAt,o.reversed_by_name reversedByName,"
@@ -252,6 +284,24 @@ public class SalesOutboundService {
                 () -> String.valueOf(doUpdate(id, request, actor, requestKey))));
     }
 
+    /**
+     * 代发建单（草稿）：供应商直发客户，**无仓库、不碰本地库存**。
+     *
+     * <p>入口只有一处——采购订单详情里的「生成代发出库单」（P3）。它把 PO 明细快照原样带入
+     * 出库单，客户/业务员取销售订单归属，之后走与普通出库单完全相同的过账入口
+     * （{@link #post}），只是过账时按 {@code fulfillment_source=DROP_SHIP} 豁免扣库存。
+     * 这样「过账」在全系统只有一个语义出口，代发不是特例通道。
+     */
+    public long createDropShip(DropShipRequest request, String requestKey) {
+        ErpActor actor = actors.current();
+        Map<String, Object> payload = ErpChangeLogWriter.changes(
+                "customerId", request.customerId(), "customerName", clean(request.customerName()),
+                "salesOrderRef", clean(request.salesOrderRef()), "fulfillmentSource", FULFILLMENT_DROP_SHIP,
+                "lines", describeDropShipLines(request.lines()));
+        return Long.parseLong(idem.execute(actor, requestKey, ACTION_CREATE_DROP_SHIP, payload,
+                () -> String.valueOf(doCreateDropShip(request, actor, requestKey))));
+    }
+
     /** 过账：扣库存 + 写流水。库存不足整体回滚（不会出现「单过了、货没扣」）。 */
     public void post(long id, String requestKey) {
         ErpActor actor = actors.current();
@@ -266,6 +316,27 @@ public class SalesOutboundService {
         Map<String, Object> payload = ErpChangeLogWriter.changes("id", id, "reason", clean(reason));
         idem.execute(actor, requestKey, ACTION_REVERSE, payload,
                 () -> { doReverse(id, reason, actor, requestKey); return String.valueOf(id); });
+    }
+
+    /** 取消未过账草稿，不碰库存；释放关联订单明细的待发数量。 */
+    public void cancel(long id, String reason, String requestKey) {
+        if (reason == null || reason.isBlank()) throw new IllegalArgumentException("请填写取消原因");
+        requireVisible(id);
+        ErpActor actor = actors.current();
+        idem.execute(actor, requestKey, ACTION_CANCEL,
+                ErpChangeLogWriter.changes("id", id, "reason", reason.trim()), () -> {
+                    var head = lockHead(id);
+                    if (!"DRAFT".equals(head.get("status")))
+                        throw new IllegalStateException("只有未过账的草稿可以取消");
+                    if ("H3YUN".equals(head.get("externalSource")))
+                        throw new IllegalStateException("氚云历史镜像单不能在此取消");
+                    jdbc.update("UPDATE erp_sales_outbounds SET status='CANCELLED',reversal_reason=? WHERE id=?",
+                            reason.trim(), id);
+                    changeLog.write(ErpChangeLogWriter.of(actor, "product_archive.erp_sales_outbounds", id,
+                            "UPDATE", ErpChangeLogWriter.changes("status", "CANCELLED"),
+                            null, "取消出库草稿：" + reason.trim(), requestKey, null));
+                    return String.valueOf(id);
+                });
     }
 
     // ==================== 写实现 ====================
@@ -297,10 +368,105 @@ public class SalesOutboundService {
         return id;
     }
 
+    /**
+     * 代发建单实现：不校验仓库，明细按快照落库（产品身份可空）。
+     *
+     * <p>{@code salesperson_id} 取销售订单归属而非录单人——出库单的列表可见性按业务员过滤
+     * （{@code DataScopeSupport.appendByEmployeeId}，featureCode=SALES_OUTBOUND），
+     * 若记成「录代发单的人」，下单的业务员反而看不到自己那批货的物流单据。
+     */
+    private long doCreateDropShip(DropShipRequest request, ErpActor actor, String requestKey) {
+        String customer = required(request.customerName(), "客户名称", 300);
+        var lines = validateDropShipLines(request.lines());
+        LocalDate date = request.outboundDate() == null ? LocalDate.now() : request.outboundDate();
+        var user = users.current();
+        String tmp = "PENDING-" + UUID.randomUUID();
+        jdbc.update("INSERT INTO erp_sales_outbounds(outbound_no,status,customer_id,customer_name_snapshot,"
+                        + "salesperson_id,salesperson_name_snapshot,warehouse_id,fulfillment_source,sales_order_ref,"
+                        + "outbound_date,remark,total_amount,created_by_employee_id,created_by_name)"
+                        + " VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                tmp, "DRAFT", request.customerId(), customer,
+                request.salespersonId() == null ? user.employeeId() : request.salespersonId(),
+                clean(request.salespersonName()) == null ? user.name() : request.salespersonName().trim(),
+                null, FULFILLMENT_DROP_SHIP, clean(request.salesOrderRef()), date, clean(request.remark()),
+                totalOf(lines), user.employeeId(), user.name());
+        long id = jdbc.queryForObject("SELECT id FROM erp_sales_outbounds WHERE outbound_no=?", Long.class, tmp);
+        String no = "XSCK" + String.format("%08d", id);
+        jdbc.update("UPDATE erp_sales_outbounds SET outbound_no=? WHERE id=?", no, id);
+        writeDropShipLines(id, lines);
+        changeLog.write(ErpChangeLogWriter.of(actor, "product_archive.erp_sales_outbounds", id, "INSERT",
+                ErpChangeLogWriter.changes("outboundNo", no, "status", "DRAFT", "fulfillmentSource", FULFILLMENT_DROP_SHIP,
+                        "customerNameSnapshot", customer, "outboundDate", date, "lineCount", lines.size(),
+                        "totalAmount", totalOf(lines), "inventoryDeducted", false),
+                null, "创建代发出库单草稿（供应商直发客户）", requestKey, null));
+        return id;
+    }
+
+    /** 代发明细校验：产品身份可缺省（临时外采品），但名称/单位/数量必须有；给了身份就要有效。 */
+    private List<Map<String, Object>> validateDropShipLines(List<DropShipLine> input) {
+        if (input == null || input.isEmpty()) throw new IllegalArgumentException("请至少添加一行出库明细");
+        if (input.size() > MAX_LINES) throw new IllegalArgumentException("出库明细不能超过 " + MAX_LINES + " 行");
+        List<Map<String, Object>> result = new ArrayList<>();
+        Set<String> seen = new HashSet<>();
+        for (DropShipLine line : input) {
+            if (line == null) throw new IllegalArgumentException("出库明细不能为空");
+            String name = required(line.productName(), "产品名称", 500);
+            String unit = required(line.unit(), "单位", 40);
+            BigDecimal qty = line.quantity();
+            if (qty == null || qty.signum() <= 0 || qty.scale() > 6)
+                throw new IllegalArgumentException("出库数量必须大于0且最多6位小数");
+            if (!seen.add(name + "\u0001" + unit))
+                throw new IllegalArgumentException("同一产品在明细中重复出现，请合并为一行");
+            BigDecimal price = line.unitPrice();
+            if (price != null && (price.signum() < 0 || price.scale() > 4))
+                throw new IllegalArgumentException("单价必须≥0且最多4位小数");
+            Map<String, Object> row = new LinkedHashMap<>();
+            row.put("productId", line.productId());
+            row.put("canonicalProductId", null);
+            row.put("productCode", null);
+            row.put("productName", name);
+            row.put("specification", clean(line.specification()));
+            row.put("unit", unit);
+            row.put("quantity", qty);
+            row.put("unitPrice", price);
+            row.put("remark", clean(line.remark()));
+            if (line.productId() != null) {
+                var product = jdbc.queryForList("SELECT id,product_code productCode,product_name productName,"
+                                + "specification,unit,COALESCE(canonical_product_id,id) canonicalProductId "
+                                + "FROM sales_products WHERE id=? AND deleted_at IS NULL", line.productId())
+                        .stream().findFirst()
+                        .orElseThrow(() -> new IllegalArgumentException("出库明细的产品不存在：" + line.productId()));
+                row.put("productId", product.get("id"));
+                row.put("canonicalProductId", product.get("canonicalProductId"));
+                row.put("productCode", product.get("productCode"));
+                // 名称/规格/单位仍以采购订单快照为准：代发单是对外凭证，应反映下单时约定的那份货
+            }
+            result.add(row);
+        }
+        return result;
+    }
+
+    private void writeDropShipLines(long outboundId, List<Map<String, Object>> lines) {
+        int lineNo = 1;
+        for (var row : lines) {
+            BigDecimal qty = (BigDecimal) row.get("quantity");
+            BigDecimal price = (BigDecimal) row.get("unitPrice");
+            BigDecimal amount = price == null ? null : price.multiply(qty).setScale(4, java.math.RoundingMode.HALF_UP);
+            jdbc.update("INSERT INTO erp_sales_outbound_items(outbound_id,line_no,sales_product_id,"
+                            + "canonical_product_id,product_code_snapshot,product_name_snapshot,specification_snapshot,"
+                            + "unit,quantity,unit_price,amount,remark)"
+                            + " VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+                    outboundId, lineNo++, row.get("productId"), row.get("canonicalProductId"), row.get("productCode"),
+                    row.get("productName"), row.get("specification"), row.get("unit"), qty, price, amount, row.get("remark"));
+        }
+    }
+
     private long doUpdate(long id, OutboundRequest request, ErpActor actor, String requestKey) {
         var head = lockHead(id);
         if (!"DRAFT".equals(String.valueOf(head.get("status"))))
             throw new IllegalStateException("只有草稿状态的销售出库单可以修改");
+        if (head.get("salesOrderId") != null)
+            throw new IllegalStateException("此出库草稿由销售订单明细生成，不能脱离订单直接修改");
         String customer = required(request.customerName(), "客户名称", 300);
         Long warehouseId = requireWarehouse(request.warehouseId());
         var lines = validateLines(request.lines());
@@ -340,6 +506,11 @@ public class SalesOutboundService {
         if ("H3YUN".equals(head.get("externalSource")))
             throw new IllegalStateException("这是氚云镜像进来的历史出库单，不参与过账（它只如实反映氚云原状态）。"
                     + "如需按当前库存出库，请新建一张出库单。");
+        // 代发（供应商直发客户）：这批货从未进过本地仓库，过账只落状态与审计。
+        if (FULFILLMENT_DROP_SHIP.equals(head.get("fulfillmentSource"))) {
+            postDropShip(id, actor, requestKey);
+            return;
+        }
         long warehouseId = requireWarehouseForPost(head);
         String no = String.valueOf(head.get("outboundNo"));
         var lines = jdbc.queryForList("SELECT id,line_no lineNo,sales_product_id salesProductId,"
@@ -373,6 +544,25 @@ public class SalesOutboundService {
                 null, "销售出库过账", requestKey, null));
     }
 
+    /**
+     * 代发过账：只落状态与行级审计，**不扣本地库存、不写库存流水**。
+     *
+     * <p>为什么不做「虚拟一入一出」（先入库再出库、净变化 0）：那会在
+     * {@code product_inventory_transactions} 里留下两笔从未真实发生的库存动作，
+     * 把「这批货到过我们仓库」写进不可变流水，之后任何按流水的口径（期末对账、
+     * 「这批货是哪张单产的」）都要先学会识别这种伪行。宁可在这一个分支里少做一步。
+     */
+    private void postDropShip(long id, ErpActor actor, String requestKey) {
+        var user = users.current();
+        LocalDateTime at = LocalDateTime.now();
+        jdbc.update("UPDATE erp_sales_outbounds SET status='POSTED',posted_at=?,posted_by_employee_id=?,"
+                + "posted_by_name=? WHERE id=?", at, user.employeeId(), user.name(), id);
+        changeLog.write(ErpChangeLogWriter.of(actor, "product_archive.erp_sales_outbounds", id, "UPDATE",
+                ErpChangeLogWriter.changes("status", "DRAFT→POSTED", "postedAt", at,
+                        "fulfillmentSource", FULFILLMENT_DROP_SHIP, "inventoryDeducted", false),
+                null, "代发出库过账（供应商直发客户，不过本地库存账）", requestKey, null));
+    }
+
     private void doReverse(long id, String reason, ErpActor actor, String requestKey) {
         String r = clean(reason);
         if (r == null || r.isBlank()) throw new IllegalArgumentException("请填写冲销原因");
@@ -380,6 +570,20 @@ public class SalesOutboundService {
         var head = lockHead(id);
         if (!"POSTED".equals(String.valueOf(head.get("status"))))
             throw new IllegalStateException("只有已过账的销售出库单可以冲销");
+        // 代发单过账时没扣库存，冲销自然也**不能回补库存**——否则会凭空多出一批货。
+        // 代发的撤销真实语义是「要求供应商别发/召回」，属采购侧动作，这里只退状态。
+        if (FULFILLMENT_DROP_SHIP.equals(head.get("fulfillmentSource"))) {
+            var dropShipUser = users.current();
+            LocalDateTime dropShipAt = LocalDateTime.now();
+            jdbc.update("UPDATE erp_sales_outbounds SET status='REVERSED',reversed_at=?,reversed_by_employee_id=?,"
+                            + "reversed_by_name=?,reversal_reason=? WHERE id=?",
+                    dropShipAt, dropShipUser.employeeId(), dropShipUser.name(), r, id);
+            changeLog.write(ErpChangeLogWriter.of(actor, "product_archive.erp_sales_outbounds", id, "UPDATE",
+                    ErpChangeLogWriter.changes("status", "POSTED→REVERSED", "fulfillmentSource", FULFILLMENT_DROP_SHIP,
+                            "reversalReason", r, "inventoryRestored", false),
+                    "REVERSAL", r, requestKey, null));
+            return;
+        }
         long warehouseId = requireWarehouseForPost(head);
         String no = String.valueOf(head.get("outboundNo"));
         var lines = jdbc.queryForList("SELECT line_no lineNo,sales_product_id salesProductId,"
@@ -462,7 +666,8 @@ public class SalesOutboundService {
     /** 锁定并读取单头（并发下过账/冲销串行化）。字段名统一转 camelCase 以便下游按名取值。 */
     private Map<String, Object> lockHead(long id) {
         var rows = jdbc.queryForList("SELECT id,outbound_no outboundNo,status,warehouse_id warehouseId,"
-                + "external_source externalSource "
+                + "sales_order_id salesOrderId,"
+                + "external_source externalSource,fulfillment_source fulfillmentSource "
                 + "FROM erp_sales_outbounds WHERE id=? FOR UPDATE", id);
         if (rows.isEmpty()) throw new IllegalArgumentException("销售出库单不存在");
         return rows.getFirst();
@@ -557,6 +762,18 @@ public class SalesOutboundService {
     /** 去掉小数末尾无意义的 0（错误提示里 10.000000 读起来像精度问题）。 */
     private static String strip(BigDecimal v) {
         return v == null ? "0" : v.stripTrailingZeros().toPlainString();
+    }
+
+    /** 代发明细摘要（幂等载荷/审计用；无产品 id 时用名称，保证两次提交载荷可比对）。 */
+    private static String describeDropShipLines(List<DropShipLine> lines) {
+        if (lines == null) return "(无)";
+        StringBuilder b = new StringBuilder();
+        for (DropShipLine l : lines) {
+            if (l == null) continue;
+            if (b.length() > 0) b.append(';');
+            b.append(l.productName()).append('(').append(l.unit()).append(")x").append(l.quantity());
+        }
+        return b.toString();
     }
 
     private static String required(String s, String label, int max) {

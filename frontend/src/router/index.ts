@@ -118,6 +118,41 @@ const routes: RouteRecordRaw[] = [
       group: 'sales'
     }
   },
+  {
+    path: '/sales-orders',
+    name: 'salesOrders',
+    component: () => import('../views/sales/SalesOrderView.vue'),
+    meta: {
+      title: '销售订单',
+      layout: 'list',
+      permission: ['sales_order.read.self', 'sales_order.read.department', 'sales_order.read.all'],
+      group: 'sales'
+    }
+  },
+  {
+    path: '/production-demands',
+    name: 'productionDemands',
+    component: () => import('../views/production/ProductionDemandView.vue'),
+    meta: {
+      title: '待接生产需求',
+      layout: 'list',
+      permission: 'manufacturing.manage',
+      group: 'sales'
+    }
+  },
+  // 外采采购订单：销售订单里供货方式为「外采」的明细在这里落地。
+  // 入库型到货写本地库存账（与自产完工入库同套余额表）；代发型供应商直发客户、不进本地仓。
+  {
+    path: '/purchase-orders',
+    name: 'purchaseOrders',
+    component: () => import('../views/procurement/PurchaseOrderView.vue'),
+    meta: {
+      title: '采购订单',
+      layout: 'list',
+      permission: ['purchase_order.read.self', 'purchase_order.read.department', 'purchase_order.read.all'],
+      group: 'sales'
+    }
+  },
   // P1-1：氚云导入中心（原 H3Business import stage 独立）
   {
     path: '/h3-imports',
@@ -132,29 +167,37 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '销售出库关联工作台', layout: 'list', permission: 'integration.h3', group: 'h3' }
   },
   {
-    path: '/production-followups',
-    name: 'productionFollowups',
-    component: () => import('../views/production/ProductionFollowUpView.vue'),
-    meta: { title: '生产跟单', layout: 'list', group: 'h3', permission: ['manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'] }
+    path: '/h3-production-execution',
+    name: 'h3ProductionExecution',
+    component: () => import('../views/production/H3ProductionExecutionView.vue'),
+    meta: { title: '车间执行 · 氚云生产任务', layout: 'list', group: 'h3',
+      permission: ['manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all', 'manufacturing.report', 'manufacturing.report.override', 'manufacturing.inspect', 'manufacturing.followup'] }
   },
-  // 车间执行（工单 → 报工 → 交付收货）：报工段与收货段的唯一操作入口。
-  // 权限取并集：生产侧看报工（manufacturing.report），仓库侧看收货（manufacturing.receive），
-  // 只读角色（manufacturing.read.*）可看板与记录但不能写。领料/BOM 由车间自管，本页不含任何领料入口。
+  // 旧的车间执行地址保留本地生产任务入口，避免原先的「新建生产任务单」书签失效。
   {
     path: '/manufacturing-execution',
     name: 'manufacturingExecution',
+    redirect: { path: '/local-manufacturing-execution' }
+  },
+  // 本地任务为正式入口：展会、展厅、打样等内部需求可不经过销售订单直接建单。
+  {
+    path: '/local-manufacturing-execution',
+    name: 'localManufacturingExecution',
     component: () => import('../views/production/ManufacturingExecutionView.vue'),
     meta: {
-      title: '车间执行',
+      title: '本地生产任务 · 车间执行',
       layout: 'list',
       permission: [
+        'manufacturing.manage',
         'manufacturing.report',
+        'manufacturing.inspect',
+        'manufacturing.report.override',
         'manufacturing.receive',
         'manufacturing.read.self',
         'manufacturing.read.department',
         'manufacturing.read.all'
       ],
-      group: 'h3'
+      group: 'sales'
     }
   },
   {
@@ -163,13 +206,21 @@ const routes: RouteRecordRaw[] = [
     component: () => import('../views/production/ManufacturingProcessManagementView.vue'),
     meta: { title: '制程与工序管理', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
   },
-  // 下单不是独立页面：入口是「车间执行」页右上角的「新建生产任务单」抽屉
+  // 「任务单产品与配置」原为制程管理页内的抽屉，2026-09-24 独立成页：
+  // 它是新建任务单的联动数据源，也是产品身份（可售库存口径）的锚点，需要独立演进。
+  {
+    path: '/manufacturing-task-configs',
+    name: 'manufacturingTaskConfigs',
+    component: () => import('../views/production/ManufacturingTaskConfigView.vue'),
+    meta: { title: '任务单产品与配置', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
+  },
+  // 本地新建任务不是独立页面：入口在本地任务执行页右上角。
   // （组件 components/production/ProductionTaskOrderDrawer.vue）。
   // 旧路径保留为跳转，避免历史书签 404。
   {
     path: '/production-task-orders',
     name: 'productionTaskOrders',
-    redirect: { path: '/manufacturing-execution', query: {} }
+    redirect: { path: '/local-manufacturing-execution', query: {} }
   },
   {
     path: '/product-inventory',

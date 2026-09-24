@@ -52,12 +52,15 @@ const CATEGORY_LABELS: Record<string, string> = {
   SALES: '销售业务',
   FINANCE: '财务结算',
   MFG: '生产制造',
+  PROCUREMENT: '采购管理',
   INVENTORY: '库存管理',
   DATA: '数据集成',
   PLATFORM: '平台管理',
 }
 
-const CATEGORY_ORDER = ['SALES', 'FINANCE', 'MFG', 'INVENTORY', 'DATA', 'PLATFORM']
+// ⚠️ 下方分组用的是 CATEGORY_ORDER.filter(c => groups.has(c))：**未登记在此的功能分类不会显示**
+// （不报错、整块消失）。新增 system_features.category 时这里必须同步，否则授权页看不见该功能。
+const CATEGORY_ORDER = ['SALES', 'FINANCE', 'MFG', 'PROCUREMENT', 'INVENTORY', 'DATA', 'PLATFORM']
 
 const groupedFeatures = computed(() => {
   const groups = new Map<string, FeatureItem[]>()
