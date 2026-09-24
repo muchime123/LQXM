@@ -164,6 +164,17 @@
           </el-descriptions-item>
           <el-descriptions-item label="客户">{{ detail.head.customerName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="建单人">{{ detail.head.createdByName }}</el-descriptions-item>
+          <el-descriptions-item label="审批状态">
+            <el-tag :type="approvalTag(detail.head.approvalStatus)" size="small">
+              {{ APPROVAL_STATUS_TEXT[detail.head.approvalStatus || 'NONE'] }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="提交审批">
+            {{ detail.head.approvalSubmittedAt ? formatTime(detail.head.approvalSubmittedAt) : '—' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="审批决定">
+            {{ detail.head.approvalDecidedAt ? formatTime(detail.head.approvalDecidedAt) : '—' }}
+          </el-descriptions-item>
           <el-descriptions-item label="备注" :span="3">{{ detail.head.remark || '—' }}</el-descriptions-item>
         </el-descriptions>
 
@@ -195,11 +206,25 @@
 
         <el-alert v-if="detail.dropShipOutbound" class="drop-alert" type="success" :closable="false"
           :title="`已生成代发出库单 ${detail.dropShipOutbound.outboundNo}（${detail.dropShipOutbound.status === 'POSTED' ? '已过账' : '草稿'}）。过账不扣本地库存。`" />
+
+        <div v-if="detail.approvals?.length" class="line-heading"><h3>审批记录</h3></div>
+        <el-table v-if="detail.approvals?.length" :data="detail.approvals" border size="small">
+          <el-table-column label="动作" width="100"><template #default="{ row }">
+            <el-tag :type="row.action === 'APPROVE' ? 'success' : row.action === 'REJECT' ? 'danger' : 'info'" size="small">
+              {{ approvalActionText(row.action) }}
+            </el-tag>
+          </template></el-table-column>
+          <el-table-column prop="actorName" label="操作人" width="100" />
+          <el-table-column label="时间" width="170"><template #default="{ row }">{{ formatTime(row.createdAt) }}</template></el-table-column>
+          <el-table-column prop="comment" label="意见" min-width="200" show-overflow-tooltip />
+        </el-table>
       </div>
       <template #footer>
         <el-button @click="detailDrawer = false">关闭</el-button>
         <el-button v-if="canCancel" link type="danger" @click="doCancel">取消订单</el-button>
-        <el-button v-if="canConfirm" type="primary" :loading="saving" @click="doConfirm">确认采购</el-button>
+        <el-button v-if="canApprove && headStatus === 'PENDING_APPROVAL'" link type="danger" @click="doReject">驳回</el-button>
+        <el-button v-if="canSubmit" type="primary" :loading="saving" @click="doSubmit">提交审批</el-button>
+        <el-button v-if="canApprove && headStatus === 'PENDING_APPROVAL'" type="primary" :loading="saving" @click="doApprove">审批通过</el-button>
         <el-button v-if="canReceive" type="success" :loading="saving" @click="openReceive">到货入库</el-button>
         <el-button v-if="canDropShip" type="warning" :loading="saving" @click="doDropShip">生成代发出库单</el-button>
       </template>
@@ -241,11 +266,12 @@ import { newRequestKey } from '@/api/salesOutbound'
 import OrderFulfillmentSteps from '@/components/sales/OrderFulfillmentSteps.vue'
 import {
   fetchPurchaseOrders, fetchPurchaseOrder, fetchPurchaseDemands, searchPurchaseSuppliers,
-  fetchPurchaseWarehouses, createPurchaseOrder, confirmPurchaseOrder, cancelPurchaseOrder,
+  fetchPurchaseWarehouses, createPurchaseOrder, cancelPurchaseOrder,
+  submitPurchaseOrderApproval, approvePurchaseOrder, rejectPurchaseOrder,
   receivePurchaseOrder, reversePurchaseReceipt, createDropShipOutbound,
-  PURCHASE_STATUS_TEXT, FULFILLMENT_MODE_TEXT,
+  PURCHASE_STATUS_TEXT, FULFILLMENT_MODE_TEXT, APPROVAL_ACTION_TEXT, APPROVAL_STATUS_TEXT,
   type PurchaseOrder, type PurchaseOrderDetail, type PurchaseOrderLine, type PurchaseDemand,
-  type PurchaseFulfillmentMode, type PurchaseOrderStatus,
+  type PurchaseFulfillmentMode, type PurchaseOrderStatus, type ApprovalStatus,
 } from '@/api/purchaseOrder'
 
 const router = useRouter()
@@ -294,8 +320,12 @@ const saveKey = ref('')
 
 const headStatus = computed<PurchaseOrderStatus | undefined>(() => detail.value?.head.status)
 const isDropShip = computed(() => detail.value?.head.fulfillmentMode === 'DROP_SHIP')
-const canConfirm = computed(() => canManage.value && headStatus.value === 'DRAFT')
-const canCancel = computed(() => canManage.value && (headStatus.value === 'DRAFT' || headStatus.value === 'CONFIRMED'))
+// 审批关口（#35）：「谁能开单」（manage）与「谁能批」（approve）是两个权限，
+// 所以提交按钮与审批按钮的可见性分开算 —— 别用一个 canManage 覆盖两者。
+const canApprove = computed(() => auth.can('purchase_order.approve'))
+const canSubmit = computed(() => canManage.value && headStatus.value === 'DRAFT')
+const canCancel = computed(() => canManage.value && (headStatus.value === 'DRAFT'
+  || headStatus.value === 'PENDING_APPROVAL' || headStatus.value === 'CONFIRMED'))
 // 到货入库只属于「入库型」；代发的货从不进本地仓，永远不出现入库按钮。
 const canReceive = computed(() => canManage.value && !isDropShip.value
   && (headStatus.value === 'CONFIRMED' || headStatus.value === 'RECEIVING'))
@@ -307,9 +337,24 @@ function qty(n?: number | null) { return Number(n ?? 0).toLocaleString('zh-CN', 
 function statusTag(s: PurchaseOrderStatus) {
   if (s === 'CLOSED') return 'success'
   if (s === 'RECEIVING') return 'warning'
+  if (s === 'PENDING_APPROVAL') return 'warning'
   if (s === 'CANCELLED') return 'info'
   if (s === 'CONFIRMED') return 'primary'
   return 'info'
+}
+function approvalTag(s?: ApprovalStatus) {
+  if (s === 'APPROVED') return 'success'
+  if (s === 'PENDING') return 'warning'
+  if (s === 'REJECTED') return 'danger'
+  return 'info'
+}
+function approvalActionText(a: string) {
+  return (APPROVAL_ACTION_TEXT as Record<string, string>)[a] || a
+}
+/** 后端回的是 "2026-09-24T18:04:01"，列表里 秒 就够用。 */
+function formatTime(v?: string | null) {
+  if (!v) return '—'
+  return v.replace('T', ' ').slice(0, 19)
 }
 
 async function load(p = page.value) {
@@ -408,14 +453,44 @@ async function openDetail(id: number) {
   } catch (e) { notify.errorWithDetail('读取采购订单失败', e) }
 }
 
-async function doConfirm() {
+async function doSubmit() {
   if (!detail.value || saving.value) return
   saving.value = true
   try {
-    await confirmPurchaseOrder(detail.value.head.id, newRequestKey())
-    notify.success('采购订单已确认')
+    await submitPurchaseOrderApproval(detail.value.head.id, newRequestKey())
+    notify.success('已提交审批，等待审批人处理')
     await load(); await openDetail(detail.value.head.id)
-  } catch (e) { notify.errorWithDetail('确认采购订单失败', e) }
+  } catch (e) { notify.errorWithDetail('提交审批失败', e) }
+  finally { saving.value = false }
+}
+
+async function doApprove() {
+  if (!detail.value || saving.value) return
+  saving.value = true
+  try {
+    await approvePurchaseOrder(detail.value.head.id, '审批通过', newRequestKey())
+    notify.success('已审批通过，采购订单转为已确认')
+    await load(); await openDetail(detail.value.head.id)
+  } catch (e) { notify.errorWithDetail('审批失败', e) }
+  finally { saving.value = false }
+}
+
+async function doReject() {
+  if (!detail.value || saving.value) return
+  let reason = ''
+  try {
+    const result = await ElMessageBox.prompt('驳回后订单退回草稿，建单人可修改后重新提交。', '驳回采购订单', {
+      inputPlaceholder: '请填写驳回原因（必填）', confirmButtonText: '确认驳回',
+      inputValidator: (v: string) => (v && v.trim() ? true : '驳回原因必填'),
+    })
+    reason = result.value
+  } catch { return }
+  saving.value = true
+  try {
+    await rejectPurchaseOrder(detail.value.head.id, reason.trim(), newRequestKey())
+    notify.success('已驳回，订单退回草稿')
+    await load(); await openDetail(detail.value.head.id)
+  } catch (e) { notify.errorWithDetail('驳回失败', e) }
   finally { saving.value = false }
 }
 

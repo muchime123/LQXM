@@ -62,6 +62,7 @@ class ErpPurchaseOrderContractMysqlTest {
             "erp_purchase_orders", "erp_purchase_order_items",
             "erp_purchase_receipts", "erp_purchase_receipt_items",
             "erp_sales_outbounds", "erp_sales_outbound_items",
+            "erp_approvals", "manufacturing_orders",
             "h3_supplier_catalog");
 
     private static String baseUrl;
@@ -73,6 +74,7 @@ class ErpPurchaseOrderContractMysqlTest {
     private DataSourceTransactionManager txm;
     private ErpPurchaseOrderService service;
     private SalesOutboundService outbounds;
+    private ErpApprovalService approvals;
     private long warehouseId;
     private long productId;
     private long supplierId;
@@ -136,8 +138,9 @@ class ErpPurchaseOrderContractMysqlTest {
         var changeLog = new ErpChangeLogWriter(jdbc, new ObjectMapper(), "row_change_log");
         var actors = new ErpActorResolver(users);
         var inventory = new ProductInventoryService(jdbc, users);
+        approvals = new ErpApprovalService(jdbc, actors, idem, changeLog);
         outbounds = new SalesOutboundService(jdbc, inventory, users, scope, idem, changeLog, actors);
-        service = new ErpPurchaseOrderService(jdbc, actors, scope, idem, changeLog, inventory, outbounds);
+        service = new ErpPurchaseOrderService(jdbc, actors, scope, idem, changeLog, inventory, outbounds, approvals);
 
         warehouseId = jdbc.queryForObject("SELECT id FROM warehouses WHERE warehouse_code='PO-CTL-WH'", Long.class);
         productId = jdbc.queryForObject("SELECT id FROM sales_products WHERE product_code='PO-CTL-SKU'", Long.class);
@@ -184,12 +187,21 @@ class ErpPurchaseOrderContractMysqlTest {
             assertEquals(ErpErrorCode.IDEMPOTENCY_PAYLOAD_CONFLICT, conflict.errorCode());
             assertEquals(1, count("SELECT COUNT(*) FROM erp_purchase_orders"), "冲突请求不得落第二张单");
 
-            // ---- 2) 确认 ----
-            service.confirm(poId, "po-ctl-confirm");
+            // ---- 2) 提交审批 → 审批通过（#35：不再保留「草稿直跳已确认」的绕过口子） ----
+            service.submit(poId, "po-ctl-submit");
+            assertEquals("PENDING_APPROVAL", status(poId), "提交后必须停在待审批");
+            assertEquals("PENDING", jdbc.queryForObject(
+                    "SELECT approval_status FROM erp_purchase_orders WHERE id=?", String.class, poId));
+            assertThrows(IllegalStateException.class, () -> service.submit(poId, "po-ctl-submit-again"),
+                    "待审批状态不能重复提交");
+
+            service.approve(poId, "同意采购", "po-ctl-approve");
             assertEquals("CONFIRMED", status(poId));
+            assertEquals("APPROVED", jdbc.queryForObject(
+                    "SELECT approval_status FROM erp_purchase_orders WHERE id=?", String.class, poId));
             assertNotNull(jdbc.queryForObject("SELECT confirmed_at FROM erp_purchase_orders WHERE id=?", Object.class, poId));
-            assertThrows(IllegalStateException.class, () -> service.confirm(poId, "po-ctl-confirm-again"),
-                    "已确认不能重复确认");
+            assertThrows(IllegalStateException.class, () -> service.approve(poId, null, "po-ctl-approve-again"),
+                    "已确认不能重复审批");
 
             // ---- 3) 分次到货：余额与累计到货量同步，全到即结案 ----
             long poItemId = poItemId(poId);
@@ -212,7 +224,8 @@ class ErpPurchaseOrderContractMysqlTest {
                     () -> service.receive(poId, new ErpPurchaseOrderService.ReceiveRequest(warehouseId,
                             List.of(new ErpPurchaseOrderService.ReceiveItem(poItemId, BigDecimal.ONE)), null), "po-ctl-recv-over"),
                     "超过未到货量必须拒绝");
-            assertTrue(String.valueOf(over.getMessage()).contains("未到货") || String.valueOf(over.getMessage()).contains("可以办理"),
+            assertTrue(String.valueOf(over.getMessage()).contains("未到货")
+                            || String.valueOf(over.getMessage()).contains("不能办理到货入库"),
                     "提示应点明到货量或单据状态：" + over.getMessage());
 
             // ---- 4) 冲正：反向过账、累计量回退、单回到在途 ----
@@ -254,7 +267,8 @@ class ErpPurchaseOrderContractMysqlTest {
                             new BigDecimal("2"), new BigDecimal("3"), null))), "po-ctl-ds-create");
             assertEquals("DROP_SHIP", jdbc.queryForObject(
                     "SELECT fulfillment_mode FROM erp_purchase_orders WHERE id=?", String.class, poId));
-            service.confirm(poId, "po-ctl-ds-confirm");
+            service.submit(poId, "po-ctl-ds-submit");
+            service.approve(poId, "同意代发采购", "po-ctl-ds-approve");
 
             // 代发单不能走到货入库
             var rejected = assertThrows(IllegalStateException.class,
@@ -342,6 +356,67 @@ class ErpPurchaseOrderContractMysqlTest {
             service.cancel(poId, "契约验证取消", "po-ctl-d1-cancel");
             assertEquals("CANCELLED", status(poId));
             assertEquals(1, service.pendingPurchaseDemands().size(), "取消后该明细应重新可采购");
+        });
+    }
+
+    // ==================== 用例 4：审批关口（#35）—— 未审批不可执行、驳回必填原因、历史逐次留痕 ====================
+
+    @Test
+    void approvalGateBlocksExecutionAndKeepsHistory() {
+        runInRollbackTransaction(() -> {
+            long poId = service.create(warehouseRequest(new BigDecimal("3"), new BigDecimal("5"), null), "po-ctl-ap-create");
+            long poItem = poItemId(poId);
+
+            // ---- 1) 草稿：到货入库必须被拒（审批是执行的前置关口，不是事后补签） ----
+            var notApproved = assertThrows(IllegalStateException.class,
+                    () -> service.receive(poId, new ErpPurchaseOrderService.ReceiveRequest(warehouseId,
+                            List.of(new ErpPurchaseOrderService.ReceiveItem(poItem, BigDecimal.ONE)), null), "po-ctl-ap-recv0"),
+                    "未审批的采购订单不得办理到货入库");
+            assertTrue(String.valueOf(notApproved.getMessage()).contains("审批"),
+                    "提示应点明审批：" + notApproved.getMessage());
+
+            // ---- 2) 提交后停在待审批，一样不能到货 ----
+            service.submit(poId, "po-ctl-ap-submit");
+            assertEquals("PENDING_APPROVAL", status(poId));
+            assertThrows(IllegalStateException.class,
+                    () -> service.receive(poId, new ErpPurchaseOrderService.ReceiveRequest(warehouseId,
+                            List.of(new ErpPurchaseOrderService.ReceiveItem(poItem, BigDecimal.ONE)), null), "po-ctl-ap-recv1"),
+                    "待审批的采购订单不得办理到货入库");
+
+            // ---- 3) 驳回原因必填 ----
+            var noReason = assertThrows(IllegalArgumentException.class,
+                    () -> service.reject(poId, "   ", "po-ctl-ap-reject0"), "驳回原因必填");
+            assertTrue(String.valueOf(noReason.getMessage()).contains("原因"), noReason.getMessage());
+
+            // ---- 4) 驳回 → 退回草稿，且能重新提交（证明不是一次性锁死） ----
+            service.reject(poId, "价格需再谈", "po-ctl-ap-reject");
+            assertEquals("DRAFT", status(poId), "驳回必须退回草稿");
+            assertEquals("REJECTED", jdbc.queryForObject(
+                    "SELECT approval_status FROM erp_purchase_orders WHERE id=?", String.class, poId));
+
+            service.submit(poId, "po-ctl-ap-resubmit");
+            assertEquals("PENDING_APPROVAL", status(poId), "驳回后必须能重新提交");
+            assertNull(jdbc.queryForObject(
+                            "SELECT approval_decided_by_employee_id FROM erp_purchase_orders WHERE id=?", Object.class, poId),
+                    "重新提交必须清掉上一轮的审批决定，否则详情里还挂着上次的审批人");
+            service.approve(poId, "这次可以", "po-ctl-ap-approve2");
+            assertEquals("CONFIRMED", status(poId));
+
+            // ---- 5) 流水：4 次动作一条不少（提交/驳回/重提/通过） ----
+            var history = approvals.history(ErpApprovalService.DocType.PURCHASE_ORDER, poId);
+            assertEquals(4, history.size(), "审批流水必须逐次留痕，不能只留最后一次");
+            assertEquals(List.of("SUBMIT", "REJECT", "SUBMIT", "APPROVE"),
+                    history.stream().map(r -> String.valueOf(r.get("action"))).toList(),
+                    "动作顺序必须与真实发生顺序一致");
+            assertEquals("价格需再谈", history.get(1).get("comment"), "驳回意见必须落流水");
+            assertEquals("DRAFT", history.get(1).get("toStatus"), "驳回的目标状态是草稿");
+            assertEquals(ACTOR_NAME, history.get(1).get("actorName"), "操作人姓名快照");
+            assertEquals("CGDD" + String.format("%08d", poId), history.getFirst().get("docNo"),
+                    "单号快照必须落库（流水对账靠它）");
+
+            // ---- 6) 待审批清单：通过后不再出现 ----
+            assertTrue(approvals.pending().stream().noneMatch(r -> ((Number) r.get("docId")).longValue() == poId),
+                    "已通过的单不应留在审批待办里");
         });
     }
 

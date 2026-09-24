@@ -23,8 +23,13 @@ import java.util.UUID;
 
 /**
  * 外采采购订单（BUY 履约）。与 ErpSalesOrderService 对称：
- * 本地动作单（DRAFT→CONFIRMED→RECEIVING→CLOSED/CANCELLED），与只读氚云台账
+ * 本地动作单（DRAFT→PENDING_APPROVAL→CONFIRMED→RECEIVING→CLOSED/CANCELLED），与只读氚云台账
  * purchase_receipts 隔离。一行销售需求对应一个采购订单（1:1，仿 manufacturing_orders）。
+ *
+ * <p><b>审批关口（#35）</b>：「确认」不再是单步动作，而是**提交审批 → 老板通过**两步
+ * （{@link ErpApprovalService}）。所以 {@code /confirm} 端点已由 {@code /submit} + {@code /approve}
+ * 取代 —— 保留一个能直接从草稿跳到 {@code CONFIRMED} 的入口等于**绕过审批**，故不保留。
+ * 到货入库必须有 {@code CONFIRMED} 起的状态，因此未审批的单在库存侧天然不可执行。
  *
  * <p>履约模式（V344/V345）：
  * <ul>
@@ -65,11 +70,13 @@ public class ErpPurchaseOrderService {
     private final ErpChangeLogWriter log;
     private final ProductInventoryService inventory;
     private final SalesOutboundService outbounds;
+    private final ErpApprovalService approvals;
 
     public ErpPurchaseOrderService(JdbcTemplate jdbc, ErpActorResolver actors, DataScopeSupport scope,
                                    @Qualifier("archiveIdempotencyService") ErpIdempotencyService idem,
                                    @Qualifier("archiveAuditWriter") ErpChangeLogWriter log,
-                                   ProductInventoryService inventory, SalesOutboundService outbounds) {
+                                   ProductInventoryService inventory, SalesOutboundService outbounds,
+                                   ErpApprovalService approvals) {
         this.jdbc = jdbc;
         this.actors = actors;
         this.scope = scope;
@@ -77,6 +84,7 @@ public class ErpPurchaseOrderService {
         this.log = log;
         this.inventory = inventory;
         this.outbounds = outbounds;
+        this.approvals = approvals;
     }
 
     public Map<String, Object> list(String keyword, String status, String fulfillmentMode, int page, int size) {
@@ -101,7 +109,8 @@ public class ErpPurchaseOrderService {
                 + " LEFT JOIN employees e ON e.id=p.created_by_employee_id" + where, Long.class, args.toArray());
         List<Object> paged = new ArrayList<>(args);
         paged.add(safeSize); paged.add((safePage - 1) * safeSize);
-        var rows = jdbc.queryForList("SELECT p.id,p.po_no poNo,p.status,p.supplier_id supplierId,"
+        var rows = jdbc.queryForList("SELECT p.id,p.po_no poNo,p.status,p.approval_status approvalStatus,"
+                + "p.supplier_id supplierId,"
                 + "p.supplier_name_snapshot supplierName,p.warehouse_id warehouseId,p.fulfillment_mode fulfillmentMode,"
                 + "p.sales_order_item_id salesOrderItemId,p.expected_arrival_date expectedArrivalDate,"
                 + "p.total_amount totalAmount,p.created_by_name createdByName,p.created_at createdAt,"
@@ -143,7 +152,10 @@ public class ErpPurchaseOrderService {
         var where = new StringBuilder(" WHERE p.id=?");
         List<Object> args = new ArrayList<>(); args.add(id);
         scope.appendByEmployeeId(where, args, "p.created_by_employee_id", "e.department", FeatureCode.PURCHASE_ORDER);
-        var heads = jdbc.queryForList("SELECT p.id,p.po_no poNo,p.status,p.supplier_id supplierId,"
+        var heads = jdbc.queryForList("SELECT p.id,p.po_no poNo,p.status,p.approval_status approvalStatus,"
+                + "p.approval_submitted_at approvalSubmittedAt,p.approval_submitted_by_employee_id approvalSubmittedByEmployeeId,"
+                + "p.approval_decided_at approvalDecidedAt,p.approval_decided_by_employee_id approvalDecidedByEmployeeId,"
+                + "p.supplier_id supplierId,"
                 + "p.supplier_name_snapshot supplierName,p.warehouse_id warehouseId,w.warehouse_name warehouseName,"
                 + "p.fulfillment_mode fulfillmentMode,"
                 + "p.sales_order_item_id salesOrderItemId,p.expected_arrival_date expectedArrivalDate,p.remark,"
@@ -179,6 +191,7 @@ public class ErpPurchaseOrderService {
         result.put("head", heads.getFirst());
         result.put("items", items);
         result.put("receipts", receipts);
+        result.put("approvals", approvals.history(ErpApprovalService.DocType.PURCHASE_ORDER, id));
         result.put("dropShipOutbound", outbound.isEmpty() ? null : outbound.getFirst());
         result.put("warehouses", warehouses());
         return result;
@@ -206,23 +219,40 @@ public class ErpPurchaseOrderService {
                 () -> String.valueOf(insert(request, actor, key))));
     }
 
-    public void confirm(long id, String key) {
-        ErpActor actor = actors.current();
+    /**
+     * 提交审批（草稿 → 待审批）。提交人须对该单可见（谁开的单谁提交）。
+     *
+     * <p>「必须有明细」的业务前置校验通过 {@code precondition} 传进审批服务的**同一事务**，
+     * 避免「校验过了但流转没做 / 流转做了但校验没跑」这种分家。
+     */
+    public void submit(long id, String key) {
         requireVisible(id);
-        idem.execute(actor, key, "purchase.order.confirm", Map.of("id", id), () -> {
-            var heads = jdbc.queryForList("SELECT status FROM erp_purchase_orders WHERE id=? FOR UPDATE", id);
-            if (heads.isEmpty() || !"DRAFT".equals(heads.getFirst().get("status")))
-                throw new IllegalStateException("只有草稿采购订单可以确认");
+        approvals.submit(ErpApprovalService.DocType.PURCHASE_ORDER, id, key, () -> {
             Long lineCount = jdbc.queryForObject("SELECT COUNT(*) FROM erp_purchase_order_items WHERE po_id=?",
                     Long.class, id);
             if (lineCount == null || lineCount == 0)
-                throw new IllegalStateException("采购订单没有明细，不能确认");
-            jdbc.update("UPDATE erp_purchase_orders SET status='CONFIRMED',confirmed_at=NOW(),"
-                    + "confirmed_by_employee_id=? WHERE id=?", actor.employeeId(), id);
-            log.write(ErpChangeLogWriter.of(actor, "product_archive.erp_purchase_orders", id, "UPDATE",
-                    ErpChangeLogWriter.changes("status", "CONFIRMED"), null, "确认采购订单", key, null));
-            return String.valueOf(id);
+                throw new IllegalStateException("采购订单没有明细，不能提交审批");
         });
+    }
+
+    /**
+     * 审批通过（待审批 → 已确认）。
+     *
+     * <p>⚠️ 这里**不做行级可见性校验** —— 审批人（老板）通常不是建单人，按建单人/部门过滤
+     * 会让审批入口对审批人永久 403。准入只由 {@code purchase_order.approve} 权限决定。
+     */
+    public void approve(long id, String comment, String key) {
+        approvals.approve(ErpApprovalService.DocType.PURCHASE_ORDER, id, comment, key);
+    }
+
+    /** 驳回（待审批 → 草稿，原因必填）。 */
+    public void reject(long id, String comment, String key) {
+        approvals.reject(ErpApprovalService.DocType.PURCHASE_ORDER, id, comment, key);
+    }
+
+    /** 该采购订单的完整审批历史（含驳回）。 */
+    public List<Map<String, Object>> approvalHistory(long id) {
+        return approvals.history(ErpApprovalService.DocType.PURCHASE_ORDER, id);
     }
 
     public void cancel(long id, String reason, String key) {
@@ -273,7 +303,8 @@ public class ErpPurchaseOrderService {
         if ("DROP_SHIP".equals(head.get("fulfillmentMode")))
             throw new IllegalStateException("这是供应商直发客户（代发）的采购订单，不办理到货入库；请生成代发出库单");
         if (!List.of("CONFIRMED", "RECEIVING").contains(String.valueOf(head.get("status"))))
-            throw new IllegalStateException("只有已确认的采购订单可以办理到货入库");
+            throw new IllegalStateException("采购订单尚未审批通过（当前状态「" + head.get("status")
+                    + "」），不能办理到货入库");
         if (!Long.valueOf(1L).equals(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM warehouses WHERE id=? AND active=1", Long.class, request.warehouseId())))
             throw new IllegalArgumentException("请选择有效仓库");
