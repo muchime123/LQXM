@@ -10,7 +10,7 @@
       <el-table-column prop="workshopName" label="目标产线" width="150" />
       <el-table-column label="数量" width="110"><template #default="{ row }">{{ row.quantity }} {{ row.unit }}</template></el-table-column>
       <el-table-column prop="dueDate" label="期望交期" width="125" />
-      <el-table-column label="操作" width="120"><template #default="{ row }"><el-button link type="primary" @click="open(row)">评估接单</el-button></template></el-table-column>
+      <el-table-column label="操作" width="120" fixed="right"><template #default="{ row }"><el-button link type="primary" @click="open(row)">评估接单</el-button></template></el-table-column>
     </el-table>
 
     <el-drawer v-model="drawer" title="生产需求评估" size="min(720px, 96vw)">

@@ -23,7 +23,7 @@
       <el-table-column label="状态" width="90"><template #default="{ row }"><el-tag :type="statusTag(row.status)">{{ SALES_ORDER_STATUS_TEXT[row.status as SalesOrderStatus] }}</el-tag></template></el-table-column>
       <!-- 驳回后状态回到「草稿」，只看状态看不出被驳回；审批列把它显出来（业务员要按意见改）。 -->
       <el-table-column label="审批" width="90"><template #default="{ row }"><el-tag :type="approvalTag(row.approvalStatus)" size="small">{{ approvalStatusText(row.approvalStatus) }}</el-tag></template></el-table-column>
-      <el-table-column label="操作" width="100"><template #default="{ row }"><el-button link type="primary" @click="openDetail(row.id)">详情</el-button></template></el-table-column>
+      <el-table-column label="操作" width="100" fixed="right"><template #default="{ row }"><el-button link type="primary" @click="openDetail(row.id)">详情</el-button></template></el-table-column>
     </el-table>
     <el-pagination class="pager" background layout="total, prev, pager, next" :total="total" :page-size="20" :current-page="page" @current-change="load" />
 

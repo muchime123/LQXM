@@ -24,7 +24,7 @@
         <el-table-column prop="specification" label="规格要求" min-width="160" show-overflow-tooltip />
         <el-table-column label="数量" width="110"><template #default="{ row }">{{ qty(row.quantity) }} {{ row.unit }}</template></el-table-column>
         <el-table-column prop="dueDate" label="期望交期" width="120" />
-        <el-table-column label="操作" width="110">
+        <el-table-column label="操作" width="110" fixed="right">
           <template #default="{ row }">
             <el-button v-if="canManage" link type="primary" @click="openCreate(row)">建采购单</el-button>
           </template>
@@ -71,7 +71,7 @@
           <el-tag :type="statusTag(row.status)" size="small">{{ PURCHASE_STATUS_TEXT[row.status as PurchaseOrderStatus] || row.status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="90"><template #default="{ row }">
+      <el-table-column label="操作" width="90" fixed="right"><template #default="{ row }">
         <el-button link type="primary" @click="openDetail(row.id)">详情</el-button>
       </template></el-table-column>
     </el-table>
