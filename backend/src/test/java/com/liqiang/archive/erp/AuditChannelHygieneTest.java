@@ -1,5 +1,6 @@
 package com.liqiang.archive.erp;
 
+import com.liqiang.archive.service.ErpApprovalService;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -51,7 +52,13 @@ class AuditChannelHygieneTest {
             "com/liqiang/archive/service/SalesOutboundService.java",
             "com/liqiang/archive/service/ManufacturingService.java",
             "com/liqiang/archive/service/ManufacturingExecutionService.java",
-            "com/liqiang/archive/controller/ManufacturingTaskConfigController.java"
+            "com/liqiang/archive/controller/ManufacturingTaskConfigController.java",
+            "com/liqiang/archive/service/ErpSalesOrderService.java",
+            "com/liqiang/archive/service/ErpPurchaseOrderService.java",
+            "com/liqiang/archive/service/ErpApprovalService.java",
+            "com/liqiang/archive/service/H3ProductionExecutionService.java",
+            "com/liqiang/archive/service/H3ProductionCompletionService.java",
+            "com/liqiang/archive/service/H3ProductionReworkService.java"
     );
 
     /**
@@ -162,6 +169,34 @@ class AuditChannelHygieneTest {
         assertTrue(checked > 0, "未扫描到任何 ErpChangeLogWriter.of(...) 调用 —— 正则或路径已失效，本测试变成空转");
         assertTrue(violations.isEmpty(),
                 "row_change_log.target_table 必须为 schema 限定表名：\n  " + String.join("\n  ", violations));
+    }
+
+    /**
+     * 通用审批服务把 target_table 收进了 {@link ErpApprovalService.DocType} 注册表，
+     * 调用点传的是**枚举访问器**而不是字面量 —— 上面的源码扫描看不见它。
+     *
+     * <p>扫不到 ≠ 合规：这里对注册表**逐项**断言，把同一条口径补回门禁，而不是让
+     * 「正则扫不到」冒充「没问题」。同时钉住「审计目标名 = schema + 裸表名」，
+     * 防止将来有人把 schema 限定名反向塞进 SQL 标识符 —— 那会让跑在隔离 schema 里的
+     * 契约测试**绕过被测 schema 直接打到真表**上。
+     */
+    @Test
+    void approvalRegistryTargetTablesAreSchemaQualified() {
+        ErpApprovalService.DocType[] types = ErpApprovalService.DocType.values();
+        assertTrue(types.length > 0, "DocType 注册表为空 —— 本测试变成空转");
+
+        List<String> violations = new ArrayList<>();
+        for (ErpApprovalService.DocType type : types) {
+            if (!type.auditTarget().matches("[A-Za-z0-9_]+\\.[A-Za-z0-9_]+")) {
+                violations.add(type.name() + " → auditTarget=\"" + type.auditTarget() + "\"");
+            }
+            if (!type.auditTarget().equals(ErpApprovalService.AUDIT_SCHEMA + "." + type.table())) {
+                violations.add(type.name() + " → 审计目标名与裸表名不一致：\""
+                        + type.auditTarget() + "\" vs " + type.table());
+            }
+        }
+        assertTrue(violations.isEmpty(),
+                "DocType 的审计目标表必须为「schema.裸表名」：\n  " + String.join("\n  ", violations));
     }
 
     // ==================== 3. 长度硬上限 ====================

@@ -41,6 +41,9 @@ public class ErpApprovalService {
     /** 单据「待审批」状态。三张表共用同一个字面量，避免各单各起一个名字。 */
     public static final String PENDING_STATUS = "PENDING_APPROVAL";
 
+    /** ERP 域 schema 名 —— 仅用于拼审计目标表名，见 {@link DocType#auditTarget()}。 */
+    public static final String AUDIT_SCHEMA = "product_archive";
+
     public static final String APPROVAL_NONE = "NONE";
     public static final String APPROVAL_PENDING = "PENDING";
     public static final String APPROVAL_APPROVED = "APPROVED";
@@ -49,7 +52,8 @@ public class ErpApprovalService {
     /**
      * 单据类型注册表 —— 单据之间的**全部**差异都在这里，新链只需加一行枚举。
      *
-     * @param table         物理表名（限定在 {@code product_archive}）
+     * @param table         物理表名（**裸表名**：SQL 标识符用它，不能带 schema —— 契约测试跑在
+     *                      隔离 schema 里，带 schema 会打到真表上）
      * @param noColumn      单据编号列（写进流水快照）
      * @param label         中文名（错误文案用；不用 "单" 结尾，调用方自己接）
      * @param permission    审批权限码
@@ -66,6 +70,15 @@ public class ErpApprovalService {
                 "DRAFT", "CONFIRMED", "confirmed_at=NOW(),confirmed_by_employee_id=?");
 
         private final String table;
+        /**
+         * 审计目标表 = **schema 限定名**（决策 #20②）。
+         *
+         * <p>⚠️ 它**只作为字符串写进 {@code row_change_log.target_table} 列**，绝不当 SQL 标识符用：
+         * 两侧 schema 有同名表，裸表名会让人看不出「改的是哪张表」；而反过来把 SQL 里的表名
+         * 也限定成 {@code product_archive.xxx}，隔离 schema 的契约测试就会**绕过被测 schema
+         * 直接打到真表**上。两种用法必须分开，故这里由裸表名派生、单列一个访问器。
+         */
+        private final String auditTarget;
         private final String noColumn;
         private final String label;
         private final String permission;
@@ -76,6 +89,7 @@ public class ErpApprovalService {
         DocType(String table, String noColumn, String label, String permission,
                 String draftStatus, String approvedStatus, String approveExtraSet) {
             this.table = table;
+            this.auditTarget = AUDIT_SCHEMA + "." + table;
             this.noColumn = noColumn;
             this.label = label;
             this.permission = permission;
@@ -85,6 +99,9 @@ public class ErpApprovalService {
         }
 
         public String table() { return table; }
+
+        /** 审计目标表（schema 限定名），只写进 {@code row_change_log.target_table} 列。 */
+        public String auditTarget() { return auditTarget; }
         public String noColumn() { return noColumn; }
         public String label() { return label; }
         public String permission() { return permission; }
@@ -221,7 +238,7 @@ public class ErpApprovalService {
         jdbc.update(sql.toString(), args.toArray());
 
         record(type, docId, str(head.get("docNo")), action, from, to, actor, comment, key);
-        log.write(ErpChangeLogWriter.of(actor, "product_archive." + type.table(), docId, "UPDATE",
+        log.write(ErpChangeLogWriter.of(actor, type.auditTarget(), docId, "UPDATE",
                 ErpChangeLogWriter.changes("status", from + "->" + to, "approvalStatus", approvalStatus,
                         "approvalComment", comment),
                 null, type.summary(action), key, null));
