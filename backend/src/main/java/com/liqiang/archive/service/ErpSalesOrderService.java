@@ -45,12 +45,14 @@ public class ErpSalesOrderService {
     private final SalesOutboundService outbounds;
     private final ObjectMapper mapper;
     private final ManufacturingService manufacturing;
+    private final ErpApprovalService approvals;
 
     public ErpSalesOrderService(JdbcTemplate jdbc, ErpActorResolver actors, DataScopeSupport scope,
                                @Qualifier("archiveIdempotencyService") ErpIdempotencyService idem,
                                @Qualifier("archiveAuditWriter") ErpChangeLogWriter log,
                                SalesOutboundService outbounds, ObjectMapper mapper,
-                               ManufacturingService manufacturing) {
+                               ManufacturingService manufacturing,
+                               ErpApprovalService approvals) {
         this.jdbc = jdbc;
         this.actors = actors;
         this.scope = scope;
@@ -59,6 +61,7 @@ public class ErpSalesOrderService {
         this.outbounds = outbounds;
         this.mapper = mapper;
         this.manufacturing = manufacturing;
+        this.approvals = approvals;
     }
 
     public Map<String, Object> list(String keyword, String status, int page, int size) {
@@ -79,7 +82,12 @@ public class ErpSalesOrderService {
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM erp_sales_orders o" + where, Long.class, args.toArray());
         List<Object> paged = new ArrayList<>(args);
         paged.add(safeSize); paged.add((safePage - 1) * safeSize);
-        var rows = jdbc.queryForList("SELECT o.id,o.order_no orderNo,o.status,o.customer_id customerId,"
+        var rows = jdbc.queryForList("SELECT o.id,o.order_no orderNo,o.status,o.approval_status approvalStatus,"
+                + "o.approval_submitted_at approvalSubmittedAt,"
+                + "o.approval_submitted_by_employee_id approvalSubmittedByEmployeeId,"
+                + "o.approval_decided_at approvalDecidedAt,"
+                + "o.approval_decided_by_employee_id approvalDecidedByEmployeeId,"
+                + "o.customer_id customerId,"
                 + "o.customer_name_snapshot customerName,o.salesperson_name_snapshot salespersonName,"
                 + "o.order_date orderDate,o.requested_delivery_date requestedDeliveryDate,o.total_amount totalAmount,"
                 + "o.created_at createdAt,(SELECT COUNT(*) FROM erp_sales_order_items i WHERE i.order_id=o.id) itemCount"
@@ -202,7 +210,12 @@ public class ErpSalesOrderService {
         StringBuilder where = new StringBuilder(" WHERE o.id=?");
         List<Object> args = new ArrayList<>(); args.add(id);
         scope.appendByName(where, args, "o.salesperson_name_snapshot", FeatureCode.SALES_OUTBOUND);
-        var heads = jdbc.queryForList("SELECT o.id,o.order_no orderNo,o.status,o.customer_id customerId,"
+        var heads = jdbc.queryForList("SELECT o.id,o.order_no orderNo,o.status,o.approval_status approvalStatus,"
+                + "o.approval_submitted_at approvalSubmittedAt,"
+                + "o.approval_submitted_by_employee_id approvalSubmittedByEmployeeId,"
+                + "o.approval_decided_at approvalDecidedAt,"
+                + "o.approval_decided_by_employee_id approvalDecidedByEmployeeId,"
+                + "o.customer_id customerId,"
                 + "o.customer_name_snapshot customerName,o.salesperson_id salespersonId,"
                 + "o.salesperson_name_snapshot salespersonName,o.order_date orderDate,"
                 + "o.requested_delivery_date requestedDeliveryDate,o.remark,o.total_amount totalAmount,"
@@ -222,7 +235,8 @@ public class ErpSalesOrderService {
                 + " JOIN erp_sales_outbounds o ON o.id=oi.outbound_id"
                 + " WHERE oi.sales_order_item_id=erp_sales_order_items.id AND o.status='POSTED') shippedQuantity"
                 + " FROM erp_sales_order_items WHERE order_id=? ORDER BY line_no", id);
-        return Map.of("head", heads.getFirst(), "items", lines);
+        return Map.of("head", heads.getFirst(), "items", lines,
+                "approvals", approvals.history(ErpApprovalService.DocType.SALES_ORDER, id));
     }
 
     public long create(Request request, String key) {
@@ -238,35 +252,58 @@ public class ErpSalesOrderService {
                 () -> String.valueOf(replace(id, request, actor, key))));
     }
 
-    public void confirm(long id, String key) {
+    // ==================== 审批（决策 #35）：草稿 → 待审批 → 通过即确认 ====================
+
+    /**
+     * 提交审批（草稿 → 待审批）。
+     *
+     * <p>⚠️ {@code 原 confirm()} 已废除：它是**单步动作**（草稿直接跳 CONFIRMED），
+     * 而 LQ 要求销售订单必须审价格与配置是否填对 —— 留一个能跳过审批的入口就等于没有审批。
+     *
+     * <p>校验放在**提交**这一侧而不是审批侧：让不合规的单子在离开业务员之前就被挡住，
+     * 而不是先发给老板、再由老板退回（老板看到的应该是能批的单）。
+     */
+    public void submit(long id, String key) {
         ErpActor actor = actors.current();
         requireVisible(id);
-        idem.execute(actor, key, "sales.order.confirm", Map.of("id", id), () -> {
-            var heads = jdbc.queryForList("SELECT status FROM erp_sales_orders WHERE id=? FOR UPDATE", id);
-            if (heads.isEmpty() || !"DRAFT".equals(heads.getFirst().get("status")))
-                throw new IllegalStateException("只有草稿订单可以确认");
-            var requirements = jdbc.queryForList("SELECT id,supply_mode supplyMode,production_config_json productionConfigJson"
-                    + " FROM erp_sales_order_items WHERE order_id=?", id);
-            for (var line : requirements) {
-                if ("UNDECIDED".equals(line.get("supplyMode")))
-                    throw new IllegalStateException("明细 " + line.get("id") + " 尚未确定供货方式");
-                if ("MAKE".equals(line.get("supplyMode"))) {
-                    if (line.get("productionConfigJson") == null)
-                        throw new IllegalStateException("自产明细 " + line.get("id") + " 尚未完成产品配置");
-                    try {
-                        validateProductionConfig(mapper.readValue(jsonText(line.get("productionConfigJson")),
-                                ProductionConfig.class));
-                    } catch (JsonProcessingException e) {
-                        throw new IllegalStateException("自产明细 " + line.get("id") + " 的产品配置无法读取", e);
-                    }
+        approvals.submit(ErpApprovalService.DocType.SALES_ORDER, id, key, () -> requireSubmittable(id));
+    }
+
+    /** 审批通过（待审批 → 已确认）。审批人与建单人可以是同一人（#35：默认不禁止自审，但有留痕）。 */
+    public void approve(long id, String comment, String key) {
+        approvals.approve(ErpApprovalService.DocType.SALES_ORDER, id, comment, key);
+    }
+
+    /** 驳回（待审批 → 草稿）。原因必填。 */
+    public void reject(long id, String comment, String key) {
+        approvals.reject(ErpApprovalService.DocType.SALES_ORDER, id, comment, key);
+    }
+
+    /** 审批历史（含驳回）。 */
+    public List<Map<String, Object>> approvalHistory(long id) {
+        return approvals.history(ErpApprovalService.DocType.SALES_ORDER, id);
+    }
+
+    /** 提交前的业务校验：每行都得定下供货方式；自产行还要把产品配置填全填对。 */
+    private void requireSubmittable(long id) {
+        var requirements = jdbc.queryForList("SELECT id,supply_mode supplyMode,production_config_json productionConfigJson"
+                + " FROM erp_sales_order_items WHERE order_id=?", id);
+        if (requirements.isEmpty())
+            throw new IllegalStateException("订单没有明细，不能提交审批");
+        for (var line : requirements) {
+            if ("UNDECIDED".equals(line.get("supplyMode")))
+                throw new IllegalStateException("明细 " + line.get("id") + " 尚未确定供货方式");
+            if ("MAKE".equals(line.get("supplyMode"))) {
+                if (line.get("productionConfigJson") == null)
+                    throw new IllegalStateException("自产明细 " + line.get("id") + " 尚未完成产品配置");
+                try {
+                    validateProductionConfig(mapper.readValue(jsonText(line.get("productionConfigJson")),
+                            ProductionConfig.class));
+                } catch (JsonProcessingException e) {
+                    throw new IllegalStateException("自产明细 " + line.get("id") + " 的产品配置无法读取", e);
                 }
             }
-            jdbc.update("UPDATE erp_sales_orders SET status='CONFIRMED',confirmed_at=NOW(),"
-                    + "confirmed_by_employee_id=? WHERE id=?", actor.employeeId(), id);
-            log.write(ErpChangeLogWriter.of(actor, "product_archive.erp_sales_orders", id, "UPDATE",
-                    ErpChangeLogWriter.changes("status", "CONFIRMED"), null, "确认销售需求", key, null));
-            return String.valueOf(id);
-        });
+        }
     }
 
     /** 现货明细一键生成可复核的出库草稿；不扣库存，过账仍由仓库流程完成。 */

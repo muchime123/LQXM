@@ -32,7 +32,7 @@ class ErpSalesOrderLineIdentityTest {
         var service = new ErpSalesOrderService(jdbc, mock(ErpActorResolver.class),
                 mock(DataScopeSupport.class), mock(ErpIdempotencyService.class),
                 mock(ErpChangeLogWriter.class), mock(SalesOutboundService.class),
-                new ObjectMapper(), mock(ManufacturingService.class));
+                new ObjectMapper(), mock(ManufacturingService.class), mock(ErpApprovalService.class));
         var line = new ErpSalesOrderService.Line(91L, "外采设备", "标准配置", null, "BUY",
                 "台", BigDecimal.ONE, BigDecimal.TEN, null, null, null);
         var request = new ErpSalesOrderService.Request(null, "客户", LocalDate.of(2026, 9, 24),
@@ -64,7 +64,7 @@ class ErpSalesOrderLineIdentityTest {
         var service = new ErpSalesOrderService(jdbc, mock(ErpActorResolver.class),
                 mock(DataScopeSupport.class), mock(ErpIdempotencyService.class),
                 mock(ErpChangeLogWriter.class), mock(SalesOutboundService.class),
-                new ObjectMapper(), mock(ManufacturingService.class));
+                new ObjectMapper(), mock(ManufacturingService.class), mock(ErpApprovalService.class));
         var replacement = new ErpSalesOrderService.Line(null, "新产品", null, null, "BUY",
                 "台", BigDecimal.ONE, null, null, null, null);
         var request = new ErpSalesOrderService.Request(null, "客户", LocalDate.of(2026, 9, 24),

@@ -1,27 +1,15 @@
 import { http } from '../http'
 import { newRequestKey } from '../salesOutbound'
+import type { ApprovalStatus, ApprovalEntry } from '../approval'
 
 /** 采购订单履约方式：WAREHOUSE 到货入本地库存账；DROP_SHIP 供应商直发客户（不进本地仓）。 */
 export type PurchaseFulfillmentMode = 'WAREHOUSE' | 'DROP_SHIP'
 /** 审批关口（#35）：草稿 → 待审批 → 已确认（或驳回落回草稿）。 */
 export type PurchaseOrderStatus = 'DRAFT' | 'PENDING_APPROVAL' | 'CONFIRMED' | 'RECEIVING' | 'CLOSED' | 'CANCELLED'
-export type ApprovalStatus = 'NONE' | 'PENDING' | 'APPROVED' | 'REJECTED'
-export type ApprovalAction = 'SUBMIT' | 'APPROVE' | 'REJECT'
 
-/** 审批流水一条（append-only，含驳回次数）。 */
-export interface ApprovalEntry {
-  id: number
-  docType: string
-  docId: number
-  docNo: string
-  action: ApprovalAction
-  fromStatus?: string | null
-  toStatus?: string | null
-  actorEmployeeId: number
-  actorName: string
-  comment?: string | null
-  createdAt: string
-}
+// 审批的类型与词表统一放在 api/approval（三条链共用一套），这里只转出、不再各写一份。
+export type { ApprovalStatus, ApprovalAction, ApprovalEntry, PendingApproval, ApprovalDocType } from '../approval'
+export { fetchPendingApprovals } from '../approval'
 
 export interface PurchaseOrderLine {
   id?: number
@@ -160,12 +148,6 @@ export const rejectPurchaseOrder = async (id: number, comment: string, requestKe
 export const fetchPurchaseOrderApprovals = async (id: number) =>
   (await http.get<ApprovalEntry[]>(`/erp-purchase-orders/${id}/approvals`)).data
 
-/** 待审批清单（跨三种单据的审批人待办）。 */
-export const fetchPendingApprovals = async () =>
-  (await http.get<Array<{ docType: string; docLabel: string; docId: number; docNo: string; status: string
-    submittedAt?: string | null; submittedByEmployeeId?: number | null; submittedByName?: string | null }>>(
-    '/erp-approvals/pending')).data
-
 export const cancelPurchaseOrder = async (id: number, reason: string, requestKey?: string) =>
   (await http.post(`/erp-purchase-orders/${id}/cancel`, { reason }, key(requestKey))).data
 
@@ -192,18 +174,8 @@ export const PURCHASE_STATUS_TEXT: Record<PurchaseOrderStatus, string> = {
   CANCELLED: '已取消',
 }
 
-export const APPROVAL_ACTION_TEXT: Record<ApprovalAction, string> = {
-  SUBMIT: '提交审批',
-  APPROVE: '审批通过',
-  REJECT: '驳回',
-}
-
-export const APPROVAL_STATUS_TEXT: Record<ApprovalStatus, string> = {
-  NONE: '未提交',
-  PENDING: '待审批',
-  APPROVED: '已通过',
-  REJECTED: '已驳回',
-}
+// 词表也只此一份（api/approval）；这里转出，供视图沿用原有 import 路径。
+export { APPROVAL_ACTION_TEXT, APPROVAL_STATUS_TEXT } from '../approval'
 
 export const FULFILLMENT_MODE_TEXT: Record<PurchaseFulfillmentMode, string> = {
   WAREHOUSE: '到货入库',

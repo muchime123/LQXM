@@ -30,7 +30,7 @@ class ErpSalesOrderProductionConfigTest {
         var service = new ErpSalesOrderService(jdbc, mock(ErpActorResolver.class),
                 mock(DataScopeSupport.class), mock(ErpIdempotencyService.class),
                 mock(ErpChangeLogWriter.class), mock(SalesOutboundService.class),
-                new ObjectMapper(), mock(ManufacturingService.class));
+                new ObjectMapper(), mock(ManufacturingService.class), mock(ErpApprovalService.class));
 
         assertDoesNotThrow(() -> service.validateProductionConfig(config("全自动气调机", List.of("加宽"))));
         assertThrows(IllegalArgumentException.class,

@@ -69,11 +69,40 @@ public class ErpSalesOrderController {
         return service.update(id, request, key);
     }
 
-    @PostMapping("/{id}/confirm")
+    /**
+     * 提交审批（草稿 → 待审批）。⚠️ 原先的 {@code /confirm} 已废除：
+     * 它是单步动作（草稿直接跳 CONFIRMED），保留它 = 绕过审批（决策 #35）。
+     */
+    @PostMapping("/{id}/submit")
     @RequirePermission("sales_order.manage")
-    public void confirm(@PathVariable long id,
+    public void submit(@PathVariable long id,
+                       @RequestHeader(value = "X-Request-Key", required = false) String key) {
+        service.submit(id, key);
+    }
+
+    /** 审批通过（待审批 → 已确认）。审批人与建单人可以是同一人（#35：默认不禁止自审，但有留痕）。 */
+    @PostMapping("/{id}/approve")
+    @RequirePermission("sales_order.approve")
+    public void approve(@PathVariable long id, @RequestBody(required = false) Map<String, Object> body,
                         @RequestHeader(value = "X-Request-Key", required = false) String key) {
-        service.confirm(id, key);
+        Object comment = body == null ? null : body.get("comment");
+        service.approve(id, comment == null ? null : String.valueOf(comment), key);
+    }
+
+    /** 驳回（待审批 → 草稿）。原因必填。 */
+    @PostMapping("/{id}/reject")
+    @RequirePermission("sales_order.approve")
+    public void reject(@PathVariable long id, @RequestBody(required = false) Map<String, Object> body,
+                       @RequestHeader(value = "X-Request-Key", required = false) String key) {
+        Object comment = body == null ? null : body.get("comment");
+        service.reject(id, comment == null ? null : String.valueOf(comment), key);
+    }
+
+    /** 审批历史（含驳回）。 */
+    @GetMapping("/{id}/approvals")
+    @RequirePermission({"sales_order.read.self", "sales_order.read.department", "sales_order.read.all"})
+    public java.util.List<Map<String, Object>> approvals(@PathVariable long id) {
+        return service.approvalHistory(id);
     }
 
     @PostMapping("/{id}/items/{itemId}/outbound-draft")
