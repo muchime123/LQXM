@@ -50,6 +50,7 @@ public class ManufacturingService {
     private final ErpIdempotencyService idem;
     private final ErpChangeLogWriter changeLog;
     private final ErpActorResolver actors;
+    private final ErpApprovalService approvals;
 
     public ManufacturingService(JdbcTemplate jdbc,
                                 ProductInventoryService productInventory,
@@ -59,7 +60,8 @@ public class ManufacturingService {
                                 ManufacturingTaskTemplateResolver taskTemplateResolver,
                                 @Qualifier("archiveIdempotencyService") ErpIdempotencyService idem,
                                 @Qualifier("archiveAuditWriter") ErpChangeLogWriter changeLog,
-                                ErpActorResolver actors) {
+                                ErpActorResolver actors,
+                                ErpApprovalService approvals) {
         this.jdbc = jdbc;
         this.productInventory = productInventory;
         this.users = users;
@@ -69,6 +71,7 @@ public class ManufacturingService {
         this.idem = idem;
         this.changeLog = changeLog;
         this.actors = actors;
+        this.approvals = approvals;
     }
 
     /**
@@ -299,7 +302,9 @@ public class ManufacturingService {
     public Map<String,Object> scheduleSummary() {
         var where=new StringBuilder(" WHERE 1=1");var params=new ArrayList<>();
         scope.appendByEmployeeId(where,params,"m.salesperson_id","e.department", FeatureCode.MANUFACTURING);
-        String active=" AND m.status NOT IN ('COMPLETED','CLOSED','CANCELLED')";
+        // 「活跃」= 已放行给车间、还没结束。草稿/待审批**不算**：它们还没进车间，
+        // 算进去会让「待排产」被一批还没批的单灌满，排产员也分不清哪些真能排。
+        String active=" AND m.status NOT IN ('COMPLETED','CLOSED','CANCELLED','DRAFT','"+ErpApprovalService.PENDING_STATUS+"')";
         Long total=jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_orders m LEFT JOIN employees e ON e.id=m.salesperson_id"+where+active,Long.class,params.toArray());
         Long unscheduled=jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_orders m LEFT JOIN employees e ON e.id=m.salesperson_id"+where+active+" AND m.planned_start_date IS NULL AND m.planned_finish_date IS NULL",Long.class,params.toArray());
         Long scheduled=jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_orders m LEFT JOIN employees e ON e.id=m.salesperson_id"+where+active+" AND (m.planned_start_date IS NOT NULL OR m.planned_finish_date IS NOT NULL)",Long.class,params.toArray());
@@ -331,7 +336,72 @@ public class ManufacturingService {
         result.put("inspections",execution.inspections(id));
         result.put("issues",execution.issues(id));
         result.put("reworks",execution.reworks(id));
+        result.put("approvals",approvals.history(ErpApprovalService.DocType.MFG_ORDER,id));
         return result;
+    }
+
+    // ==================== 审批（决策 #35）：草稿 → 待审批 → 通过才流转给车间 ====================
+
+    /**
+     * 提交审批（草稿 → 待审批）。
+     *
+     * <p>两个建单入口（手工建单、销售订单明细发起的车间接单）都走 {@link #create}，所以都落草稿、
+     * 都得提交。提交要 {@code manufacturing.manage}，审批要 {@code manufacturing.approve}，
+     * **是两个独立权限**：能开单 ≠ 能批单。
+     */
+    public void submit(long id,String key){
+        requireVisible(id);
+        approvals.submit(ErpApprovalService.DocType.MFG_ORDER,id,key,()->requireSubmittable(id));
+    }
+
+    /**
+     * 审批通过。落哪个状态**由单据自己决定**，不是一个常量：
+     * <ul>
+     *   <li>有工序 → {@code RELEASED}：车间可以开始报工；</li>
+     *   <li>0 道工序 → {@code PENDING_INSPECTION}：这张单没有报工可做，收货是它唯一的推进动作
+     *       （{@link ManufacturingExecutionService#markNoProcessOrder} 就是按这个语义建的）。
+     *       若这里也落 {@code RELEASED}，「展开 0 道工序后卡在 RELEASED 无人能推」的老坑会复活。</li>
+     * </ul>
+     * 解析在审批事务内、单据行已加锁之后求值，与状态改写/流水/审计共享同一事务。
+     */
+    public void approve(long id,String comment,String key){
+        approvals.approve(ErpApprovalService.DocType.MFG_ORDER,id,comment,key,this::releasedStatus);
+    }
+
+    private String releasedStatus(long id){
+        Integer operations=jdbc.queryForObject(
+                "SELECT COUNT(*) FROM manufacturing_order_operations WHERE manufacturing_order_id=?",Integer.class,id);
+        return operations!=null && operations>0 ? "RELEASED" : "PENDING_INSPECTION";
+    }
+
+    /** 驳回（待审批 → 草稿）。原因必填。 */
+    public void reject(long id,String comment,String key){
+        approvals.reject(ErpApprovalService.DocType.MFG_ORDER,id,comment,key);
+    }
+
+    /** 审批历史（含驳回）。 */
+    public List<Map<String,Object>> approvalHistory(long id){
+        requireVisible(id);
+        return approvals.history(ErpApprovalService.DocType.MFG_ORDER,id);
+    }
+
+    /**
+     * 提交前的业务校验：把「审完也是一张推不动的单」挡在提交这一步，而不是让老板去发现。
+     *
+     * <p>判据是「有制程却一道工序都没有」——正常建单不会出现（要么展开工序、要么标为无制程单），
+     * 出现即为工序生成中途失败，必须重新生成再提交。
+     */
+    private void requireSubmittable(long id){
+        var head=jdbc.queryForList("SELECT process_template_id processTemplateId FROM manufacturing_orders WHERE id=?",id);
+        if(head.isEmpty()) throw new IllegalArgumentException("生产任务单不存在");
+        Integer operations=jdbc.queryForObject(
+                "SELECT COUNT(*) FROM manufacturing_order_operations WHERE manufacturing_order_id=?",Integer.class,id);
+        if(head.getFirst().get("processTemplateId")!=null && (operations==null||operations==0))
+            throw new IllegalStateException("本单已选制程但没有工序，请先生成工序再提交审批");
+        Integer outputs=jdbc.queryForObject(
+                "SELECT COUNT(*) FROM manufacturing_order_outputs WHERE manufacturing_order_id=?",Integer.class,id);
+        if(outputs==null||outputs==0)
+            throw new IllegalStateException("本单没有产出清单，收货时无从填写，不能提交审批");
     }
     /**
      * 建生产任务（M0 契约写动作）。
@@ -455,6 +525,12 @@ public class ManufacturingService {
         else execution.doGenerateOperations(id,templateId,actor,requestKey);
         // 产线由下单选择决定，不能被制程模板上的历史车间标签覆盖。
         if(selection!=null) jdbc.update("UPDATE manufacturing_orders SET workshop_type=? WHERE id=?",selection.workshopName(),id);
+        // 决策 #35：建单只落**草稿**，审批通过才流转给车间。
+        // 上面两个分支会把 status 置成 RELEASED / PENDING_INSPECTION（那是「可以开工了」的语义），
+        // 这里统一压回 DRAFT —— 车间入口（执行看板、待检验清单）都按 status 过滤，
+        // 落在 DRAFT 就自动看不见，不必去那些查询里逐个加条件。
+        // 工序仍照常展开：审批人要看到工序清单才审得下去；通过后车间立刻能报工，不用二次生成。
+        jdbc.update("UPDATE manufacturing_orders SET status='DRAFT',approval_status='NONE' WHERE id=?",id);
         changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_orders",id,"INSERT",
                 ErpChangeLogWriter.changes(
                         "orderNo",no,"taskType",taskType,"customerNameSnapshot",customer,
@@ -464,8 +540,9 @@ public class ManufacturingService {
                         "plannedQuantity",planned,"unit",unit,"outputLineCount",lineNo-1,
                         "workshopType",selection!=null?selection.workshopName():null,
                         "processTemplateId",templateId,"dueDate",request.dueDate(),
-                        "status",templateId==null?"PENDING_INSPECTION(该产线无制程)":"RELEASED"),
-                null,templateId==null?"创建手工生产任务（该产线无制程，直接进入检验）":"创建手工生产任务",requestKey,null));
+                        "hasOperations",templateId!=null,
+                        "status","DRAFT（草稿，待提交审批）"),
+                null,templateId==null?"创建手工生产任务草稿（该产线无制程，审完直接进待检验）":"创建手工生产任务草稿",requestKey,null));
         return id;
     }
 
@@ -962,7 +1039,9 @@ public class ManufacturingService {
             String k="%"+keyword.trim()+"%";for(int i=0;i<3;i++)params.add(k);
         }
         if(status!=null&&!status.isBlank()){where.append(" AND m.status=?");params.add(status);}
-        else{where.append(" AND m.status<>'CANCELLED'");}
+        // 默认视图只放「已放行给车间」的单：草稿/待审批还没进车间，混进跟单进度表会让人以为在产。
+        // 想单看它们就把 status 显式筛成 DRAFT / PENDING_APPROVAL（上面那一支）。
+        else{where.append(" AND m.status NOT IN ('CANCELLED','DRAFT','"+ErpApprovalService.PENDING_STATUS+"')");}
         if(workshop!=null&&!workshop.isBlank()){where.append(" AND m.workshop_type=?");params.add(workshop.trim());}
         if("Y".equalsIgnoreCase(overdue)){
             // 超期判定：原交期与修订预计完成都过期、且未完工（与跟单进度表「已超期」口径一致）

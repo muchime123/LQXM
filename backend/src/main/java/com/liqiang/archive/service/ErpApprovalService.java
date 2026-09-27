@@ -11,6 +11,7 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.function.LongFunction;
 
 /**
  * 通用审批（决策登记 #35）。三条链——销售订单 / 生产任务单 / 采购订单——共用这一套状态机，
@@ -166,26 +167,46 @@ public class ErpApprovalService {
                 });
     }
 
-    public void approve(DocType type, long docId, String comment, String key) {
+    /**
+     * 审批通过。目标状态默认取 {@link DocType#approvedStatus()}。
+     *
+     * <p>但有些单据「审完该落哪」要看单据自身，不是个常量 —— 例如生产任务单：有工序的审完才能
+     * 报工（{@code RELEASED}），一道工序都没有的没有报工可做、只能直接进待检验
+     * （{@code PENDING_INSPECTION}）；若一律落 {@code RELEASED}，这张单就卡着没人能推。
+     * 故允许调用方传解析器，它在**同一事务内**（单据行已 {@code FOR UPDATE}）求值，
+     * 与状态改写、流水、审计共享事务与幂等键。
+     *
+     * @param targetStatus 目标状态解析器；{@code null} 表示用注册表的默认值
+     */
+    public void approve(DocType type, long docId, String comment, String key, LongFunction<String> targetStatus) {
         ErpActor actor = actors.current();
         idem.execute(actor, key, type.action("approve"), Map.of("docType", type.name(), "docId", docId),
                 () -> {
-                    transition(type, docId, "APPROVE", actor, comment, key);
+                    transition(type, docId, "APPROVE", actor, comment, key, targetStatus);
                     return "ok";
                 });
+    }
+
+    public void approve(DocType type, long docId, String comment, String key) {
+        approve(type, docId, comment, key, null);
     }
 
     public void reject(DocType type, long docId, String comment, String key) {
         ErpActor actor = actors.current();
         idem.execute(actor, key, type.action("reject"), Map.of("docType", type.name(), "docId", docId),
                 () -> {
-                    transition(type, docId, "REJECT", actor, comment, key);
+                    transition(type, docId, "REJECT", actor, comment, key, null);
                     return "ok";
                 });
     }
 
     /** 状态机本体：加锁读现状 → 校验 → 改状态 → 落流水 → 写审计（全在同一事务内）。 */
     private void transition(DocType type, long docId, String action, ErpActor actor, String comment, String key) {
+        transition(type, docId, action, actor, comment, key, null);
+    }
+
+    private void transition(DocType type, long docId, String action, ErpActor actor, String comment, String key,
+                            LongFunction<String> targetStatus) {
         Map<String, Object> head = lock(type, docId);
         String status = str(head.get("status"));
 
@@ -205,7 +226,8 @@ public class ErpApprovalService {
                     throw new IllegalStateException(type.label() + "不在待审批状态（当前「" + status + "」），无法审批");
                 from = status;
                 boolean pass = "APPROVE".equals(action);
-                to = pass ? type.approvedStatus() : type.draftStatus();
+                to = pass ? (targetStatus == null ? type.approvedStatus() : targetStatus.apply(docId))
+                        : type.draftStatus();
                 approvalStatus = pass ? APPROVAL_APPROVED : APPROVAL_REJECTED;
                 if (!pass) requireRejectReason(comment);
             }

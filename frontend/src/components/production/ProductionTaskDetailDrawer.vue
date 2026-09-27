@@ -5,7 +5,15 @@
       <el-button v-if="error" @click="load">重新加载</el-button>
       <template v-if="detail">
         <h2>{{ detail.order.orderNo }} · {{ detail.order.productNameSnapshot }}</h2>
+        <el-alert v-if="orderStatus === 'PENDING_APPROVAL'" title="已提交审批，等待老板审批；审批通过前车间看不到这张单，也不能排产。" type="warning" :closable="false" />
+        <el-alert v-else-if="orderStatus === 'DRAFT'" :title="approvalStatus === 'REJECTED' ? '上次提交被驳回，请按审批意见修改后重新提交。' : '草稿：尚未提交审批，车间看不到这张单。'" :type="approvalStatus === 'REJECTED' ? 'error' : 'info'" :closable="false" />
+        <div v-if="approvalStatus !== 'NONE'" class="approval-meta">
+          <el-tag :type="approvalTag(approvalStatus)" size="small">{{ approvalStatusText(approvalStatus) }}</el-tag>
+          <span v-if="detail.order.approvalSubmittedAt" class="detail-note">提交 {{ formatTime(detail.order.approvalSubmittedAt) }}</span>
+          <span v-if="detail.order.approvalDecidedAt" class="detail-note">决定 {{ formatTime(detail.order.approvalDecidedAt) }}</span>
+        </div>
         <el-descriptions :column="2" border>
+          <el-descriptions-item label="审批状态"><el-tag :type="approvalTag(approvalStatus)" size="small">{{ approvalStatusText(approvalStatus) }}</el-tag></el-descriptions-item>
           <el-descriptions-item label="任务来源">{{ detail.order.externalSource === 'H3YUN' ? '氚云导入' : detail.order.externalSource || '系统创建（非氚云导入）' }}</el-descriptions-item>
           <el-descriptions-item label="氚云工单号">{{ detail.order.h3WorkOrderNo || '未关联' }}</el-descriptions-item>
           <el-descriptions-item label="客户">{{ detail.order.customerNameSnapshot || '—' }}</el-descriptions-item>
@@ -68,23 +76,55 @@
           <el-table-column prop="completedAt" label="入库时间" min-width="170" />
           <el-table-column prop="status" label="状态" width="100" />
         </el-table>
+        <template v-if="detail.approvals?.length">
+          <h3>审批记录</h3>
+          <el-table :data="detail.approvals" border size="small" empty-text="暂无审批记录">
+            <el-table-column label="动作" width="105"><template #default="{ row }">
+              <el-tag :type="row.action === 'APPROVE' ? 'success' : row.action === 'REJECT' ? 'danger' : 'info'" size="small">
+                {{ approvalActionText(row.action) }}
+              </el-tag>
+            </template></el-table-column>
+            <el-table-column prop="actorName" label="操作人" width="115" />
+            <el-table-column label="时间" width="170"><template #default="{ row }">{{ formatTime(row.createdAt) }}</template></el-table-column>
+            <el-table-column label="意见" min-width="180" show-overflow-tooltip><template #default="{ row }">{{ row.comment || '—' }}</template></el-table-column>
+          </el-table>
+        </template>
       </template>
     </div>
+    <template #footer>
+      <el-button @click="visible = false">关闭</el-button>
+      <el-button v-if="canManage && orderStatus === 'DRAFT'" type="primary" :loading="acting" @click="submit">提交审批</el-button>
+      <el-button v-if="canApprove && orderStatus === 'PENDING_APPROVAL'" type="success" :loading="acting" @click="approve">审批通过</el-button>
+      <el-button v-if="canApprove && orderStatus === 'PENDING_APPROVAL'" type="danger" :loading="acting" @click="reject">驳回</el-button>
+    </template>
   </el-drawer>
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { fetchManufacturingOrder, type ManufacturingDetail, type ManufacturingOperation, type ExecutionBoardItem, type WorkReport, type AllWorkReport } from '@/api/manufacturing'
+import { ElMessageBox } from 'element-plus'
+import { fetchManufacturingOrder, submitManufacturingOrderApproval, approveManufacturingOrder, rejectManufacturingOrder, newRequestKey, type ManufacturingDetail, type ManufacturingOperation, type ExecutionBoardItem, type WorkReport, type AllWorkReport } from '@/api/manufacturing'
+import { APPROVAL_STATUS_TEXT, APPROVAL_ACTION_TEXT, type ApprovalStatus } from '@/api/approval'
+import { notify } from '@/composables/ui/useToast'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { processProgress, operationStatusLabel } from '@/utils/manufacturingProgress'
 import { boxShapeLabel } from '@/utils/boxSize'
 const visible = defineModel<boolean>({ default: false })
 const props = defineProps<{ orderId: number | null; refreshKey?: number }>()
-const emit = defineEmits<{ report: [row: ExecutionBoardItem]; reverse: [row: AllWorkReport] }>()
+const emit = defineEmits<{ report: [row: ExecutionBoardItem]; reverse: [row: AllWorkReport]; changed: [] }>()
 const { can } = useCurrentUser()
 const canReport = computed(() => can('manufacturing.report'))
 const canReverse = computed(() => can('manufacturing.report.override'))
+/**
+ * 提交（`manufacturing.manage`）与审批（`manufacturing.approve`）是**两个独立权限**（决策 #35）：
+ * 有建单权 ≠ 有审批权，所以两类按钮各按各的权限显示，不能合成一个「能管这个单子」的判断。
+ */
+const canManage = computed(() => can('manufacturing.manage'))
+const canApprove = computed(() => can('manufacturing.approve'))
+const acting = ref(false)
+const orderStatus = computed(() => detail.value?.order.status || '')
+/** 审批态独立于业务状态：驳回后 status 回到草稿，只有它记得被驳回过。 */
+const approvalStatus = computed<ApprovalStatus>(() => detail.value?.order.approvalStatus || 'NONE')
 const detail = ref<ManufacturingDetail | null>(null), loading = ref(false), error = ref('')
 let sequence = 0
 const progress = computed(() => processProgress(detail.value?.operations || []))
@@ -120,9 +160,78 @@ function reverse(row: WorkReport) {
   emit('reverse', { ...row, orderNo: order.orderNo, customerNameSnapshot: order.customerNameSnapshot,
     productNameSnapshot: order.productNameSnapshot, unit: order.unit, workshopType: order.workshopType })
 }
+/** 后端回的是 "2026-09-27T10:04:01"，秒就够用（与销售 / 采购视图同口径）。 */
+function formatTime(v?: string | null) {
+  if (!v) return '—'
+  return v.replace('T', ' ').slice(0, 19)
+}
+// 表格插槽里的 row 是 any，直接索引字面量 Record 会触发 noImplicitAny；统一走查表函数。
+function approvalStatusText(s?: string | null) {
+  return (APPROVAL_STATUS_TEXT as Record<string, string>)[s || 'NONE'] || '未提交'
+}
+function approvalActionText(a?: string | null) {
+  return (APPROVAL_ACTION_TEXT as Record<string, string>)[a || ''] || a || ''
+}
+function approvalTag(s?: ApprovalStatus) {
+  if (s === 'APPROVED') return 'success'
+  if (s === 'PENDING') return 'warning'
+  if (s === 'REJECTED') return 'danger'
+  return 'info'
+}
+/** 提交审批（草稿 → 待审批）。提交前车间看不到这张单，也不占排产。 */
+async function submit() {
+  if (acting.value || !props.orderId) return
+  try { await ElMessageBox.confirm('提交后这张单进入待审批，审批期间车间看不到、也不能排产。请先核对产线、制程、数量和交期。', '提交审批') }
+  catch { return }
+  acting.value = true
+  try {
+    await submitManufacturingOrderApproval(props.orderId, newRequestKey())
+    notify.success('已提交审批，等待老板审批'); await load(); emit('changed')
+  } catch (e) { notify.errorWithDetail('提交审批失败', e) }
+  finally { acting.value = false }
+}
+/**
+ * 审批通过。落哪个态**由单据自身决定**（后端按工序数判断），不在这里假定：
+ * 有工序 → 「已下达」（可排产 / 报工）；0 工序 → 「待完工检验」（直接送去检验入库），
+ * 否则 0 工序单会卡在「已下达」永远没有工序可报。
+ */
+async function approve() {
+  if (acting.value || !props.orderId) return
+  const zeroProcess = !detail.value?.operations?.length
+  try { await ElMessageBox.confirm(zeroProcess
+    ? '本例没有工序，审批通过后这张单直接进入「待完工检验」。'
+    : '审批通过后这张单下达到车间，可以排产、报工。', '审批通过') }
+  catch { return }
+  acting.value = true
+  try {
+    await approveManufacturingOrder(props.orderId, undefined, newRequestKey())
+    notify.success('已审批通过'); await load(); emit('changed')
+  } catch (e) { notify.errorWithDetail('审批失败', e) }
+  finally { acting.value = false }
+}
+/** 驳回（待审批 → 草稿），原因必填：不给理由，建单人不知道该改什么。 */
+async function reject() {
+  if (acting.value || !props.orderId) return
+  let comment = ''
+  try {
+    const { value } = await ElMessageBox.prompt('请填写驳回原因，建单人会看到。', '驳回生产任务单', {
+      inputType: 'textarea',
+      inputPlaceholder: '例如：产线选错 / 交期不现实 / 数量与销售订单不符',
+      inputValidator: v => (String(v ?? '').trim() ? true : '驳回原因必填'),
+    })
+    comment = String(value ?? '').trim()
+  } catch { return }
+  acting.value = true
+  try {
+    await rejectManufacturingOrder(props.orderId, comment, newRequestKey())
+    notify.success('已驳回，任务单退回草稿'); await load(); emit('changed')
+  } catch (e) { notify.errorWithDetail('驳回失败', e) }
+  finally { acting.value = false }
+}
 watch(() => [visible.value, props.orderId, props.refreshKey], load)
 </script>
 
 <style scoped>
 h3 { margin-top: 24px; }.detail-note { color: var(--color-text-secondary); font-size: 13px; }
+.approval-meta { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
 </style>

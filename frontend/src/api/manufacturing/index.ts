@@ -1,4 +1,5 @@
 import { http } from '../http'
+import type { ApprovalStatus, ApprovalEntry } from '../approval'
 
 export interface ManufacturingOrder {
   externalSource?: string
@@ -37,6 +38,15 @@ export interface ManufacturingOrder {
   inspectionStatus?: string
   remark?: string
   createdAt: string
+  /**
+   * 审批态（决策 #35）。与 `status`（业务流转态）**是两个独立字段**：
+   * 驳回后 `status` 回到 `DRAFT`，只有它记得「被驳回过」，所以列表要单独出一列。
+   */
+  approvalStatus?: ApprovalStatus
+  approvalSubmittedAt?: string | null
+  approvalSubmittedByEmployeeId?: number | null
+  approvalDecidedAt?: string | null
+  approvalDecidedByEmployeeId?: number | null
 }
 export interface FinishedGoodsLot {
   id: number
@@ -99,6 +109,8 @@ export interface ManufacturingDetail {
   inspections: InspectionRecord[]
   issues: ManufacturingIssue[]
   reworks: ManufacturingRework[]
+  /** 审批流水（含历次驳回），append-only。 */
+  approvals: ApprovalEntry[]
 }
 export interface ProcessTemplate { id:number; templateCode:string; templateName:string; workshopType?:string; operationCount:number }
 export interface ManufacturingOperation { id:number; sequenceNo:number; operationNameSnapshot:string; requiredQuantity:number; reportedQuantity:number; progressPercent:number; status:string; isFinal:boolean; required?:boolean | number; startedAt?:string; completedAt?:string; executionRound?:number; assignedTeamName?:string; assignedEmployeeId?:number; assignedEmployeeName?:string }
@@ -165,6 +177,22 @@ function idemConfig(requestKey?: string) {
 }
 export const createManufacturingOrder = async (payload: Record<string, unknown>, requestKey?: string) =>
   (await http.post<number>('/manufacturing/orders', payload, idemConfig(requestKey))).data
+// ============ 审批关口（决策 #35）============
+// 建单落 `DRAFT`（草稿），建单人提交、老板审批通过后才流转到车间：
+//   有工序 → `RELEASED`（可排产报工）；0 工序 → `PENDING_INSPECTION`（直接待完工检验）。
+// 驳回退回 `DRAFT`，原因必填。提交（manage）与审批（approve）是**两个独立权限**。
+/** 提交审批（草稿 → 待审批）。权限 `manufacturing.manage`。 */
+export const submitManufacturingOrderApproval = async (id: number, requestKey?: string) =>
+  (await http.post(`/manufacturing/orders/${id}/submit`, {}, idemConfig(requestKey))).data
+/** 审批通过（待审批 → 按单据自身落 RELEASED / PENDING_INSPECTION）。权限 `manufacturing.approve`。 */
+export const approveManufacturingOrder = async (id: number, comment?: string, requestKey?: string) =>
+  (await http.post(`/manufacturing/orders/${id}/approve`, { comment }, idemConfig(requestKey))).data
+/** 驳回（待审批 → 草稿），原因必填。权限 `manufacturing.approve`。 */
+export const rejectManufacturingOrder = async (id: number, comment: string, requestKey?: string) =>
+  (await http.post(`/manufacturing/orders/${id}/reject`, { comment }, idemConfig(requestKey))).data
+/** 某张生产任务单的完整审批历史（含驳回）。 */
+export const fetchManufacturingOrderApprovals = async (id: number) =>
+  (await http.get<ApprovalEntry[]>(`/manufacturing/orders/${id}/approvals`)).data
 export const fetchProcessTemplates = async () =>
   (await http.get<ProcessTemplate[]>('/manufacturing/process-templates')).data
 /**

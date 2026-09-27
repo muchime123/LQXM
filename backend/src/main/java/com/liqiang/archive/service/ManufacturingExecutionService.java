@@ -264,6 +264,10 @@ public class ManufacturingExecutionService {
     public void schedule(long orderId,ScheduleRequest request){
         var order=jdbc.queryForMap("SELECT order_no,status FROM manufacturing_orders WHERE id=? FOR UPDATE",orderId);
         if(Set.of("COMPLETED","CLOSED","CANCELLED").contains(String.valueOf(order.get("status"))))throw new IllegalStateException("已结束的生产任务不能修改排产");
+        // 决策 #35：草稿/待审批的单还没「放行给车间」，排产是车间侧的预备动作，不许提前做
+        // （否则会出现「审批没过但产能已经排掉」）。
+        if(Set.of("DRAFT",ErpApprovalService.PENDING_STATUS).contains(String.valueOf(order.get("status"))))
+            throw new IllegalStateException("草稿或待审批的生产任务不能排产，请先提交并等审批通过");
         String priority=clean(request.priority());if(priority==null)priority="NORMAL";
         if(!Set.of("LOW","NORMAL","HIGH","URGENT").contains(priority))throw new IllegalArgumentException("生产优先级无效");
         if(request.plannedStartDate()!=null&&request.plannedFinishDate()!=null&&request.plannedFinishDate().isBefore(request.plannedStartDate()))throw new IllegalArgumentException("计划完工日期不能早于计划开工日期");
@@ -288,6 +292,9 @@ public class ManufacturingExecutionService {
         if(Set.of("COMPLETED","CANCELLED").contains(String.valueOf(operation.get("status"))))throw new IllegalStateException("已结束的工序不能重新分派");
         String orderStatus=jdbc.queryForObject("SELECT status FROM manufacturing_orders WHERE id=?",String.class,orderId);
         if(Set.of("COMPLETED","CLOSED","CANCELLED").contains(orderStatus))throw new IllegalStateException("已结束的生产任务不能重新分派");
+        // 同 schedule()：草稿/待审批不许分派到人。
+        if(Set.of("DRAFT",ErpApprovalService.PENDING_STATUS).contains(orderStatus))
+            throw new IllegalStateException("草稿或待审批的生产任务不能分派工序，请先提交并等审批通过");
         String employeeName=employeeName(request.assignedEmployeeId());
         jdbc.update("UPDATE manufacturing_order_operations SET assigned_team_name=?,assigned_employee_id=?,assigned_employee_name=? WHERE id=?",
                 clean(request.assignedTeamName()),request.assignedEmployeeId(),employeeName,operationId);

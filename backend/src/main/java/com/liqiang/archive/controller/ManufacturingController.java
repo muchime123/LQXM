@@ -77,6 +77,31 @@ public class ManufacturingController {
     @GetMapping("/orders/{id}") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.report","manufacturing.inspect","manufacturing.receive"})
     public Map<String,Object> detail(@PathVariable long id){return service.detail(id);}
     @GetMapping("/orders/{id}/materials") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.material.manage"}) public Map<String,Object> materials(@PathVariable long id){service.requireVisible(id);return materials.detail(id);}
+    /**
+     * 提交审批（草稿 → 待审批）。建单只落草稿，车间入口按 status 过滤，故未审批的单车间看不见。
+     * 权限 {@code manufacturing.manage}（提交与审批是两个独立权限，决策 #35）。
+     */
+    @PostMapping("/orders/{id}/submit") @RequirePermission("manufacturing.manage")
+    public void submitOrder(@PathVariable long id,@RequestHeader(value="X-Request-Key",required=false)String requestKey){
+        service.submit(id,requestKey);
+    }
+    /** 审批通过（待审批 → 有工序落 RELEASED / 0 工序落 PENDING_INSPECTION）。权限 {@code manufacturing.approve}。 */
+    @PostMapping("/orders/{id}/approve") @RequirePermission("manufacturing.approve")
+    public void approveOrder(@PathVariable long id,@RequestBody(required=false)Map<String,Object> body,
+            @RequestHeader(value="X-Request-Key",required=false)String requestKey){
+        Object comment=body==null?null:body.get("comment");
+        service.approve(id,comment==null?null:String.valueOf(comment),requestKey);
+    }
+    /** 驳回（待审批 → 草稿）。原因必填。权限 {@code manufacturing.approve}。 */
+    @PostMapping("/orders/{id}/reject") @RequirePermission("manufacturing.approve")
+    public void rejectOrder(@PathVariable long id,@RequestBody(required=false)Map<String,Object> body,
+            @RequestHeader(value="X-Request-Key",required=false)String requestKey){
+        Object comment=body==null?null:body.get("comment");
+        service.reject(id,comment==null?null:String.valueOf(comment),requestKey);
+    }
+    /** 某张生产任务单的完整审批历史（含驳回）。 */
+    @GetMapping("/orders/{id}/approvals") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    public List<Map<String,Object>> orderApprovals(@PathVariable long id){return service.approvalHistory(id);}
     @PostMapping("/orders/{id}/materials") @RequirePermission("manufacturing.material.manage") public long createMaterial(@PathVariable long id,@RequestBody com.liqiang.archive.service.ManufacturingMaterialService.RequirementRequest request){service.requireVisible(id);return materials.saveRequirement(id,null,request);}
     @PutMapping("/orders/{id}/materials/{materialId}") @RequirePermission("manufacturing.material.manage") public long updateMaterial(@PathVariable long id,@PathVariable long materialId,@RequestBody com.liqiang.archive.service.ManufacturingMaterialService.RequirementRequest request){service.requireVisible(id);return materials.saveRequirement(id,materialId,request);}
     @PostMapping("/orders/{id}/material-issues") @RequirePermission("manufacturing.material.manage") public long issueMaterial(@PathVariable long id,@RequestBody com.liqiang.archive.service.ManufacturingMaterialService.MovementRequest request){service.requireVisible(id);return materials.move(id,"ISSUE",request);}

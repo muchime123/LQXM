@@ -129,7 +129,8 @@ class ManufacturingNoProcessOrderMysqlTest {
         var actors = new ErpActorResolver(users);
         execution = new ManufacturingExecutionService(jdbc, users, idem, changeLog, actors);
         manufacturing = new ManufacturingService(jdbc, new ProductInventoryService(jdbc, users), users, scope,
-                execution, new ManufacturingTaskTemplateResolver(jdbc), idem, changeLog, actors);
+                execution, new ManufacturingTaskTemplateResolver(jdbc), idem, changeLog, actors,
+                org.mockito.Mockito.mock(ErpApprovalService.class));
     }
 
     // ---------- 用例 1：无制程产线建单 —— 不展开工序，直接待收货 ----------
@@ -274,7 +275,15 @@ class ManufacturingNoProcessOrderMysqlTest {
         var request = new ManufacturingService.CreateOrder(null, null, "免报工客户-" + requestKey,
                 firstProductName(workshopId), null, null, null, null, quantity, null, "无工序建单验证", "SAMPLE",
                 null, workshopId, null, null, null);
-        return manufacturing.create(request, requestKey);
+        long orderId = manufacturing.create(request, requestKey);
+        // 决策 #35：建单只落草稿。本用例主体是「无工序单的执行链」，故这里把草稿推到「已放行」，
+        // 口径与审批通过一致：有工序 → RELEASED，无工序 → PENDING_INSPECTION。
+        // 审批状态机本身由 ManufacturingApprovalContractMysqlTest 单独验。
+        // 前置断言 DRAFT 是故意的：建单不再落草稿时这里立刻红，不会静默失效。
+        assertEquals("DRAFT", order(orderId).get("status"), "建单必须先落草稿（决策 #35）");
+        boolean hasOperations = count("SELECT COUNT(*) FROM manufacturing_order_operations WHERE manufacturing_order_id=" + orderId) > 0;
+        jdbc.update("UPDATE manufacturing_orders SET status=? WHERE id=?", hasOperations ? "RELEASED" : "PENDING_INSPECTION", orderId);
+        return orderId;
     }
 
     private long outputIdOfPrimary(long orderId) {

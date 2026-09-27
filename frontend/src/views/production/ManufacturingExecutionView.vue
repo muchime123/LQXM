@@ -31,6 +31,7 @@
             <el-table-column prop="plannedQuantity" label="任务数量" width="95" />
             <el-table-column prop="dueDate" label="交期" width="120" />
             <el-table-column label="任务状态" width="110"><template #default="{ row }">{{ orderLabel(row.status) }}</template></el-table-column>
+            <el-table-column label="审批" width="90"><template #default="{ row }"><el-tag :type="approvalTag(row.approvalStatus)" size="small">{{ approvalStatusText(row.approvalStatus) }}</el-tag></template></el-table-column>
             <el-table-column label="操作" width="170"><template #default="{ row }">
               <el-button link type="primary" @click="openTaskDetail(row.id)">详情</el-button>
               <el-button v-if="canInspect && ['PENDING_INSPECTION','PENDING_REINSPECTION'].includes(row.status)" link type="success" @click="openQuality(row.id)">检验入库</el-button>
@@ -483,7 +484,7 @@
     <!-- ==================== 新建生产任务单（manufacturing.manage） ==================== -->
     <!-- 形态纪律：下单是抽屉，不是独立侧边栏页面；旧的手工建单弹窗已废弃并删除。 -->
     <ProductionTaskOrderDrawer v-model="createOpen" @created="onOrderCreated" />
-    <ProductionTaskDetailDrawer v-model="taskDetailOpen" :order-id="taskDetailId" :refresh-key="taskDetailRefresh" @report="openReport" @reverse="openReportReverse" />
+    <ProductionTaskDetailDrawer v-model="taskDetailOpen" :order-id="taskDetailId" :refresh-key="taskDetailRefresh" @report="openReport" @reverse="openReportReverse" @changed="onOrderApprovalChanged" />
     <ManufacturingQualityDialog v-model="qualityOpen" :order-id="qualityOrderId" @completed="onQualityCompleted" />
   </div>
 </template>
@@ -506,6 +507,7 @@ import {
   type ExecutionBoardItem, type AllWorkReport, type CompletionReceipt, type ManufacturingOrder,
   type Warehouse, type WorkReport, type PendingInspectionItem
 } from '@/api/manufacturing'
+import { APPROVAL_STATUS_TEXT } from '@/api/approval'
 
 const { can } = useCurrentUser()
 const canReport = computed(() => can('manufacturing.report'))
@@ -540,6 +542,20 @@ const STATE_OPTIONS = [
   { value: 'REWORK', label: '返工中' }
 ] as const
 
+/**
+ * 审批列（决策 #35）：驳回后 `status` 回到「草稿」，只看业务状态看不出被驳回过，
+ * 所以审批态必须单独出一列，让建单人知道「要按意见改」而不是「我刚建好还没提交」。
+ */
+function approvalTag(s?: string | null): 'success' | 'warning' | 'danger' | 'info' {
+  if (s === 'APPROVED') return 'success'
+  if (s === 'PENDING') return 'warning'
+  if (s === 'REJECTED') return 'danger'
+  return 'info'
+}
+// 表格插槽里的 row 是 any，直接索引字面量 Record 会触发 noImplicitAny；统一走查表函数。
+function approvalStatusText(s?: string | null) {
+  return (APPROVAL_STATUS_TEXT as Record<string, string>)[s || 'NONE'] || '未提交'
+}
 const ORDER_STATUS: Record<string, string> = {
   DRAFT: '草稿', RELEASED: '已下达', SCHEDULED: '已排产', IN_PRODUCTION: '生产中',
   REWORK: '返工中', PENDING_INSPECTION: '待完工检验', PENDING_REINSPECTION: '待复检',
@@ -618,6 +634,14 @@ async function loadTasks(page = taskPage.value) {
 }
 
 function onOrderCreated() {
+  // 建单落草稿（决策 #35）：车间现在看不到这张单，提交审批通过后才下达。
+  // 不明说这一点，建单人会把「刚建完却在看板上找不到」当成故障来报。
+  ElMessage.success('生产任务单已存为草稿，待提交审批；审批通过后车间才能看到并排产')
+  loadBoard(1)
+  if (canReadTasks.value) void loadTasks(1)
+}
+/** 详情抽屉里提交 / 审批 / 驳回之后：单据态变了，列表与排产看板都要重算。 */
+function onOrderApprovalChanged() {
   loadBoard(1)
   if (canReadTasks.value) void loadTasks(1)
 }

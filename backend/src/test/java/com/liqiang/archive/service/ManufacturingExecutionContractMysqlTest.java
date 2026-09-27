@@ -148,7 +148,22 @@ class ManufacturingExecutionContractMysqlTest {
         var actors = new ErpActorResolver(users);
         execution = new ManufacturingExecutionService(jdbc, users, idem, changeLog, actors);
         manufacturing = new ManufacturingService(jdbc, new ProductInventoryService(jdbc, users), users, scope,
-                execution, new ManufacturingTaskTemplateResolver(jdbc), idem, changeLog, actors);
+                execution, new ManufacturingTaskTemplateResolver(jdbc), idem, changeLog, actors,
+                org.mockito.Mockito.mock(ErpApprovalService.class));
+    }
+
+    /**
+     * 建单并把草稿推到「已放行给车间」。
+     *
+     * <p>决策 #35 起建单只落 {@code DRAFT}，而本用例的主体是**执行链**（报工 → 自动放行 → 收货 → 冲销 → 幂等），
+     * 所以这里造一张「已放行」的单就好；审批状态机本身由 {@code ManufacturingApprovalContractMysqlTest} 单独验。
+     * 前置断言「此刻必须是 DRAFT」是**故意的**：哪天建单不再落草稿，这里会立刻红，而不是静默失效。
+     */
+    private long createReleased(ManufacturingService.CreateOrder request, String requestKey) {
+        long id = manufacturing.create(request, requestKey);
+        assertEquals("DRAFT", order(id).get("status"), "建单必须先落草稿（决策 #35）");
+        jdbc.update("UPDATE manufacturing_orders SET status='RELEASED' WHERE id=?", id);
+        return id;
     }
 
     // ---------- 用例 1：全链路（建单 → 报工 → 自动放行 → 收货 → 冲销）幂等且留痕 ----------
@@ -163,7 +178,7 @@ class ManufacturingExecutionContractMysqlTest {
             //    （09-22 起 unit 是新增形参，此处传 null → 回落到 SKU 主数据上的单位，行为与改造前一致）
             var createRequest = new ManufacturingService.CreateOrder(null, null, "契约验证客户", "契约验证产品",
                     product("CTL-SKU-1"), null, "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null, null);
-            long orderId = manufacturing.create(createRequest, "ctl-loop-order-create");
+            long orderId = createReleased(createRequest, "ctl-loop-order-create");
             assertEquals(orderId, (long) manufacturing.create(createRequest, "ctl-loop-order-create"),
                     "同键重放必须复用首次结果，不得重复建单");
             assertEquals(1, count("SELECT COUNT(*) FROM manufacturing_orders WHERE customer_name_snapshot='契约验证客户'"),
@@ -296,7 +311,7 @@ class ManufacturingExecutionContractMysqlTest {
     @Test
     void stockOrderNeedsNoCustomerAndMarksInternalPurpose() {
         runInRollbackTransaction(() -> {
-            long orderId = manufacturing.create(new ManufacturingService.CreateOrder(
+            long orderId = createReleased(new ManufacturingService.CreateOrder(
                     null, null, null, "备货验证产品", null, null, null, null,
                     new BigDecimal("3"), null, null, "STOCK", template(TEMPLATE), null, null, null, null),
                     "ctl-stock-create");
@@ -315,7 +330,7 @@ class ManufacturingExecutionContractMysqlTest {
             long warehouseId = jdbc.queryForObject("SELECT id FROM warehouses WHERE warehouse_code='VERIFY-WH'", Long.class);
             var createRequest = new ManufacturingService.CreateOrder(null, null, "契约重试客户", "契约重试产品",
                     product("CTL-SKU-1"), null, null, null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null, null);
-            long orderId = manufacturing.create(createRequest, "ctl-retry-create");
+            long orderId = createReleased(createRequest, "ctl-retry-create");
             for (long opId : jdbc.queryForList("SELECT id FROM manufacturing_order_operations WHERE manufacturing_order_id=? ORDER BY sequence_no",
                     Long.class, orderId)) {
                 execution.report(orderId, opId, report(10), "ctl-retry-report-" + opId);
@@ -349,7 +364,7 @@ class ManufacturingExecutionContractMysqlTest {
     @Test
     void qualityCompletionRequiresInventoryIdentityAndPostsAtomically() {
         runInRollbackTransaction(() -> {
-            long orderId=manufacturing.create(new ManufacturingService.CreateOrder(null,null,"质检客户","契约验证产品",
+            long orderId=createReleased(new ManufacturingService.CreateOrder(null,null,"质检客户","契约验证产品",
                     null,"台",null,null,new BigDecimal("10"),null,null,"SAMPLE",template(TEMPLATE),null,null,null,null),
                     "ctl-quality-create");
             for(long opId:jdbc.queryForList("SELECT id FROM manufacturing_order_operations WHERE manufacturing_order_id=? ORDER BY sequence_no",Long.class,orderId))
@@ -388,7 +403,7 @@ class ManufacturingExecutionContractMysqlTest {
             var createRequest = new ManufacturingService.CreateOrder(null, null, "多产出客户", "契约验证产品",
                     primarySku, null, "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null,
                     List.of(new ManufacturingService.OutputLine(moldSku, new BigDecimal("2"), true, "配套模具")), null, null);
-            long orderId = manufacturing.create(createRequest, "ctl-multi-create");
+            long orderId = createReleased(createRequest, "ctl-multi-create");
 
             assertEquals(2, count("SELECT COUNT(*) FROM manufacturing_order_outputs WHERE manufacturing_order_id=" + orderId),
                     "产出清单应为 2 行（主产品 + 模具）");

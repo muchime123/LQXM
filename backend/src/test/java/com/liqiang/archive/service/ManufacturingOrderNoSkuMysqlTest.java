@@ -146,7 +146,8 @@ class ManufacturingOrderNoSkuMysqlTest {
         var actors = new ErpActorResolver(users);
         execution = new ManufacturingExecutionService(jdbc, users, idem, changeLog, actors);
         manufacturing = new ManufacturingService(jdbc, new ProductInventoryService(jdbc, users), users, scope,
-                execution, new ManufacturingTaskTemplateResolver(jdbc), idem, changeLog, actors);
+                execution, new ManufacturingTaskTemplateResolver(jdbc), idem, changeLog, actors,
+                org.mockito.Mockito.mock(ErpApprovalService.class));
     }
 
     // ---------- 用例 1：不传 SKU 建单 —— 工单与产出清单主行都没有库存身份 ----------
@@ -247,7 +248,7 @@ class ManufacturingOrderNoSkuMysqlTest {
             long skuId = jdbc.queryForObject("SELECT id FROM sales_products WHERE product_code='NOSKU-SKU-1'", Long.class);
             var request = new ManufacturingService.CreateOrder(null, null, "带SKU客户", CATEGORY,
                     skuId, null, "X1", null, new BigDecimal("4"), null, "带SKU验证", "SAMPLE", template(TEMPLATE), null, null, null, null);
-            long orderId = manufacturing.create(request, "nosku-create-5");
+            long orderId = createReleased(request, "nosku-create-5");
             assertEquals(skuId, ((Number) order(orderId).get("sales_product_id")).longValue(), "显式传 SKU 时仍应落到工单");
             reportAllOperations(orderId, new BigDecimal("4"));
 
@@ -273,7 +274,19 @@ class ManufacturingOrderNoSkuMysqlTest {
         var request = new ManufacturingService.CreateOrder(null, null, "无SKU客户-" + requestKey, CATEGORY,
                 null, unit, "X1", null, new BigDecimal("10"), null, "无SKU验证", "SAMPLE",
                 template(TEMPLATE), null, null, null, null);
-        return manufacturing.create(request, requestKey);
+        return createReleased(request, requestKey);
+    }
+
+    /**
+     * 建单并推到「已放行给车间」——决策 #35 起建单只落草稿，而本用例主体是
+     * 「有没有 SKU 对库存身份的影响」，不是审批，故这里造一张已放行的单。
+     * 前置断言 DRAFT 是故意的：建单不再落草稿时这里立刻红。
+     */
+    private long createReleased(ManufacturingService.CreateOrder request, String requestKey) {
+        long id = manufacturing.create(request, requestKey);
+        assertEquals("DRAFT", order(id).get("status"), "建单必须先落草稿（决策 #35）");
+        jdbc.update("UPDATE manufacturing_orders SET status='RELEASED' WHERE id=?", id);
+        return id;
     }
 
     private void reportAllOperations(long orderId, BigDecimal quantity) {
