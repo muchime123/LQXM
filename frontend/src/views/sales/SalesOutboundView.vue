@@ -1,5 +1,6 @@
 <template>
   <div class="outbound-page">
+    <OrderFulfillmentSteps current="outbound" />
     <!-- 统计卡片：口径为当前筛选条件下的全量（后端聚合），与分页无关 -->
     <section class="stats-grid">
       <div class="stat-card">
@@ -28,6 +29,7 @@
             <el-option value="DRAFT" label="草稿" />
             <el-option value="POSTED" label="已过账" />
             <el-option value="REVERSED" label="已冲销" />
+            <el-option value="CANCELLED" label="已取消" />
           </el-select>
           <el-select v-model="warehouseId" clearable placeholder="全部仓库" style="width:130px" @change="load(1)">
             <el-option v-for="w in warehouses" :key="w.id" :value="w.id" :label="w.warehouseName" />
@@ -41,7 +43,7 @@
           <el-button type="primary" plain @click="load(1)">查询</el-button>
         </div>
         <div class="toolbar__right">
-          <el-button v-if="canManage" type="primary" @click="openCreate()">新建出库单</el-button>
+          <el-button v-if="canManage" type="primary" @click="router.push('/sales-orders')">从销售订单发起</el-button>
         </div>
       </div>
 
@@ -93,8 +95,9 @@
         <el-table-column label="操作" width="210" fixed="right">
           <template #default="{ row }">
             <el-button link type="primary" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="canManage && row.status === 'DRAFT'" link type="primary" @click="openEdit(row)">编辑</el-button>
+            <el-button v-if="canManage && row.status === 'DRAFT' && !row.salesOrderId" link type="primary" @click="openEdit(row)">编辑</el-button>
             <el-button v-if="canManage && row.status === 'DRAFT'" link type="success" @click="doPost(row)">过账</el-button>
+            <el-button v-if="canManage && row.status === 'DRAFT'" link type="warning" @click="doCancel(row)">取消</el-button>
             <el-button v-if="canManage && row.status === 'POSTED'" link type="danger" @click="doReverse(row)">冲销</el-button>
           </template>
         </el-table-column>
@@ -102,7 +105,7 @@
           <div class="empty-box">
             <p>还没有销售出库单</p>
             <p class="empty-box__hint" v-if="canManage">
-              点右上角「新建出库单」开始；明细只能从<b>可售库存</b>里选 —— 选不到就说明该先下生产任务。
+              请先建立销售订单，从已确认的现货明细生成出库草稿。
             </p>
           </div>
         </template>
@@ -250,7 +253,7 @@
           <el-descriptions-item label="客户">{{ detail.head.customerName }}</el-descriptions-item>
           <el-descriptions-item label="业务员">{{ detail.head.salespersonName || '—' }}</el-descriptions-item>
           <el-descriptions-item label="发货仓库">{{ detail.head.warehouseName || '—' }}</el-descriptions-item>
-          <el-descriptions-item label="关联订单号">{{ detail.head.salesOrderRef || '—' }}</el-descriptions-item>
+          <el-descriptions-item label="关联订单号"><el-button v-if="detail.head.salesOrderId" link type="primary" @click="router.push({ path: '/sales-orders', query: { orderId: String(detail.head.salesOrderId) } })">{{ detail.head.salesOrderRef || `#${detail.head.salesOrderId}` }}</el-button><span v-else>{{ detail.head.salesOrderRef || '—' }}</span></el-descriptions-item>
           <el-descriptions-item label="金额">
             <span v-if="detail.head.totalAmount != null">¥{{ fmtMoney(detail.head.totalAmount) }}</span>
             <span v-else class="cell-muted">未填单价</span>
@@ -294,6 +297,7 @@
 
         <div class="detail__actions" v-if="canManage">
           <el-button v-if="detail.head.status === 'DRAFT'" type="success" @click="doPost(detail.head)">过账</el-button>
+          <el-button v-if="detail.head.status === 'DRAFT'" type="warning" @click="doCancel(detail.head)">取消草稿</el-button>
           <el-button v-if="detail.head.status === 'POSTED'" type="danger" @click="doReverse(detail.head)">冲销</el-button>
         </div>
       </div>
@@ -302,22 +306,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed } from 'vue'
+import OrderFulfillmentSteps from '@/components/sales/OrderFulfillmentSteps.vue'
+import { ref, reactive, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { Search } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 import { notify } from '@/composables/ui/useToast'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import {
   fetchSalesOutbounds, fetchSalesOutbound, fetchSalesOutboundWarehouses, fetchAvailableStock,
-  createSalesOutbound, updateSalesOutbound, postSalesOutbound, reverseSalesOutbound, newRequestKey,
+  updateSalesOutbound, postSalesOutbound, reverseSalesOutbound, cancelSalesOutbound, newRequestKey,
   type SalesOutbound, type SalesOutboundItem, type AvailableStock
 } from '@/api/salesOutbound'
 
 const auth = useCurrentUser()
+const router = useRouter()
+const route = useRoute()
 const canManage = computed(() => auth.can('sales_order.manage'))
 
-const STATUS_TEXT: Record<string, string> = { DRAFT: '草稿', POSTED: '已过账', REVERSED: '已冲销' }
-const STATUS_TAG: Record<string, 'info' | 'success' | 'danger'> = { DRAFT: 'info', POSTED: 'success', REVERSED: 'danger' }
+const STATUS_TEXT: Record<string, string> = { DRAFT: '草稿', POSTED: '已过账', REVERSED: '已冲销', CANCELLED: '已取消' }
+const STATUS_TAG: Record<string, 'info' | 'success' | 'danger'> = { DRAFT: 'info', POSTED: 'success', REVERSED: 'danger', CANCELLED: 'info' }
 
 const keyword = ref('')
 const statusFilter = ref<string>()
@@ -404,18 +412,6 @@ function today() {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-const openCreate = () => {
-  editingId.value = null
-  form.customerName = ''
-  form.warehouseId = warehouses.value.length === 1 ? warehouses.value[0].id : undefined
-  form.outboundDate = today()
-  form.salesOrderRef = ''
-  form.remark = ''
-  form.lines = []
-  formKey.value = newRequestKey()
-  formOpen.value = true
-}
-
 const openEdit = async (row: SalesOutbound) => {
   try {
     const d = await fetchSalesOutbound(row.id)
@@ -474,13 +470,9 @@ const submitForm = async () => {
   }
   saving.value = true
   try {
-    if (editingId.value) {
-      await updateSalesOutbound(editingId.value, payload, formKey.value)
-      notify.success('已保存')
-    } else {
-      await createSalesOutbound(payload, formKey.value)
-      notify.success('已创建草稿，确认无误后点「过账」才会扣减库存')
-    }
+    if (!editingId.value) { notify.warning('请先从销售订单生成出库草稿'); return }
+    await updateSalesOutbound(editingId.value, payload, formKey.value)
+    notify.success('已保存')
     formOpen.value = false
     formKey.value = '' // 本次动作完成，下一次提交必须换新键
     await load(editingId.value ? page.value : 1)
@@ -551,7 +543,7 @@ const pickStock = (row: AvailableStock) => {
 const detailOpen = ref(false)
 const detail = ref<{ head: SalesOutbound; items: SalesOutboundItem[] } | null>(null)
 
-const openDetail = async (row: SalesOutbound) => {
+const openDetail = async (row: Pick<SalesOutbound, 'id'>) => {
   try {
     detail.value = await fetchSalesOutbound(row.id)
     detailOpen.value = true
@@ -598,6 +590,22 @@ const doReverse = async (row: SalesOutbound) => {
   }
 }
 
+const doCancel = async (row: SalesOutbound) => {
+  let reason = ''
+  try {
+    const res = await ElMessageBox.prompt('请填写取消原因；未过账草稿不会影响库存。', '取消出库草稿', {
+      inputValidator: (v: string) => (v?.trim() ? true : '取消原因不能为空')
+    })
+    reason = res.value
+  } catch { return }
+  try {
+    await cancelSalesOutbound(row.id, reason.trim(), newRequestKey())
+    notify.success('草稿已取消')
+    detailOpen.value = false
+    await load()
+  } catch (e) { notify.errorWithDetail('取消草稿失败', e) }
+}
+
 // ==================== 格式化 ====================
 
 const fmtNum = (v: unknown) => Number(v || 0).toLocaleString('zh-CN', { maximumFractionDigits: 6 })
@@ -606,6 +614,10 @@ const shortDate = (s?: string | null) => (s ? String(s).slice(0, 10) : '—')
 const shortTime = (s?: string | null) => (s ? String(s).replace('T', ' ').slice(0, 16) : '—')
 
 loadWarehouses().then(() => load(1))
+watch(() => route.query.outboundId, value => {
+  const id = Number(value)
+  if (Number.isSafeInteger(id) && id > 0) void openDetail({ id })
+}, { immediate: true })
 </script>
 
 <style scoped>

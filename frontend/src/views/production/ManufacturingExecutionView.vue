@@ -1,10 +1,11 @@
 <template>
   <div class="exec-page">
+    <OrderFulfillmentSteps current="task" />
     <header class="page-head">
       <div>
         <p class="eyebrow">MANUFACTURING EXECUTION</p>
-        <h1>车间执行</h1>
-        <p>车间按工序报工；质检或跟单复核报工，全部工序完成后检验，合格即办理完工入库。</p>
+        <h1>本地生产任务 · 车间执行</h1>
+        <p>这里办理本系统新建的生产任务；氚云导入任务请到「车间执行 · 氚云生产任务」办理。</p>
       </div>
       <div class="head-actions">
         <el-button v-if="canManage" type="primary" :icon="Plus" @click="createOpen = true">新建生产任务单</el-button>
@@ -340,8 +341,8 @@
             <el-table-column prop="remark" label="备注" min-width="120" show-overflow-tooltip />
             <el-table-column label="状态" width="140">
               <template #default="{ row }">
-                <el-tag size="small" :type="row.status === 'POSTED' ? 'success' : 'info'">
-                  {{ row.status === 'POSTED' ? '已入库' : '已冲销' }}
+                <el-tag size="small" :type="row.status !== 'POSTED' ? 'info' : row.stockPosted ? 'success' : 'warning'">
+                  {{ row.status !== 'POSTED' ? '已冲销' : row.stockPosted ? '已入库' : '历史仅登记（未入库存）' }}
                 </el-tag>
                 <small v-if="row.status !== 'POSTED' && row.reversalReason" class="cell-sub">
                   {{ row.reversedByName || '' }} {{ row.reversalReason }}
@@ -488,7 +489,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import OrderFulfillmentSteps from '@/components/sales/OrderFulfillmentSteps.vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Refresh, Search, Plus } from '@element-plus/icons-vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
@@ -579,6 +582,11 @@ const priorityTagType = (v?: string): 'success' | 'warning' | 'danger' | 'info' 
 const createOpen = ref(false)
 const taskDetailOpen = ref(false), taskDetailId = ref<number | null>(null), taskDetailRefresh = ref(0)
 function openTaskDetail(id: number) { taskDetailId.value = id; taskDetailOpen.value = true }
+const route = useRoute()
+watch(() => route.query.taskId, value => {
+  const id = Number(value)
+  if (Number.isSafeInteger(id) && id > 0) openTaskDetail(id)
+}, { immediate: true })
 const qualityOpen = ref(false), qualityOrderId = ref<number | null>(null)
 const qualityKeyword = ref(''), qualityItems = ref<PendingInspectionItem[]>([])
 const qualityPage = ref(1), qualityTotal = ref(0), qualityLoading = ref(false)

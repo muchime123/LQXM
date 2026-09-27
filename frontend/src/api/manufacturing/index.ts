@@ -180,7 +180,7 @@ export const fetchProcessCategories = async (workshopId: number) =>
  *
  * 与制程解析读同一张「任务单产品与配置」表 —— 选得到的必然解析得出制程。
  */
-export interface TaskConfigOptions { productNames: string[]; optionalConfigs: string[] }
+export interface TaskConfigOptions { productNames: string[]; productTemplates: Record<string, number | null>; optionalConfigs: string[] }
 export const fetchTaskConfigOptions = async (workshopId: number) =>
   (await http.get<TaskConfigOptions>('/manufacturing/task-config-options', { params: { workshopId } })).data
 export const generateManufacturingOperations = async (id:number,templateId:number,requestKey?:string) =>
@@ -219,6 +219,7 @@ export const fetchAllWorkReports = async (params:Record<string,unknown>) =>
   (await http.get<AllWorkReportsResult>('/manufacturing/work-reports',{ params })).data
 export interface CompletionReceipt {
   id:number; receiptNo:string; manufacturingOrderId:number; warehouseId:number; warehouseName?:string
+  stockPosted?: boolean | number
   completedAt:string; quantity:number; unit:string; finishedGoodsName:string; specificationSnapshot?:string
   operatorEmployeeId?:number; operatorName?:string; status:string; remark?:string
   reversedAt?:string; reversedByName?:string; reversalReason?:string; reversalMovementId?:number

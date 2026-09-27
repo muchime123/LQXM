@@ -246,7 +246,7 @@ class ManufacturingOrderNoSkuMysqlTest {
             jdbc.update("INSERT INTO sales_products(product_code,product_name,specification,unit) VALUES('NOSKU-SKU-1','契约带SKU产品','X1','台')");
             long skuId = jdbc.queryForObject("SELECT id FROM sales_products WHERE product_code='NOSKU-SKU-1'", Long.class);
             var request = new ManufacturingService.CreateOrder(null, null, "带SKU客户", CATEGORY,
-                    skuId, null, "X1", null, new BigDecimal("4"), null, "带SKU验证", "SAMPLE", template(TEMPLATE), null, null, null);
+                    skuId, null, "X1", null, new BigDecimal("4"), null, "带SKU验证", "SAMPLE", template(TEMPLATE), null, null, null, null);
             long orderId = manufacturing.create(request, "nosku-create-5");
             assertEquals(skuId, ((Number) order(orderId).get("sales_product_id")).longValue(), "显式传 SKU 时仍应落到工单");
             reportAllOperations(orderId, new BigDecimal("4"));
@@ -272,7 +272,7 @@ class ManufacturingOrderNoSkuMysqlTest {
     private long createWithoutSku(String requestKey, String unit) {
         var request = new ManufacturingService.CreateOrder(null, null, "无SKU客户-" + requestKey, CATEGORY,
                 null, unit, "X1", null, new BigDecimal("10"), null, "无SKU验证", "SAMPLE",
-                template(TEMPLATE), null, null, null);
+                template(TEMPLATE), null, null, null, null);
         return manufacturing.create(request, requestKey);
     }
 

@@ -66,7 +66,9 @@ public class SalesOutboundController {
     @RequirePermission("sales_order.manage")
     public long create(@RequestBody SalesOutboundService.OutboundRequest request,
                        @RequestHeader(value = "X-Request-Key", required = false) String requestKey) {
-        return service.create(request, requestKey);
+        throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.CONFLICT,
+                "请先创建并确认销售订单，再从订单明细生成出库草稿");
     }
 
     @PutMapping("/{id}")
@@ -90,5 +92,12 @@ public class SalesOutboundController {
     public void reverse(@PathVariable long id, @RequestBody Map<String, String> request,
                         @RequestHeader(value = "X-Request-Key", required = false) String requestKey) {
         service.reverse(id, request.get("reason"), requestKey);
+    }
+
+    @PostMapping("/{id}/cancel")
+    @RequirePermission("sales_order.manage")
+    public void cancel(@PathVariable long id, @RequestBody Map<String, String> request,
+                       @RequestHeader(value = "X-Request-Key", required = false) String requestKey) {
+        service.cancel(id, request.get("reason"), requestKey);
     }
 }

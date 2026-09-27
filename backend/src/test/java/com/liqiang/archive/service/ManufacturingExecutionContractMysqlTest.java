@@ -162,7 +162,7 @@ class ManufacturingExecutionContractMysqlTest {
             // 1) 建单：同键重放必须返回同一个工单，而不是再建一张
             //    （09-22 起 unit 是新增形参，此处传 null → 回落到 SKU 主数据上的单位，行为与改造前一致）
             var createRequest = new ManufacturingService.CreateOrder(null, null, "契约验证客户", "契约验证产品",
-                    product("CTL-SKU-1"), null, "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null);
+                    product("CTL-SKU-1"), null, "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null, null);
             long orderId = manufacturing.create(createRequest, "ctl-loop-order-create");
             assertEquals(orderId, (long) manufacturing.create(createRequest, "ctl-loop-order-create"),
                     "同键重放必须复用首次结果，不得重复建单");
@@ -292,13 +292,29 @@ class ManufacturingExecutionContractMysqlTest {
 
     // ---------- 用例 2：业务失败的请求不落半张单，且同键可安全重试 ----------
 
+    /** 备货单（STOCK，09-24 新增任务类型）：无客户合法，需求方快照=「内部用途」、customer_id 落 NULL。 */
+    @Test
+    void stockOrderNeedsNoCustomerAndMarksInternalPurpose() {
+        runInRollbackTransaction(() -> {
+            long orderId = manufacturing.create(new ManufacturingService.CreateOrder(
+                    null, null, null, "备货验证产品", null, null, null, null,
+                    new BigDecimal("3"), null, null, "STOCK", template(TEMPLATE), null, null, null, null),
+                    "ctl-stock-create");
+            var head = jdbc.queryForMap("SELECT task_type taskType, customer_id customerId, "
+                    + "customer_name_snapshot customerName FROM manufacturing_orders WHERE id=?", orderId);
+            assertEquals("STOCK", head.get("taskType"), "备货类型必须在白名单内");
+            assertNull(head.get("customerId"), "备货单不挂客户");
+            assertEquals("内部用途", head.get("customerName"), "需求方快照用「内部用途」标识，不伪造销售客户");
+        });
+    }
+
     @Test
     void failedRequestLeavesNothingAndKeyStaysRetryable() {
         runInRollbackTransaction(() -> {
             long templateId = template(TEMPLATE);
             long warehouseId = jdbc.queryForObject("SELECT id FROM warehouses WHERE warehouse_code='VERIFY-WH'", Long.class);
             var createRequest = new ManufacturingService.CreateOrder(null, null, "契约重试客户", "契约重试产品",
-                    product("CTL-SKU-1"), null, null, null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null);
+                    product("CTL-SKU-1"), null, null, null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null, null, null, null);
             long orderId = manufacturing.create(createRequest, "ctl-retry-create");
             for (long opId : jdbc.queryForList("SELECT id FROM manufacturing_order_operations WHERE manufacturing_order_id=? ORDER BY sequence_no",
                     Long.class, orderId)) {
@@ -334,7 +350,7 @@ class ManufacturingExecutionContractMysqlTest {
     void qualityCompletionRequiresInventoryIdentityAndPostsAtomically() {
         runInRollbackTransaction(() -> {
             long orderId=manufacturing.create(new ManufacturingService.CreateOrder(null,null,"质检客户","契约验证产品",
-                    null,"台",null,null,new BigDecimal("10"),null,null,"SAMPLE",template(TEMPLATE),null,null,null),
+                    null,"台",null,null,new BigDecimal("10"),null,null,"SAMPLE",template(TEMPLATE),null,null,null,null),
                     "ctl-quality-create");
             for(long opId:jdbc.queryForList("SELECT id FROM manufacturing_order_operations WHERE manufacturing_order_id=? ORDER BY sequence_no",Long.class,orderId))
                 execution.report(orderId,opId,report(10),"ctl-quality-report-"+opId);
@@ -371,7 +387,7 @@ class ManufacturingExecutionContractMysqlTest {
             // 建单：主产品 10 台 + 配套模具 2 套（实测 14.0% 的工单产出多个 SKU）
             var createRequest = new ManufacturingService.CreateOrder(null, null, "多产出客户", "契约验证产品",
                     primarySku, null, "X1", null, new BigDecimal("10"), null, "契约验证", "SAMPLE", templateId, null,
-                    List.of(new ManufacturingService.OutputLine(moldSku, new BigDecimal("2"), true, "配套模具")), null);
+                    List.of(new ManufacturingService.OutputLine(moldSku, new BigDecimal("2"), true, "配套模具")), null, null);
             long orderId = manufacturing.create(createRequest, "ctl-multi-create");
 
             assertEquals(2, count("SELECT COUNT(*) FROM manufacturing_order_outputs WHERE manufacturing_order_id=" + orderId),

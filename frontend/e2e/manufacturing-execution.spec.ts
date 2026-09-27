@@ -60,13 +60,23 @@ async function mockManufacturingApis(page: Page, writes: Array<{ path: string; k
   })
 }
 
+test('旧车间执行地址进入氚云任务，保留本地任务的独立地址', async ({ page }) => {
+  await page.addInitScript(EMPLOYEE_INIT)
+  await page.route(url => url.pathname === '/api/h3-production-execution', route =>
+    route.fulfill(envelope({ items: [], total: 0 })))
+  await page.goto('/#/manufacturing-execution')
+  await expect(page).toHaveURL(/#\/h3-production-execution/)
+  await expect(page.getByRole('heading', { level: 1, name: '车间执行 · 氚云生产任务' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '新建生产任务单' })).toHaveCount(0)
+})
+
 test('车间执行页：报工与完工检验分开，且没有独立收货入口', async ({ page }) => {
   const writes: Array<{ path: string; key?: string }> = []
   await mockManufacturingApis(page, writes)
   await page.addInitScript(EMPLOYEE_INIT)
-  await page.goto('/#/manufacturing-execution')
+  await page.goto('/#/local-manufacturing-execution')
 
-  await expect(page.getByRole('heading', { level: 1, name: '车间执行' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '本地生产任务 · 车间执行' })).toBeVisible()
   for (const tab of ['执行看板', '报工记录', '待完工检验', '完工入库记录']) {
     await expect(page.getByRole('tab', { name: tab })).toBeVisible()
   }
@@ -129,8 +139,8 @@ test('车间执行页：对真实后端只读冒烟（后端不可达则跳过�
   test.skip(!reachable, '本机 8081 后端未启动，跳过真后端冒烟')
 
   await page.addInitScript(EMPLOYEE_INIT)
-  await page.goto('/#/manufacturing-execution')
-  await expect(page.getByRole('heading', { level: 1, name: '车间执行' })).toBeVisible()
+  await page.goto('/#/local-manufacturing-execution')
+  await expect(page.getByRole('heading', { level: 1, name: '本地生产任务 · 车间执行' })).toBeVisible()
   // 真实数据可能为空：只断言页面没有报错横幅、统计卡渲染出数字
   await expect(page.locator('.stat-card__value').first()).toBeVisible()
   await expect(page.getByText('请求失败')).toHaveCount(0)

@@ -29,4 +29,6 @@ public final class FeatureCode {
     public static final String MONTHLY_COMMISSION = "MONTHLY_COMMISSION";
     /** 生产制造 */
     public static final String MANUFACTURING = "MANUFACTURING";
+    /** 采购订单（外采） */
+    public static final String PURCHASE_ORDER = "PURCHASE_ORDER";
 }

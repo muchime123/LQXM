@@ -108,12 +108,19 @@ public class ManufacturingService {
      * 强制每次填一堆模具行只会让人绕过它。多 SKU 的 14% 才需要走这里；若某一行的
      * {@code salesProductId} 传了值，仍按主数据校验（该行会正常落批次与库存账）。
      */
+    /**
+     * {@code salesOrderItemId}（09-24 LQ 定「配置不写两份」）：销售订单明细行（供货方式＝自产）
+     * 直接调本入口建单时带上该行 id，落 {@code manufacturing_orders.sales_order_item_id}
+     * （V342 的唯一索引保证一行只建一张单）。产品配置只在任务单这一侧录，
+     * 销售订单明细行**不再存第二份配置快照**。
+     */
     public record CreateOrder(String salesOrderRef,Long customerId,String customerName,
                               String processCategory,Long salesProductId,String unit,
                               String specification,String customRequirement,
                               BigDecimal plannedQuantity,LocalDate dueDate,String remark,
                               String taskType,Long processTemplateId,Long workshopId,
-                              List<OutputLine> outputs,Map<String,Object> productConfig) {}
+                              List<OutputLine> outputs,Map<String,Object> productConfig,
+                              Long salesOrderItemId) {}
     /** 附加产出项（主产品不走这里；它由建单头部的 {@code processCategory} + {@code plannedQuantity} 表达）。 */
     public record OutputLine(Long salesProductId,BigDecimal plannedQuantity,Boolean isMold,String remark) {}
     /** 收货明细项（P3 ②：按产出清单逐项确认实际数量，不再手打名称）。 */
@@ -246,10 +253,14 @@ public class ManufacturingService {
      */
     public Map<String,Object> taskConfigOptions(Long workshopId) {
         var m=new LinkedHashMap<String,Object>();
-        if(workshopId==null){ m.put("productNames",List.of()); m.put("optionalConfigs",List.of()); return m; }
-        m.put("productNames",jdbc.queryForList("SELECT config_name FROM manufacturing_task_config_items"
-                +" WHERE workshop_id=? AND config_type='PRODUCT_NAME' AND active=1 ORDER BY config_name",
-                String.class,workshopId));
+        if(workshopId==null){ m.put("productNames",List.of()); m.put("productTemplates",Map.of()); m.put("optionalConfigs",List.of()); return m; }
+        var products=jdbc.queryForList("SELECT config_name configName,process_template_id processTemplateId"
+                +" FROM manufacturing_task_config_items WHERE workshop_id=? AND config_type='PRODUCT_NAME'"
+                +" AND active=1 ORDER BY config_name",workshopId);
+        m.put("productNames",products.stream().map(row->String.valueOf(row.get("configName"))).toList());
+        var productTemplates=new LinkedHashMap<String,Object>();
+        products.forEach(row->productTemplates.put(String.valueOf(row.get("configName")),row.get("processTemplateId")));
+        m.put("productTemplates",productTemplates);
         m.put("optionalConfigs",jdbc.queryForList("SELECT config_name FROM manufacturing_task_config_items"
                 +" WHERE workshop_id=? AND config_type='OPTIONAL_CONFIG' AND active=1 ORDER BY config_name",
                 String.class,workshopId));
@@ -344,7 +355,14 @@ public class ManufacturingService {
     }
 
     private long doCreate(CreateOrder request,ErpActor actor,String requestKey) {
-        String customer=required(request.customerName(),"客户名称",300);
+        String taskType=clean(request.taskType());
+        // 展会机、展厅机、内部领用和备货（先生产后入库）都没有客户订单。数据库仍保留非空需求方快照，
+        // 用明确的「内部用途」标识，而不伪造销售客户。
+        boolean internalPurpose=taskType!=null && Set.of("EXHIBITION","SHOWROOM","INTERNAL","STOCK").contains(taskType);
+        if(internalPurpose && request.salesOrderRef()!=null && !request.salesOrderRef().isBlank())
+            throw new IllegalArgumentException("展会、展厅、内部和备货任务不应填写销售订单号");
+        String customer=internalPurpose ? "内部用途" : required(request.customerName(),"客户/需求方",300);
+        Long customerId=internalPurpose?null:request.customerId();
         String product=required(request.processCategory(),"制程品类",500);
         // 09-22：主产品**不再要求** SKU。传了就照旧解析主数据（单位也优先取它），不传则该单没有 SKU。
         var primary=request.salesProductId()==null?null:requireProduct(request.salesProductId(),"生产产品");
@@ -356,10 +374,13 @@ public class ManufacturingService {
         BigDecimal planned=request.plannedQuantity();
         if(planned==null||planned.signum()<=0||planned.scale()>6)
             throw new IllegalArgumentException("计划数量必须大于0且最多6位小数");
-        String taskType=clean(request.taskType());
-        // 手工任务类型：SAMPLE 打样 / REPLACEMENT 返工替换 / REWORK 返工 / INTERNAL 内部领用 / SPECIAL 特殊定制 / SALES_ORDER 销售排产（业务员缺货时下达）
-        if(!Set.of("SAMPLE","REPLACEMENT","REWORK","INTERNAL","SPECIAL","SALES_ORDER").contains(taskType))
+        // 销售排产走已确认订单；展会/展厅等非销售需求允许直接建单。
+        if(taskType==null || !Set.of("SAMPLE","REPLACEMENT","REWORK","INTERNAL","EXHIBITION","SHOWROOM","SPECIAL","SALES_ORDER","STOCK").contains(taskType))
             throw new IllegalArgumentException("请选择有效的手工任务类型");
+        if("SALES_ORDER".equals(taskType) && request.salesOrderItemId()==null)
+            throw new IllegalArgumentException("销售订单生产任务必须从已确认的订单明细发起");
+        if(!"SALES_ORDER".equals(taskType) && request.salesOrderItemId()!=null)
+            throw new IllegalArgumentException("关联销售订单明细的生产任务类型必须为销售订单");
         var user=users.current();
         String temporary="PENDING-"+UUID.randomUUID();
         String productConfigJson=null;
@@ -368,15 +389,30 @@ public class ManufacturingService {
                     .writeValueAsString(request.productConfig()); }
             catch(Exception e){ throw new IllegalArgumentException("产品配置参数无法序列化"); }
         }
+        // 销售订单明细行发起的单（09-24）：一条明细行只能建一张任务单（DB 有唯一索引兜底），
+        // 这里先给业务可读的提示，避免直接抛唯一键约束异常。
+        if(request.salesOrderItemId()!=null){
+            var demands=jdbc.queryForList("SELECT o.status,i.supply_mode supplyMode FROM erp_sales_order_items i "
+                    + "JOIN erp_sales_orders o ON o.id=i.order_id WHERE i.id=?",request.salesOrderItemId());
+            if(demands.isEmpty() || !"CONFIRMED".equals(demands.getFirst().get("status"))
+                    || !"MAKE".equals(demands.getFirst().get("supplyMode")))
+                throw new IllegalStateException("只有已确认销售订单的自产明细可以生成生产任务");
+            Integer existing=jdbc.queryForObject(
+                "SELECT COUNT(*) FROM manufacturing_orders WHERE sales_order_item_id=?",
+                Integer.class,request.salesOrderItemId());
+            if(existing!=null&&existing>0)
+                throw new IllegalArgumentException("该销售订单明细行已经建过生产任务单，请到任务单里查看");
+        }
         jdbc.update("""
             INSERT INTO manufacturing_orders(order_no,sales_order_ref,customer_id,customer_name_snapshot,
               salesperson_id,salesperson_name_snapshot,product_name_snapshot,sales_product_id,specification_snapshot,
               custom_requirement,planned_quantity,unit,due_date,remark,task_type,created_by_employee_id,created_by_name,
-              product_config_json)
-            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-            """,temporary,clean(request.salesOrderRef()),request.customerId(),customer,user.employeeId(),user.name(),
+              product_config_json,sales_order_item_id)
+            VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,temporary,clean(request.salesOrderRef()),customerId,customer,user.employeeId(),user.name(),
                 product,primaryId,clean(request.specification()),clean(request.customRequirement()),planned,unit,
-                request.dueDate(),clean(request.remark()),taskType,user.employeeId(),user.name(),productConfigJson);
+                request.dueDate(),clean(request.remark()),taskType,user.employeeId(),user.name(),productConfigJson,
+                request.salesOrderItemId());
         long id=jdbc.queryForObject("SELECT id FROM manufacturing_orders WHERE order_no=?",Long.class,temporary);
         String no="MO"+String.format("%08d",id);jdbc.update("UPDATE manufacturing_orders SET order_no=? WHERE id=?",no,id);
         // 产出清单：第 1 行恒为主产品（P3 ①），附加产出按行追加。清单是后续收货的唯一入口。
@@ -666,7 +702,9 @@ public class ManufacturingService {
         Long total=jdbc.queryForObject("SELECT COUNT(*)"+from+where,Long.class,params.toArray());
         var listParams=new ArrayList<>(params);listParams.add(size);listParams.add((page-1)*size);
         var items=jdbc.query("SELECT r.*,m.order_no,m.sales_order_ref,m.customer_name_snapshot,m.product_name_snapshot,m.unit order_unit,"
-                + "w.warehouse_name warehouseName"+from+where+" ORDER BY r.completed_at DESC,r.id DESC LIMIT ? OFFSET ?",
+                + "w.warehouse_name warehouse_name,CASE WHEN EXISTS (SELECT 1 FROM manufacturing_completion_receipt_items i WHERE i.receipt_id=r.id)"
+                + " AND NOT EXISTS (SELECT 1 FROM manufacturing_completion_receipt_items i WHERE i.receipt_id=r.id AND i.finished_goods_lot_id IS NULL)"
+                + " THEN 1 ELSE 0 END stock_posted"+from+where+" ORDER BY r.completed_at DESC,r.id DESC LIMIT ? OFFSET ?",
                 (r,n)->row(r),listParams.toArray());
         var warehouses=jdbc.queryForList("SELECT id,warehouse_code warehouseCode,warehouse_name warehouseName FROM warehouses WHERE active=1 ORDER BY id");
         return Map.of("items",items,"total",total==null?0:total,"page",page,"size",size,"warehouses",warehouses);
@@ -798,14 +836,17 @@ public class ManufacturingService {
         String newStatus;
         BigDecimal planned=(BigDecimal)order.get("plannedQuantity");
         if(newCompleted.compareTo(BigDecimal.ZERO)==0){
-            newStatus="PENDING_RECEIPT";
+            newStatus="PENDING_INSPECTION";
         }else if(newCompleted.compareTo(planned)>=0){
             newStatus="COMPLETED";
         }else{
             // 含 0 工序工单（无制程/免报工）：冲销后同样要留在「待收货」列表里，才能再收第二笔
             newStatus="PARTIALLY_RECEIVED";
         }
-        jdbc.update("UPDATE manufacturing_orders SET completed_quantity=?,status=? WHERE id=?",newCompleted,newStatus,orderId);
+        jdbc.update("UPDATE manufacturing_orders SET completed_quantity=?,status=?,"
+                +"inspection_status=CASE WHEN ?='PENDING_INSPECTION' THEN 'PENDING' ELSE inspection_status END,"
+                +"inspection_source=CASE WHEN ?='PENDING_INSPECTION' THEN NULL ELSE inspection_source END WHERE id=?",
+                newCompleted,newStatus,newStatus,newStatus,orderId);
         changeLog.write(ErpChangeLogWriter.of(actor,"product_archive.manufacturing_completion_receipts",receiptId,"UPDATE",
                 ErpChangeLogWriter.changes(
                         "status","POSTED→REVERSED","reversalReason",r,"reversedQuantity",receipt.get("quantity"),

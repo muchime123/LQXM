@@ -44,7 +44,7 @@
                     :class="{ active: isParentActive(item) }"
                   >
                     <RouterLink
-                      :to="item.to"
+                      :to="item.children[0]?.to || item.to"
                       class="nav-item nav-item--parent-main"
                       :title="item.description ?? (sidebarCollapsed ? item.label : undefined)"
                       active-class="active"

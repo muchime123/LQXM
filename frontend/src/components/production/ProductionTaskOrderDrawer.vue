@@ -1,20 +1,25 @@
 <template>
   <!--
-    生产任务单（业务员下单）—— 抽屉形态。
+    独立生产任务单（展会、展厅、打样等不依赖销售订单的需求）—— 抽屉形态。
     形态纪律：下单是「车间执行页右上角按钮」调出的抽屉，不是独立侧边栏页面。
-    联动纪律（09-23 LQ 定「制程先行」）：先选制程 → 制程唯一对应产线时产线自动带出并锁定；
-              通用制程（无需报工，workshop_type 为空）产线任选 → 该产线的「产品名称 / 可选配置」才可选
+    联动纪律：先选产线与产品名称，制程跟随「任务单产品与配置」中产品绑定的制程，
+              未单独绑定时取产线默认制程；该产线的「产品名称 / 可选配置」才可选
               （数据源 = 制程与工序管理 → 任务单产品与配置）。
-    建单纪律：产品名称即后端的 processCategory；显式 processTemplateId 随单提交，后端以它为准
-              （车间默认制程只在未显式给制程时兜底，见 ManufacturingService.doCreate）。
+    建单纪律：产品名称即后端的 processCategory；制程由后端统一解析。
               09-22 起**不再要求选可售产品（SKU）** —— SKU 是完工入库的库存身份键，
               不是下单字段，且该主数据要重新设计；下单只带 产线 + 产品名称 + 配置 + 数量，
               单位默认「台」（后端兜底）。无 SKU 的工单完工收货时不落库存账，只登记收货事实。
   -->
-  <el-drawer v-model="visible" title="生产任务单" :size="drawerSize" :close-on-click-modal="!submitting"
+  <el-drawer v-model="visible" :title="configureOnly ? '生产任务单 · 配置销售需求' : '生产任务单'" :size="drawerSize" :close-on-click-modal="!submitting"
     :close-on-press-escape="!submitting" :show-close="!submitting" :before-close="beforeClose" @open="onOpen">
     <el-form ref="formRef" :model="form" :rules="rules" label-position="top" class="to-form">
-      <section class="to-block">
+      <el-alert v-if="!configureOnly" type="info" :closable="false" show-icon class="to-tip"
+        title="销售需求从「销售订单」发起；展会、展厅、打样等无销售订单的任务可在这里直接新建。" />
+      <el-alert v-else type="info" :closable="false" show-icon class="to-tip"
+        title="沿用生产任务单的产品配置字段。这里仅保存销售订单需求；销售订单确认后，车间再生成生产任务单。" />
+      <el-alert v-if="fromSalesOrder" type="success" :closable="false" show-icon class="to-tip"
+        title="本单由销售订单明细行发起；客户、数量与已确认配置应以销售订单为准。" />
+      <section v-if="!configureOnly" class="to-block">
         <h3>订单信息</h3>
         <div class="to-grid">
           <el-form-item label="工单申请日期">
@@ -27,25 +32,19 @@
             <el-date-picker v-model="form.dueDate" type="date" value-format="YYYY-MM-DD" placeholder="选择日期" class="full" />
           </el-form-item>
           <el-form-item label="计划类型" prop="taskType">
-            <el-select v-model="form.taskType" class="full">
+            <el-select v-model="form.taskType" class="full" @change="onTaskTypeChange">
               <el-option v-for="t in TASK_TYPES" :key="t.value" :value="t.value" :label="t.label" />
             </el-select>
           </el-form-item>
-          <el-form-item label="制程选择" prop="processTemplateId">
-            <el-select v-model="form.processTemplateId" placeholder="请选择制程" class="full" @change="onProcessChange">
-              <el-option v-for="t in processTemplates" :key="t.id" :value="t.id"
-                :label="t.operationCount === 0 ? `${t.templateName}（不展开工序）` : t.templateName" />
-            </el-select>
-          </el-form-item>
           <el-form-item label="产线选择（生产车间）" prop="workshopId">
-            <el-select v-model="form.workshopId" :disabled="workshopLocked" class="full"
-              :placeholder="workshopLocked ? '随制程自动带出' : '请选择产线（生产车间）'" @change="onWorkshopChange">
+            <el-select v-model="form.workshopId" class="full" placeholder="请选择产线（生产车间）" @change="onWorkshopChange">
               <el-option v-for="w in workshops" :key="w.id" :value="w.id" :label="w.workshopName" />
             </el-select>
           </el-form-item>
-          <el-form-item label="客户选择" prop="customerName">
+          <el-form-item :label="internalPurpose ? '需求方' : '客户选择'" prop="customerName">
+            <el-input v-if="internalPurpose" model-value="内部用途" disabled class="full" />
             <el-select v-model="form.customerName" filterable remote clearable :remote-method="searchCustomers"
-              :loading="customerLoading" placeholder="输入关键字搜索客户" class="full" @change="onCustomerChange">
+              v-else :loading="customerLoading" placeholder="输入关键字搜索客户" class="full" @change="onCustomerChange">
               <el-option v-for="c in customerOptions" :key="c.id" :value="c.name" :label="c.name" />
             </el-select>
           </el-form-item>
@@ -56,31 +55,65 @@
             <el-input-number v-model="form.plannedQuantity" :min="0.01" :precision="2" :controls="false"
               placeholder="大于 0" class="full" />
           </el-form-item>
-          <el-form-item label="是否需要额外模具" prop="extraMold">
-            <el-radio-group v-model="form.extraMold">
-              <el-radio value="yes">是</el-radio>
-              <el-radio value="no">否</el-radio>
-            </el-radio-group>
-          </el-form-item>
         </div>
       </section>
 
       <section class="to-block">
         <h3>产品配置</h3>
+        <el-form-item v-if="configureOnly" label="产线选择（生产车间）" prop="workshopId">
+          <el-select v-model="form.workshopId" class="full" placeholder="先选择产线" @change="onWorkshopChange">
+            <el-option v-for="w in workshops" :key="w.id" :value="w.id" :label="w.workshopName" />
+          </el-select>
+        </el-form-item>
+        <el-alert v-if="!configureOnly && internalPurpose" type="warning" :closable="false" show-icon class="to-tip"
+          :title="internalPurposeTip" />
         <el-alert v-if="noOpsTemplate" type="warning" :closable="false" show-icon class="to-tip"
-          :title="`制程「${noOpsTemplate}」不展开任何工序：本单建后直接进入待收货，办完车间交付收货即完成（免报工）。产线可任选。`" />
+          :title="`产品绑定制程「${noOpsTemplate}」不展开工序，建单后直接进入待收货。`" />
         <el-alert type="info" :closable="false" show-icon class="to-tip"
-          title="先选制程，再定产线：制程只对应一条产线时自动带出并锁定；「无需报工」这类通用制程可任选产线。产品名称与可选配置来自「制程与工序管理 → 任务单产品与配置」，按所选产线联动。" />
+          title="先选产线与产品名称。制程自动取「任务单产品与配置」中该产品绑定的制程；未单独绑定时取产线默认制程。" />
         <div class="to-grid">
           <el-form-item label="产品名称" prop="productName" class="span-2">
-            <el-select v-model="form.productName" :disabled="!form.workshopId" class="full"
+            <el-select v-model="form.productName" :disabled="!form.workshopId" class="full" @change="onProductChange"
               :placeholder="form.workshopId ? '请选择' : '先选择产线'">
               <el-option v-for="n in productNames" :key="n" :value="n" :label="n" />
             </el-select>
           </el-form-item>
-          <el-form-item label="盒子尺寸" prop="boxSize">
-            <el-input v-model="form.boxSize" placeholder="mm（只允许正数，保留 2 位）" maxlength="50" />
+          <el-form-item label="对应制程" class="span-2">
+            <el-input :model-value="resolvedProcessName" disabled class="full" />
           </el-form-item>
+          <!--
+            形状先行（09-24 LQ 定）：先选盒子形状，形状决定下面录哪几个尺寸值。
+            尺寸的形态规范（方=长x宽 / 圆=裸直径 / 其他=不进比对）统一在 @/utils/boxSize，
+            前端不在这里自己拼尺寸文本。
+          -->
+          <el-form-item label="盒子形状" prop="boxShape" class="span-2">
+            <el-radio-group v-model="form.boxShape" @change="onShapeChange">
+              <el-radio v-for="s in BOX_SHAPES" :key="s.value" :value="s.value">{{ s.label }}</el-radio>
+            </el-radio-group>
+          </el-form-item>
+          <template v-if="form.boxShape === 'RECT'">
+            <el-form-item label="盒子长（mm）" prop="boxLengthMm">
+              <el-input v-model="form.boxLengthMm" placeholder="较大的一边，最多 2 位小数" maxlength="20" />
+            </el-form-item>
+            <el-form-item label="盒子宽（mm）" prop="boxWidthMm">
+              <el-input v-model="form.boxWidthMm" placeholder="较小的一边，最多 2 位小数" maxlength="20" />
+            </el-form-item>
+          </template>
+          <template v-else-if="form.boxShape === 'ROUND'">
+            <el-form-item label="盒子直径（mm）" prop="boxDiameterMm">
+              <el-input v-model="form.boxDiameterMm" placeholder="正数，最多 2 位小数" maxlength="20" />
+            </el-form-item>
+          </template>
+          <template v-else-if="form.boxShape === 'OTHER'">
+            <el-form-item label="盒子形状说明" prop="boxShapeNote">
+              <el-input v-model="form.boxShapeNote" placeholder="如：六角形 / 心形" maxlength="50" />
+            </el-form-item>
+            <el-form-item label="尺寸描述" prop="boxSizeNote">
+              <el-input v-model="form.boxSizeNote" placeholder="如：对边 120mm" maxlength="100" />
+            </el-form-item>
+            <el-alert class="span-2 to-tip" type="warning" :closable="false" show-icon
+              title="异形盒子车间没有常规尺寸模具，需要按订做安排。" />
+          </template>
           <el-form-item label="盒子高度" prop="boxHeight">
             <el-input v-model="form.boxHeight" placeholder="请输入" maxlength="50" />
           </el-form-item>
@@ -92,11 +125,6 @@
           </el-form-item>
           <el-form-item label="盒子材质" prop="boxMaterial">
             <el-input v-model="form.boxMaterial" placeholder="请输入" maxlength="100" />
-          </el-form-item>
-          <el-form-item label="盒子形状" prop="boxShape">
-            <el-radio-group v-model="form.boxShape">
-              <el-radio v-for="s in BOX_SHAPES" :key="s" :value="s">{{ s }}</el-radio>
-            </el-radio-group>
           </el-form-item>
           <el-form-item label="电压" prop="voltage">
             <el-radio-group v-model="form.voltage">
@@ -119,13 +147,19 @@
               <el-option v-for="o in configOptions" :key="o" :value="o" :label="o" />
             </el-select>
           </el-form-item>
+          <el-form-item label="是否需要额外模具" prop="extraMold">
+            <el-radio-group v-model="form.extraMold">
+              <el-radio value="yes">是</el-radio>
+              <el-radio value="no">否</el-radio>
+            </el-radio-group>
+          </el-form-item>
           <el-form-item label="填写配置说明" class="span-2">
             <el-input v-model="form.configNote" type="textarea" :rows="2" maxlength="500" show-word-limit />
           </el-form-item>
         </div>
       </section>
 
-      <section class="to-block">
+      <section v-if="!configureOnly" class="to-block">
         <h3>额外信息</h3>
         <el-form-item label="备注">
           <el-input v-model="form.remark" type="textarea" :rows="3" maxlength="500" show-word-limit />
@@ -136,8 +170,8 @@
     <template #footer>
       <div class="to-footer">
         <el-button :disabled="submitting" @click="close">取消</el-button>
-        <el-button :loading="submitting" @click="submit(true)">提交并继续下单</el-button>
-        <el-button type="primary" :loading="submitting" @click="submit(false)">提交</el-button>
+        <el-button v-if="!configureOnly" :loading="submitting" @click="submit(true)">提交并继续下单</el-button>
+        <el-button type="primary" :loading="submitting" @click="submit(false)">{{ configureOnly ? '保存配置到销售订单' : '提交' }}</el-button>
       </div>
     </template>
   </el-drawer>
@@ -151,15 +185,40 @@ import {
   createManufacturingOrder, fetchProcessTemplates, fetchTaskConfigOptions, fetchWorkshopOptions,
   newRequestKey, type ProcessTemplate, type WorkshopOption
 } from '@/api/manufacturing'
+import {
+  BOX_SHAPES, boxRectSides, boxSizeFieldProblem, boxSizeProblem, boxSizeText, specificationText, tidyMm,
+  type BoxShape, type BoxSizeFields
+} from '@/utils/boxSize'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
+import type { ProductionDemandConfig } from '@/api/salesOrder'
+import { fetchOrderProductionWorkshops, fetchOrderProductionOptions } from '@/api/salesOrder'
 
-const props = defineProps<{ modelValue: boolean }>()
-const emit = defineEmits<{ 'update:modelValue': [value: boolean]; created: [id: number] }>()
+/**
+ * 由上层带进来的预填值。
+ *
+ * 独立建单时可由上层预填客户、数量与销售订单明细行。
+ * 销售订单的配置模式只使用同一套产品配置字段，保存到订单明细；车间接单时再建任务。
+ */
+interface TaskOrderPreset {
+  customerId?: number | null
+  customerName?: string
+  plannedQuantity?: number | null
+  salesOrderItemId?: number
+  taskType?: string
+}
+
+const props = defineProps<{ modelValue: boolean; preset?: TaskOrderPreset | null; mode?: 'create' | 'configure'; initial?: ProductionDemandConfig | null }>()
+const emit = defineEmits<{ 'update:modelValue': [value: boolean]; created: [id: number]; configured: [config: ProductionDemandConfig, specification: string] }>()
+const configureOnly = computed(() => props.mode === 'configure')
 
 interface CustomerOption { id: number; name: string }
 
 const TASK_TYPES = [
-  { value: 'SALES_ORDER', label: '销售排产（缺货下单）' },
+  // 备货（09-24 LQ 定）：直接建单先生产后入库，之后在销售订单里作为现货可选；无客户
+  { value: 'STOCK', label: '备货（先生产后入库）' },
+  // 销售订单来源的单（后端 task_type 白名单里的 SALES_ORDER）
+  { value: 'EXHIBITION', label: '展会展示机' },
+  { value: 'SHOWROOM', label: '展厅展示机' },
   { value: 'SAMPLE', label: '打样' },
   { value: 'SPECIAL', label: '特殊定制' },
   { value: 'INTERNAL', label: '内部领用' },
@@ -167,7 +226,6 @@ const TASK_TYPES = [
   { value: 'REPLACEMENT', label: '返工替换' }
 ]
 const MOLD_ARRANGEMENTS = ['1出1', '1出2', '2出1', '2出2', '1出4', '4出1', '其他']
-const BOX_SHAPES = ['圆形', '方形', '其他']
 const VOLTAGES = ['单相110V', '单相220V', '三相220V', '三相380V']
 const PLUGS = ['国标', '欧标', '英标', '美标', '其他']
 const BRANDS = ['利强品牌', '中性', '其他']
@@ -188,38 +246,48 @@ const today = new Date().toISOString().slice(0, 10)
 const workshops = ref<WorkshopOption[]>([])
 const processTemplates = ref<ProcessTemplate[]>([])
 const productNames = ref<string[]>([])
+const productTemplates = ref<Record<string, number | null>>({})
+const productTemplateNames = ref<Record<string, string>>({})
 const configOptions = ref<string[]>([])
 
-/**
- * 制程先行（09-23 LQ 定）：先选制程，再定产线。
- * - 制程的 workshop_type 对得上某条产线 → 唯一对应，产线自动带出并锁定（下拉禁用）；
- * - workshop_type 为空（「无需报工」这类通用制程）→ 产线放开任选。
- */
+/** 产品对应制程仅展示；建单时后端再次按产品配置解析，避免依赖前端选项快照。 */
 const selectedTemplate = computed(() => processTemplates.value.find(t => t.id === form.processTemplateId))
-const workshopLocked = computed(() => !!selectedTemplate.value?.workshopType && workshops.value.some(w => w.workshopName === selectedTemplate.value?.workshopType))
+const resolvedProcessName = computed(() => {
+  if (!form.workshopId || !form.productName) return '选择产品后自动确定'
+  if (configureOnly.value) return productTemplateNames.value[form.productName] || '无需报工'
+  return selectedTemplate.value?.templateName || '无需报工'
+})
 /** 选中的制程是 0 道工序（免报工）→ 当场讲清楚这张单不会有工序。 */
 const noOpsTemplate = computed(() =>
-  selectedTemplate.value && selectedTemplate.value.operationCount === 0 ? selectedTemplate.value.templateName : '')
+  form.productName && !form.processTemplateId ? '无需报工'
+    : selectedTemplate.value?.operationCount === 0 ? selectedTemplate.value.templateName : '')
 const customerOptions = ref<CustomerOption[]>([])
 const customerLoading = ref(false)
 const submitting = ref(false)
 /** 请求键：打开抽屉时生成，提交失败保留（重试复用同一次动作），提交成功作废。 */
 let requestKey = ''
+/** 销售订单明细行 id（由 preset 带入）；非空表示本单由销售订单发起。 */
+const salesOrderItemId = ref<number | null>(null)
+const fromSalesOrder = computed(() => salesOrderItemId.value != null)
 
 const blankForm = () => ({
   processTemplateId: null as number | null,
   dueDate: '',
-  taskType: 'SALES_ORDER',
+  taskType: 'STOCK',
   customerId: null as number | null,
   customerName: '',
   workshopId: null as number | null,
   plannedQuantity: undefined as number | undefined,
   extraMold: 'no',
   productName: '',
-  boxSize: '',
+  boxShape: '' as BoxShape | '',
+  boxLengthMm: '',
+  boxWidthMm: '',
+  boxDiameterMm: '',
+  boxShapeNote: '',
+  boxSizeNote: '',
   boxHeight: '',
   moldArrangement: '',
-  boxShape: '',
   boxMaterial: '',
   voltage: '',
   plug: '',
@@ -230,20 +298,71 @@ const blankForm = () => ({
 })
 const form = reactive(blankForm())
 
+/**
+ * 交给 @/utils/boxSize 的尺寸字段视图。
+ * 形状与尺寸的**形态规范只在那一个文件里实现**，这里只负责把表单值喂进去、
+ * 把算出来的错误文案挂回对应字段（避免抽屉与后端各有一套口径）。
+ */
+const sizeFields = (): BoxSizeFields => ({
+  boxShape: form.boxShape,
+  boxLengthMm: form.boxLengthMm,
+  boxWidthMm: form.boxWidthMm,
+  boxDiameterMm: form.boxDiameterMm,
+  boxShapeNote: form.boxShapeNote,
+  boxSizeNote: form.boxSizeNote
+})
+
+const internalPurpose = computed(() => ['EXHIBITION', 'SHOWROOM', 'INTERNAL', 'STOCK'].includes(form.taskType))
+/** 内部用途提示按类型区分：备货的去向就是可售库存（这正是它存在的意义），其余内部任务完工后不自动转库存。 */
+const internalPurposeTip = computed(() => form.taskType === 'STOCK'
+  ? '备货任务无需销售订单：完工检验入库后进可售库存，之后在销售订单里作为「现货」可选。'
+  : '内部任务无需销售订单。展会结束后转可售库存、或交接到展厅，是后续独立业务动作；当前完工记录不会自动完成这两种去向。')
+
+function onTaskTypeChange() {
+  form.customerId = null
+  form.customerName = ''
+  formRef.value?.clearValidate('customerName')
+}
+
+/** 换形状：上一形状的字段已经卸载，清掉它们的校验痕迹，别让红字留到提交时。 */
+function onShapeChange() {
+  formRef.value?.clearValidate(['boxShape', 'boxLengthMm', 'boxWidthMm', 'boxDiameterMm', 'boxShapeNote', 'boxSizeNote'])
+}
+
 const required = { required: true, message: '必填', trigger: ['blur', 'change'] as const }
+
+/**
+ * 尺寸字段的校验：判定与文案全部来自 @/utils/boxSize（唯一实现），这里只做接线。
+ * 不属于当前形状的字段恒通过 —— 所以即使表单项被 v-if 卸掉也不会误拦。
+ */
+const sizeField = (field: keyof BoxSizeFields) => ({
+  validator: (_rule: unknown, _value: unknown, callback: (error?: Error) => void) => {
+    const problem = boxSizeFieldProblem(field, sizeFields())
+    if (problem) callback(new Error(problem))
+    else callback()
+  },
+  trigger: ['blur', 'change'] as const
+})
+
 const rules: FormRules = {
   dueDate: required,
   taskType: required,
-  customerName: required,
-  processTemplateId: required,
+  customerName: { validator: (_rule, value: string, callback: (error?: Error) => void) => {
+    if (!internalPurpose.value && !value?.trim()) callback(new Error('请选择客户'))
+    else callback()
+  }, trigger: ['blur', 'change'] },
   workshopId: required,
   plannedQuantity: { required: true, message: '必填且大于 0', trigger: ['blur', 'change'] },
   extraMold: required,
   productName: required,
-  boxSize: required,
+  boxShape: sizeField('boxShape'),
+  boxLengthMm: sizeField('boxLengthMm'),
+  boxWidthMm: sizeField('boxWidthMm'),
+  boxDiameterMm: sizeField('boxDiameterMm'),
+  boxShapeNote: sizeField('boxShapeNote'),
+  boxSizeNote: sizeField('boxSizeNote'),
   boxHeight: required,
   moldArrangement: required,
-  boxShape: required,
   boxMaterial: required,
   voltage: required,
   plug: required,
@@ -252,58 +371,103 @@ const rules: FormRules = {
 
 function resetForm() {
   Object.assign(form, blankForm())
+  salesOrderItemId.value = null
   productNames.value = []
+  productTemplates.value = {}
+  productTemplateNames.value = {}
   configOptions.value = []
   customerOptions.value = []
   formRef.value?.clearValidate()
 }
 
+/**
+ * 应用上层预填值（销售订单明细行发起时）。
+ *
+ * 销售订单模式只回写配置快照，不在此创建生产任务。
+ */
+function applyPreset() {
+  const preset = props.preset
+  if (!preset) return
+  salesOrderItemId.value = preset.salesOrderItemId ?? null
+  form.taskType = preset.taskType || 'SALES_ORDER'
+  form.customerId = preset.customerId ?? null
+  form.customerName = preset.customerName ?? ''
+  // 客户下拉是远程搜索：不塞一条候选，带入的客户名就显示不出来
+  if (preset.customerName) customerOptions.value = [{ id: preset.customerId ?? 0, name: preset.customerName }]
+  if (preset.plannedQuantity) form.plannedQuantity = Number(preset.plannedQuantity)
+}
+
 /** 每次打开都从空白开始，并保证有一次新的请求键。 */
 async function onOpen() {
   resetForm()
+  applyPreset()
   requestKey = newRequestKey()
   try {
-    const [ws, ts] = await Promise.all([
-      workshops.value.length ? Promise.resolve(workshops.value) : fetchWorkshopOptions(),
-      processTemplates.value.length ? Promise.resolve(processTemplates.value) : fetchProcessTemplates()
-    ])
-    workshops.value = ws
-    processTemplates.value = ts
+    if (configureOnly.value) {
+      workshops.value = await fetchOrderProductionWorkshops()
+    } else {
+      const [ws, ts] = await Promise.all([fetchWorkshopOptions(), fetchProcessTemplates()])
+      workshops.value = ws
+      processTemplates.value = ts
+    }
+    if (configureOnly.value && props.initial) await applyInitial(props.initial)
   } catch {
     ElMessage.error('制程 / 产线加载失败，请关闭后重试')
-  }
-}
-
-/**
- * 制程 → 产线联动：
- * - 制程唯一对应一条产线（workshop_type 对得上）→ 自动带出并锁定，产品名称/可选配置随之按该产线加载；
- * - 通用制程（无需报工）→ 产线放开。换产线必须重取该产线的产品名称与可选配置。
- */
-async function onProcessChange() {
-  const type = selectedTemplate.value?.workshopType
-  const hit = type ? workshops.value.find(w => w.workshopName === type) : undefined
-  const nextWorkshop = hit ? hit.id : null
-  if (nextWorkshop !== form.workshopId) {
-    form.workshopId = nextWorkshop
-    if (nextWorkshop) await onWorkshopChange(nextWorkshop)
-    else { form.productName = ''; form.optionalConfigs = []; productNames.value = []; configOptions.value = [] }
   }
 }
 
 /** 产线联动：换产线必须清掉上一个产线的产品名称与可选配置，并重取本产线可选项。 */
 async function onWorkshopChange(workshopId: number) {
   form.productName = ''
+  form.processTemplateId = null
   form.optionalConfigs = []
   productNames.value = []
+  productTemplates.value = {}
+  productTemplateNames.value = {}
   configOptions.value = []
   if (!workshopId) return
   try {
-    const options = await fetchTaskConfigOptions(workshopId)
+    const options = configureOnly.value
+      ? await fetchOrderProductionOptions(workshopId)
+      : await fetchTaskConfigOptions(workshopId)
     productNames.value = options.productNames
+    productTemplates.value = options.productTemplates || {}
+    productTemplateNames.value = configureOnly.value
+      ? (options as Awaited<ReturnType<typeof fetchOrderProductionOptions>>).productTemplateNames
+      : {}
     configOptions.value = options.optionalConfigs
   } catch {
     ElMessage.error('该产线的产品名称与可选配置加载失败，请重新选择产线')
   }
+}
+
+function onProductChange() {
+  const productTemplate = productTemplates.value[form.productName]
+  form.processTemplateId = productTemplate ?? workshops.value.find(w => w.id === form.workshopId)?.defaultProcessTemplateId ?? null
+}
+
+async function applyInitial(config: ProductionDemandConfig) {
+  form.workshopId = config.workshopId
+  await onWorkshopChange(config.workshopId)
+  form.productName = config.productName
+  onProductChange()
+  const legacyShape = config.boxShape === '方形' ? 'RECT' : config.boxShape === '圆形' ? 'ROUND' : config.boxShape === '异形' ? 'OTHER' : config.boxShape
+  form.boxShape = ['RECT', 'ROUND', 'OTHER'].includes(legacyShape) ? legacyShape as BoxShape : 'OTHER'
+  const rectSides = (config.boxSize || '').split(/[xX×*]/).map(side => side.trim())
+  form.boxLengthMm = config.boxLengthMm || (form.boxShape === 'RECT' ? rectSides[0] || '' : '')
+  form.boxWidthMm = config.boxWidthMm || (form.boxShape === 'RECT' ? rectSides[1] || '' : '')
+  form.boxDiameterMm = config.boxDiameterMm || (form.boxShape === 'ROUND' ? config.boxSize || '' : '')
+  form.boxShapeNote = config.boxShapeNote || (form.boxShape === 'OTHER' && legacyShape !== 'OTHER' ? config.boxShape : '')
+  form.boxSizeNote = config.boxSizeNote || (form.boxShape === 'OTHER' ? config.boxSize || '' : '')
+  form.boxHeight = config.boxHeight
+  form.moldArrangement = config.moldArrangement
+  form.boxMaterial = config.boxMaterial
+  form.voltage = config.voltage
+  form.plug = config.plug
+  form.brand = config.brand
+  form.optionalConfigs = [...(config.optionalConfigs || [])]
+  form.configNote = config.configNote || ''
+  form.extraMold = config.extraMold ? 'yes' : 'no'
 }
 
 async function searchCustomers(keyword: string) {
@@ -330,39 +494,69 @@ async function submit(createNext: boolean) {
   try {
     await formRef.value?.validate()
   } catch { return }
+  // 兜底：尺寸字段按形状渲染，这里再按形状整体校一次，避免漏网
+  const sizeProblem = boxSizeProblem(sizeFields())
+  if (sizeProblem) { ElMessage.error(sizeProblem); return }
   if (submitting.value) return
   submitting.value = true
   try {
-    const specParts: string[] = []
-    if (form.boxSize) specParts.push(`尺寸${form.boxSize}`)
-    if (form.boxHeight) specParts.push(`高${form.boxHeight}`)
+    const fields = sizeFields()
+    const shape = fields.boxShape as BoxShape
+    /**
+     * 结构化尺寸随单落 product_config_json：**只带当前形状相关的键**，
+     * 避免残留上一个形状的值（先填方形的长宽又改成圆形，长宽不该跟着走）。
+     * `boxSize` 是给人看与对齐台账的尺寸文本（方=`长x宽`、圆=裸直径）；
+     * 数值键（长/宽/直径）才是**判「常规/订做」的入参**，两者分工不同但同出 @/utils/boxSize。
+     * 「其他」形状不产出 `boxSize`，异形稳定落非标。
+     */
+    let sizeConfig: Record<string, string>
+    if (shape === 'RECT') {
+      // 长宽**原样保序**（长=较大的一边），与台账写法 `200x140` 一致；填反由 boxSize 校验当场拦下
+      const sides = boxRectSides(fields)
+      sizeConfig = { boxSize: boxSizeText(fields), boxLengthMm: sides?.lengthMm ?? '', boxWidthMm: sides?.widthMm ?? '' }
+    } else if (shape === 'ROUND') {
+      sizeConfig = { boxSize: boxSizeText(fields), boxDiameterMm: tidyMm(fields.boxDiameterMm) }
+    } else {
+      sizeConfig = { boxShapeNote: fields.boxShapeNote.trim(), boxSizeNote: fields.boxSizeNote.trim() }
+    }
+    const productConfig: ProductionDemandConfig = {
+      workshopId: form.workshopId || 0,
+      productName: form.productName,
+      boxShape: shape,
+      boxSize: sizeConfig.boxSize || '',
+      boxHeight: form.boxHeight,
+      moldArrangement: form.moldArrangement,
+      boxMaterial: form.boxMaterial,
+      voltage: form.voltage,
+      plug: form.plug,
+      brand: form.brand,
+      optionalConfigs: [...form.optionalConfigs],
+      configNote: form.configNote || '',
+      extraMold: form.extraMold === 'yes',
+      ...sizeConfig
+    }
+    if (configureOnly.value) {
+      emit('configured', productConfig, specificationText(fields, form.boxHeight))
+      visible.value = false
+      return
+    }
     const payload = {
       customerName: form.customerName,
       customerId: form.customerId,
-      // 产品名称 = processCategory（品类级身份）；制程由用户显式选择（processTemplateId 随单提交）
+      // 由销售订单明细行发起时带上行 id：后端落 manufacturing_orders.sales_order_item_id（唯一）
+      salesOrderItemId: salesOrderItemId.value,
+      // 产品名称 = processCategory；制程由后端按产品配置解析。
       processCategory: form.productName,
       plannedQuantity: form.plannedQuantity,
       dueDate: form.dueDate || null,
       taskType: form.taskType,
-      // 制程先行（09-23）：显式制程随单提交，后端以它为准（车间默认只在未传时兜底）
-      processTemplateId: form.processTemplateId,
+      // 制程由后端按产线+产品配置解析，避免前端显示的制程与实际落单不一致。
+      processTemplateId: null,
       workshopId: form.workshopId,
-      specification: specParts.length ? specParts.join('，') : '',
+      // 规格摘要给人看（圆口径带 Φ）；与用于比对常规尺寸的裸数字分工不同，两处都出自 utils/boxSize
+      specification: specificationText(fields, form.boxHeight),
       remark: form.remark || '',
-      productConfig: {
-        productName: form.productName,
-        boxSize: form.boxSize,
-        boxHeight: form.boxHeight,
-        moldArrangement: form.moldArrangement,
-        boxShape: form.boxShape,
-        boxMaterial: form.boxMaterial,
-        voltage: form.voltage,
-        plug: form.plug,
-        brand: form.brand,
-        optionalConfigs: form.optionalConfigs,
-        configNote: form.configNote || '',
-        extraMold: form.extraMold === 'yes'
-      }
+      productConfig
     }
     const id = await createManufacturingOrder(payload, requestKey)
     requestKey = ''

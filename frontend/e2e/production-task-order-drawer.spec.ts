@@ -5,14 +5,13 @@ import { expect, test, type Locator, type Page } from '@playwright/test'
  *
  * 钉死六件事：
  * 1. **形态**：下单是抽屉（role=dialog），不是独立侧边栏页面；旧路径只做跳转。
- * 2. **制程先行**（09-23 LQ 定）：先选制程，再定产线 —— 制程唯一对应产线时产线自动带出并锁定；
- *    通用制程（无需报工）产线任选。提交体必须显式带 `processTemplateId`。
+ * 2. **产品决定制程**：先选产线与产品，制程跟随「任务单产品与配置」，提交时由后端再次解析。
  * 3. **产线联动**：定了产线后，该产线的「产品名称 / 可选配置」才可选（未定产线时两者禁用）。
  * 4. **契约**：产品名称即后端的 `processCategory`；产品配置随单落库；
  *    写动作必须带 `X-Request-Key`（决策 #12「无键不直通」）。
  * 5. **不带 SKU**（09-22 拍板）：抽屉里不存在「可售产品（SKU）」这一项，
  *    提交体也不含 `salesProductId` —— SKU 是完工入库的库存身份键，不是下单字段。
- * 6. **免报工当场提示**（09-23 拍板）：选了 0 道工序的制程（无需报工）
+ * 6. **免报工当场提示**：产品未绑定制程且产线没有默认制程时
  *    要**当场提示**「本单不展开工序」，而不是让用户提交后吃 400。
  *
  * 全 mock，确定性；不写任何真库数据。
@@ -64,7 +63,7 @@ async function fixtures(
       const workshopId = new URL(request.url()).searchParams.get('workshopId')
       expect(workshopId, '产品名称/可选配置必须按 workshopId 拉取').toBeTruthy()
       probes.configWorkshopIds.push(workshopId as string)
-      return reply({ productNames: ['气动片膜'], optionalConfigs: ['加长嘴', '双出'] })
+      return reply({ productNames: ['气动片膜'], productTemplates: { 气动片膜: workshopId === String(WORKSHOP.id) ? TEMPLATE_SEALER.id : null }, optionalConfigs: ['加长嘴', '双出'] })
     }
     // 09-22 起抽屉不应再拉 SKU 候选 —— 这里计数，由用例断言恒为 0（防「悄悄加回来」）
     if (path === '/api/manufacturing/product-options') {
@@ -115,13 +114,13 @@ async function pickRadio(drawer: Locator, label: string, value: string) {
   await item(drawer, label).getByText(value, { exact: true }).click()
 }
 
-test('生产任务单是抽屉：制程先行带出产线，提交带显式制程与产品配置', async ({ page }) => {
+test('生产任务单是抽屉：选产品自动显示制程，提交由后端解析并保留配置', async ({ page }) => {
   const created: Array<{ key?: string; body: Record<string, any> }> = []
   const probes: Probes = { productOptionCalls: 0, configWorkshopIds: [] }
   await fixtures(page, created, probes)
-  await page.goto('/#/manufacturing-execution')
+  await page.goto('/#/local-manufacturing-execution')
 
-  await expect(page.getByRole('heading', { level: 1, name: '车间执行' })).toBeVisible()
+  await expect(page.getByRole('heading', { level: 1, name: '本地生产任务 · 车间执行' })).toBeVisible()
   // 抽屉在点击之前不存在 —— 它确实是「按钮调出来的」，不是页面常驻区块
   await expect(page.getByRole('dialog', { name: '生产任务单' })).toHaveCount(0)
 
@@ -138,15 +137,11 @@ test('生产任务单是抽屉：制程先行带出产线，提交带显式制�
   await expect(productNameSelect).toBeDisabled()
   await expect(configSelect).toBeDisabled()
 
-  // ---- 制程先行（09-23）：先选制程，产线自动带出并锁定 ----
-  await pickSelect(page, drawer, '制程选择', TEMPLATE_SEALER.templateName)
+  // ---- 先选产线，再从该产线选产品；制程不需要手选 ----
+  await expect(item(drawer, '制程选择')).toHaveCount(0)
   const workshopSelect = drawer.getByRole('combobox', { name: /产线选择/ })
-  await expect(workshopSelect).toBeDisabled()
-  // ⚠️ **判"选中了什么"只能断言渲染文案，不能断言 `.el-select__input` 的 value**：
-  // EP 2.x 里非 filterable 的 el-select 把选中项渲染进 `<span class="el-select__selected-item">`，
-  // 内层 input 的值**恒为空字符串** → `toHaveValue('封口机车间')` 必然假失败（09-23 实测：
-  // 制程先行改版去掉了产线下拉的 `filterable`，同一处断言立刻由通过变失败，看着像"产线没带出来"）。
-  await expect(item(drawer, '产线选择')).toContainText(TEMPLATE_SEALER.workshopType!)
+  await expect(workshopSelect).toBeEnabled()
+  await pickSelect(page, drawer, '产线选择', WORKSHOP.workshopName)
 
   // 封口机车间有制程 → 不得出现免报工提示
   await expect(drawer.getByText('不展开任何工序')).toHaveCount(0)
@@ -159,15 +154,22 @@ test('生产任务单是抽屉：制程先行带出产线，提交带显式制�
   await dueDate.fill('2026-09-30')
   await dueDate.press('Enter')
 
+  await pickSelect(page, drawer, '计划类型', '打样')
   await pickSelect(page, drawer, '客户选择', '测试客户', '测试')
   await item(drawer, '需求数量').locator('input').fill('12')
 
   await pickSelect(page, drawer, '产品名称', '气动片膜')
-  await item(drawer, '盒子尺寸').locator('input').fill('94×94')
+  await expect(item(drawer, '对应制程').locator('input')).toHaveValue(TEMPLATE_SEALER.templateName)
+  // ---- 形状先行（09-24）：先选形状，形状决定下面录哪几个尺寸值 ----
+  await pickRadio(drawer, '盒子形状', '方形')
+  // 方形给长宽两格、不给直径
+  await expect(item(drawer, '盒子直径')).toHaveCount(0)
+  // 故意按「长=184 / 宽=128」填（长边在前），断言落库归成同一个「小x大」
+  await item(drawer, '盒子长').locator('input').fill('184')
+  await item(drawer, '盒子宽').locator('input').fill('128')
   await item(drawer, '盒子高度').locator('input').fill('60')
   await pickSelect(page, drawer, '模具排列', '1出2')
   await item(drawer, '盒子材质').locator('input').fill('PET')
-  await pickRadio(drawer, '盒子形状', '方形')
   await pickRadio(drawer, '电压', '单相220V')
   await pickRadio(drawer, '插头', '国标')
   await pickRadio(drawer, '品牌', '利强品牌')
@@ -183,8 +185,8 @@ test('生产任务单是抽屉：制程先行带出产线，提交带显式制�
   expect(key, '建单必须携带 X-Request-Key').toBeTruthy()
   // 产品名称 → processCategory：后端按它建单，缺了就建不出工序
   expect(body.processCategory).toBe('气动片膜')
-  // 制程先行（09-23）：显式制程必须随单提交，产线由制程带出
-  expect(body.processTemplateId).toBe(TEMPLATE_SEALER.id)
+  // 制程由后端按产品绑定解析，前端不能再覆盖产品配置
+  expect(body.processTemplateId).toBeNull()
   expect(body.workshopId).toBe(WORKSHOP.id)
   // 09-22：提交体里不能再有 salesProductId（SKU 已退出建单），也不是前端硬塞单位
   expect(body).not.toHaveProperty('salesProductId')
@@ -194,10 +196,13 @@ test('生产任务单是抽屉：制程先行带出产线，提交带显式制�
   expect(body.dueDate).toBe('2026-09-30')
   expect(body.productConfig).toMatchObject({
     productName: '气动片膜',
-    boxSize: '94×94',
+    boxShape: 'RECT',
+    // 形状先行：方形的两个值归成「小x大」，长宽填反也是同一个尺寸
+    boxSize: '184x128',
+    boxLengthMm: '184',
+    boxWidthMm: '128',
     boxHeight: '60',
     moldArrangement: '1出2',
-    boxShape: '方形',
     boxMaterial: 'PET',
     voltage: '单相220V',
     plug: '国标',
@@ -206,6 +211,8 @@ test('生产任务单是抽屉：制程先行带出产线，提交带显式制�
     configNote: '客户要求加长出料嘴',
     extraMold: false
   })
+  // 规格摘要是给人看的（方形用 x 连接），与判「常规/订做」用的裸尺寸分工不同
+  expect(body.specification).toBe('184x128，高60')
 
   // 防「悄悄加回来」：整个下单过程一次都没拉过 SKU 候选
   expect(probes.productOptionCalls, '建单不应再请求 SKU 候选').toBe(0)
@@ -216,31 +223,24 @@ test('生产任务单是抽屉：制程先行带出产线，提交带显式制�
   await expect(drawer).toBeHidden()
 })
 
-test('通用制程（无需报工）：产线任选且当场提示「不展开工序」', async ({ page }) => {
+test('产品未绑定制程且产线无默认制程：当场提示免报工', async ({ page }) => {
   const created: Array<{ key?: string; body: Record<string, any> }> = []
   const probes: Probes = { productOptionCalls: 0, configWorkshopIds: [] }
   await fixtures(page, created, probes, [WORKSHOP_NO_PROCESS])
-  await page.goto('/#/manufacturing-execution')
+  await page.goto('/#/local-manufacturing-execution')
 
   await page.getByRole('button', { name: '新建生产任务单' }).click()
   const drawer = page.getByRole('dialog', { name: '生产任务单' })
   await expect(drawer).toBeVisible()
 
-  // 未选制程时不该有任何免报工提示
-  await expect(drawer.getByText('不展开任何工序')).toHaveCount(0)
-
-  await pickSelect(page, drawer, '制程选择', TEMPLATE_NO_REPORT.templateName)
-
-  // 通用制程不锁产线
+  // 产线由建单人员选择，产品再决定制程
   await expect(drawer.getByRole('combobox', { name: /产线选择/ })).toBeEnabled()
-  // 选中的是 0 道工序制程 → 必须当场说清楚这张单不会有工序
-  await expect(drawer.getByText(/不展开任何工序/)).toBeVisible()
-  await expect(drawer.getByText(/免报工/)).toBeVisible()
-
-  // 定了产线后产品名称照常可选，提交路径不变
   await pickSelect(page, drawer, '产线选择', WORKSHOP_NO_PROCESS.workshopName)
   await expect(drawer.getByRole('combobox', { name: /产品名称/ })).toBeEnabled()
-  expect(created.length, '仅选制程/产线不应触发建单').toBe(0)
+  await pickSelect(page, drawer, '产品名称', '气动片膜')
+  await expect(item(drawer, '对应制程').locator('input')).toHaveValue('无需报工')
+  await expect(drawer.getByText(/不展开工序/)).toBeVisible()
+  expect(created.length, '仅选产线/产品不应触发建单').toBe(0)
 })
 
 test('下单没有独立侧边栏页面：旧路径跳转到车间执行，入口只有那个按钮', async ({ page }) => {
@@ -249,8 +249,8 @@ test('下单没有独立侧边栏页面：旧路径跳转到车间执行，入�
   await fixtures(page, created, probes)
 
   await page.goto('/#/production-task-orders')
-  await expect(page).toHaveURL(/#\/manufacturing-execution/)
-  await expect(page.getByRole('heading', { level: 1, name: '车间执行' })).toBeVisible()
+  await expect(page).toHaveURL(/#\/local-manufacturing-execution/)
+  await expect(page.getByRole('heading', { level: 1, name: '本地生产任务 · 车间执行' })).toBeVisible()
   // 下单入口收敛成一个按钮；页面上不存在「生产任务单」的独立导航项
   await expect(page.getByRole('button', { name: '新建生产任务单' })).toBeVisible()
   await expect(page.getByRole('link', { name: '生产任务单', exact: true })).toHaveCount(0)

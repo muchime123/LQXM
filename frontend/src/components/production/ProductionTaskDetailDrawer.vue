@@ -43,6 +43,16 @@
           <el-table-column label="完成内容 / 冲正原因" min-width="180"><template #default="{ row }">{{ row.reversalReason || row.remark || '—' }}</template></el-table-column>
           <el-table-column v-if="canReverse" label="操作" width="80"><template #default="{ row }"><el-button v-if="row.status === 'VALID'" link type="danger" @click="reverse(row)">冲正</el-button></template></el-table-column>
         </el-table>
+        <h3>完工检验记录</h3>
+        <el-table :data="detail.inspections" border empty-text="暂无检验记录">
+          <el-table-column prop="inspectionNo" label="检验单号" width="150" />
+          <el-table-column label="结论" width="100"><template #default="{ row }">{{ row.inspectionResult === 'PASSED' ? '合格' : '不合格' }}</template></el-table-column>
+          <el-table-column prop="qualifiedQuantity" label="合格数量" width="100" />
+          <el-table-column prop="unqualifiedQuantity" label="不合格数量" width="110" />
+          <el-table-column prop="inspectorNameSnapshot" label="检验人" width="110" />
+          <el-table-column prop="inspectedAt" label="检验时间" width="170" />
+          <el-table-column prop="remark" label="说明" min-width="140" />
+        </el-table>
         <h3>异常与处理</h3>
         <el-table :data="detail.issues" border empty-text="暂无生产异常">
           <el-table-column prop="operationNameSnapshot" label="工序" min-width="140" />
@@ -68,6 +78,7 @@ import { computed, ref, watch } from 'vue'
 import { fetchManufacturingOrder, type ManufacturingDetail, type ManufacturingOperation, type ExecutionBoardItem, type WorkReport, type AllWorkReport } from '@/api/manufacturing'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { processProgress, operationStatusLabel } from '@/utils/manufacturingProgress'
+import { boxShapeLabel } from '@/utils/boxSize'
 const visible = defineModel<boolean>({ default: false })
 const props = defineProps<{ orderId: number | null; refreshKey?: number }>()
 const emit = defineEmits<{ report: [row: ExecutionBoardItem]; reverse: [row: AllWorkReport] }>()
@@ -82,8 +93,11 @@ const configs = computed(() => {
   if (!raw) return []
   let values: Record<string, unknown>
   try { values = typeof raw === 'string' ? JSON.parse(raw) : raw } catch { return [{ label: '产品配置', value: '配置格式异常，请核对来源' }] }
-  const labels: Record<string,string> = { boxSize: '盒子尺寸', boxHeight: '盒子高度', moldArrangement: '模具排列', boxShape: '盒子形状', boxMaterial: '盒子材质', voltage: '电压', plug: '插头', brand: '品牌', optionalConfigs: '可选配置', configNote: '配置说明', extraMold: '额外模具' }
-  return Object.entries(labels).filter(([key]) => values[key] !== undefined && values[key] !== null && values[key] !== '').map(([key,label]) => ({ label, value: Array.isArray(values[key]) ? (values[key] as unknown[]).join('、') : typeof values[key] === 'boolean' ? values[key] ? '是' : '否' : String(values[key]) }))
+  // 顺序与建单抽屉一致：形状在前，尺寸在后。
+  // 只展示 boxSize / boxShapeNote / boxSizeNote —— 方形那两个数值（boxLengthMm/boxWidthMm）
+  // 与圆形直径是 boxSize 的构成项，给后端判「常规/订做」用的，不重复铺给人看。
+  const labels: Record<string,string> = { boxShape: '盒子形状', boxSize: '盒子尺寸', boxShapeNote: '盒子形状说明', boxSizeNote: '尺寸描述', boxHeight: '盒子高度', moldArrangement: '模具排列', boxMaterial: '盒子材质', voltage: '电压', plug: '插头', brand: '品牌', optionalConfigs: '可选配置', configNote: '配置说明', extraMold: '额外模具' }
+  return Object.entries(labels).filter(([key]) => values[key] !== undefined && values[key] !== null && values[key] !== '').map(([key,label]) => ({ label, value: key === 'boxShape' ? boxShapeLabel(values[key]) : Array.isArray(values[key]) ? (values[key] as unknown[]).join('、') : typeof values[key] === 'boolean' ? values[key] ? '是' : '否' : String(values[key]) }))
 })
 async function load() {
   const current = ++sequence

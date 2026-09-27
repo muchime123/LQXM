@@ -16,7 +16,7 @@ public class ManufacturingController {
     @GetMapping("/warehouses") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.inspect"})
     public List<Map<String,Object>> warehouses(){return service.warehouses();}
     /** 建单弹窗用：启用中的车间 + 默认制程（读权限即可，勿并入 /master/workshops——那是模板管理权限）。 */
-    @GetMapping("/workshop-options") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    @GetMapping("/workshop-options") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.manage"})
     public List<Map<String,Object>> workshopOptions(){return service.workshopOptions();}
     /**
      * 建单弹窗用：产品选择器（P3 ①：产品身份必须从主数据里选，不再打名字）。
@@ -81,9 +81,9 @@ public class ManufacturingController {
     @PutMapping("/orders/{id}/materials/{materialId}") @RequirePermission("manufacturing.material.manage") public long updateMaterial(@PathVariable long id,@PathVariable long materialId,@RequestBody com.liqiang.archive.service.ManufacturingMaterialService.RequirementRequest request){service.requireVisible(id);return materials.saveRequirement(id,materialId,request);}
     @PostMapping("/orders/{id}/material-issues") @RequirePermission("manufacturing.material.manage") public long issueMaterial(@PathVariable long id,@RequestBody com.liqiang.archive.service.ManufacturingMaterialService.MovementRequest request){service.requireVisible(id);return materials.move(id,"ISSUE",request);}
     @PostMapping("/orders/{id}/material-returns") @RequirePermission("manufacturing.material.manage") public long returnMaterial(@PathVariable long id,@RequestBody com.liqiang.archive.service.ManufacturingMaterialService.MovementRequest request){service.requireVisible(id);return materials.move(id,"RETURN",request);}
-    @GetMapping("/process-templates") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    @GetMapping("/process-templates") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.manage"})
     public List<Map<String,Object>> templates(){return execution.templates();}
-    @GetMapping("/execution-board") @RequirePermission("manufacturing.report")
+    @GetMapping("/execution-board") @RequirePermission({"manufacturing.report","manufacturing.inspect","manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public Map<String,Object> executionBoard(@RequestParam(defaultValue="")String keyword,@RequestParam(defaultValue="")String workshop,
             @RequestParam(defaultValue="")String state,@RequestParam(defaultValue="1")int page,@RequestParam(defaultValue="20")int size){
         return execution.executionBoard(keyword,workshop,state,page,size);
@@ -159,14 +159,14 @@ public class ManufacturingController {
     @PostMapping("/orders") @RequirePermission("manufacturing.manage")
     public long create(@RequestBody ManufacturingService.CreateOrder request,
             @RequestHeader(value="X-Request-Key",required=false) String requestKey){return service.create(request,requestKey);}
-    @GetMapping("/completion-receipts") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.receive","manufacturing.receive.reverse"})
+    @GetMapping("/completion-receipts") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.inspect","manufacturing.receive","manufacturing.receive.reverse"})
     public Map<String,Object> completionReceipts(@RequestParam(defaultValue="")String keyword,@RequestParam(defaultValue="")String status,
             @RequestParam(required=false)Long warehouseId,@RequestParam(defaultValue="")String operatorName,
             @RequestParam(defaultValue="")String dateFrom,@RequestParam(defaultValue="")String dateTo,
             @RequestParam(defaultValue="1")int page,@RequestParam(defaultValue="20")int size){
         return service.allReceipts(keyword,status,warehouseId,operatorName,dateFrom,dateTo,page,size);
     }
-    @GetMapping("/completion-receipts/{id}") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.receive","manufacturing.receive.reverse"})
+    @GetMapping("/completion-receipts/{id}") @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all","manufacturing.inspect","manufacturing.receive","manufacturing.receive.reverse"})
     public Map<String,Object> receiptDetail(@PathVariable long id){return service.receiptDetail(id);}
     @PostMapping("/completion-receipts/{id}/reverse") @RequirePermission("manufacturing.receive.reverse")
     public void reverseReceipt(@PathVariable long id,@RequestBody Map<String,String> request,

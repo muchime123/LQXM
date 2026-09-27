@@ -227,7 +227,7 @@ class ManufacturingNoProcessOrderMysqlTest {
     void createWithoutWorkshopAndWithoutProcessTemplateIsStillRejected() {
         runInRollbackTransaction(() -> {
             var request = new ManufacturingService.CreateOrder(null, null, "无制程客户", CATEGORY,
-                    null, null, null, null, new BigDecimal("1"), null, null, "SAMPLE", null, null, null, null);
+                    null, null, null, null, new BigDecimal("1"), null, null, "SAMPLE", null, null, null, null, null);
             var error = assertThrows(IllegalArgumentException.class,
                     () -> manufacturing.create(request, "noproc-create-5"));
             // ⚠️ 只断言「文案同时点出制程与产线」这两件事，**不钉整句措辞**。
@@ -273,7 +273,7 @@ class ManufacturingNoProcessOrderMysqlTest {
     private long createForWorkshop(long workshopId, String requestKey, BigDecimal quantity) {
         var request = new ManufacturingService.CreateOrder(null, null, "免报工客户-" + requestKey,
                 firstProductName(workshopId), null, null, null, null, quantity, null, "无工序建单验证", "SAMPLE",
-                null, workshopId, null, null);
+                null, workshopId, null, null, null);
         return manufacturing.create(request, requestKey);
     }
 

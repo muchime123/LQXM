@@ -26,7 +26,7 @@ export interface SalesOutboundItem {
 export interface SalesOutbound {
   id: number
   outboundNo: string
-  status: 'DRAFT' | 'POSTED' | 'REVERSED'
+  status: 'DRAFT' | 'POSTED' | 'REVERSED' | 'CANCELLED'
   customerId?: number | null
   customerName: string
   salespersonId?: number | null
@@ -34,6 +34,7 @@ export interface SalesOutbound {
   warehouseId: number
   warehouseName?: string
   salesOrderRef?: string | null
+  salesOrderId?: number | null
   outboundDate: string
   totalAmount?: number | null
   remark?: string | null
@@ -117,4 +118,8 @@ export const postSalesOutbound = async (id: number, requestKey?: string) => {
 
 export const reverseSalesOutbound = async (id: number, reason: string, requestKey?: string) => {
   await http.post(`/sales-outbounds/${id}/reverse`, { reason }, idemConfig(requestKey))
+}
+
+export const cancelSalesOutbound = async (id: number, reason: string, requestKey?: string) => {
+  await http.post(`/sales-outbounds/${id}/cancel`, { reason }, idemConfig(requestKey))
 }

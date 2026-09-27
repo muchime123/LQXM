@@ -155,10 +155,10 @@
         <el-table-column prop="requiredCompletionDate" label="要求完成" width="120" :formatter="dateCell" />
         <el-table-column prop="salespersonName" label="业务员" width="100" show-overflow-tooltip />
         <el-table-column prop="componentCount" label="制程明细" width="100" align="center" />
-        <el-table-column label="操作" width="125" fixed="right" align="center">
+        <el-table-column label="操作" width="180" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="canFollowUp" link type="primary" size="small" @click="followUpRouter.push({ path: '/production-followups', query: { sourceId: String(row.id) } })">跟单</el-button>
+            <el-button v-if="canExecute" link type="primary" size="small" @click="followUpRouter.push({ path: '/h3-production-execution', query: { sourceId: String(row.id) } })">查看执行</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -852,7 +852,7 @@ import type { H3LedgerKind, LedgerDetailResult, LedgerRow } from '@/api/business
 
 const followUpRouter = useRouter()
 const { can: canFollowUpPermission } = useCurrentUser()
-const canFollowUp = computed(() => ['manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'].some(canFollowUpPermission))
+const canExecute = computed(() => ['manufacturing.report', 'manufacturing.report.override', 'manufacturing.inspect', 'manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'].some(canFollowUpPermission))
 
 /** initialKeyword：从外部深链（如出库单详情 → 本页台账）带入的初始搜索词，仅挂载时生效一次 */
 const props = defineProps<{ ledgerType: H3LedgerKind; initialKeyword?: string }>()

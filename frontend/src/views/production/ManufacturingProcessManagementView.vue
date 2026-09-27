@@ -9,13 +9,10 @@
       <div class="master-actions">
         <el-button @click="workshopDrawerOpen=true">车间管理</el-button>
         <el-button @click="operationDrawerOpen=true">工序库</el-button>
-        <el-button @click="taskConfigDrawerOpen=true">任务单产品与配置</el-button>
+        <el-button @click="openTaskConfigs">任务单产品与配置</el-button>
       </div>
     </header>
 
-    <el-drawer v-model="taskConfigDrawerOpen" title="任务单产品与配置" size="min(1100px, 92vw)" destroy-on-close>
-        <ManufacturingTaskConfigPanel />
-    </el-drawer>
     <el-drawer v-model="workshopDrawerOpen" title="车间管理" size="min(900px, 92vw)" destroy-on-close @closed="loadTemplates">
         <ManufacturingWorkshopPanel />
     </el-drawer>
@@ -291,7 +288,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import ManufacturingTaskConfigPanel from '@/components/production/ManufacturingTaskConfigPanel.vue'
+import { useRouter } from 'vue-router'
 import ManufacturingWorkshopPanel from '@/components/production/ManufacturingWorkshopPanel.vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
@@ -329,7 +326,9 @@ const categoryTagType = (v: string): 'info' | 'warning' | 'success' | 'primary' 
   return 'info'
 }
 
-const taskConfigDrawerOpen=ref(false)
+// 「任务单产品与配置」已独立成页（/manufacturing-task-configs），本页只保留入口按钮。
+const router=useRouter()
+const openTaskConfigs=()=>router.push('/manufacturing-task-configs')
 const workshopDrawerOpen=ref(false)
 const operationDrawerOpen=ref(false)
 
