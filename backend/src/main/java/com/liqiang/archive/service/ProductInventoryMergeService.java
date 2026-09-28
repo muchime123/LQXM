@@ -21,6 +21,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -205,6 +206,142 @@ public class ProductInventoryMergeService {
                 .forEach(stockRows::add);
 
         return doMerge(productMap, stockRows);
+    }
+
+    /** 代发仓：{@code DROP_SHIP} 不持有实物库存，期初不进账（决策 {@code #38}⑥）。 */
+    public static final String DROP_SHIP_WAREHOUSE = "代发仓";
+
+    /**
+     * 开账干跑（决策 {@code #38}）：产出「切换日 T 开账会发生什么」的对账清单。<b>只读，不写任何表。</b>
+     *
+     * <p><b>为什么复用 {@link #preview()} 而不是另写一套</b>：预览里包含了「费用项过滤 → 数量异常入
+     * REVIEW → 身份解析降级链 → 按 (仓库,解析后产品) 聚合 → 新增/更新/忽略判定」的全部分支，重写一份
+     * 必然与它漂移（铁律：同一业务口径禁两套实现）。故此处只在其结果上套 #38 的口径。
+     *
+     * <p><b>#38 与现状 preview 的口径差异（干跑必须报出来，否则 T 日会少开账）</b>：
+     * <ol>
+     *   <li><b>代发仓不进账</b>（#38⑥）：preview 不区分仓库，此处后置剔除；</li>
+     *   <li><b>缺价与编号对不上：金额置 null、行仍进账</b>（#38⑤）：preview 会判
+     *       {@code PRICE_MISSING}/{@code PRODUCT_NOT_FOUND} 为 REVIEW 拦下 —— 与 #38 相反。
+     *       此处把它们单列为 {@code policyGaps}（<b>不擅自改 confirm 行为</b>），供 T 日前决断。</li>
+     * </ol>
+     *
+     * <p><b>务必注意</b>：{@code policyGaps} 里的行按 #38 是「进账的」，但当前 {@code confirm}
+     * 会跳过它们。若 T 日直接执行 confirm 而不先处理，期初将<b>静默少开这批行</b>。
+     *
+     * @return {@code policy}（口径声明）/ {@code summary}（计数与金额）/{@code opening}（进账明细）/
+     *         {@code policyGaps}（口径缺口，全量）/ {@code blocked}（真异常）/ {@code excluded}（不进账）
+     */
+    public Map<String, Object> openingPreflight() {
+        MergePreview preview = preview();
+
+        List<Map<String, Object>> opening = new ArrayList<>();
+        List<Map<String, Object>> policyGaps = new ArrayList<>();
+        List<Map<String, Object>> blocked = new ArrayList<>();
+        List<Map<String, Object>> excluded = new ArrayList<>();
+        Set<String> openingProducts = new LinkedHashSet<>();
+        Set<String> gapProducts = new LinkedHashSet<>();
+        BigDecimal openingAmount = BigDecimal.ZERO;
+        int dropShipRows = 0, dropShipPositiveRows = 0, notPositiveRows = 0, nullIdentityRows = 0;
+
+        for (MergedItem it : preview.items()) {
+            Map<String, Object> row = openingRowOf(it);
+
+            // #38④ 名称 / 编号 为 NULL：费用判据（含 ProductFeeFilter 的编号兜底）覆盖不到 →
+            //   挂异常清单，不进账。三值逻辑会让这类行从一切「= / <> 比较」里静默漏网
+            //   （实测进账集外仍有 1 行有量的 NULL 行：编号 295QZDQTJ、缺名称）。
+            if (it.productName() == null || trim(it.productName()).isEmpty()
+                    || it.productCode() == null || trim(it.productCode()).isEmpty()) {
+                row.put("disposition", "EXCLUDED_NULL_IDENTITY");
+                excluded.add(row);
+                nullIdentityRows++;
+                continue;
+            }
+
+            // #38⑥ 代发仓：DROP_SHIP 不持有库存 → 不进账
+            if (DROP_SHIP_WAREHOUSE.equals(trim(it.warehouse()))) {
+                row.put("disposition", "EXCLUDED_DROP_SHIP");
+                excluded.add(row);
+                dropShipRows++;
+                if (it.quantity() != null && it.quantity().signum() > 0) dropShipPositiveRows++;
+                continue;
+            }
+            // #38③ 只开有数的行：零 / 负 / 数量缺失一律不进账
+            if (it.quantity() == null || it.quantity().signum() <= 0) {
+                row.put("disposition", "EXCLUDED_NOT_POSITIVE");
+                excluded.add(row);
+                notPositiveRows++;
+                continue;
+            }
+            // #38⑤ 缺价 / 编号对不上产品目录：金额置 null、行仍进账
+            if ("PRICE_MISSING".equals(it.issue()) || "PRODUCT_NOT_FOUND".equals(it.issue())) {
+                row.put("disposition", "POLICY_GAP_AMOUNT_NULL");
+                row.put("stockAmount", null);
+                policyGaps.add(row);
+                gapProducts.add(trim(it.productCode()));
+                continue;
+            }
+            // 其余 REVIEW：真异常（身份歧义 / 仓库缺失等），T 日也不该进账
+            if (!"READY".equals(it.status())) {
+                row.put("disposition", "BLOCKED_" + (it.issue() == null ? "UNKNOWN" : it.issue()));
+                blocked.add(row);
+                continue;
+            }
+            // 按 #38 会进账
+            row.put("disposition", "OPENING");
+            opening.add(row);
+            openingProducts.add(trim(it.productCode()));
+            if (it.stockAmount() != null) openingAmount = openingAmount.add(it.stockAmount());
+        }
+
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("openingRows", opening.size());
+        summary.put("openingProducts", openingProducts.size());
+        summary.put("openingAmount", openingAmount.setScale(2, RoundingMode.HALF_UP));
+        summary.put("policyGapRows", policyGaps.size());
+        summary.put("policyGapProducts", gapProducts.size());
+        summary.put("blockedRows", blocked.size());
+        summary.put("excludedRows", excluded.size());
+        summary.put("excludedDropShip", dropShipRows);
+        summary.put("excludedDropShipPositive", dropShipPositiveRows);
+        summary.put("excludedNotPositive", notPositiveRows);
+        summary.put("excludedNullIdentity", nullIdentityRows);
+        summary.put("previewTotalRows", preview.totalCount());
+        summary.put("previewReadyRows", preview.readyCount());
+        summary.put("previewReviewRows", preview.reviewCount());
+        summary.put("previewSkippedFee", preview.skippedFee());
+        summary.put("previewSkippedZero", preview.skippedZero());
+        summary.put("snapshotTime", preview.snapshotTime());
+
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("policy", List.of(
+                "只开数量 > 0 的行（决策 #38③）",
+                "代发仓不进账（决策 #38⑥）",
+                "费用/非产品项按 ProductFeeFilter 剔除（唯一实现）",
+                "缺价与编号对不上：金额置 null、行仍进账（决策 #38⑤）"));
+        result.put("summary", summary);
+        result.put("opening", opening);
+        result.put("policyGaps", policyGaps);
+        result.put("blocked", blocked);
+        result.put("excluded", excluded);
+        return result;
+    }
+
+    /** 干跑行：只暴露对账需要的列，避免把内部聚合细节泄进接口。 */
+    private static Map<String, Object> openingRowOf(MergedItem it) {
+        Map<String, Object> row = new LinkedHashMap<>();
+        row.put("warehouse", it.warehouse());
+        row.put("productCode", it.productCode());
+        row.put("productName", it.productName());
+        row.put("specification", it.specification());
+        row.put("unit", it.unit());
+        row.put("quantity", it.quantity());
+        row.put("purchasePrice", it.purchasePrice());
+        row.put("stockAmount", it.stockAmount());
+        row.put("status", it.status());
+        row.put("issue", it.issue());
+        row.put("sourceRows", it.sourceRows());
+        return row;
     }
 
     private MergePreview doMerge(Map<String, ProductInfo> productMap, List<StockRow> stockRows) {
