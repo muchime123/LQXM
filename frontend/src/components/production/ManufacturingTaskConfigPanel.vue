@@ -38,7 +38,7 @@
             默认制程
             <el-tag v-if="current.defaultTemplateName" size="small" effect="plain">{{ current.defaultTemplateName }}</el-tag>
             <el-tag v-else size="small" type="danger" effect="plain">未设置</el-tag>
-            <span v-if="!current.defaultTemplateName" class="note">该产线的产品若未指定专属制程，建单时必须显式选择制程</span>
+            <span v-if="!current.defaultTemplateName" class="note">请维护产线默认制程或产品专属制程，建单时自动匹配</span>
           </p>
         </div>
         <div class="detail-stats">
@@ -74,9 +74,10 @@
             <el-table-column label="启用" width="72">
               <template #default="{ row }"><el-switch v-model="row.active" size="small" /></template>
             </el-table-column>
-            <el-table-column label="操作" width="72" fixed="right">
+            <el-table-column label="操作" width="150" fixed="right">
               <template #default="{ row }">
                 <el-button link type="primary" :loading="saving === row.id" @click="save(row)">保存</el-button>
+                <el-button link type="primary" @click="ruleEditor?.show(row.id)">配置规则</el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -117,6 +118,7 @@
 
     <el-empty v-else description="没有可维护的生产车间" />
 
+    <ProductConfigurationRuleDialog ref="ruleEditor" />
     <!-- ==================== 新增配置 ==================== -->
     <el-dialog v-model="dialogOpen" :title="createForm.configType === 'PRODUCT_NAME' ? '新增产品名称' : '新增可选配置'" width="min(520px, calc(100vw - 32px))">
       <el-form label-width="92px">
@@ -146,8 +148,10 @@
 import { computed, onMounted, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { http } from '@/api/http'
+import ProductConfigurationRuleDialog from './ProductConfigurationRuleDialog.vue'
+const ruleEditor = ref<InstanceType<typeof ProductConfigurationRuleDialog>>()
 
-interface Config { id: number; configName: string; workshopName: string; configType: string; active: boolean; processTemplateId: number | null }
+interface Config { id: number; workshopId: number; configCode: string; configName: string; workshopName: string; configType: string; active: boolean; processTemplateId: number | null }
 interface Workshop { id: number; workshopName: string; enabled: boolean; defaultProcessTemplateId: number | null }
 interface Template { id: number; templateName: string; active: boolean }
 
@@ -160,7 +164,7 @@ const saving = ref<number | null>(null)
 
 /** 车间卡片：把配置按 workshop_name 归到各产线下（后端返回的配置不带 workshopId，车间名唯一且改名会级联）。 */
 const workshopCards = computed(() => workshops.value.map(w => {
-  const mine = configs.value.filter(c => c.workshopName === w.workshopName)
+  const mine = configs.value.filter(c => c.workshopId === w.id)
   const products = mine.filter(c => c.configType === 'PRODUCT_NAME')
   const ownConfigs = mine.filter(c => c.configType !== 'PRODUCT_NAME')
   return {

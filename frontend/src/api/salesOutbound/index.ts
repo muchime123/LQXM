@@ -9,6 +9,9 @@ import { http } from '../http'
  */
 
 export interface SalesOutboundItem {
+  salesOrderItemId?: number
+  sourceLotNo?: string
+  sourcePurchaseNo?: string
   id?: number
   lineNo?: number
   salesProductId: number
@@ -106,8 +109,9 @@ export const fetchSalesOutboundWarehouses = async () =>
 export const fetchAvailableStock = async (params: { keyword?: string; warehouseId?: number; limit?: number }) =>
   (await http.get<AvailableStock[]>('/sales-outbounds/available-stock', { params })).data
 
-export const createSalesOutbound = async (payload: OutboundPayload, requestKey?: string) =>
-  (await http.post<number>('/sales-outbounds', payload, idemConfig(requestKey))).data
+// ⚠️ 没有 `createSalesOutbound`：出库单**不能直接新建**，只有两个合法来源 ——
+//   ① 销售订单明细的「办理发货」（`createOrderOutboundDraft`）、② 采购订单的代发（`createDropShipOutbound`）。
+//   服务端 `POST /sales-outbounds` 也已显式返回 405。没有来源批次的出库单无法回写需求，会制造"孤儿出库"。
 
 export const updateSalesOutbound = async (id: number, payload: OutboundPayload, requestKey?: string) =>
   (await http.put<number>(`/sales-outbounds/${id}`, payload, idemConfig(requestKey))).data

@@ -1,6 +1,11 @@
 import 'vue-router'
 
-export type RouteGroup = 'h3' | 'sales' | 'production' | 'inventory' | 'settlement' | 'product' | 'marketing' | 'system'
+/**
+ * 业务分组。拆应用（2026-09-29）后收敛为实际在用的五个：
+ * 原先还列着 sales / production / inventory / settlement 四个分组，
+ * 但全仓已无任何路由或导航项使用它们 —— 枚举与实现漂移，已删除。
+ */
+export type RouteGroup = 'erp' | 'h3' | 'product' | 'marketing' | 'system'
 
 declare module 'vue-router' {
   interface RouteMeta {

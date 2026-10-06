@@ -2,6 +2,8 @@ import { http } from '../http'
 import type { ApprovalStatus, ApprovalEntry } from '../approval'
 
 export interface ManufacturingOrder {
+  approvalBasis?: string
+  salesOrderItemId?: number | null
   externalSource?: string
   externalId?: string
   h3WorkOrderNo?: string
@@ -12,6 +14,8 @@ export interface ManufacturingOrder {
   customerNameSnapshot: string
   salespersonNameSnapshot?: string
   productNameSnapshot: string
+  processCategorySnapshot?: string | null
+  skuKeySnapshot?: string | null
   productModelId?: number
   productMachineTierId?: number
   productModelNameSnapshot?: string
@@ -83,10 +87,12 @@ export interface ManufacturingOutput {
   manufacturingOrderId: number
   lineNo: number
   isPrimary: boolean
-  salesProductId: number
-  canonicalProductId: number
+  salesProductId?: number | null
+  canonicalProductId?: number | null
   productCodeSnapshot?: string
   productNameSnapshot: string
+  skuKey?: string | null
+  identityStatus?: 'RESOLVED' | 'PENDING_PRODUCT' | 'PENDING_REVIEW' | 'NON_STANDARD'
   specificationSnapshot?: string
   unit: string
   plannedQuantity: number
@@ -100,6 +106,7 @@ export interface ManufacturingOutput {
 /** 收货明细行（P3 ②）：按产出清单逐项填实际数量（outputId 指向清单行）。 */
 export interface ReceiptItem { outputId: number; quantity: number; unitCost?: number; remark?: string }
 export interface ManufacturingDetail {
+  salesDemand?: { orderId: number; orderNo: string; itemId: number } | null
   order: ManufacturingOrder
   outputs: ManufacturingOutput[]
   receipts: Record<string, unknown>[]
@@ -262,6 +269,16 @@ export const fetchCompletionReceiptDetail = async (id:number) =>
   (await http.get<{ receipt:CompletionReceipt; lots:FinishedGoodsLot[]; movements:Array<Record<string,unknown>> }>(`/manufacturing/completion-receipts/${id}`)).data
 export const reverseCompletionReceipt = async (id:number,reason:string,requestKey?:string) =>
   { await http.post(`/manufacturing/completion-receipts/${id}/reverse`,{ reason },idemConfig(requestKey)) }
+/**
+ * 作废生产任务单 —— 接错单的回收通道。
+ *
+ * 可作废判据按**事实**判而不是按状态判（「待完工检验」意味着工序已全部完成、已有报工）：
+ * 有报工 / 有完工入库单 / 有未退回领料 / 有未取消的关联出库单，任一成立即拒绝，
+ * 并告诉用户是哪一条、下一步该做什么。作废后该销售明细回到「待下达生产需求」，可重新下达。
+ * 权限复用 `manufacturing.manage`。
+ */
+export const voidManufacturingOrder = async (id:number,reason:string,requestKey?:string) =>
+  { await http.post(`/manufacturing/orders/${id}/void`,{ reason },idemConfig(requestKey)) }
 export const fetchManufacturingAssignees = async () =>
   (await http.get<ManufacturingAssignee[]>('/manufacturing/assignees')).data
 export const fetchManufacturingMaterials=async(id:number)=>(await http.get<ManufacturingMaterials>(`/manufacturing/orders/${id}/materials`)).data

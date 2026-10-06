@@ -5,10 +5,8 @@
     联动纪律：先选产线与产品名称，制程跟随「任务单产品与配置」中产品绑定的制程，
               未单独绑定时取产线默认制程；该产线的「产品名称 / 可选配置」才可选
               （数据源 = 制程与工序管理 → 任务单产品与配置）。
-    建单纪律：产品名称即后端的 processCategory；制程由后端统一解析。
-              09-22 起**不再要求选可售产品（SKU）** —— SKU 是完工入库的库存身份键，
-              不是下单字段，且该主数据要重新设计；下单只带 产线 + 产品名称 + 配置 + 数量，
-              单位默认「台」（后端兜底）。无 SKU 的工单完工收货时不落库存账，只登记收货事实。
+    建单纪律：用户选择的是制程品类；后端根据配置统一生成规范产品名称和 skuKey。
+              建单不要求先选库存产品，正式产品身份在完工入库前确认；单位默认「台」（后端兜底）。
   -->
   <el-drawer v-model="visible" :title="configureOnly ? '生产任务单 · 配置销售需求' : '生产任务单'" :size="drawerSize" :close-on-click-modal="!submitting"
     :close-on-press-escape="!submitting" :show-close="!submitting" :before-close="beforeClose" @open="onOpen">
@@ -86,61 +84,57 @@
             尺寸的形态规范（方=长x宽 / 圆=裸直径 / 其他=不进比对）统一在 @/utils/boxSize，
             前端不在这里自己拼尺寸文本。
           -->
+          <template v-if="productKind !== 'PART'">
           <el-form-item label="盒子形状" prop="boxShape" class="span-2">
-            <el-radio-group v-model="form.boxShape" @change="onShapeChange">
-              <el-radio v-for="s in BOX_SHAPES" :key="s.value" :value="s.value">{{ s.label }}</el-radio>
-            </el-radio-group>
+            <ProductionConfigurationField v-model="form.boxShape" field="boxShape" @change="onShapeChange" />
           </el-form-item>
           <template v-if="form.boxShape === 'RECT'">
             <el-form-item label="盒子长（mm）" prop="boxLengthMm">
-              <el-input v-model="form.boxLengthMm" placeholder="较大的一边，最多 2 位小数" maxlength="20" />
-            </el-form-item>
+            <ProductionConfigurationField v-model="form.boxLengthMm" field="boxLengthMm" />
+          </el-form-item>
             <el-form-item label="盒子宽（mm）" prop="boxWidthMm">
-              <el-input v-model="form.boxWidthMm" placeholder="较小的一边，最多 2 位小数" maxlength="20" />
-            </el-form-item>
+            <ProductionConfigurationField v-model="form.boxWidthMm" field="boxWidthMm" />
+          </el-form-item>
           </template>
           <template v-else-if="form.boxShape === 'ROUND'">
             <el-form-item label="盒子直径（mm）" prop="boxDiameterMm">
-              <el-input v-model="form.boxDiameterMm" placeholder="正数，最多 2 位小数" maxlength="20" />
-            </el-form-item>
+            <ProductionConfigurationField v-model="form.boxDiameterMm" field="boxDiameterMm" />
+          </el-form-item>
           </template>
           <template v-else-if="form.boxShape === 'OTHER'">
             <el-form-item label="盒子形状说明" prop="boxShapeNote">
-              <el-input v-model="form.boxShapeNote" placeholder="如：六角形 / 心形" maxlength="50" />
-            </el-form-item>
+            <ProductionConfigurationField v-model="form.boxShapeNote" field="boxShapeNote" />
+          </el-form-item>
             <el-form-item label="尺寸描述" prop="boxSizeNote">
-              <el-input v-model="form.boxSizeNote" placeholder="如：对边 120mm" maxlength="100" />
-            </el-form-item>
+            <ProductionConfigurationField v-model="form.boxSizeNote" field="boxSizeNote" />
+          </el-form-item>
             <el-alert class="span-2 to-tip" type="warning" :closable="false" show-icon
               title="异形盒子车间没有常规尺寸模具，需要按订做安排。" />
           </template>
           <el-form-item label="盒子高度" prop="boxHeight">
-            <el-input v-model="form.boxHeight" placeholder="请输入" maxlength="50" />
+            <ProductionConfigurationField v-model="form.boxHeight" field="boxHeight" />
           </el-form-item>
           <el-form-item label="模具排列" prop="moldArrangement">
-            <el-select v-model="form.moldArrangement" filterable allow-create default-first-option
-              placeholder="请选择或输入" class="full">
-              <el-option v-for="m in MOLD_ARRANGEMENTS" :key="m" :value="m" :label="m" />
-            </el-select>
+            <ProductionConfigurationField v-model="form.moldArrangement" field="moldArrangement" />
           </el-form-item>
+          </template>
+          <template v-if="productKind === 'MACHINE'">
           <el-form-item label="盒子材质" prop="boxMaterial">
-            <el-input v-model="form.boxMaterial" placeholder="请输入" maxlength="100" />
+            <ProductionConfigurationField v-model="form.boxMaterial" field="boxMaterial" />
           </el-form-item>
           <el-form-item label="电压" prop="voltage">
-            <el-radio-group v-model="form.voltage">
-              <el-radio v-for="v in VOLTAGES" :key="v" :value="v">{{ v }}</el-radio>
-            </el-radio-group>
+            <ProductionConfigurationField v-model="form.voltage" field="voltage" />
           </el-form-item>
           <el-form-item label="插头" prop="plug">
-            <el-radio-group v-model="form.plug">
-              <el-radio v-for="p in PLUGS" :key="p" :value="p">{{ p }}</el-radio>
-            </el-radio-group>
+            <ProductionConfigurationField v-model="form.plug" field="plug" />
           </el-form-item>
           <el-form-item label="品牌" prop="brand">
-            <el-radio-group v-model="form.brand">
-              <el-radio v-for="b in BRANDS" :key="b" :value="b">{{ b }}</el-radio>
-            </el-radio-group>
+            <ProductionConfigurationField v-model="form.brand" field="brand" />
           </el-form-item>
+          </template>
+          <template v-for="(label,key) in extraFields" :key="key">
+            <el-form-item v-if="productKind === 'PART' ? ['specificName','compatibleModel','partSpecification'].includes(String(key)) : productKind === 'MOLD' && ['compatibleModel','moldType','drawingVersion'].includes(String(key))" :label="label"><ProductionConfigurationField v-model="extraConfig[key]" :field="key as ProductionConfigFieldKey" /></el-form-item>
+          </template>
           <el-form-item label="可选配置" class="span-2">
             <el-select v-model="form.optionalConfigs" multiple filterable :disabled="!form.workshopId" class="full"
               :placeholder="form.workshopId ? '可多选' : '先选择产线'">
@@ -148,17 +142,15 @@
             </el-select>
           </el-form-item>
           <el-form-item label="是否需要额外模具" prop="extraMold">
-            <el-radio-group v-model="form.extraMold">
-              <el-radio value="yes">是</el-radio>
-              <el-radio value="no">否</el-radio>
-            </el-radio-group>
+            <ProductionConfigurationField v-model="form.extraMold" field="extraMold" />
           </el-form-item>
           <el-form-item label="填写配置说明" class="span-2">
-            <el-input v-model="form.configNote" type="textarea" :rows="2" maxlength="500" show-word-limit />
+            <ProductionConfigurationField v-model="form.configNote" field="configNote" />
           </el-form-item>
         </div>
       </section>
 
+      <el-alert v-if="namePreview" :title="namePreview.namePreview || '名称待完善'" :description="[namePreview.specificationPreview, ...Object.values(namePreview.fieldErrors), ...namePreview.confirmationItems].join('；')" :type="namePreview.completionState === 'COMPLETE' ? 'success' : 'warning'" :closable="false"/>
       <section v-if="!configureOnly" class="to-block">
         <h3>额外信息</h3>
         <el-form-item label="备注">
@@ -178,7 +170,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import ProductionConfigurationField from './ProductionConfigurationField.vue'
+import type { ProductionConfigFieldKey } from '@/constants/productionConfiguration'
 import { ElMessage, type FormInstance, type FormRules } from 'element-plus'
 import { fetchCustomers } from '@/api/customer/customer'
 import {
@@ -186,10 +180,11 @@ import {
   newRequestKey, type ProcessTemplate, type WorkshopOption
 } from '@/api/manufacturing'
 import {
-  BOX_SHAPES, boxRectSides, boxSizeFieldProblem, boxSizeProblem, boxSizeText, specificationText, tidyMm,
+  boxRectSides, boxSizeFieldProblem, boxSizeProblem, boxSizeText, specificationText, tidyMm,
   type BoxShape, type BoxSizeFields
 } from '@/utils/boxSize'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
+import { configurationDirectory, configurationRule, previewConfiguration, type ConfigRule, type DirectoryProduct, type NamePreview } from '@/api/productConfiguration'
 import type { ProductionDemandConfig } from '@/api/salesOrder'
 import { fetchOrderProductionWorkshops, fetchOrderProductionOptions } from '@/api/salesOrder'
 
@@ -208,7 +203,7 @@ interface TaskOrderPreset {
 }
 
 const props = defineProps<{ modelValue: boolean; preset?: TaskOrderPreset | null; mode?: 'create' | 'configure'; initial?: ProductionDemandConfig | null }>()
-const emit = defineEmits<{ 'update:modelValue': [value: boolean]; created: [id: number]; configured: [config: ProductionDemandConfig, specification: string] }>()
+const emit = defineEmits<{ 'update:modelValue': [value: boolean]; created: [id: number]; configured: [config: ProductionDemandConfig, specification: string, displayName: string] }>()
 const configureOnly = computed(() => props.mode === 'configure')
 
 interface CustomerOption { id: number; name: string }
@@ -225,10 +220,6 @@ const TASK_TYPES = [
   { value: 'REWORK', label: '返工' },
   { value: 'REPLACEMENT', label: '返工替换' }
 ]
-const MOLD_ARRANGEMENTS = ['1出1', '1出2', '2出1', '2出2', '1出4', '4出1', '其他']
-const VOLTAGES = ['单相110V', '单相220V', '三相220V', '三相380V']
-const PLUGS = ['国标', '欧标', '英标', '美标', '其他']
-const BRANDS = ['利强品牌', '中性', '其他']
 
 /** 窄屏按视口收窄，宽屏固定 920px —— 避免小屏上抽屉比屏幕还宽。 */
 const drawerSize = computed(() => (typeof window !== 'undefined' && window.innerWidth < 960 ? '96vw' : '920px'))
@@ -263,6 +254,25 @@ const noOpsTemplate = computed(() =>
     : selectedTemplate.value?.operationCount === 0 ? selectedTemplate.value.templateName : '')
 const customerOptions = ref<CustomerOption[]>([])
 const customerLoading = ref(false)
+const directory = ref<DirectoryProduct[]>([])
+const namingRule = ref<ConfigRule>()
+const namePreview = ref<NamePreview>()
+const ruleLoading = ref(false)
+const directoryFailed = ref(false)
+let ruleSequence = 0, previewSequence = 0
+const extraFields: Record<string,string> = {specificName:'配件名称',compatibleModel:'适配型号',moldType:'模具类型',drawingVersion:'图纸版本',partSpecification:'配件规格'}
+const extraConfig = reactive<Record<string,string>>({specificName:'',compatibleModel:'',moldType:'',drawingVersion:'',partSpecification:''})
+const productKind = computed(() => namingRule.value?.definition.productType || 'MACHINE')
+function namingInput() { return {...form,...extraConfig, extraMold:form.extraMold==='yes', optionIds:namingRule.value?.definition.options.filter(o => form.optionalConfigs.includes(namingRule.value!.labels.optionNames[o.optionId])).map(o=>o.optionId) || []} }
+async function loadNamingRule(pinned?:number) {
+  const seq=++ruleSequence; ruleLoading.value=false; previewSequence++; namingRule.value=undefined; namePreview.value=undefined
+  const p=directory.value.find(p=>p.name===form.productName)
+  if(!p || !(pinned || p.ruleId))return
+  ruleLoading.value=true
+  try {const r=await configurationRule(p.id,pinned || p.ruleId!); if(seq===ruleSequence){namingRule.value=r; configOptions.value=Object.values(r.labels.optionNames)}}
+  catch {if(seq===ruleSequence){directoryFailed.value=true; ElMessage.error('产品规则加载失败，请重新选择产线')}}
+  finally {if(seq===ruleSequence)ruleLoading.value=false}
+}
 const submitting = ref(false)
 /** 请求键：打开抽屉时生成，提交失败保留（重试复用同一次动作），提交成功作废。 */
 let requestKey = ''
@@ -344,7 +354,7 @@ const sizeField = (field: keyof BoxSizeFields) => ({
   trigger: ['blur', 'change'] as const
 })
 
-const rules: FormRules = {
+const legacyRules: FormRules = {
   dueDate: required,
   taskType: required,
   customerName: { validator: (_rule, value: string, callback: (error?: Error) => void) => {
@@ -368,6 +378,22 @@ const rules: FormRules = {
   plug: required,
   brand: required
 }
+
+const rules = computed<FormRules>(() => {
+ if(!namingRule.value)return legacyRules
+ const r={...legacyRules}; for(const key of ['boxShape','boxLengthMm','boxWidthMm','boxDiameterMm','boxShapeNote','boxSizeNote','boxHeight','moldArrangement','boxMaterial','voltage','plug','brand']) delete r[key]
+ for(const key of namingRule.value.definition.requiredFields) r[key]=required
+ if(productKind.value !== 'PART') for(const key of ['boxShape','boxLengthMm','boxWidthMm','boxDiameterMm','boxShapeNote','boxSizeNote'] as const) r[key]=sizeField(key)
+ return r
+})
+
+watch(() => JSON.stringify(namingInput()), async (_v,_old,onCleanup) => {
+  const seq=++previewSequence; namePreview.value=undefined
+  if(!namingRule.value)return
+  const r=namingRule.value
+  const timer=setTimeout(async()=>{try {const result=await previewConfiguration(r.baseProductId,r.id,namingInput()); if(seq===previewSequence)namePreview.value=result}catch {if(seq===previewSequence)namePreview.value=undefined}},300)
+  onCleanup(()=>clearTimeout(timer))
+})
 
 function resetForm() {
   Object.assign(form, blankForm())
@@ -418,6 +444,8 @@ async function onOpen() {
 
 /** 产线联动：换产线必须清掉上一个产线的产品名称与可选配置，并重取本产线可选项。 */
 async function onWorkshopChange(workshopId: number) {
+  ruleSequence++; previewSequence++; namingRule.value=undefined; namePreview.value=undefined; directory.value=[]; directoryFailed.value=false; ruleLoading.value=false
+  Object.keys(extraConfig).forEach(k=>extraConfig[k]='')
   form.productName = ''
   form.processTemplateId = null
   form.optionalConfigs = []
@@ -436,21 +464,25 @@ async function onWorkshopChange(workshopId: number) {
       ? (options as Awaited<ReturnType<typeof fetchOrderProductionOptions>>).productTemplateNames
       : {}
     configOptions.value = options.optionalConfigs
+    try {directory.value=(await configurationDirectory(workshopId)).products} catch {directoryFailed.value=true; ElMessage.error('产品规则目录加载失败，请重新选择产线')}
   } catch {
     ElMessage.error('该产线的产品名称与可选配置加载失败，请重新选择产线')
   }
 }
 
-function onProductChange() {
+async function onProductChange() {
   const productTemplate = productTemplates.value[form.productName]
   form.processTemplateId = productTemplate ?? workshops.value.find(w => w.id === form.workshopId)?.defaultProcessTemplateId ?? null
+  await loadNamingRule()
 }
 
 async function applyInitial(config: ProductionDemandConfig) {
   form.workshopId = config.workshopId
   await onWorkshopChange(config.workshopId)
   form.productName = config.productName
-  onProductChange()
+  await onProductChange()
+  if(config.configRuleId) await loadNamingRule(config.configRuleId)
+  Object.keys(extraConfig).forEach(k=>extraConfig[k]=String(config[k as keyof ProductionDemandConfig] || ''))
   const legacyShape = config.boxShape === '方形' ? 'RECT' : config.boxShape === '圆形' ? 'ROUND' : config.boxShape === '异形' ? 'OTHER' : config.boxShape
   form.boxShape = ['RECT', 'ROUND', 'OTHER'].includes(legacyShape) ? legacyShape as BoxShape : 'OTHER'
   const rectSides = (config.boxSize || '').split(/[xX×*]/).map(side => side.trim())
@@ -491,11 +523,12 @@ function onCustomerChange(name: string) {
 }
 
 async function submit(createNext: boolean) {
+  if(ruleLoading.value || directoryFailed.value){ElMessage.error('请等待规则加载完成或重新选择产线'); return}
   try {
     await formRef.value?.validate()
   } catch { return }
   // 兜底：尺寸字段按形状渲染，这里再按形状整体校一次，避免漏网
-  const sizeProblem = boxSizeProblem(sizeFields())
+  const sizeProblem = productKind.value === 'PART' ? '' : boxSizeProblem(sizeFields())
   if (sizeProblem) { ElMessage.error(sizeProblem); return }
   if (submitting.value) return
   submitting.value = true
@@ -535,8 +568,18 @@ async function submit(createNext: boolean) {
       extraMold: form.extraMold === 'yes',
       ...sizeConfig
     }
+    let specification=specificationText(fields, form.boxHeight)
+    if(namingRule.value){
+      const r=namingRule.value; const input=namingInput(); const preview=await previewConfiguration(r.baseProductId,r.id,input)
+      namePreview.value=preview
+      if(Object.keys(preview.fieldErrors).length){ElMessage.error(Object.values(preview.fieldErrors).join('；')); return}
+      Object.assign(productConfig,extraConfig,{baseProductId:r.baseProductId,configRuleId:r.id,optionIds:input.optionIds})
+      specification=preview.specificationPreview
+    }
     if (configureOnly.value) {
-      emit('configured', productConfig, specificationText(fields, form.boxHeight))
+      const displayName = namePreview.value?.namePreview || form.productName
+      productConfig.nameSnapshot = displayName
+      emit('configured', productConfig, specification, displayName)
       visible.value = false
       return
     }
@@ -545,7 +588,7 @@ async function submit(createNext: boolean) {
       customerId: form.customerId,
       // 由销售订单明细行发起时带上行 id：后端落 manufacturing_orders.sales_order_item_id（唯一）
       salesOrderItemId: salesOrderItemId.value,
-      // 产品名称 = processCategory；制程由后端按产品配置解析。
+      // 用户选择的是制程品类；规范产品名称和 skuKey 由后端按配置统一生成。
       processCategory: form.productName,
       plannedQuantity: form.plannedQuantity,
       dueDate: form.dueDate || null,
@@ -554,7 +597,7 @@ async function submit(createNext: boolean) {
       processTemplateId: null,
       workshopId: form.workshopId,
       // 规格摘要给人看（圆口径带 Φ）；与用于比对常规尺寸的裸数字分工不同，两处都出自 utils/boxSize
-      specification: specificationText(fields, form.boxHeight),
+      specification,
       remark: form.remark || '',
       productConfig
     }

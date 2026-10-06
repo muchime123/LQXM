@@ -13,12 +13,15 @@
           <span v-if="detail.order.approvalDecidedAt" class="detail-note">决定 {{ formatTime(detail.order.approvalDecidedAt) }}</span>
         </div>
         <el-descriptions :column="2" border>
+          <el-descriptions-item label="审批依据" v-if="detail.order.approvalBasis === 'SALES_ORDER'">沿用已确认销售订单 {{ detail.salesDemand?.orderNo }}，未重复审批</el-descriptions-item>
           <el-descriptions-item label="审批状态"><el-tag :type="approvalTag(approvalStatus)" size="small">{{ approvalStatusText(approvalStatus) }}</el-tag></el-descriptions-item>
           <el-descriptions-item label="任务来源">{{ detail.order.externalSource === 'H3YUN' ? '氚云导入' : detail.order.externalSource || '系统创建（非氚云导入）' }}</el-descriptions-item>
           <el-descriptions-item label="氚云工单号">{{ detail.order.h3WorkOrderNo || '未关联' }}</el-descriptions-item>
           <el-descriptions-item label="客户">{{ detail.order.customerNameSnapshot || '—' }}</el-descriptions-item>
           <el-descriptions-item label="业务员">{{ detail.order.salespersonNameSnapshot || '—' }}</el-descriptions-item>
           <el-descriptions-item label="车间 / 制程">{{ detail.order.workshopType || '—' }} / {{ detail.order.processTemplateNameSnapshot || '未配置' }}</el-descriptions-item>
+          <el-descriptions-item label="制程品类">{{ detail.order.processCategorySnapshot || detail.order.productNameSnapshot }}</el-descriptions-item>
+          <el-descriptions-item label="产品身份键">{{ detail.order.skuKeySnapshot || '非标或待确定' }}</el-descriptions-item>
           <el-descriptions-item label="任务数量">{{ detail.order.plannedQuantity }} {{ detail.order.unit }}</el-descriptions-item>
           <el-descriptions-item label="要求交期">{{ detail.order.dueDate || '未设置' }}</el-descriptions-item>
           <el-descriptions-item label="责任人 / 班组">{{ detail.order.responsibleEmployeeName || '未指定' }} / {{ detail.order.productionTeamName || '未指定' }}</el-descriptions-item>
@@ -93,15 +96,18 @@
     </div>
     <template #footer>
       <el-button @click="visible = false">关闭</el-button>
+      <el-button v-if="canManage && detail?.salesDemand" type="warning" @click="reportDeliveryRisk">登记履约风险／可行交期</el-button>
       <el-button v-if="canManage && orderStatus === 'DRAFT'" type="primary" :loading="acting" @click="submit">提交审批</el-button>
       <el-button v-if="canApprove && orderStatus === 'PENDING_APPROVAL'" type="success" :loading="acting" @click="approve">审批通过</el-button>
       <el-button v-if="canApprove && orderStatus === 'PENDING_APPROVAL'" type="danger" :loading="acting" @click="reject">驳回</el-button>
     </template>
   </el-drawer>
+  <SalesExecutionExceptionDialog ref="exceptionDialog" />
 </template>
 
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
+import SalesExecutionExceptionDialog from '@/components/sales/SalesExecutionExceptionDialog.vue'
 import { ElMessageBox } from 'element-plus'
 import { fetchManufacturingOrder, submitManufacturingOrderApproval, approveManufacturingOrder, rejectManufacturingOrder, newRequestKey, type ManufacturingDetail, type ManufacturingOperation, type ExecutionBoardItem, type WorkReport, type AllWorkReport } from '@/api/manufacturing'
 import { APPROVAL_STATUS_TEXT, APPROVAL_ACTION_TEXT, type ApprovalStatus } from '@/api/approval'
@@ -121,6 +127,11 @@ const canReverse = computed(() => can('manufacturing.report.override'))
  */
 const canManage = computed(() => can('manufacturing.manage'))
 const canApprove = computed(() => can('manufacturing.approve'))
+const exceptionDialog = ref<InstanceType<typeof SalesExecutionExceptionDialog>>()
+async function reportDeliveryRisk() {
+  const demand = detail.value?.salesDemand
+  if (demand) await exceptionDialog.value?.open(demand.orderId, demand.itemId, true)
+}
 const acting = ref(false)
 const orderStatus = computed(() => detail.value?.order.status || '')
 /** 审批态独立于业务状态：驳回后 status 回到草稿，只有它记得被驳回过。 */
@@ -228,7 +239,10 @@ async function reject() {
   } catch (e) { notify.errorWithDetail('驳回失败', e) }
   finally { acting.value = false }
 }
-watch(() => [visible.value, props.orderId, props.refreshKey], load)
+// immediate 必须加：从销售订单等页面带 ?taskId= 直达本页时，父组件在 setup 阶段就把
+// visible/orderId 设为有效值，子组件挂载时已是终值——非 immediate 的 watch 不会触发，
+// load() 一次都不跑，抽屉表现为「无报错的纯空白」（2026-09-28 LQ 实测踩到）。
+watch(() => [visible.value, props.orderId, props.refreshKey], load, { immediate: true })
 </script>
 
 <style scoped>

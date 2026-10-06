@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test'
+import { ORDER_CUSTOMER, customerDirectoryPage, pickOrderCustomer } from './fixtures/salesOrderCustomer'
 
 const formItem = (drawer: Locator, label: string) =>
   drawer.locator('.el-form-item').filter({ hasText: label }).first()
@@ -18,8 +19,10 @@ test('销售订单复用生产任务单配置表单，保存配置时不提前�
     const reply = (data: unknown) => route.fulfill({ json: {
       code: 0, message: 'ok', timestamp: new Date().toISOString(), data
     } })
+    if (path === '/api/product-configurations/products') return reply({ products: [], options: [] })
     if (path === '/api/auth/me') return reply({ employeeId: 23, name: '销售员', roles: [],
       permissions: ['sales_order.read.all', 'sales_order.manage'], dataScope: 'ALL', loginType: 'LOCAL' })
+    if (path === '/api/customers') return reply(customerDirectoryPage)
     if (path === '/api/erp-sales-orders/production-workshops')
       return reply([{ id: 7, workshopName: '气调机车间' }])
     if (path === '/api/erp-sales-orders/production-options')
@@ -31,7 +34,7 @@ test('销售订单复用生产任务单配置表单，保存配置时不提前�
     }
     if (path === '/api/erp-sales-orders/42') {
       const saved = orderPayloads[0]
-      return reply({ head: { id: 42, orderNo: 'XSDD00000042', status: 'DRAFT', customerName: saved.customerName,
+      return reply({ head: { id: 42, orderNo: 'XSDD00000042', status: 'DRAFT', customerId: ORDER_CUSTOMER.id, customerName: saved.customerName,
         orderDate: saved.orderDate, salespersonName: '销售员', createdAt: new Date().toISOString() },
       items: saved.lines.map((line: Record<string, unknown>, index: number) => ({ ...line, id: index + 1,
         productionConfigJson: JSON.stringify(line.productionConfig) })) })
@@ -48,7 +51,7 @@ test('销售订单复用生产任务单配置表单，保存配置时不提前�
   await page.goto('/#/sales-orders')
   await page.getByRole('button', { name: '新建订单' }).click()
   const order = page.getByRole('dialog', { name: '新建销售订单' })
-  await order.locator('.order-head-form .el-form-item').filter({ hasText: '客户名称' }).locator('input').fill('测试客户')
+  await pickOrderCustomer(page, order)
   const line = order.locator('.el-table__row').first()
   await line.locator('td').nth(1).locator('.el-select__wrapper').click()
   await page.locator('.el-select-dropdown__item:visible').filter({ hasText: '自产' }).first().click()
@@ -77,5 +80,7 @@ test('销售订单复用生产任务单配置表单，保存配置时不提前�
   await expect.poll(() => orderPayloads.length).toBe(1)
   expect(orderPayloads[0].lines[0].productionConfig).toMatchObject({ workshopId: 7,
     productName: '全自动气调机', boxShape: 'RECT', boxSize: '200x150', boxLengthMm: '200', boxWidthMm: '150' })
+  // 订单头必须带上客户档案 id（只是名称锚不上档案，下游就对不上客户）
+  expect(orderPayloads[0]).toMatchObject({ customerId: ORDER_CUSTOMER.id, customerName: ORDER_CUSTOMER.customerName })
   expect(manufacturingPosts).toHaveLength(0)
 })

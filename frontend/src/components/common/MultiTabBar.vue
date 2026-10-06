@@ -94,7 +94,8 @@ async function onClose(tab: MultiTabItem): Promise<void> {
   // 关闭激活标签：先导航到邻居，由守卫处理脏确认；取消则保留标签
   if (tab.key === route.path) {
     const next = pickNeighbor(tab.key)
-    const failure = await router.push(next)
+    const neighbor = tabs.find(item => item.key === next)
+    const failure = await router.push({ path: next, query: neighbor?.query })
     if (failure) return
   }
   removeTab(tab.key)
@@ -103,7 +104,7 @@ async function onClose(tab: MultiTabItem): Promise<void> {
 function onTabClick(tab: MultiTabItem): void {
   // 点击激活标签时忽略（已是当前页）
   if (tab.key !== route.path) {
-    router.push(tab.key) // 守卫处理脏确认
+    router.push({ path: tab.path, query: tab.query }) // 守卫处理脏确认
   }
 }
 

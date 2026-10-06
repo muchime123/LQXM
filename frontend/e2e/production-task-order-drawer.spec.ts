@@ -49,6 +49,7 @@ async function fixtures(
     const path = new URL(request.url()).pathname
     const reply = (data: unknown) =>
       route.fulfill({ json: { code: 0, message: 'ok', timestamp: new Date().toISOString(), data } })
+    if (path === '/api/product-configurations/products') return reply({ products: [], options: [] })
     if (path === '/api/auth/me') {
       return reply({
         employeeId: 23, name: '测试业务员', roles: [],

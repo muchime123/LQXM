@@ -6,7 +6,7 @@
         <span class="number">{{ step.number }}</span>{{ step.label }}
       </RouterLink>
     </template>
-    <small class="hint">现货可从订单直接出库；展会、展厅等任务可直接新建生产任务。</small>
+    <small class="hint">确认前完成履约评审；确认后自产下达生产、外采办理采购，两条路径并行。现货直接出库；展会、展厅等任务可独立新建。</small>
   </nav>
 </template>
 
@@ -14,17 +14,18 @@
 import { computed } from 'vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 
-type Stage = 'order' | 'demand' | 'task' | 'purchase' | 'outbound'
+type Stage = 'order' | 'review' | 'demand' | 'task' | 'purchase' | 'outbound'
 defineProps<{ current: Stage }>()
 
 const auth = useCurrentUser()
 const steps: Array<{ key: Stage; number: number; label: string; to: string; permissions: string[] }> = [
   { key: 'order', number: 1, label: '销售订单', to: '/sales-orders', permissions: ['sales_order.read.self', 'sales_order.read.department', 'sales_order.read.all'] },
-  { key: 'demand', number: 2, label: '待接生产需求', to: '/production-demands', permissions: ['manufacturing.manage'] },
-  { key: 'task', number: 3, label: '本地生产任务', to: '/local-manufacturing-execution', permissions: ['manufacturing.manage', 'manufacturing.report', 'manufacturing.inspect', 'manufacturing.report.override', 'manufacturing.receive', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'] },
-  // 外采（BUY）与自产并行：自产走「待接生产需求 → 本地生产任务」，外采走「采购订单 → 到货入库/代发」。
-  { key: 'purchase', number: 4, label: '采购订单', to: '/purchase-orders', permissions: ['purchase_order.read.self', 'purchase_order.read.department', 'purchase_order.read.all'] },
-  { key: 'outbound', number: 5, label: '销售出库', to: '/sales-outbounds', permissions: ['sales_order.read.self', 'sales_order.read.department', 'sales_order.read.all'] }
+  { key: 'review', number: 2, label: '履约评审', to: '/sales-fulfillment-reviews', permissions: ['manufacturing.manage', 'purchase_order.manage'] },
+  { key: 'demand', number: 3, label: '待下达生产需求', to: '/production-demands', permissions: ['manufacturing.manage'] },
+  { key: 'task', number: 4, label: '本地生产任务', to: '/local-manufacturing-execution', permissions: ['manufacturing.manage', 'manufacturing.report', 'manufacturing.inspect', 'manufacturing.report.override', 'manufacturing.receive', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'] },
+  // 外采（BUY）与自产并行：自产走「待下达生产需求 → 本地生产任务」，外采走「采购订单 → 到货入库/代发」。
+  { key: 'purchase', number: 5, label: '采购订单', to: '/purchase-orders', permissions: ['purchase_order.read.self', 'purchase_order.read.department', 'purchase_order.read.all'] },
+  { key: 'outbound', number: 6, label: '销售出库', to: '/sales-outbounds', permissions: ['sales_order.read.self', 'sales_order.read.department', 'sales_order.read.all'] }
 ]
 const visibleSteps = computed(() => steps.filter(step => step.permissions.some(permission => auth.can(permission))))
 </script>

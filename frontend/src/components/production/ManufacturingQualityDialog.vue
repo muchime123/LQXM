@@ -23,15 +23,18 @@
                 <el-option v-for="w in warehouses" :key="w.id" :label="w.warehouseName" :value="w.id" />
               </el-select>
             </el-form-item>
-            <el-alert v-if="unmatchedOutputs.length" type="warning" :closable="false"
-              title="以下产出缺少库存产品身份。请选择对应产品档案；若没有准确产品，请先建档，不能把仅登记数量当成已入库。" />
+            <el-alert v-if="autoResolvableOutputs.length" type="success" :closable="false"
+              title="带产品身份键的产出将在提交时自动复用产品；首次出现的配置会建立 CFG 待审核档案，不需要手工搜索旧库存名称。" />
+            <el-alert v-if="manualMatchOutputs.length" type="warning" :closable="false"
+              title="以下非标产出没有稳定身份键，只有这类异常需要人工选择准确的库存产品。" />
             <el-table :data="detail.outputs" border>
               <el-table-column prop="productNameSnapshot" label="入库产品" min-width="200" />
               <el-table-column prop="productCodeSnapshot" label="产品编号" width="130" />
               <el-table-column prop="unit" label="单位" width="70" />
               <el-table-column label="本次入库" width="130"><template #default="{ row }">{{ Number(row.plannedQuantity) - Number(row.receivedQuantity) }}</template></el-table-column>
-              <el-table-column v-if="unmatchedOutputs.length" label="库存产品匹配" min-width="260"><template #default="{ row }">
-                <span v-if="row.salesProductId && row.canonicalProductId">已匹配</span>
+              <el-table-column label="产品身份" min-width="280"><template #default="{ row }">
+                <el-tag v-if="row.salesProductId && row.canonicalProductId" size="small" type="success">已匹配</el-tag>
+                <span v-else-if="row.skuKey" class="auto-identity"><el-tag size="small" type="primary">自动解析</el-tag> {{ row.skuKey }}</span>
                 <el-select v-else v-model="productMatches[row.id]" filterable remote clearable :remote-method="searchProducts"
                   placeholder="搜索产品编号或名称" style="width: 100%">
                   <el-option v-for="option in productOptions.filter(p => p.unit === row.unit)" :key="option.id"
@@ -46,7 +49,7 @@
     </div>
     <template #footer>
       <el-button @click="visible = false">取消</el-button>
-      <el-button type="primary" :loading="submitting" :disabled="!detail || (result === 'PASSED' && unmatchedOutputs.some(o => !productMatches[o.id]))" @click="submit">
+      <el-button type="primary" :loading="submitting" :disabled="!detail || (result === 'PASSED' && manualMatchOutputs.some(o => !productMatches[o.id]))" @click="submit">
         {{ result === 'PASSED' ? '确认合格并入库' : '提交返工' }}
       </el-button>
     </template>
@@ -67,7 +70,9 @@ const loading = ref(false), submitting = ref(false), error = ref('')
 const result = ref<'PASSED' | 'FAILED'>('PASSED'), warehouseId = ref<number>(), returnOperationId = ref<number>()
 const reworkRequirement = ref(''), remark = ref(''), requestKey = ref('')
 const productOptions = ref<InventoryProductOption[]>([]), productMatches = ref<Record<number,number>>({})
-const unmatchedOutputs = computed(() => (detail.value?.outputs || []).filter(o => !o.salesProductId || !o.canonicalProductId))
+const unresolvedOutputs = computed(() => (detail.value?.outputs || []).filter(o => !o.salesProductId || !o.canonicalProductId))
+const autoResolvableOutputs = computed(() => unresolvedOutputs.value.filter(o => !!o.skuKey))
+const manualMatchOutputs = computed(() => unresolvedOutputs.value.filter(o => !o.skuKey))
 async function searchProducts(keyword:string) {
   try { productOptions.value = await fetchManufacturingProductOptions(keyword) }
   catch { productOptions.value = [] }
@@ -100,10 +105,14 @@ async function submit() {
       warehouseId: warehouseId.value, completedAt: null,
       items: detail.value.outputs.map(o => ({ outputId: o.id, quantity: Number(o.plannedQuantity) - Number(o.receivedQuantity), unitCost: 0 })),
       remark: remark.value.trim() || null },
-      productMatches: unmatchedOutputs.value.map(o => ({ outputId: o.id, salesProductId: productMatches.value[o.id] })) }, requestKey.value)
+      productMatches: manualMatchOutputs.value.map(o => ({ outputId: o.id, salesProductId: productMatches.value[o.id] })) }, requestKey.value)
     ElMessage.success(result.value === 'PASSED' ? '检验合格，已办理完工入库' : '检验不合格，已退回返工')
     visible.value = false; emit('completed')
   } catch (e) { ElMessage.error((e as Error).message || '提交失败') }
   finally { submitting.value = false }
 }
 </script>
+
+<style scoped>
+.auto-identity { display: inline-flex; align-items: center; gap: 6px; color: var(--el-text-color-secondary); font-size: 12px; }
+</style>

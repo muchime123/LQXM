@@ -33,6 +33,15 @@ export interface ProductInventoryBalance {
 export interface ProductInventorySummary { total: number; productCount: number; warehouseCount: number; zeroCount: number; totalAmount: number }
 export interface ProductInventoryPage { items: ProductInventoryBalance[]; total: number; page: number; size: number; summary: ProductInventorySummary; categories: string[]; warehouses: Array<{ id: number; warehouseCode: string; warehouseName: string }> }
 export const fetchProductInventory = async (params: Record<string, unknown>) => (await http.get<ProductInventoryPage>('/product-inventory/balances', { params })).data
+export interface ConfiguredProductIdentity { id:number; productCode:string; skuKey:string; productName:string; specification?:string; unit:string; status:string; createdAt:string; outputCount:number }
+export interface ConfiguredProductCandidate { id:number; productCode:string; productName:string; specification?:string; unit:string; status:string }
+export interface ConfiguredOutputQueueItem { id:number;orderId:number;orderNo:string;productName:string;specification?:string;unit:string;skuKey:string;plannedQuantity:number;receivedQuantity:number;orderStatus:string }
+export const fetchConfiguredProducts = async (params:Record<string,unknown>) =>
+  (await http.get<{items:ConfiguredProductIdentity[];total:number;page:number;size:number;queuedOutputs:ConfiguredOutputQueueItem[];queuedTotal:number}>('/product-inventory/configured-products',{params})).data
+export const fetchConfiguredProductCandidates = async (id:number,keyword:string) =>
+  (await http.get<ConfiguredProductCandidate[]>(`/product-inventory/configured-products/${id}/candidates`,{params:{keyword}})).data
+export const reviewConfiguredProduct = async (id:number,payload:{action:'CONFIRM_NEW'|'MERGE_EXISTING';targetProductId?:number}) =>
+  (await http.post(`/product-inventory/configured-products/${id}/review`,payload)).data
 
 // ===== 单行库存详情（2026-09-16）：本行快照 + 两份来源台账行 + 同编号跨仓库分布 =====
 /**

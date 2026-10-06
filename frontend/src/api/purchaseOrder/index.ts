@@ -1,6 +1,7 @@
 import { http } from '../http'
 import { newRequestKey } from '../salesOutbound'
 import type { ApprovalStatus, ApprovalEntry } from '../approval'
+import type { PurchaseDemandConfig } from '../salesOrder'
 
 /** 采购订单履约方式：WAREHOUSE 到货入本地库存账；DROP_SHIP 供应商直发客户（不进本地仓）。 */
 export type PurchaseFulfillmentMode = 'WAREHOUSE' | 'DROP_SHIP'
@@ -27,6 +28,7 @@ export interface PurchaseOrderLine {
 }
 
 export interface PurchaseOrder {
+  purchaseConfigJson?: string | null
   id: number
   poNo: string
   status: PurchaseOrderStatus
@@ -38,6 +40,8 @@ export interface PurchaseOrder {
   salesOrderItemId?: number | null
   salesOrderId?: number | null
   salesOrderNo?: string | null
+  salesDemandDeliveryDate?: string | null
+  salesOrderRevisionNo?: number | null
   customerName?: string | null
   expectedArrivalDate?: string | null
   totalAmount?: number | null
@@ -56,6 +60,9 @@ export interface PurchaseOrder {
 }
 
 export interface PurchaseDemand {
+  salesProductId?: number | null
+  purchaseConfigJson?: string | null
+  purchaseConfig?: PurchaseDemandConfig | null
   itemId: number
   orderId: number
   orderNo: string
@@ -122,6 +129,14 @@ export const fetchPurchaseDemands = async () =>
 
 export const searchPurchaseSuppliers = async (keyword: string) =>
   (await http.get<Array<{ id: number; name: string }>>('/erp-purchase-orders/suppliers', { params: { keyword } })).data
+export const searchPurchaseProducts = async (keyword:string) =>
+  (await http.get<Array<{id:number;productCode:string;productName:string;specification:string;unit:string}>>('/erp-purchase-orders/products',{params:{keyword}})).data
+
+/** 为新外采品建立本地库存产品身份，无需先导入氚云产品目录。 */
+export const createPurchaseProduct = async (payload: { productName: string; specification?: string; unit: string }, requestKey?: string) =>
+  (await http.post<{id:number;productCode:string;productName:string;specification:string;unit:string}>(
+    '/erp-purchase-orders/products', payload, key(requestKey)
+  )).data
 
 export const fetchPurchaseWarehouses = async () =>
   (await http.get<Array<{ id: number; warehouseCode: string; warehouseName: string }>>('/erp-purchase-orders/warehouses')).data
@@ -151,6 +166,15 @@ export const fetchPurchaseOrderApprovals = async (id: number) =>
 export const cancelPurchaseOrder = async (id: number, reason: string, requestKey?: string) =>
   (await http.post(`/erp-purchase-orders/${id}/cancel`, { reason }, key(requestKey))).data
 
+/**
+ * 结案（履行中 → 已结案）：已到货的部分照常发货，剩余不再追。
+ *
+ * 这是**部分到货**的唯一出口：`cancel` 会拒绝「履行中」（已经进过货，取消会让账实分叉），
+ * 而「全部到货」由收货动作自动结案。没有它，只到了几成货、供应商后面不发的单会永久停在履行中。
+ */
+export const closePurchaseOrder = async (id: number, reason?: string, requestKey?: string) =>
+  (await http.post(`/erp-purchase-orders/${id}/close`, { reason }, key(requestKey))).data
+
 /** 到货入库（仅入库型）：按采购明细行提交本次到货数量，服务端写本地库存账。 */
 export const receivePurchaseOrder = async (
   id: number,
@@ -164,6 +188,21 @@ export const reversePurchaseReceipt = async (id: number, receiptId: number, reas
 /** 生成代发出库单草稿（仅代发型）；过账时豁免扣库存。 */
 export const createDropShipOutbound = async (id: number, requestKey?: string) =>
   (await http.post<number>(`/erp-purchase-orders/${id}/drop-ship-outbound`, {}, key(requestKey))).data
+
+/**
+ * 代发出库单**过账**（采购侧推进）。
+ *
+ * 代发的履行主体是采购 —— 货由供应商直发客户，不进本地仓、销售也看不到货。
+ * 此前「生成草稿」要 `purchase_order.manage`、而「过账」要 `sales_order.manage`，
+ * 只有采购权限的人会卡在草稿态等人接力。服务端内部复用同一个销售出库过账，
+ * 所以代发依旧按 `fulfillment_source='DROP_SHIP'` 豁免扣本地库存。
+ */
+export const postDropShipOutbound = async (id: number, requestKey?: string) =>
+  (await http.post(`/erp-purchase-orders/${id}/drop-ship-outbound/post`, {}, key(requestKey))).data
+
+/** 代发出库单**冲销**（采购侧推进）：语义是「要求供应商别发/召回」；代发不过库存账，冲销也不回补库存。 */
+export const reverseDropShipOutbound = async (id: number, reason: string, requestKey?: string) =>
+  (await http.post(`/erp-purchase-orders/${id}/drop-ship-outbound/reverse`, { reason }, key(requestKey))).data
 
 export const PURCHASE_STATUS_TEXT: Record<PurchaseOrderStatus, string> = {
   DRAFT: '草稿',

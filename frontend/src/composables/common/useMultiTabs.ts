@@ -18,7 +18,7 @@
 
 import { reactive, ref, nextTick } from 'vue'
 import type { RouteLocationNormalized } from 'vue-router'
-import { navItems } from '../../constants/navigation'
+import { allNavItems as navItems } from '../../apps'
 import { askConfirm } from '../ui/useConfirmDialog'
 import { isDirty } from './useDirty'
 
@@ -52,7 +52,7 @@ const AFFIX_PATH = '/products'
 
 /** navItems（含子菜单）.to 集合，用于 tab-able 判定 */
 const tabablePaths = new Set(
-  navItems.flatMap(n => (n.children && n.children.length ? [n.to, ...n.children.map(c => c.to)] : [n.to]))
+  navItems.flatMap(n => [n.to, ...(n.activePaths || []), ...(n.children || []).flatMap(c => [c.to, ...(c.activePaths || [])])])
 )
 
 const tabs = reactive<MultiTabItem[]>([])
@@ -83,7 +83,7 @@ let persistTimer: ReturnType<typeof setTimeout> | null = null
 
 /** 路径是否可建标签：必须在 navItems 中且非 '/' redirect */
 function isTabable(path: string): boolean {
-  return path !== '/' && tabablePaths.has(path)
+  return path !== '/' && (tabablePaths.has(path) || /^\/sales-orders\/\d+$/.test(path))
 }
 
 /** 从 navItems（含子菜单）查找 icon */
@@ -91,7 +91,7 @@ function findIcon(path: string): string {
   for (const n of navItems) {
     if (n.to === path) return n.icon
     if (n.children) {
-      const c = n.children.find(child => child.to === path)
+      const c = n.children.find(child => child.to === path || child.activePaths?.includes(path))
       if (c) return c.icon
     }
   }

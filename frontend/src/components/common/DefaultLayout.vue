@@ -68,6 +68,7 @@
                       :key="child.to"
                       :to="child.to"
                       class="nav-item nav-item--child"
+                      :class="{ active: isNavActive(child) }"
                       active-class="active"
                       @click="mobileNavOpen = false"
                     >
@@ -217,8 +218,8 @@ import { RouterLink, useRoute, useRouter } from 'vue-router'
 import GlobalStatusBanner from './GlobalStatusBanner.vue'
 import MultiTabBar from './MultiTabBar.vue'
 import LqTooltip from './LqTooltip.vue'
-import { navItems as allNavItems } from '../../constants/navigation'
-import type { NavItem } from '../../constants/navigation'
+import { allNavItems } from '../../apps'
+import type { NavItem } from '../../apps'
 import { ROUTE_GROUPS, GROUP_ORDER } from '../../constants/routeGroups'
 import type { RouteGroup } from '../../types/vue-router'
 import { useTheme } from '../../composables/ui/useTheme'
@@ -240,6 +241,11 @@ async function onUserCommand(command: string) {
   router.replace({ path: '/login' })
 }
 
+/**
+ * 2026-10-06 按 LQ 决定取消「ERP / 档案与运营」分开进入：侧栏只此一份，
+ * 连续渲染两侧导航根的并集（顺序仍按路由分组 erp → h3 → product → marketing → system）。
+ * `apps/{erp,archive}` 目录拆分保留 —— 那是代码层的文件归属，用户不可见。
+ */
 const filteredNavItems = computed(() =>
   allNavItems
     .map(item => ({
@@ -285,10 +291,13 @@ function navTooltip(item: NavItem) {
 
 const openSubmenus = ref(new Set<string>())
 
+function isNavActive(item: NavItem): boolean {
+  return [item.to, ...(item.activePaths || [])].some(path => route.path === path || route.path.startsWith(`${path}/`))
+}
 function isParentActive(item: NavItem): boolean {
   if (route.path === item.to) return true
   if (item.children) {
-    return item.children.some(child => route.path.startsWith(child.to))
+    return item.children.some(isNavActive)
   }
   return false
 }
@@ -312,9 +321,9 @@ function handleParentClick(to: string) {
 
 watch(
   () => route.path,
-  path => {
+  () => {
     for (const item of filteredNavItems.value) {
-      if (item.children && item.children.some(child => path.startsWith(child.to))) {
+      if (item.children && item.children.some(isNavActive)) {
         openSubmenus.value.add(item.to)
       }
     }
