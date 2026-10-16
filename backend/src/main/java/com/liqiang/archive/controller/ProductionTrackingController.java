@@ -131,7 +131,7 @@ public class ProductionTrackingController {
     @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public Map<String,Object> analytics(@RequestParam(defaultValue="") String fromDate,
             @RequestParam(defaultValue="") String toDate,@RequestParam(defaultValue="") String workshop,
-            @RequestParam(defaultValue="active") String dateBasis){
+            @RequestParam(defaultValue="baseline") String dateBasis){
         return analytics.analyze(fromDate,toDate,workshop,dateBasis);
     }
 
@@ -140,7 +140,7 @@ public class ProductionTrackingController {
     @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public Map<String,Object> analyticsOrders(@RequestParam(defaultValue="") String fromDate,
             @RequestParam(defaultValue="") String toDate,@RequestParam(defaultValue="") String workshop,
-            @RequestParam(defaultValue="active") String dateBasis,
+            @RequestParam(defaultValue="baseline") String dateBasis,
             @RequestParam(defaultValue="") String month,@RequestParam String bucket,
             @RequestParam(defaultValue="") String reason,@RequestParam(defaultValue="1") int page,
             @RequestParam(defaultValue="30") int size){
@@ -371,6 +371,18 @@ public class ProductionTrackingController {
             @RequestBody ProductionTrackingService.DispositionRequest request,
             @RequestHeader("X-Request-Key") String key){
         return Map.of("version",service.changeDisposition(id,request,key));
+    }
+
+    /**
+     * 跟单结案确认 / 撤销：与「停止」互斥的本地处置（不修改氚云生产任务单）；
+     * 状态按「结案优先」覆盖为「跟单已完成」，与节点是否齐全解耦。
+     */
+    @PostMapping("/{id}/closure")
+    @RequirePermission("manufacturing.followup")
+    public Map<String,Long> changeClosure(@PathVariable long id,
+            @RequestBody ProductionTrackingService.ClosureRequest request,
+            @RequestHeader("X-Request-Key") String key){
+        return Map.of("version",service.changeClosure(id,request,key));
     }
 
     /**

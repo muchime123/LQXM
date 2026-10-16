@@ -17,7 +17,7 @@ import { ElMessage } from 'element-plus'
 import { fetchTrackingFilterOptions } from '@/api/productionTracking'
 import type { TrackingActionCode, TrackingFilterOptions, TrackingOrder } from '@/api/productionTracking'
 import { trackingActionLabel as actionLabel } from '@/utils/trackingAction'
-import { shortWorkshop, trackingStatusText } from '@/utils/tracking/rules'
+import { shortWorkshop, TRACKING_STATUS_FILTER_LABEL, trackingStatusText } from '@/utils/tracking/rules'
 
 export type TrackingDateFilter = { from: string; to: string }
 export type FilterChip = { key: string; label: string }
@@ -108,7 +108,7 @@ export function useTrackingFilters(options: { onChange: () => void }) {
     if (sourceStatus.value) chips.push({ key: 'sourceStatus', label: `任务单状态：${sourceStatus.value}` })
     if (assignee.value) chips.push({ key: 'assignee', label: `跟单员：${filterOptions.value.assignees.find(person => String(person.id) === assignee.value)?.name || assignee.value}` })
     if (mine.value) chips.push({ key: 'mine', label: '我的跟单' })
-    if (trackingStatus.value !== 'all') chips.push({ key: 'trackingStatus', label: `跟单状态：${trackingStatus.value === 'open' ? '跟单进行中' : trackingStatusText(trackingStatus.value as TrackingOrder['trackingStatus'])}` })
+    if (trackingStatus.value !== 'all') chips.push({ key: 'trackingStatus', label: `跟单状态：${TRACKING_STATUS_FILTER_LABEL[trackingStatus.value] || trackingStatusText(trackingStatus.value as TrackingOrder['trackingStatus'])}` })
     if (specification.value.trim()) chips.push({ key: 'specification', label: `规格：${specification.value.trim()}` })
     if (actionFilter.value !== 'all') chips.push({ key: 'action', label: `跟单待办：${actionFilter.value === 'any' ? '有提醒' : actionLabel(actionFilter.value as TrackingActionCode)}` })
     if (timeFilter.value !== 'all') chips.push({ key: 'time', label: `时间核实：${timeFilterLabels[timeFilter.value] || timeFilter.value}` })

@@ -3,4 +3,4 @@
 defineProps<{ items: { name: string; count: number; value?: string }[] }>()
 const emit=defineEmits<{ select: [name: string] }>()
 </script>
-<style scoped>.reason-list{display:grid;gap:8px}.reason-list button{display:flex;justify-content:space-between;gap:12px;border:0;border-bottom:1px solid #edf1f5;padding:5px 0;background:none;text-align:left;cursor:pointer;color:inherit}.reason-list button:hover{color:#087c72}.reason-list span{overflow-wrap:anywhere}.reason-list b{white-space:nowrap;color:#52677f}.empty{color:#94a3b8}</style>
+<style scoped>.reason-list{display:grid;gap:8px;max-height:380px;overflow-y:auto;padding-right:4px}.reason-list button{display:flex;justify-content:space-between;gap:12px;border:0;border-bottom:1px solid #edf1f5;padding:5px 0;background:none;text-align:left;cursor:pointer;color:inherit}.reason-list button:hover{color:#087c72}.reason-list span{overflow-wrap:anywhere}.reason-list b{white-space:nowrap;color:#52677f}.empty{color:#94a3b8}</style>

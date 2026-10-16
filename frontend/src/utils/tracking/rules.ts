@@ -65,6 +65,16 @@ export function shortDate(value?: string | null) {
 export function trackingStatusText(value?: TrackingOrder['trackingStatus']) {
   return ({ pending: '待跟单', in_progress: '跟单中', completed: '跟单已完成', stopped: '停止生产跟单' } as Record<string, string>)[value || ''] || '待跟单'
 }
+/**
+ * 跟单状态筛选下拉与 chip 用的展示文案：
+ * 含后端真实状态（pending/in_progress/completed/stopped）和筛选入参 'closed'（人工结案）、
+ * 前端伪值 'open'（跟单进行中 = pending+in_progress）。closed 在状态字段上不会出现，
+ * 仅作为筛选参数；带 closedAt 的行 trackingStatus 字段为 'completed'。
+ */
+export const TRACKING_STATUS_FILTER_LABEL: Record<string, string> = {
+  pending: '待跟单', in_progress: '跟单中', completed: '跟单已完成',
+  closed: '已结案（人工确认）', stopped: '停止生产跟单', open: '跟单进行中'
+}
 export function trackingStatusTone(value?: TrackingOrder['trackingStatus']): 'success' | 'warning' | 'info' {
   return value === 'completed' ? 'success' : value === 'in_progress' ? 'warning' : 'info'
 }

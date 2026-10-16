@@ -15,7 +15,8 @@
 import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  addTrackingEntry, addTrackingStageEntry, addTrackingTimeReview, changeTrackingDisposition,
+  addTrackingEntry, addTrackingStageEntry, addTrackingTimeReview, changeTrackingClosure,
+  changeTrackingDisposition,
   fetchTrackingDetail, fetchTrackingPurchaseReceiptDetail, fetchTrackingPurchaseReceipts
 } from '@/api/productionTracking'
 import type {
@@ -40,7 +41,9 @@ const STATE_FIELDS: Array<{ key: string, label: string }> = [
   { key: 'delayReason', label: '延期原因' },
   { key: 'remark', label: '跟单备注' },
   { key: 'stoppedAt', label: '停止跟单时间' },
-  { key: 'stoppedReason', label: '停止跟单原因' }
+  { key: 'stoppedReason', label: '停止跟单原因' },
+  { key: 'closedAt', label: '结案时间' },
+  { key: 'closedNote', label: '结案说明' }
 ]
 interface EntrySnapshotMilestone { code?: string | null, status?: string | null, completedDate?: string | null, note?: string | null }
 interface EntrySnapshot { state?: Record<string, unknown> | null, milestones?: EntrySnapshotMilestone[] | null }
@@ -216,6 +219,41 @@ export function useTrackingDetail(options: {
       await options.reload()
     } catch (error) { ElMessage.error(error instanceof Error ? error.message : '保存处置失败') }
     finally { dispositionSaving.value = false }
+  }
+  /** 跟单结案确认：与「标记不再生产」互斥的本地处置，状态按「结案优先」展示为已完成。 */
+  const closureVisible = ref(false)
+  const closureClosing = ref(true)
+  const closureNote = ref('')
+  const closureSaving = ref(false)
+  function openClosure(closing: boolean) {
+    if (!detail.value || hasUnsavedStageChanges()) {
+      ElMessage.warning('请先保存或撤销未保存的节点修改')
+      return
+    }
+    if (closing && detail.value.order.closedAt) { ElMessage.warning('该任务已结案'); return }
+    if (!closing && !detail.value.order.closedAt) { ElMessage.warning('该任务未结案'); return }
+    closureClosing.value = closing
+    closureNote.value = ''
+    closureVisible.value = true
+  }
+  async function saveClosure() {
+    const order = detail.value?.order
+    const note = closureNote.value.trim()
+    if (!order || !note || closureSaving.value) return
+    // 前端先做一道最弱校验（最少 6 字），与服务端一致；后端会再次校验，未登记交付的工单强制写明。
+    if (closureClosing.value && !order.deliveredDate && note.length < 6) {
+      ElMessage.warning('该任务尚未登记交付，结案说明请写明实际情况与核实结果（不少于 6 字）')
+      return
+    }
+    closureSaving.value = true
+    try {
+      await changeTrackingClosure(order.id, order.version, closureClosing.value, note)
+      closureVisible.value = false
+      ElMessage.success(closureClosing.value ? '已确认结案，状态按「结案优先」展示为已完成' : '已撤销结案，状态恢复按节点进度派生')
+      await openDetail(order)
+      await options.reload()
+    } catch (error) { ElMessage.error(error instanceof Error ? error.message : '保存结案失败') }
+    finally { closureSaving.value = false }
   }
   /** 打开抽屉时的节点快照，用于判断「保存跟进」是否真的推进了节点。 */
   const originalStages = ref<TrackingMilestone[]>([])
@@ -527,11 +565,12 @@ export function useTrackingDetail(options: {
     submittableStages, stagePercent, currentStageIndex, currentStage, referencePanels, expandedEntries,
     timeReviewVisible, timeReviewSaving, timeReviewForm, deadlineDate, opDone, saving,
     dispositionVisible, dispositionStopped, dispositionReason, dispositionSaving,
+    closureVisible, closureClosing, closureNote, closureSaving,
     originalStages, delayDialog, delaySaving, delayDraftDate, delayDraftReason, unsavedStageCount,
     entryDiff, visibleDiff, toggleEntry, entryDiffs, timeHistoryItems, stageHistories, stageNodeHistory,
     expandedStages, toggleStage, pendingStageChanges, stageRecordCount,
     openDetail, openPurchaseReceipts, openPurchaseDetail, hasUnsavedStageChanges, quickStartCurrentStage,
     quickCompleteCurrentStage, resetStageDraft, recordStageSequenceReason, openDelayDialog, saveDelay, save, saveAndNext,
-    openTimeReview, saveTimeReview, openDisposition, saveDisposition, onStageStatusChange
+    openTimeReview, saveTimeReview, openDisposition, saveDisposition, openClosure, saveClosure, onStageStatusChange
   }
 }

@@ -50,6 +50,14 @@ export interface TrackingOrder {
   stoppedReason?: string | null
   stoppedByName?: string | null
   /**
+   * 跟单结案确认：跟单员主动确认结束。设置后状态按「结案优先」展示为「跟单已完成」，
+   * 节点是否齐全与状态解耦——不再为了凑齐节点而补录虚假生产记录。
+   * 互斥规则：已停止跟单的任务不能结案，已结案的任务不能再停止。
+   */
+  closedAt?: string | null
+  closedByName?: string | null
+  closedNote?: string | null
+  /**
    * 跟单待办提醒（派生，不落库）：一单只出一个代码，按严重度取第一条命中。
    * 用于回答「这单现在该我做什么、为什么轮到我了」，筛选入参同名 `action`。
    */
@@ -386,6 +394,8 @@ export interface TrackingFilterOptions {
 
 export interface TrackingAnalyticsBucket {
   name?: string
+  dueTasks: number; cancelled: number; matured: number; openNotDue: number; openDueToday: number
+  completionRate: number | null; onTimeAchievementRate: number | null; completedOnTimeRate: number | null
   total: number; stopped: number; delivered: number; comparable: number; onTime: number; overdue: number
   onTimeRate: number | null; deliveredNoBaseline: number
   open: number; openOverdue: number; openDueSoon: number; openNoBaseline: number; openOverdueDays: number
@@ -396,6 +406,7 @@ export interface TrackingAnalyticsBucket {
   receiptOnly: number; manualOnly: number; bothSources: number
 }
 export interface TrackingAnalytics {
+  missingExpected: number
   totals: TrackingAnalyticsBucket
   workshops: TrackingAnalyticsBucket[]
   months: TrackingAnalyticsBucket[]
@@ -404,7 +415,7 @@ export interface TrackingAnalytics {
   overdueReasons: { name: string; count: number }[]
   asOf: string
 }
-export type TrackingAnalysisDateBasis = 'active' | 'submitted' | 'inbound'
+export type TrackingAnalysisDateBasis = 'baseline'
 export const fetchTrackingAnalytics = async (params: { fromDate?: string; toDate?: string; workshop?: string; dateBasis?: TrackingAnalysisDateBasis }) =>
   (await http.get<TrackingAnalytics>('/manufacturing/followups/analytics', { params })).data
 export interface TrackingAnalyticsOrder {
@@ -415,6 +426,7 @@ export interface TrackingAnalyticsOrder {
   submittedDate: string | null
   baseline: string | null
   deliveredDate: string | null
+  status: 'ON_TIME' | 'LATE' | 'UNFINISHED' | 'CANCELLED' | 'MISSING_EXPECTED'
   overdueDays: number | null
 }
 export const fetchTrackingAnalyticsOrders = async (params: {
@@ -667,6 +679,14 @@ export const addTrackingStageEntry = async (id: number, version: number, milesto
 export const changeTrackingDisposition = async (id: number, version: number, stopped: boolean, reason: string) =>
   (await http.post<{ version: number }>(`/manufacturing/followups/${id}/disposition`,
     { version, stopped, reason }, { headers: { 'X-Request-Key': createRequestKey() } })).data
+
+/**
+ * 跟单结案确认 / 撤销：与「标记不再生产」互斥的本地处置（不修改氚云生产任务单）；
+ * closed=true 写结案时间/原因/操作人；closed=false 清空三列，恢复按节点进度派生状态。
+ */
+export const changeTrackingClosure = async (id: number, version: number, closed: boolean, note: string) =>
+  (await http.post<{ version: number }>(`/manufacturing/followups/${id}/closure`,
+    { version, closed, note }, { headers: { 'X-Request-Key': createRequestKey() } })).data
 
 export interface TrackingBenchmarkStage {
   stageCode: string

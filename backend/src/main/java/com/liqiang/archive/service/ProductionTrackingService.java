@@ -205,6 +205,7 @@ public class ProductionTrackingService {
      * 只能用在同时挂了这两者的 SELECT 上（列表 / 详情 / 下拉计数）；末尾不带逗号。
      */
     static final String TRACKING_ACTION="CASE WHEN t.stopped_at IS NOT NULL THEN NULL "
+            +"WHEN t.closed_at IS NOT NULL THEN NULL "
             +"WHEN "+NEVER_TRACKED+" AND p.actual_completion_date IS NOT NULL THEN 'FINISHED_PENDING' "
             +"WHEN "+NEVER_TRACKED+" AND ib.first_in IS NOT NULL THEN 'INBOUND_PENDING' "
             +"WHEN "+NEVER_TRACKED+" AND p.schedule_time IS NOT NULL THEN 'SCHEDULED_PENDING' "
@@ -241,12 +242,16 @@ public class ProductionTrackingService {
     /** 九月起正式跟单：申请日期或任务单提交时间任一落在范围内即可；重导不会改变提交时间。 */
     static final String SCOPE_DATE="(p.application_date>='"+ProductionTrackingPolicy.SCOPE_START_DATE
             +"' OR p.source_created_at>='"+ProductionTrackingPolicy.SCOPE_START_DATE+"')";
-    /** 跟单状态只取本地节点记录，不复用氚云任务单状态：「有节点记录即跟单中」由 NEVER_TRACKED 表达。 */
+    /** 跟单状态只取本地节点记录，不复用氚云任务单状态：「有节点记录即跟单中」由 NEVER_TRACKED 表达。
+     *  闭案优先级最高：跟单员主动确认结束后，无论节点是否齐全一律显示「已完成」，避免为了凑齐节点
+     *  而补录虚假生产记录（与「停止」互斥：闭案后状态为 completed，停止后状态为 stopped）。 */
     static final String TRACKING_STATUS_CASE="CASE WHEN t.stopped_at IS NOT NULL THEN 'stopped' "
+            +"WHEN t.closed_at IS NOT NULL THEN 'completed' "
             +"WHEN "+NEVER_TRACKED+" THEN 'pending' "
             +"WHEN "+TRACKING_COMPLETE+" THEN 'completed' ELSE 'in_progress' END";
     /** 提醒只表示待处理风险；任务单状态和跟单状态各有独立字段。 */
     static final String REMINDER_CASE="CASE WHEN t.stopped_at IS NOT NULL THEN 'none' "
+            +"WHEN t.closed_at IS NOT NULL THEN 'none' "
             +"WHEN NOT "+NEVER_TRACKED+" AND "+TRACKING_COMPLETE+" THEN 'none' "
             +"WHEN "+DEADLINE+" IS NOT NULL AND "+DEADLINE+"<CURDATE() THEN 'overdue' "
             +"WHEN t.next_followup_date IS NOT NULL AND t.next_followup_date<=CURDATE() THEN 'due' "
@@ -341,6 +346,7 @@ public class ProductionTrackingService {
             +"p.external_source,"
             +"t.planned_start_date,t.forecast_finish_date,t.risk_category,t.delay_reason,t.next_followup_date,t.remark,"
             +"t.stopped_at,t.stopped_reason,t.stopped_by_name,"
+            +"t.closed_at,t.closed_by_name,t.closed_note,"
             +"assigned.id assignee_employee_id,"+ASSIGNEE_NAME+" assignee_name,t.last_followup_at,"
             +"COALESCE(t.version,0) version,"
             +STAGE_DONE_CASE+" stage_done_count,"
@@ -388,6 +394,13 @@ public class ProductionTrackingService {
     public record Milestone(String code, String status, LocalDate completedDate, String note) {}
     public record EntryRequest(long version, String content, State state, List<Milestone> milestones) {}
     public record DispositionRequest(long version, boolean stopped, String reason) {}
+    /**
+     * 跟单结案确认：与「停止」互斥的两个本地处置。
+     * {@code closed=true} ＝跟单员主动确认结束（无论节点是否齐全），写 closed_at/note/by_name；
+     * {@code closed=false}＝撤销结案，恢复按节点进度派生状态。
+     * 关闭态下 status 强制展示为 completed；停止态下 status 仍为 stopped；二者互斥。
+     */
+    public record ClosureRequest(long version, boolean closed, String note) {}
     public record TimeReviewRequest(String kind,String status,String reason,String contactName,
                                     LocalDate agreedDate,LocalDate nextFollowupDate) {}
 
@@ -973,7 +986,7 @@ public class ProductionTrackingService {
             String salesperson,String deliveryResult,DateRangeFilter application,DateRangeFilter schedule,
             DateRangeFilter expected,boolean urgent,String specification,String moldLayout,DateRangeFilter created,
             String optionalStage) {
-        if(!Set.of("open","all","pending","in_progress","completed","stopped").contains(trackingStatus))
+        if(!Set.of("open","all","pending","in_progress","completed","closed","stopped").contains(trackingStatus))
             throw new IllegalArgumentException("跟单状态筛选无效");
         if(!Set.of("all","overdue","due","delayed","near","none","time_due","time_attention",
                 "time_application","time_required","time_acceptance","time_commitment",
@@ -1030,7 +1043,8 @@ public class ProductionTrackingService {
             where.append(" AND ").append(trackingActionPredicate(action));
             if(!"any".equals(action))params.add(action);
         }
-        if(!"all".equals(trackingStatus))where.append(" AND ").append(TRACKING_STATUS_CASE)
+        if("closed".equals(trackingStatus))where.append(" AND t.closed_at IS NOT NULL");
+        else if(!"all".equals(trackingStatus))where.append(" AND ").append(TRACKING_STATUS_CASE)
                 .append(" IN (").append("open".equals(trackingStatus)?"'pending','in_progress'":"'"+trackingStatus+"'").append(")");
         String timePredicate=switch(reminder){
             case "time_due"->TIME_REVIEW_DUE;
@@ -1616,6 +1630,7 @@ public class ProductionTrackingService {
                 +"p.completed_quantity,"
                 +"t.planned_start_date,t.forecast_finish_date,t.risk_category,t.delay_reason,t.next_followup_date,"
                 +"t.stopped_at,t.stopped_reason,t.stopped_by_name,"
+                +"t.closed_at,t.closed_by_name,t.closed_note,"
                 +"t.delivery_result,t.shipment_status,t.remark,"
                 +"assigned.id assignee_employee_id,"+ASSIGNEE_NAME+" assignee_name,t.last_followup_at,COALESCE(t.version,0) version,"
                 +TRACKING_STATUS_CASE+" tracking_status,"+REMINDER_CASE+" reminder,"
@@ -1811,6 +1826,56 @@ public class ProductionTrackingService {
             long entryId=Objects.requireNonNull(jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class));
             audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_entries",entryId,"INSERT",
                     ErpChangeLogWriter.changes("orderId",id,"version",version+1,"stopped",request.stopped()),
+                    "FOLLOW_UP",content,key,null));
+            return String.valueOf(version+1);
+        }));
+    }
+
+    /**
+     * 跟单结案确认（与 {@link #changeDisposition} 同款的本地处置写库链路）：
+     * <ul>
+     *   <li>状态优先级：{@code stopped > closed > 节点派生}；停止任务不能再结案，结案任务不能再停止；</li>
+     *   <li>结案：要求提供说明；未登记交付的工单强制要求写明（避免「没记录交付就结案」的盲点）；</li>
+     *   <li>撤销结案：恢复按节点进度派生（completed 可能回退为 in_progress / pending），要求写明撤销原因；</li>
+     *   <li>同一条跟单历史时间线 + 统一审计日志，与「停止」共用同一种落地方式。</li>
+     * </ul>
+     */
+    public long changeClosure(long id,ClosureRequest request,String key) {
+        var current=order(id);
+        if(request==null||request.version()<0)throw new IllegalArgumentException("缺少跟单版本");
+        String note=clean(request.note(),500,request.closed()?"结案说明":"撤销结案原因");
+        if(note.isBlank())throw new IllegalArgumentException(request.closed()?"请填写结案说明":"请填写撤销结案的原因");
+        if(current.get("stoppedAt")!=null)throw new IllegalArgumentException("已停止跟单的任务不能结案，请先恢复跟单");
+        if(request.closed() && current.get("deliveredDate")==null && note.trim().length()<6)
+            throw new IllegalArgumentException("该任务尚未登记交付（入库），结案说明请写明实际情况与核实结果（不少于 6 字）");
+        var actor=actors.current();
+        return Long.parseLong(idem.execute(actor,key,"production.tracking.closure",
+                Map.of("id",id,"request",request),()->{
+            jdbc.update("INSERT IGNORE INTO production_tracking_enrollments(production_order_id,origin) VALUES(?,'MANUAL')",id);
+            jdbc.update("INSERT INTO production_tracking_state(production_order_id) VALUES(?) "
+                    +"ON DUPLICATE KEY UPDATE production_order_id=production_order_id",id);
+            var before=jdbc.queryForMap("SELECT * FROM production_tracking_state WHERE production_order_id=? FOR UPDATE",id);
+            long version=((Number)before.get("version")).longValue();
+            if(version!=request.version())throw new ResponseStatusException(HttpStatus.CONFLICT,"该任务已由其他人更新，请刷新后重试");
+            boolean alreadyClosed=before.get("closed_at")!=null;
+            if(alreadyClosed==request.closed())throw new IllegalArgumentException(alreadyClosed?"该任务已结案":"该任务未结案");
+            if(request.closed())jdbc.update("UPDATE production_tracking_state SET closed_at=NOW(),closed_by_name=?,"
+                    +"closed_note=?,version=?,last_followup_at=NOW() WHERE production_order_id=?",
+                    actor.name(),note,version+1,id);
+            else jdbc.update("UPDATE production_tracking_state SET closed_at=NULL,closed_by_name=NULL,"
+                    +"closed_note=NULL,version=?,last_followup_at=NOW() WHERE production_order_id=?",
+                    version+1,id);
+            var after=jdbc.queryForMap("SELECT * FROM production_tracking_state WHERE production_order_id=?",id);
+            var milestones=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note "
+                    +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",id);
+            String content=(request.closed()?"跟单结案确认：":"撤销跟单结案：")+note;
+            jdbc.update("INSERT INTO production_tracking_entries(production_order_id,version,content,before_json,after_json,"
+                    +"created_by_employee_id,created_by_name) VALUES(?,?,?,?,?,?,?)",id,version+1,content,
+                    write(Map.of("state",before,"milestones",milestones)),
+                    write(Map.of("state",after,"milestones",milestones)),actor.employeeId(),actor.name());
+            long entryId=Objects.requireNonNull(jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class));
+            audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_entries",entryId,"INSERT",
+                    ErpChangeLogWriter.changes("orderId",id,"version",version+1,"closed",request.closed()),
                     "FOLLOW_UP",content,key,null));
             return String.valueOf(version+1);
         }));
