@@ -130,8 +130,9 @@ public class ProductionTrackingService {
             +"CASE WHEN ib.first_in IS NOT NULL AND p.actual_completion_date IS NOT NULL "
             +"THEN DATEDIFF(ib.first_in,p.actual_completion_date) END report_to_inbound_days";
     /**
-     * 实际交付日期优先采用跟单员登记的「入库」节点日期；尚未登记时采用采购首次入库日期。
-     * 两个来源都没有时为 NULL。分析筛选、列表交付结果与详情共用此口径。
+     * 入库进度对照日期优先采用跟单员登记的「入库」节点日期；尚未登记时采用采购首次入库日期。
+     * 两个来源都没有时为 NULL。采购首次入库可能只有部分数量，不代表整单完工；
+     * 生产交期分析另用按计划数量核实后的整单完工日，不复用此表达式。
      *
      * <p>⚠️ 依赖 {@link #INBOUND_JOIN} 的 {@code ib} 别名与 {@link #TRACKING_FROM} 的 {@code ms} 别名，
      * 只能用在同时挂了这两者的 SELECT 上（列表 / 详情）。末尾不带逗号。
@@ -152,8 +153,8 @@ public class ProductionTrackingService {
      */
     static final String DELIVERY_BASELINE="COALESCE(t.forecast_finish_date,p.expected_completion_date,"+VALID_REQUIRED_DATE+")";
     /**
-     * 生产交付结果：以车间给出的预计完成日期（跟单员确认后，见 {@link #DELIVERY_BASELINE}）为基准，
-     * 判「未完工 / 按期完工 / 逾期完工 X 天」。
+     * 入库记录交期：以车间给出的预计完成日期（跟单员确认后，见 {@link #DELIVERY_BASELINE}）为基准，
+     * 判「未见入库 / 按期见入库 / 见入库逾期 X 天」；不代表整单生产完工。
      * <p>⚠️ 用词：「逾期」= 实际交付晚于基准这一<b>既成事实</b>；「延期」专指车间预计完成实现不了时，
      * 跟单员与车间/业务员协商另订新完成日期的<b>主动动作</b>（见 {@code forecast_finish_date}）——两者不可混用。
      * <ul>
@@ -843,7 +844,7 @@ public class ProductionTrackingService {
         var params=new ArrayList<Object>();
         var where=visible(params);
         where.append(" AND t.stopped_at IS NULL");
-        // 在制按实际交付日期判断；已交付口径与列表的生产交付结果完全一致。
+        // 在制按入库进度日期判断；本概览与列表的入库记录交期口径一致，不代表整单完工。
         var delivered=DELIVERED_IN_DATE;
         var baseline=DELIVERY_BASELINE;
         var sql="SELECT COALESCE(NULLIF(p.production_line,''),'未分车间') workshop,COUNT(*) total,"
@@ -1029,12 +1030,12 @@ public class ProductionTrackingService {
                 params.addAll(selected);
             }
         }
-        // 「生产交付结果」列筛选：取值是固定的四态枚举（见 {@link #DELIVERY_OUTCOME}），白名单校验后内联。
+        // 「入库记录交期」列筛选：取值是固定的四态枚举（见 {@link #DELIVERY_OUTCOME}），白名单校验后内联。
         // ⚠️ DELIVERY_OUTCOME 依赖 {@link #INBOUND_JOIN} 的 ib；列表/导出的 COUNT 与明细查询均已挂该 JOIN。
         if(deliveryResult!=null&&!deliveryResult.isBlank()){
             var selected=new java.util.LinkedHashSet<>(List.of(deliveryResult.split(",",-1)));
             if(!Set.of("PENDING","NO_BASELINE","ON_TIME","OVERDUE").containsAll(selected))
-                throw new IllegalArgumentException("生产交付结果筛选无效");
+                throw new IllegalArgumentException("入库记录交期筛选无效");
             where.append(" AND t.stopped_at IS NULL AND (").append(DELIVERY_OUTCOME).append(") IN ('")
                     .append(String.join("','",selected)).append("')");
         }

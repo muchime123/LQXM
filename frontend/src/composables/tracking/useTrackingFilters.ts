@@ -26,12 +26,12 @@ export type QuickFilterKey = 'pending' | 'in_progress' | 'today' | 'overdue' | '
 const emptyTrackingDateFilter = (): TrackingDateFilter => ({ from: '', to: '' })
 
 /**
- * 「生产交付结果」常用区多选筛选：取值是后端固定的四态枚举（见 Service.DELIVERY_OUTCOME），
+ * 「入库记录交期」常用区多选筛选：取值是后端固定的四态枚举（见 Service.DELIVERY_OUTCOME），
  * 与列表徽标一一对应，故这里是常量而非从数据里取。
  */
 const DELIVERY_FILTER_OPTIONS = [
-  { value: 'OVERDUE', label: '逾期完工' }, { value: 'ON_TIME', label: '按期完工' },
-  { value: 'NO_BASELINE', label: '已完工（无基准）' }, { value: 'PENDING', label: '未完工' }
+  { value: 'OVERDUE', label: '见入库逾期' }, { value: 'ON_TIME', label: '按期见入库' },
+  { value: 'NO_BASELINE', label: '已见入库（无基准）' }, { value: 'PENDING', label: '未见入库' }
 ]
 const COUNTDOWN_FILTER_OPTIONS = [
   { value: 'overdue', label: '已超期' }, { value: 'today', label: '今日到期' },
@@ -116,7 +116,7 @@ export function useTrackingFilters(options: { onChange: () => void }) {
     if (urgentOnly.value) chips.push({ key: 'urgent', label: '仅看加急' })
     if (salespersonFilter.value.length) chips.push({ key: 'salesperson', label: `业务员：${salespersonFilter.value.join('、')}` })
     if (countdownFilter.value.length) chips.push({ key: 'countdown', label: `生产倒计时：${countdownFilter.value.map(value => COUNTDOWN_FILTER_OPTIONS.find(option => option.value === value)?.label || value).join('、')}` })
-    if (deliveryFilter.value.length) chips.push({ key: 'delivery', label: `交付结果：${deliveryFilter.value.map(value => DELIVERY_FILTER_OPTIONS.find(option => option.value === value)?.label || value).join('、')}` })
+    if (deliveryFilter.value.length) chips.push({ key: 'delivery', label: `入库记录交期：${deliveryFilter.value.map(value => DELIVERY_FILTER_OPTIONS.find(option => option.value === value)?.label || value).join('、')}` })
     const created = dateFilters.value.created
     if (created.from || created.to) chips.push({ key: 'createdDate', label: `生产任务单提交时间：${created.from || '不限'}～${created.to || '不限'}` })
     return chips

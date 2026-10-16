@@ -218,15 +218,15 @@ export function reportCompareText(row: TrackingOrder) {
   const days = daysBetween(row.expectedFinishDate, row.actualFinishDate)
   return days == null ? '' : days < 0 ? `比车间预计早 ${-days} 天（报工仅供对照）` : days === 0 ? '与车间预计同日（报工仅供对照）' : `比车间预计晚 ${days} 天（报工仅供对照）`
 }
-/** 生产交付结果的展示文案；口径与后端 delivery_outcome 一致（基准＝车间预计完成，跟单员确认后）。 */
+/** 首次入库/跟单确认的交期对照；可能只是部分入库，不代表整单完工。 */
 export function deliveryOutcomeText(row: TrackingOrder) {
   if (row.stoppedAt) return '已停止跟单'
-  if (row.deliveryOutcome === 'OVERDUE') return `逾期完工 ${row.deliveryOverdueDays ?? 0} 天`
-  if (row.deliveryOutcome === 'ON_TIME') return '按期完工'
-  if (row.deliveryOutcome === 'NO_BASELINE') return '已交付（无基准）'
-  return '未完工'
+  if (row.deliveryOutcome === 'OVERDUE') return `见入库逾期 ${row.deliveryOverdueDays ?? 0} 天`
+  if (row.deliveryOutcome === 'ON_TIME') return '按期见入库'
+  if (row.deliveryOutcome === 'NO_BASELINE') return '已见入库（无基准）'
+  return '未见入库'
 }
-/** 交付结果的语义色：口径与列表 el-tag 的 type 完全一致（网页导出用它上色）。 */
+/** 入库记录交期的语义色：口径与列表 el-tag 的 type 完全一致（网页导出用它上色）。 */
 export function deliveryOutcomeTone(row: TrackingOrder): Tone | '' {
   if (row.stoppedAt) return 'info'
   if (row.deliveryOutcome === 'OVERDUE') return 'danger'

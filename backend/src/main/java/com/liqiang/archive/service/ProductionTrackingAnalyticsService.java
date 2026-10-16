@@ -22,16 +22,27 @@ public class ProductionTrackingAnalyticsService {
     static final String EFFECTIVE_EXPECTED_DATE="COALESCE(t.forecast_finish_date,p.expected_completion_date)";
     /** 分析专用整单完工日：人工确认优先；未确认时须同产品累计入库数达到计划数。 */
     static final String COMPLETE_DATE="COALESCE(ms.warehouse_in_date,iq.full_in)";
-    /** 窗口累计确定首次达到整单数量的日期，避免后续补入库把完工日推迟。 */
-    private static final String QUANTITY_JOIN=" LEFT JOIN (SELECT p2.id order_id,MIN(q.purchase_date) full_in "
-            +"FROM production_orders p2 JOIN (SELECT i.production_order_no,i.product_name,r.purchase_date,"
-            +"SUM(COALESCE(i.quantity,0)) OVER (PARTITION BY i.production_order_no,i.product_name "
+    /**
+     * 氚云任务名是短类目、采购品名带规格，不能按名称相等关联。仅当同任务编号下全部有效入库行
+     * 品名和单位各自唯一、数量均为正数时，才按窗口累计推定整单完成；混合产品/单位留给跟单员核实。
+     */
+    static final String QUANTITY_JOIN=" LEFT JOIN (SELECT p2.id order_id,MIN(q.purchase_date) full_in "
+            +"FROM production_orders p2 JOIN (SELECT i.production_order_no,r.purchase_date,"
+            +"SUM(i.quantity) OVER (PARTITION BY i.production_order_no "
             +"ORDER BY r.purchase_date,r.id,i.id ROWS UNBOUNDED PRECEDING) running_quantity "
             +"FROM purchase_receipt_items i JOIN purchase_receipts r ON r.id=i.purchase_receipt_id "
             +"WHERE i.production_order_no IS NOT NULL AND i.production_order_no<>'' "
             +"AND r.purchase_date IS NOT NULL AND (r.data_status IS NULL OR r.data_status='已生效') "
-            +"AND i.product_name IS NOT NULL) q ON q.production_order_no=p2.work_order_no "
-            +"AND q.product_name=p2.product_name WHERE p2.required_quantity>0 "
+            +") q ON q.production_order_no=p2.work_order_no "
+            +"JOIN (SELECT i.production_order_no FROM purchase_receipt_items i "
+            +"JOIN purchase_receipts r ON r.id=i.purchase_receipt_id "
+            +"WHERE i.production_order_no IS NOT NULL AND i.production_order_no<>'' "
+            +"AND r.purchase_date IS NOT NULL AND (r.data_status IS NULL OR r.data_status='已生效') "
+            +"GROUP BY i.production_order_no HAVING COUNT(DISTINCT i.product_name)=1 "
+            +"AND COUNT(DISTINCT i.unit)=1 AND COUNT(*)=COUNT(i.product_name) "
+            +"AND COUNT(*)=COUNT(i.unit) AND COUNT(*)=COUNT(i.quantity) "
+            +"AND MIN(i.quantity)>0) safe "
+            +"ON safe.production_order_no=p2.work_order_no WHERE p2.required_quantity>0 "
             +"AND q.running_quantity>=p2.required_quantity GROUP BY p2.id) iq ON iq.order_id=p.id";
     private final JdbcTemplate jdbc;
     private final ProductionTrackingService tracking;
@@ -79,6 +90,8 @@ public class ProductionTrackingAnalyticsService {
             entry.put("status",status(row));
             entry.put("overdueDays",row.delivered()!=null&&row.baseline()!=null&&row.delivered().isAfter(row.baseline())
                     ?ChronoUnit.DAYS.between(row.baseline(),row.delivered()):null);
+            entry.put("unfinishedOverdueDays",row.delivered()==null&&row.baseline()!=null&&row.baseline().isBefore(today)
+                    ?ChronoUnit.DAYS.between(row.baseline(),today):null);
             result.add(entry);
         }
         return Map.of("items",result,"total",selected.size(),"page",page,"size",size);

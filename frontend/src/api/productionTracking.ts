@@ -94,8 +94,8 @@ export interface TrackingOrder {
   /** 报工完工 → 首次入库 的自然日间隔；为负表示入库早于报工（现场补录顺序）。 */
   reportToInboundDays?: number | null
   /**
-   * 实际交付日期优先采用跟单员在「入库」节点登记的完成日期；尚未登记时采用采购首次入库日期。
-   * 两个来源皆无时为 null，即尚未交付。派生字段，不落库。
+   * 入库进度对照日期：跟单员「入库」节点优先，否则为采购首次入库。
+   * 首次入库可能只是部分数量，不能据此认定整单完工；分析页使用独立的整单判据。
    */
   deliveredDate?: string | null
   /**
@@ -105,8 +105,8 @@ export interface TrackingOrder {
    */
   deliveryBaseline?: string | null
   /**
-   * 生产交付结果（派生，不落库）：以交付基准（deliveryBaseline）比较实际交付日期。
-   * PENDING=未完工 / ON_TIME=按期完工 / OVERDUE=逾期完工（天数见 deliveryOverdueDays）/ NO_BASELINE=已交付但无基准。
+   * 入库记录交期（派生，不落库）：以交付基准（deliveryBaseline）比较入库进度对照日期。
+   * PENDING=未见入库 / ON_TIME=按期见入库 / OVERDUE=见入库逾期（天数见 deliveryOverdueDays）/ NO_BASELINE=已见入库但无基准。
    * ⚠️ 用词：这里是「逾期」（实际交付晚于基准这一既成事实）；「延期」另有所指——车间预计完成实现不了时
    * 与业务员协商另订新完成日期的主动动作（state.forecastFinishDate / delayReason），两者不可混用。
    * ⚠️ 与下面 state 里的 deliveryResult（跟单员手工登记的交付结果）不是一份数据。
@@ -428,6 +428,7 @@ export interface TrackingAnalyticsOrder {
   deliveredDate: string | null
   status: 'ON_TIME' | 'LATE' | 'UNFINISHED' | 'CANCELLED' | 'MISSING_EXPECTED'
   overdueDays: number | null
+  unfinishedOverdueDays: number | null
 }
 export const fetchTrackingAnalyticsOrders = async (params: {
   fromDate?: string; toDate?: string; workshop?: string; dateBasis?: TrackingAnalysisDateBasis; month?: string
