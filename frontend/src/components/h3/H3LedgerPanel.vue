@@ -17,6 +17,10 @@
         <span class="ledger-toolbar__count">共 <b>{{ total }}</b> 条</span>
       </span>
     </div>
+    <div v-if="ledgerType === 'outbound' && productCodeFilter" class="ledger-product-filter">
+      仅看产品编号 <b>{{ productCodeFilter }}</b><template v-if="categoryFilter"> · 类目 {{ categoryFilter }}</template> 的正数出库
+      <el-button link type="primary" @click="clearProductFilter">清除产品筛选</el-button>
+    </div>
 
     <!-- sheet 维度汇总条（2026-09-21）：源文件「每账户/每供应商一个 sheet」的结构，以汇总下拉 + 小计还原。
          选中 = 只看该 sheet 的行（后端精确筛选）；不选 = 全量平铺 + 全局合计。 -->
@@ -77,8 +81,8 @@
 
     <!-- 销售出库台账 -->
     <template v-if="ledgerType === 'outbound'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="outboundNo" label="出库单号" width="170" show-overflow-tooltip />
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="outboundNo" :sortable="sortableOf('outboundNo')" label="出库单号" width="170" show-overflow-tooltip />
         <el-table-column label="状态" width="100">
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.status)">{{ row.status || '—' }}</el-tag></template>
         </el-table-column>
@@ -89,10 +93,10 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="shipDate" label="发货日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="shipDate" :sortable="sortableOf('shipDate')" label="发货日期" width="110" :formatter="dateCell" />
         <el-table-column prop="businessDate" label="业务日期" width="110" :formatter="dateCell" />
-        <el-table-column prop="customerName" label="客户" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="dealerName" label="经销商" min-width="130" show-overflow-tooltip />
+        <el-table-column prop="customerName" :sortable="sortableOf('customerName')" label="客户" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="dealerName" :sortable="sortableOf('dealerName')" label="经销商" min-width="130" show-overflow-tooltip />
         <el-table-column prop="salespersonName" label="业务员" width="100" show-overflow-tooltip />
         <el-table-column prop="region" label="地区" width="100" show-overflow-tooltip />
         <el-table-column prop="itemCount" label="产品明细" width="90" align="center" />
@@ -114,14 +118,14 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="salesAmount" label="销售金额" width="130" align="right">
+        <el-table-column prop="salesAmount" :sortable="sortableOf('salesAmount')" label="销售金额" width="130" align="right">
           <template #default="{ row }">{{ money(row.salesAmount) }}</template>
         </el-table-column>
         <el-table-column prop="sourceGrossProfit" label="源毛利" width="120" align="right">
           <template #default="{ row }">{{ money(row.sourceGrossProfit) }}</template>
         </el-table-column>
         <el-table-column prop="departmentName" label="部门" min-width="130" show-overflow-tooltip />
-        <el-table-column prop="sourceCreatedAt" label="源创建时间" width="170" :formatter="dateTimeCell" />
+        <el-table-column prop="sourceCreatedAt" :sortable="sortableOf('sourceCreatedAt')" label="源创建时间" width="170" :formatter="dateTimeCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -132,14 +136,14 @@
 
     <!-- 生产任务工单台账 -->
     <template v-else-if="ledgerType === 'production'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="workOrderNo" label="工单号" width="180" show-overflow-tooltip />
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="workOrderNo" :sortable="sortableOf('workOrderNo')" label="工单号" width="180" show-overflow-tooltip />
         <el-table-column label="状态" width="100">
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.status)">{{ row.status || '—' }}</el-tag></template>
         </el-table-column>
         <el-table-column prop="planType" label="计划类型" width="120" show-overflow-tooltip />
-        <el-table-column prop="customerName" label="客户" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="productName" label="产品" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="customerName" :sortable="sortableOf('customerName')" label="客户" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="productName" :sortable="sortableOf('productName')" label="产品" min-width="180" show-overflow-tooltip />
         <el-table-column prop="requiredQuantity" label="需求数量" width="110" align="right">
           <template #default="{ row }">{{ num(row.requiredQuantity) }}</template>
         </el-table-column>
@@ -152,13 +156,13 @@
         <el-table-column prop="productionProgress" label="生产进度" width="110" />
         <el-table-column prop="warehousingProgress" label="入库进度" width="110" />
         <el-table-column prop="applicationDate" label="申请日期" width="120" :formatter="dateCell" />
+        <el-table-column prop="sourceCreatedAt" :sortable="sortableOf('sourceCreatedAt')" label="源创建时间" width="165" :formatter="dateTimeCell" />
         <el-table-column prop="requiredCompletionDate" label="要求完成" width="120" :formatter="dateCell" />
         <el-table-column prop="salespersonName" label="业务员" width="100" show-overflow-tooltip />
         <el-table-column prop="componentCount" label="制程明细" width="100" align="center" />
-        <el-table-column label="操作" width="180" fixed="right" align="center">
+        <el-table-column label="操作" width="100" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
-            <el-button v-if="canExecute" link type="primary" size="small" @click="followUpRouter.push({ path: '/h3-production-execution', query: { sourceId: String(row.id) } })">查看执行</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -166,17 +170,17 @@
 
     <!-- 收款记录台账（SINGLE_OUTBOUND） -->
     <template v-else-if="ledgerType === 'receipt'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="receiptNo" label="收款单号" width="180" show-overflow-tooltip />
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="receiptNo" :sortable="sortableOf('receiptNo')" label="收款单号" width="180" show-overflow-tooltip />
         <el-table-column label="状态" width="100">
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.status)">{{ row.status || '—' }}</el-tag></template>
         </el-table-column>
-        <el-table-column prop="receiptDate" label="收款日期" width="120" :formatter="dateCell" />
-        <el-table-column prop="customerName" label="客户" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="dealerName" label="经销商" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="receiptDate" :sortable="sortableOf('receiptDate')" label="收款日期" width="120" :formatter="dateCell" />
+        <el-table-column prop="customerName" :sortable="sortableOf('customerName')" label="客户" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="dealerName" :sortable="sortableOf('dealerName')" label="经销商" min-width="140" show-overflow-tooltip />
         <el-table-column prop="salespersonName" label="业务员" width="110" show-overflow-tooltip />
         <el-table-column prop="paymentMethod" label="支付方式" width="140" show-overflow-tooltip />
-        <el-table-column prop="receiptAmount" label="收款金额" width="130" align="right">
+        <el-table-column prop="receiptAmount" :sortable="sortableOf('receiptAmount')" label="收款金额" width="130" align="right">
           <template #default="{ row }">{{ money(row.receiptAmount) }}</template>
         </el-table-column>
         <el-table-column prop="receivableAmount" label="应收金额" width="130" align="right">
@@ -189,7 +193,7 @@
           </template>
         </el-table-column>
         <el-table-column prop="departmentName" label="部门" min-width="140" show-overflow-tooltip />
-        <el-table-column prop="sourceCreatedAt" label="源创建时间" width="170" :formatter="dateTimeCell" />
+        <el-table-column prop="sourceCreatedAt" :sortable="sortableOf('sourceCreatedAt')" label="源创建时间" width="170" :formatter="dateTimeCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -200,7 +204,7 @@
 
     <!-- 多订单结清台账（MULTI_OUTBOUND，展开查看覆盖的出库单） -->
     <template v-else-if="ledgerType === 'settlement'">
-      <el-table v-loading="loading" :data="items" stripe row-key="id">
+      <el-table v-loading="loading" :data="items" stripe row-key="id" :default-sort="defaultSort" @sort-change="handleSortChange">
         <el-table-column type="expand" width="44">
           <template #default="{ row }">
             <div class="expand-body">
@@ -222,23 +226,23 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="receiptNo" label="结清单号" width="180" show-overflow-tooltip />
+        <el-table-column prop="receiptNo" :sortable="sortableOf('receiptNo')" label="结清单号" width="180" show-overflow-tooltip />
         <el-table-column label="状态" width="100">
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.status)">{{ row.status || '—' }}</el-tag></template>
         </el-table-column>
-        <el-table-column prop="receiptDate" label="结清日期" width="120" :formatter="dateCell" />
-        <el-table-column prop="customerName" label="客户" min-width="160" show-overflow-tooltip />
-        <el-table-column prop="dealerName" label="经销商" min-width="140" show-overflow-tooltip />
+        <el-table-column prop="receiptDate" :sortable="sortableOf('receiptDate')" label="结清日期" width="120" :formatter="dateCell" />
+        <el-table-column prop="customerName" :sortable="sortableOf('customerName')" label="客户" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="dealerName" :sortable="sortableOf('dealerName')" label="经销商" min-width="140" show-overflow-tooltip />
         <el-table-column prop="salespersonName" label="业务员" width="110" show-overflow-tooltip />
         <el-table-column prop="paymentMethod" label="支付方式" width="140" show-overflow-tooltip />
-        <el-table-column prop="receiptAmount" label="结清金额" width="130" align="right">
+        <el-table-column prop="receiptAmount" :sortable="sortableOf('receiptAmount')" label="结清金额" width="130" align="right">
           <template #default="{ row }">{{ money(row.receiptAmount) }}</template>
         </el-table-column>
         <el-table-column prop="receivableAmount" label="应收金额" width="130" align="right">
           <template #default="{ row }">{{ money(row.receivableAmount) }}</template>
         </el-table-column>
         <el-table-column prop="departmentName" label="部门" min-width="140" show-overflow-tooltip />
-        <el-table-column prop="sourceCreatedAt" label="源创建时间" width="170" :formatter="dateTimeCell" />
+        <el-table-column prop="sourceCreatedAt" :sortable="sortableOf('sourceCreatedAt')" label="源创建时间" width="170" :formatter="dateTimeCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -251,10 +255,10 @@
 
     <!-- 产品信息台账（氚云产品信息 Excel 按批次增量导入 h3_product_catalog，不覆盖） -->
     <template v-else-if="ledgerType === 'product'">
-      <el-table v-loading="loading" :data="items" stripe>
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
         <el-table-column type="index" label="#" width="50" />
-        <el-table-column prop="productCode" label="产品编号" width="130" show-overflow-tooltip />
-        <el-table-column prop="productName" label="产品名称" min-width="180" show-overflow-tooltip />
+        <el-table-column prop="productCode" :sortable="sortableOf('productCode')" label="产品编号" width="130" show-overflow-tooltip />
+        <el-table-column prop="productName" :sortable="sortableOf('productName')" label="产品名称" min-width="180" show-overflow-tooltip />
         <el-table-column prop="category" label="类目" width="120" show-overflow-tooltip />
         <el-table-column prop="specification" label="规格" min-width="140" show-overflow-tooltip />
         <el-table-column prop="unit" label="单位" width="80" />
@@ -262,7 +266,7 @@
           <template #default="{ row }">{{ money(row.purchasePrice) }}</template>
         </el-table-column>
         <el-table-column prop="batchId" label="导入批次" width="170" show-overflow-tooltip />
-        <el-table-column prop="createdAt" label="导入时间" width="170" :formatter="dateTimeCell" />
+        <el-table-column prop="createdAt" :sortable="sortableOf('createdAt')" label="导入时间" width="170" :formatter="dateTimeCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -273,11 +277,11 @@
 
     <!-- 仓库明细台账（氚云仓库明细 Excel 按批次增量导入 h3_warehouse_stock，不覆盖） -->
     <template v-else-if="ledgerType === 'stock'">
-      <el-table v-loading="loading" :data="items" stripe>
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
         <el-table-column type="index" label="#" width="50" />
         <el-table-column prop="warehouse" label="仓库" width="110" show-overflow-tooltip />
-        <el-table-column prop="productCode" label="产品编号" width="130" show-overflow-tooltip />
-        <el-table-column prop="productName" label="产品名称" min-width="170" show-overflow-tooltip />
+        <el-table-column prop="productCode" :sortable="sortableOf('productCode')" label="产品编号" width="130" show-overflow-tooltip />
+        <el-table-column prop="productName" :sortable="sortableOf('productName')" label="产品名称" min-width="170" show-overflow-tooltip />
         <el-table-column prop="category" label="类目" width="110" show-overflow-tooltip />
         <el-table-column prop="specification" label="规格" min-width="130" show-overflow-tooltip />
         <el-table-column prop="unit" label="单位" width="70" />
@@ -288,7 +292,7 @@
           <template #default="{ row }">{{ money(row.purchasePrice) }}</template>
         </el-table-column>
         <el-table-column prop="batchId" label="导入批次" width="170" show-overflow-tooltip />
-        <el-table-column prop="createdAt" label="导入时间" width="170" :formatter="dateTimeCell" />
+        <el-table-column prop="createdAt" :sortable="sortableOf('createdAt')" label="导入时间" width="170" :formatter="dateTimeCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -299,10 +303,10 @@
 
     <!-- 经销商信息台账（氚云经销商信息 Excel 按批次增量导入 h3_dealer_catalog，不覆盖） -->
     <template v-else-if="ledgerType === 'dealer'">
-      <el-table v-loading="loading" :data="items" stripe>
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
         <el-table-column type="index" label="#" width="50" />
-        <el-table-column prop="dealerCode" label="经销商编号" width="140" show-overflow-tooltip />
-        <el-table-column prop="dealerName" label="经销商名称" min-width="170" show-overflow-tooltip />
+        <el-table-column prop="dealerCode" :sortable="sortableOf('dealerCode')" label="经销商编号" width="140" show-overflow-tooltip />
+        <el-table-column prop="dealerName" :sortable="sortableOf('dealerName')" label="经销商名称" min-width="170" show-overflow-tooltip />
         <el-table-column prop="contact" label="联系方式" width="140" show-overflow-tooltip>
           <template #default="{ row }">{{ row.contact || '—' }}</template>
         </el-table-column>
@@ -319,7 +323,7 @@
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.dataStatus)">{{ row.dataStatus || '—' }}</el-tag></template>
         </el-table-column>
         <el-table-column prop="batchId" label="导入批次" width="170" show-overflow-tooltip />
-        <el-table-column prop="createdAt" label="导入时间" width="170" :formatter="dateTimeCell" />
+        <el-table-column prop="createdAt" :sortable="sortableOf('createdAt')" label="导入时间" width="170" :formatter="dateTimeCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -330,12 +334,12 @@
 
     <!-- 采购入库台账（V305 事实层；供应商解析失败标黄待人工核对，草稿单不进正式口径） -->
     <template v-else-if="ledgerType === 'purchase'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="sourceNo" label="采购入库编号" width="180" show-overflow-tooltip />
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="sourceNo" :sortable="sortableOf('sourceNo')" label="采购入库编号" width="180" show-overflow-tooltip />
         <el-table-column label="状态" width="90">
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.dataStatus)">{{ row.dataStatus || '—' }}</el-tag></template>
         </el-table-column>
-        <el-table-column prop="purchaseDate" label="采购日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="purchaseDate" :sortable="sortableOf('purchaseDate')" label="采购日期" width="110" :formatter="dateCell" />
         <el-table-column label="供应商" min-width="170" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="row.supplierName">{{ row.supplierName }}</span>
@@ -352,7 +356,7 @@
         <el-table-column prop="totalQuantity" label="合计数量" width="110" align="right">
           <template #default="{ row }">{{ num(row.totalQuantity) }}</template>
         </el-table-column>
-        <el-table-column prop="totalAmount" label="合计金额" width="130" align="right">
+        <el-table-column prop="totalAmount" :sortable="sortableOf('totalAmount')" label="合计金额" width="130" align="right">
           <template #default="{ row }">{{ money(row.totalAmount) }}</template>
         </el-table-column>
         <el-table-column prop="unpaidAmount" label="未付款金额" width="120" align="right">
@@ -364,7 +368,7 @@
         <el-table-column prop="keeper" label="仓管员" width="90" show-overflow-tooltip>
           <template #default="{ row }">{{ row.keeper || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="sourceCreatedAt" label="源创建时间" width="170" :formatter="dateTimeCell" />
+        <el-table-column prop="sourceCreatedAt" :sortable="sortableOf('sourceCreatedAt')" label="源创建时间" width="170" :formatter="dateTimeCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -375,9 +379,9 @@
 
     <!-- 供应商主数据台账（V305；名称即业务语义键，is_internal/is_dirty_value 为导入时标记） -->
     <template v-else-if="ledgerType === 'supplier'">
-      <el-table v-loading="loading" :data="items" stripe>
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
         <el-table-column type="index" label="#" width="50" />
-        <el-table-column prop="name" label="供应商名称" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="name" :sortable="sortableOf('name')" label="供应商名称" min-width="200" show-overflow-tooltip />
         <el-table-column prop="supplierStatus" label="合作状态" width="100">
           <template #default="{ row }">{{ row.supplierStatus || '—' }}</template>
         </el-table-column>
@@ -402,7 +406,7 @@
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.dataStatus)">{{ row.dataStatus || '—' }}</el-tag></template>
         </el-table-column>
         <el-table-column prop="departmentName" label="所属部门" min-width="130" show-overflow-tooltip />
-        <el-table-column prop="sourceCreatedAt" label="源创建时间" width="170" :formatter="dateTimeCell" />
+        <el-table-column prop="sourceCreatedAt" :sortable="sortableOf('sourceCreatedAt')" label="源创建时间" width="170" :formatter="dateTimeCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -413,12 +417,12 @@
 
     <!-- 其他入库台账（V306 direction=IN；与其他出库同表单复制，明细前缀同名） -->
     <template v-else-if="ledgerType === 'otherIn'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="sourceNo" label="入库单号" width="190" show-overflow-tooltip />
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="sourceNo" :sortable="sortableOf('sourceNo')" label="入库单号" width="190" show-overflow-tooltip />
         <el-table-column label="状态" width="90">
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.dataStatus)">{{ row.dataStatus || '—' }}</el-tag></template>
         </el-table-column>
-        <el-table-column prop="movementDate" label="入库日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="movementDate" :sortable="sortableOf('movementDate')" label="入库日期" width="110" :formatter="dateCell" />
         <el-table-column prop="warehouseName" label="入库仓库" min-width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.warehouseName || '—' }}</template>
         </el-table-column>
@@ -432,7 +436,7 @@
         <el-table-column prop="departmentName" label="所属部门" min-width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.departmentName || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="sourceCreatedAt" label="源创建时间" width="170" :formatter="dateTimeCell" />
+        <el-table-column prop="sourceCreatedAt" :sortable="sortableOf('sourceCreatedAt')" label="源创建时间" width="170" :formatter="dateTimeCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -443,12 +447,12 @@
 
     <!-- 其他出库台账（V306 direction=OUT；合计数量/金额为主表原值） -->
     <template v-else-if="ledgerType === 'otherOut'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="sourceNo" label="出库单号" width="190" show-overflow-tooltip />
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="sourceNo" :sortable="sortableOf('sourceNo')" label="出库单号" width="190" show-overflow-tooltip />
         <el-table-column label="状态" width="90">
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.dataStatus)">{{ row.dataStatus || '—' }}</el-tag></template>
         </el-table-column>
-        <el-table-column prop="movementDate" label="出库日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="movementDate" :sortable="sortableOf('movementDate')" label="出库日期" width="110" :formatter="dateCell" />
         <el-table-column prop="warehouseName" label="出库仓库" min-width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.warehouseName || '—' }}</template>
         </el-table-column>
@@ -462,10 +466,10 @@
         <el-table-column prop="totalQuantity" label="合计数量" width="110" align="right">
           <template #default="{ row }">{{ num(row.totalQuantity) }}</template>
         </el-table-column>
-        <el-table-column prop="totalAmount" label="合计金额" width="130" align="right">
+        <el-table-column prop="totalAmount" :sortable="sortableOf('totalAmount')" label="合计金额" width="130" align="right">
           <template #default="{ row }">{{ money(row.totalAmount) }}</template>
         </el-table-column>
-        <el-table-column prop="sourceCreatedAt" label="源创建时间" width="170" :formatter="dateTimeCell" />
+        <el-table-column prop="sourceCreatedAt" :sortable="sortableOf('sourceCreatedAt')" label="源创建时间" width="170" :formatter="dateTimeCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -476,12 +480,12 @@
 
     <!-- 库存调拨台账（V307；双仓库 + 双仓管员，纯数量无金额） -->
     <template v-else-if="ledgerType === 'transfer'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="sourceNo" label="调拨单号" width="190" show-overflow-tooltip />
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="sourceNo" :sortable="sortableOf('sourceNo')" label="调拨单号" width="190" show-overflow-tooltip />
         <el-table-column label="状态" width="90">
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.dataStatus)">{{ row.dataStatus || '—' }}</el-tag></template>
         </el-table-column>
-        <el-table-column prop="transferDate" label="调拨日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="transferDate" :sortable="sortableOf('transferDate')" label="调拨日期" width="110" :formatter="dateCell" />
         <el-table-column prop="outWarehouseName" label="调出仓库" min-width="120" show-overflow-tooltip>
           <template #default="{ row }">{{ row.outWarehouseName || '—' }}</template>
         </el-table-column>
@@ -501,7 +505,7 @@
         <el-table-column prop="departmentName" label="所属部门" min-width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.departmentName || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="sourceCreatedAt" label="源创建时间" width="170" :formatter="dateTimeCell" />
+        <el-table-column prop="sourceCreatedAt" :sortable="sortableOf('sourceCreatedAt')" label="源创建时间" width="170" :formatter="dateTimeCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -510,8 +514,8 @@
       </el-table>
     </template>
     <template v-else-if="ledgerType === 'invoiceProfile'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="customerName" label="户名" min-width="200" show-overflow-tooltip />
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="customerName" :sortable="sortableOf('customerName')" label="户名" min-width="200" show-overflow-tooltip />
         <el-table-column prop="taxNo" label="税号" width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ row.taxNo || '—' }}</template>
         </el-table-column>
@@ -530,7 +534,7 @@
         <el-table-column label="状态" width="90">
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.dataStatus)">{{ row.dataStatus || '—' }}</el-tag></template>
         </el-table-column>
-        <el-table-column prop="sourceUpdatedAt" label="源更新时间" width="150" :formatter="dateCell" />
+        <el-table-column prop="sourceUpdatedAt" :sortable="sortableOf('sourceUpdatedAt')" label="源更新时间" width="150" :formatter="dateCell" />
         <el-table-column label="操作" width="72" fixed="right" align="center">
           <template #default="{ row }">
             <el-button link type="primary" size="small" @click="openDetail(row)">详情</el-button>
@@ -539,19 +543,19 @@
       </el-table>
     </template>
     <template v-else-if="ledgerType === 'invoiceRequest'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="sourceNo" label="流水号" width="110" show-overflow-tooltip />
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="sourceNo" :sortable="sortableOf('sourceNo')" label="流水号" width="110" show-overflow-tooltip />
         <el-table-column prop="invoiceType" label="发票类型" width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.invoiceType || '—' }}</template>
         </el-table-column>
         <el-table-column label="状态" width="90">
           <template #default="{ row }"><el-tag size="small" :type="tagType(row.dataStatus)">{{ row.dataStatus || '—' }}</el-tag></template>
         </el-table-column>
-        <el-table-column prop="requestDate" label="开票日期" width="110" :formatter="dateCell" />
-        <el-table-column prop="customerName" label="户名" min-width="190" show-overflow-tooltip>
+        <el-table-column prop="requestDate" :sortable="sortableOf('requestDate')" label="开票日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="customerName" :sortable="sortableOf('customerName')" label="户名" min-width="190" show-overflow-tooltip>
           <template #default="{ row }">{{ row.customerName || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="requestAmount" label="申请金额" width="110" align="right">
+        <el-table-column prop="requestAmount" :sortable="sortableOf('requestAmount')" label="申请金额" width="110" align="right">
           <template #default="{ row }">{{ money(row.requestAmount) }}</template>
         </el-table-column>
         <el-table-column prop="receivedAmount" label="已收款" width="110" align="right">
@@ -573,9 +577,9 @@
       </el-table>
     </template>
     <template v-else-if="ledgerType === 'productionReport'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="reportTime" label="报工时间" width="140" :formatter="dateCell" />
-        <el-table-column prop="workOrderNo" label="生产工单编号" width="150" show-overflow-tooltip>
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="reportTime" :sortable="sortableOf('reportTime')" label="报工时间" width="140" :formatter="dateCell" />
+        <el-table-column prop="workOrderNo" :sortable="sortableOf('workOrderNo')" label="生产工单编号" width="150" show-overflow-tooltip>
           <template #default="{ row }">{{ row.workOrderNo || '—' }}</template>
         </el-table-column>
         <el-table-column prop="componentName" label="工序（零部件）" width="150" show-overflow-tooltip>
@@ -605,24 +609,24 @@
       </el-table>
     </template>
     <template v-else-if="ledgerType === 'invoiceInput'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="sourceNo" label="数电发票号码" width="200" show-overflow-tooltip>
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="sourceNo" :sortable="sortableOf('sourceNo')" label="数电发票号码" width="200" show-overflow-tooltip>
           <template #default="{ row }">{{ row.sourceNo || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="invoiceDate" label="开票日期" width="150" :formatter="dateCell" />
+        <el-table-column prop="invoiceDate" :sortable="sortableOf('invoiceDate')" label="开票日期" width="150" :formatter="dateCell" />
         <el-table-column prop="sellerName" label="销方名称" min-width="220" show-overflow-tooltip>
           <template #default="{ row }">{{ row.sellerName || '—' }}</template>
         </el-table-column>
         <el-table-column prop="sellerTaxNo" label="销方识别号" width="180" show-overflow-tooltip>
           <template #default="{ row }">{{ row.sellerTaxNo || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="amount" label="金额" width="110" align="right">
+        <el-table-column prop="amount" :sortable="sortableOf('amount')" label="金额" width="110" align="right">
           <template #default="{ row }">{{ money(row.amount) }}</template>
         </el-table-column>
         <el-table-column prop="taxAmount" label="税额" width="100" align="right">
           <template #default="{ row }">{{ money(row.taxAmount) }}</template>
         </el-table-column>
-        <el-table-column prop="totalAmount" label="价税合计" width="110" align="right">
+        <el-table-column prop="totalAmount" :sortable="sortableOf('totalAmount')" label="价税合计" width="110" align="right">
           <template #default="{ row }">{{ money(row.totalAmount) }}</template>
         </el-table-column>
         <el-table-column prop="invoiceKind" label="票种" width="180" show-overflow-tooltip>
@@ -644,22 +648,22 @@
       </el-table>
     </template>
     <template v-else-if="ledgerType === 'invoiceSales'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="sourceNo" label="数电发票号码" width="200" show-overflow-tooltip>
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="sourceNo" :sortable="sortableOf('sourceNo')" label="数电发票号码" width="200" show-overflow-tooltip>
           <template #default="{ row }">{{ row.sourceNo || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="invoiceDate" label="开票日期" width="150" :formatter="dateCell" />
+        <el-table-column prop="invoiceDate" :sortable="sortableOf('invoiceDate')" label="开票日期" width="150" :formatter="dateCell" />
         <el-table-column prop="buyerName" label="购买方名称" min-width="220" show-overflow-tooltip>
           <template #default="{ row }">{{ row.buyerName || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="totalAmount" label="价税合计" width="110" align="right">
+        <el-table-column prop="totalAmount" :sortable="sortableOf('totalAmount')" label="价税合计" width="110" align="right">
           <template #default="{ row }">{{ money(row.totalAmount) }}</template>
         </el-table-column>
-        <el-table-column prop="receiptDate" label="收款日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="receiptDate" :sortable="sortableOf('receiptDate')" label="收款日期" width="110" :formatter="dateCell" />
         <el-table-column prop="paymentMethod" label="付款方式" width="140" show-overflow-tooltip>
           <template #default="{ row }">{{ row.paymentMethod || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="receiptAmount" label="收款金额" width="110" align="right">
+        <el-table-column prop="receiptAmount" :sortable="sortableOf('receiptAmount')" label="收款金额" width="110" align="right">
           <template #default="{ row }">{{ money(row.receiptAmount) }}</template>
         </el-table-column>
         <el-table-column prop="unreceivedAmount" label="未收款" width="110" align="right">
@@ -682,11 +686,11 @@
       </el-table>
     </template>
     <template v-else-if="ledgerType === 'supplierPayable'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="supplierName" label="供应商" min-width="160" show-overflow-tooltip>
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="supplierName" :sortable="sortableOf('supplierName')" label="供应商" min-width="160" show-overflow-tooltip>
           <template #default="{ row }">{{ row.supplierName || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="monthNo" label="月份" width="80" align="center">
+        <el-table-column prop="monthNo" :sortable="sortableOf('monthNo')" label="月份" width="80" align="center">
           <template #default="{ row }">{{ row.monthNo ? row.monthNo + '月' : (row.monthRaw || '—') }}</template>
         </el-table-column>
         <el-table-column prop="payableAmount" label="应付货款" width="120" align="right">
@@ -698,7 +702,7 @@
         <el-table-column prop="allowance" label="折让" width="110" align="right">
           <template #default="{ row }">{{ money(row.allowance) }}</template>
         </el-table-column>
-        <el-table-column prop="payDate" label="付款日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="payDate" :sortable="sortableOf('payDate')" label="付款日期" width="110" :formatter="dateCell" />
         <el-table-column prop="payMethod" label="付款方式" width="130" show-overflow-tooltip>
           <template #default="{ row }">{{ row.payMethod || '—' }}</template>
         </el-table-column>
@@ -719,11 +723,11 @@
       </el-table>
     </template>
     <template v-else-if="ledgerType === 'cashflowJournal'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="accountName" label="账户" min-width="170" show-overflow-tooltip fixed="left">
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="accountName" :sortable="sortableOf('accountName')" label="账户" min-width="170" show-overflow-tooltip fixed="left">
           <template #default="{ row }">{{ row.accountName || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="entryDate" label="日期" width="110" :formatter="dateCell" />
+        <el-table-column prop="entryDate" :sortable="sortableOf('entryDate')" label="日期" width="110" :formatter="dateCell" />
         <el-table-column prop="monthLabel" label="月份" width="70" align="center">
           <template #default="{ row }">{{ row.monthLabel || '—' }}</template>
         </el-table-column>
@@ -765,12 +769,12 @@
       </el-table>
     </template>
     <template v-else-if="ledgerType === 'cashierLog'">
-      <el-table v-loading="loading" :data="items" stripe>
-        <el-table-column prop="txTime" label="交易完成时间" width="165" :formatter="dateTimeCell" />
+      <el-table v-loading="loading" :data="items" stripe :default-sort="defaultSort" @sort-change="handleSortChange">
+        <el-table-column prop="txTime" :sortable="sortableOf('txTime')" label="交易完成时间" width="165" :formatter="dateTimeCell" />
         <el-table-column prop="status" label="状态" width="80" align="center">
           <template #default="{ row }">{{ row.status || '—' }}</template>
         </el-table-column>
-        <el-table-column prop="amount" label="交易金额" width="120" align="right">
+        <el-table-column prop="amount" :sortable="sortableOf('amount')" label="交易金额" width="120" align="right">
           <template #default="{ row }">{{ money(row.amount) }}</template>
         </el-table-column>
         <el-table-column prop="fee" label="订单总扣费" width="120" align="right">
@@ -818,8 +822,6 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { Search } from '@element-plus/icons-vue'
 import H3LedgerDetailDrawer from './H3LedgerDetailDrawer.vue'
 import {
@@ -850,14 +852,11 @@ import { fetchProductCatalogLedger, fetchWarehouseStockLedger, fetchDealerLedger
 import { notify } from '@/composables/ui/useToast'
 import type { H3LedgerKind, LedgerDetailResult, LedgerRow } from '@/api/business/orders'
 
-const followUpRouter = useRouter()
-const { can: canFollowUpPermission } = useCurrentUser()
-const canExecute = computed(() => ['manufacturing.report', 'manufacturing.report.override', 'manufacturing.inspect', 'manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'].some(canFollowUpPermission))
 
 /** initialKeyword：从外部深链（如出库单详情 → 本页台账）带入的初始搜索词，仅挂载时生效一次 */
-const props = defineProps<{ ledgerType: H3LedgerKind; initialKeyword?: string }>()
+const props = defineProps<{ ledgerType: H3LedgerKind; initialKeyword?: string; initialProductCode?: string; initialCategory?: string }>()
 
-const FETCHERS: Record<H3LedgerKind, (p: { keyword?: string; account?: string; supplier?: string; page?: number; size?: number }) => Promise<{ items: LedgerRow[]; total: number }>> = {
+const FETCHERS: Record<H3LedgerKind, (p: { keyword?: string; productCode?: string; category?: string; account?: string; supplier?: string; page?: number; size?: number; sort?: string; direction?: 'asc' | 'desc' }) => Promise<{ items: LedgerRow[]; total: number }>> = {
   outbound: fetchOutboundLedger,
   production: fetchProductionLedger,
   receipt: fetchReceiptLedger,
@@ -886,7 +885,7 @@ const META: Record<H3LedgerKind, { placeholder: string; hint: string }> = {
   },
   production: {
     placeholder: '搜索工单号 / 客户 / 产品',
-    hint: '保留氚云生产任务工单原始数据；点击“跟单”维护本地进度，重新导入不覆盖跟单记录。'
+    hint: '保留氚云生产任务工单原始数据，供核对任务与工序来源；此处为只读台账。'
   },
   receipt: {
     placeholder: '搜索收款单号 / 客户 / 业务员',
@@ -962,8 +961,85 @@ const META: Record<H3LedgerKind, { placeholder: string; hint: string }> = {
   }
 }
 const meta = computed(() => META[props.ledgerType])
+// ---- 台账排序（2026-10-08）----
+// 背景：面板里 20 类台账原先一律按 id 倒序（= 导入顺序），与业务时间/单号无关，看着乱且无排序入口。
+// 列 prop → 排序键，与后端 LedgerSort 白名单一一对应；键：time 业务时间 / code 单号编号 / amount 金额 / name 往来单位。
+// 只有「当前台账类型」配置了的列才可排序 —— sortableOf 取的是当前 ledgerType 的配置，
+// 所以同一 prop 在不同台账里可排序/不可排序各自独立。
+const SORTABLE_COLUMNS: Record<string, Record<string, string>> = {
+  outbound: { shipDate: 'time', outboundNo: 'code', salesAmount: 'amount', customerName: 'name' },
+  production: { sourceCreatedAt: 'time', workOrderNo: 'code', customerName: 'name' },
+  receipt: { receiptDate: 'time', receiptNo: 'code', receiptAmount: 'amount', customerName: 'name' },
+  settlement: { receiptDate: 'time', receiptNo: 'code', receiptAmount: 'amount', customerName: 'name' },
+  product: { createdAt: 'time', productCode: 'code', productName: 'name' },
+  stock: { createdAt: 'time', productCode: 'code', productName: 'name' },
+  dealer: { createdAt: 'time', dealerCode: 'code', dealerName: 'name' },
+  supplier: { sourceCreatedAt: 'time', name: 'name' },
+  purchase: { purchaseDate: 'time', sourceNo: 'code', totalAmount: 'amount' },
+  otherIn: { movementDate: 'time', sourceNo: 'code' },
+  otherOut: { movementDate: 'time', sourceNo: 'code', totalAmount: 'amount' },
+  transfer: { transferDate: 'time', sourceNo: 'code' },
+  invoiceProfile: { sourceUpdatedAt: 'time', customerName: 'name' },
+  invoiceRequest: { requestDate: 'time', sourceNo: 'code', requestAmount: 'amount', customerName: 'name' },
+  productionReport: { reportTime: 'time', workOrderNo: 'code' },
+  invoiceInput: { invoiceDate: 'time', sourceNo: 'code', totalAmount: 'amount' },
+  invoiceSales: { invoiceDate: 'time', sourceNo: 'code', totalAmount: 'amount' },
+  supplierPayable: { supplierName: 'name', payDate: 'time', monthNo: 'code' },
+  cashflowJournal: { accountName: 'name', entryDate: 'time' },
+  cashierLog: { txTime: 'time', amount: 'amount' }
+}
+// 默认序必须与后端「不传 sort 时」的顺序一致，否则表头箭头撒谎。
+// 应付/流水日记账后端默认按 sheet 维度（供应商名 / 账户名）分组，故箭头落在该列升序上。
+const DEFAULT_SORT: Record<string, { prop: string; order: 'ascending' | 'descending' }> = {
+  outbound: { prop: 'shipDate', order: 'descending' },
+  production: { prop: 'sourceCreatedAt', order: 'descending' },
+  receipt: { prop: 'receiptDate', order: 'descending' },
+  settlement: { prop: 'receiptDate', order: 'descending' },
+  product: { prop: 'createdAt', order: 'descending' },
+  stock: { prop: 'createdAt', order: 'descending' },
+  dealer: { prop: 'createdAt', order: 'descending' },
+  supplier: { prop: 'sourceCreatedAt', order: 'descending' },
+  purchase: { prop: 'purchaseDate', order: 'descending' },
+  otherIn: { prop: 'movementDate', order: 'descending' },
+  otherOut: { prop: 'movementDate', order: 'descending' },
+  transfer: { prop: 'transferDate', order: 'descending' },
+  invoiceProfile: { prop: 'sourceUpdatedAt', order: 'descending' },
+  invoiceRequest: { prop: 'requestDate', order: 'descending' },
+  productionReport: { prop: 'reportTime', order: 'descending' },
+  invoiceInput: { prop: 'invoiceDate', order: 'descending' },
+  invoiceSales: { prop: 'invoiceDate', order: 'descending' },
+  supplierPayable: { prop: 'supplierName', order: 'ascending' },
+  cashflowJournal: { prop: 'accountName', order: 'ascending' },
+  cashierLog: { prop: 'txTime', order: 'descending' }
+}
+const defaultSort = computed(() => DEFAULT_SORT[props.ledgerType] ?? { prop: '', order: 'descending' as const })
+/** 排序目标：空 = 用后端该台账默认序（不复用表头箭头，避免「箭头在 A、实际按 B 排」）。 */
+const sortField = ref('')
+const sortDir = ref<'asc' | 'desc'>('desc')
+function sortableOf(prop: string): 'custom' | false {
+  return SORTABLE_COLUMNS[props.ledgerType]?.[prop] ? 'custom' : false
+}
+/** 三段点击 asc → desc → null：null/未知列要回落该台账默认序，不能当成「不排序」，否则顺序与箭头不符。 */
+function handleSortChange({ prop, order }: { prop: string | null; order: 'ascending' | 'descending' | null }) {
+  const key = prop ? SORTABLE_COLUMNS[props.ledgerType]?.[prop] : undefined
+  if (!order || !key) {
+    sortField.value = ''
+    sortDir.value = 'desc'
+  } else {
+    sortField.value = key
+    sortDir.value = order === 'ascending' ? 'asc' : 'desc'
+  }
+  void reload(1)
+}
 
 const keyword = ref(props.initialKeyword ?? '')
+const productCodeFilter = ref(props.initialProductCode ?? '')
+const categoryFilter = ref(props.initialCategory ?? '')
+function clearProductFilter() {
+  productCodeFilter.value = ''
+  categoryFilter.value = ''
+  void reload(1)
+}
 const items = ref<LedgerRow[]>([])
 const total = ref(0)
 const page = ref(1)
@@ -1010,10 +1086,14 @@ async function reload(p?: number | undefined) {
   try {
     const r = await FETCHERS[props.ledgerType]({
       keyword: keyword.value || undefined,
+      productCode: props.ledgerType === 'outbound' ? productCodeFilter.value || undefined : undefined,
+      category: props.ledgerType === 'outbound' ? categoryFilter.value || undefined : undefined,
       account: accountFilter.value || undefined,
       supplier: supplierFilter.value || undefined,
       page: page.value,
-      size: size.value
+      size: size.value,
+      sort: sortField.value || undefined,
+      direction: sortField.value ? sortDir.value : undefined
     })
     items.value = r.items
     total.value = r.total

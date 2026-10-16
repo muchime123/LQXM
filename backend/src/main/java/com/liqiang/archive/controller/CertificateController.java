@@ -29,8 +29,10 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 
+/** 知识产权（专利/商标/软著）。类级查看权限 certificate.read；写接口维持方法级 certificate.manage。 */
 @RestController
 @RequestMapping("/api/certificates")
+@RequirePermission("certificate.read")
 @RequiredArgsConstructor
 public class CertificateController {
 

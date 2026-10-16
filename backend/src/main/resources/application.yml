@@ -79,8 +79,9 @@ app:
     session-timeout-hours: ${APP_SECURITY_SESSION_TIMEOUT_HOURS:12}
     # 未登录时是否返回"兼容管理员"（开发兜底）。生产环境必须为 false
     compatibility-admin: ${APP_SECURITY_COMPAT_ADMIN:false}
-    # 是否允许用 X-Employee-Id 请求头模拟身份（仅开发环境）。生产环境必须为 false
-    allow-employee-header: ${APP_SECURITY_ALLOW_EMPLOYEE_HEADER:true}
+    # 是否允许用 X-Employee-Id 请求头模拟身份（仅开发环境）。默认 false（安全，内网亦关）；
+    # 开发实例由 scripts/start-local.ps1 显式加 -Dapp.security.allow-employee-header=true 开启。
+    allow-employee-header: ${APP_SECURITY_ALLOW_EMPLOYEE_HEADER:false}
   archive:
     soft-delete:
       # 是否启用软删自动归档（=把 deleted_at 超过保留天数的记录迁移到 *_archive 然后物理删除）

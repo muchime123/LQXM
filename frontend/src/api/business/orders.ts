@@ -125,167 +125,76 @@ export async function fetchReassignTargets(entityType: 'CUSTOMER' | 'EMPLOYEE', 
   return (await http.get<{ items: Array<{ id: number; name: string }> }>('/h3-imports/identities/targets', { params: { entityType, keyword } })).data
 }
 
+/**
+ * 台账排序参数（2026-10-08）：`sort` ∈ time/code/amount/name（各台账可排序键不同），
+ * 缺省或非白名单键由服务端静默回落该台账默认序；`direction` 仅 'asc' 为升序，缺省降序。
+ * 键名与后端 `LedgerSort` 常量一致（time=业务时间、code=单号/编号、amount=金额、name=往来单位）。
+ */
+export interface LedgerSortParams { sort?: string; direction?: 'asc' | 'desc' }
+
 // ---- [历史台账] 统一读端点 /api/h3-imports/ledger/{kind}（阶段 3 收口，A/B 域同前缀） ----
 /** 销售出库台账 */
-export async function fetchOutboundLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchOutboundLedger(params: { keyword?: string; productCode?: string; category?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/outbound', { params })).data
 }
-export interface OutboundRelationCounts {
-  total: number
-  missingCustomer: number
-  missingEmployee: number
-  missingProduct: number
-  missingWarehouse: number
-  complete: number
-  draftExcluded: number
-}
-export interface OutboundRelationPage extends LedgerPage { counts: OutboundRelationCounts }
-export async function fetchOutboundRelations(params: { keyword?: string; relation?: string; page?: number; size?: number }) {
-  return (await http.get<OutboundRelationPage>('/h3-imports/outbound-relations', { params })).data
-}
-export interface ExactRelationCandidate { sourceName: string; targetId: number; targetName: string; outboundCount: number; candidateCount: number }
-export interface ExactRelationPreview {
-  employees: ExactRelationCandidate[]; warehouses: ExactRelationCandidate[]
-  employeeSourceCount: number; employeeOutboundCount: number
-  warehouseSourceCount: number; warehouseOutboundCount: number
-}
-export interface ExactRelationApplyResult { employeeRules: number; employeeOutbounds: number; warehouseRules: number; warehouseOutbounds: number }
-export async function fetchOutboundExactRelationPreview() {
-  return (await http.get<ExactRelationPreview>('/h3-imports/outbound-relations/exact-preview')).data
-}
-export async function applyOutboundExactRelations() {
-  return (await http.post<ExactRelationApplyResult>('/h3-imports/outbound-relations/exact-apply')).data
-}
-export interface CustomerRelationPreviewItem { id:number; outboundNo:string; customerName:string; contactPhone:string; customerAddress:string; targetId:number; targetName:string; method:'CONFIRMED_CLUSTER'|'UNIQUE_PHONE'|'RESOLVED_IDENTITY'; reason:string }
-export interface CustomerRelationPreview { outboundCount:number; byMethod:Record<string,number>; items:CustomerRelationPreviewItem[] }
-export async function fetchOutboundCustomerRelationPreview() {
-  return (await http.get<CustomerRelationPreview>('/h3-imports/outbound-relations/customer-preview')).data
-}
-export async function applyOutboundCustomerRelations() {
-  return (await http.post<{customerOutbounds:number;byMethod:Record<string,number>}>('/h3-imports/outbound-relations/customer-apply')).data
-}
-export interface NewCustomerClusterRow { phone:string;customerName:string;outboundCount:number;sourceNames:string[];addressCount:number }
-export interface NewCustomerClusterPreview { clusterCount:number;outboundCount:number;items:NewCustomerClusterRow[] }
-export async function fetchOutboundNewCustomerPreview() {
-  return (await http.get<NewCustomerClusterPreview>('/h3-imports/outbound-relations/new-customer-preview')).data
-}
-export async function applyOutboundNewCustomers() {
-  return (await http.post<{createdCustomers:number;customerOutbounds:number}>('/h3-imports/outbound-relations/new-customer-apply')).data
-}
-export interface CustomerExceptionRow { id:number;outboundNo:string;customerName:string;contactPhone:string;customerAddress:string;phones:string[];category:'NO_VALID_PHONE'|'MULTIPLE_PHONES'|'SHARED_PHONE'|'UNRESOLVED';reason:string }
-export interface CustomerExceptionPreview { exceptionCount:number;byCategory:Record<string,number>;items:CustomerExceptionRow[] }
-export async function fetchOutboundCustomerExceptions() {
-  return (await http.get<CustomerExceptionPreview>('/h3-imports/outbound-relations/customer-exceptions')).data
-}
-export interface MultiPhoneClusterRow { customerName:string;address:string;phones:string[];outboundCount:number;targetId:number|null;targetName:string|null;decision:'LINK'|'CREATE'|'REVIEW' }
-export interface MultiPhonePreview { clusterCount:number;linkClusters:number;createClusters:number;reviewClusters:number;actionableOutbounds:number;items:MultiPhoneClusterRow[] }
-export async function fetchOutboundMultiPhonePreview() {
-  return (await http.get<MultiPhonePreview>('/h3-imports/outbound-relations/multi-phone-preview')).data
-}
-export async function applyOutboundMultiPhone() {
-  return (await http.post<{linkedClusters:number;createdCustomers:number;customerOutbounds:number}>('/h3-imports/outbound-relations/multi-phone-apply')).data
-}
-/** 产品归类建议行：decision=SUGGEST 表示唯一命中可直接归类；AMBIGUOUS/NOT_FOUND 需人工判断 */
-export interface ProductClassifyRow {
-  sourceKey: string
-  sourceCode: string
-  sourceName: string
-  sourceSpec: string
-  sourceUnit: string
-  lineCount: number
-  outboundCount: number
-  candidateCount: number
-  matchMethod: 'CODE' | 'NAME_SPEC_UNIT' | 'NAME' | 'CATALOG_CODE' | 'WAREHOUSE_STOCK_CODE' | 'WAREHOUSE_STOCK_NSU' | 'WAREHOUSE_STOCK_NAME' | 'WAREHOUSE_STOCK_CORE_NAME' | null
-  decision: 'SUGGEST' | 'AMBIGUOUS' | 'NOT_FOUND' | 'WAIT_WAREHOUSE'
-  targetId: number | null
-  targetName: string | null
-  targetSourceCode: string | null
-}
-export interface ProductClassifyPreview {
-  items: ProductClassifyRow[]
-  groupCount: number
-  lineCount: number
-  suggestedGroups: number
-  suggestedLines: number
-  ambiguousGroups: number
-  notFoundGroups: number
-  waitingWarehouseGroups: number
-}
-export interface ProductClassifyApplyResult { productRules: number; productLines: number; productOutbounds: number }
-export async function fetchOutboundProductClassifyPreview() {
-  return (await http.get<ProductClassifyPreview>('/h3-imports/outbound-relations/product-preview')).data
-}
-export async function applyOutboundProductClassify() {
-  return (await http.post<ProductClassifyApplyResult>('/h3-imports/outbound-relations/product-apply')).data
-}
-export interface OutboundAutoOrganizeResult {
-  employeeWarehouse: ExactRelationApplyResult
-  customerLinks: { customerOutbounds:number; byMethod:Record<string,number> }
-  newCustomers: { createdCustomers:number; customerOutbounds:number }
-  multiPhoneCustomers: { linkedClusters:number; createdCustomers:number; customerOutbounds:number }
-  products: ProductClassifyApplyResult
-}
-export async function autoOrganizeOutboundRelations() {
-  return (await http.post<OutboundAutoOrganizeResult>('/h3-imports/outbound-relations/auto-organize', {}, { timeout: 600000 })).data
-}
 /** 生产任务工单台账：filter ∈ all/available/linked，响应额外含 counts{available,linked}（用于台账内接入氚云工单） */
-export async function fetchProductionLedger(params: { keyword?: string; filter?: 'all' | 'available' | 'linked'; page?: number; size?: number }) {
+export async function fetchProductionLedger(params: { keyword?: string; filter?: 'all' | 'available' | 'linked'; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/production', { params })).data
 }
 /** 收款记录台账 */
-export async function fetchReceiptLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchReceiptLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/receipt', { params })).data
 }
 /** 多订单结清台账 */
-export async function fetchSettlementLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchSettlementLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/settlement', { params })).data
 }
 /** 采购入库台账（V305 事实层；supplier_id 为空 = 供应商解析失败待人工核对） */
-export async function fetchPurchaseLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchPurchaseLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/purchase', { params })).data
 }
 /** 供应商主数据台账（含别名引用数 alias_count 与内部/脏值标记） */
-export async function fetchSupplierLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchSupplierLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/supplier', { params })).data
 }
 /** 其他入库台账（V306 单表 + direction=IN；草稿单仅存档不进正式口径） */
-export async function fetchOtherInLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchOtherInLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/otherIn', { params })).data
 }
 /** 其他出库台账（V306 单表 + direction=OUT） */
-export async function fetchOtherOutLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchOtherOutLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/otherOut', { params })).data
 }
 /** 库存调拨台账（V307；双仓库/双仓管员，草稿与已取消仅标记保留） */
-export async function fetchTransferLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchTransferLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/transfer', { params })).data
 }
 /** 开票资料台账（V309；44 组同名户名是合法事实，未关联 customers 仅标记） */
-export async function fetchInvoiceProfileLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchInvoiceProfileLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/invoiceProfile', { params })).data
 }
 /** 开票申请台账（V309；本系统唯一开票口径来源，收款情况只建引用不写 receipts） */
-export async function fetchInvoiceRequestLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchInvoiceRequestLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/invoiceRequest', { params })).data
 }
 /** 生产报工台账（V311；工序完工报工，工单×零部件制程粒度，非材料领料） */
-export async function fetchProductionReportLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchProductionReportLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/productionReport', { params })).data
 }
 /** 进项发票台账（V312 第 16 类；税务平台全量导出，实开口径权威源·进项侧） */
-export async function fetchInvoiceInputLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchInvoiceInputLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/invoiceInput', { params })).data
 }
 /** 销项发票台账（V312 第 16 类；含多次收款登记子行，收款字段为校验源） */
-export async function fetchInvoiceSalesLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchInvoiceSalesLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/invoiceSales', { params })).data
 }
 /** 供应商应付台账（V313 第 17 类；multiSheet 聚合人工月度台账，补库内应付侧残缺）。supplier=sheet 维度精确筛选 */
-export async function fetchSupplierPayableLedger(params: { keyword?: string; supplier?: string; page?: number; size?: number }) {
+export async function fetchSupplierPayableLedger(params: { keyword?: string; supplier?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/supplierPayable', { params })).data
 }
 /** 流水日记账台账（V315 第 18 类；35 张账户 sheet 行级聚合 7 588 行分录，校验源·只核对不回写）。account=sheet 维度精确筛选 */
-export async function fetchCashflowJournalLedger(params: { keyword?: string; account?: string; page?: number; size?: number }) {
+export async function fetchCashflowJournalLedger(params: { keyword?: string; account?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/cashflowJournal', { params })).data
 }
 
@@ -321,7 +230,7 @@ export async function fetchPayableSuppliers() {
   return (await http.get<{ items: PayableSupplierSummary[] }>('/h3-imports/ledger/supplierPayable/suppliers')).data
 }
 /** 收银通收单流水台账（V316 第 19 类；微信收单 6088 行，校验源·只核对不回写） */
-export async function fetchCashierLogLedger(params: { keyword?: string; page?: number; size?: number }) {
+export async function fetchCashierLogLedger(params: { keyword?: string; page?: number; size?: number } & LedgerSortParams) {
   return (await http.get<LedgerPage>('/h3-imports/ledger/cashierLog', { params })).data
 }
 /**

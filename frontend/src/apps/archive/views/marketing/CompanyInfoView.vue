@@ -480,13 +480,13 @@ y2="16" />
       />
     </template>
 
-    <!-- ===== 财务账户 Tab ===== -->
-    <template v-else-if="activeTab === 'accounts'">
+    <!-- ===== 财务账户 Tab（仅管理员） ===== -->
+    <template v-else-if="activeTab === 'accounts' && isAdmin">
       <CompanyAccountsTab :file-url-resolver="companyFieldFileUrl" />
     </template>
 
-    <!-- ===== 知识库 Tab ===== -->
-    <template v-else-if="activeTab === 'kb'">
+    <!-- ===== 知识库 Tab（仅管理员） ===== -->
+    <template v-else-if="activeTab === 'kb' && isAdmin">
       <CompanyKnowledgeTab />
     </template>
 
@@ -532,16 +532,19 @@ const openAssetPreview = usePreviewAsset()
 const onImported = useImported()
 const route = useRoute()
 
-const { can } = useCurrentUser()
+const { can, user } = useCurrentUser()
 /** 是否可维护公司信息（编辑公司信息/素材/账号/里程碑等），由 company.manage 权限控制 */
 const canManageCompany = computed(() => can('company.manage'))
 
 // ========== Tab 导航 ==========
-const tabs = COMPANY_MANAGEMENT_TABS
+/** 仅系统管理员（ADMIN）可见的 Tab：财务账户、知识库 */
+const ADMIN_ONLY_TAB_KEYS: CompanyManagementTabKey[] = ['accounts', 'kb']
+const isAdmin = computed(() => !!user.value?.roles?.includes('ADMIN'))
+const tabs = computed(() => COMPANY_MANAGEMENT_TABS.filter(tab => !ADMIN_ONLY_TAB_KEYS.includes(tab.key) || isAdmin.value))
 
 const activeTab = ref<CompanyManagementTabKey>('overview')
-watch(() => route.query.tab, tab => {
-  if (typeof tab === 'string' && tabs.some(item => item.key === tab)) activeTab.value = tab as CompanyManagementTabKey
+watch([() => route.query.tab, tabs], ([tab, list]) => {
+  if (typeof tab === 'string' && list.some(item => item.key === tab)) activeTab.value = tab as CompanyManagementTabKey
 }, { immediate: true })
 const loading = ref(false)
 const companyInfo = ref<CompanyInfo>({})

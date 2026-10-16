@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>利润核算与提成规则 — 财务口径确认清单</title>
+<style>
+* { box-sizing: border-box; }
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  margin: 0; padding: 28px 32px; color: #111827; background: #fff;
+  font-size: 13.5px; line-height: 1.6;
+}
+h1 {
+  margin: 0 0 6px; font-size: 24px;
+  color: #1e3a8a; letter-spacing: 0.02em;
+}
+.doc-sub {
+  color: #6b7280; margin-bottom: 18px; font-size: 12.5px;
+  border-bottom: 2px solid #1e3a8a; padding-bottom: 10px;
+}
+.meeting-meta {
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 10px 24px; background: #eff6ff; border: 1px solid #bfdbfe;
+  border-radius: 8px; padding: 12px 18px; margin-bottom: 22px;
+}
+.meta-row {
+  display: flex; align-items: baseline; gap: 6px;
+}
+.meta-row .k { color: #1e40af; font-weight: 600; white-space: nowrap; }
+.meta-row .v {
+  border-bottom: 1px solid #93c5fd; flex: 1; min-height: 22px;
+}
+
+h2 {
+  margin: 32px 0 10px; font-size: 17px;
+  padding: 8px 14px; border-radius: 6px;
+  display: flex; align-items: center; gap: 10px;
+}
+h2.p0 { background: #fef2f2; color: #991b1b; border-left: 5px solid #dc2626; }
+h2.p1 { background: #fff7ed; color: #9a3412; border-left: 5px solid #ea580c; }
+h2.p2 { background: #fefce8; color: #854d0e; border-left: 5px solid #ca8a04; }
+h2.p3 { background: #f0fdf4; color: #166534; border-left: 5px solid #16a34a; }
+h2.p4 { background: #f5f3ff; color: #4c1d95; border-left: 5px solid #7c3aed; }
+
+.prio-badge {
+  font-size: 11px; padding: 2px 10px; border-radius: 999px;
+  font-weight: 700; letter-spacing: 0.04em;
+}
+.prio-p0 { background: #dc2626; color: #fff; }
+.prio-p1 { background: #ea580c; color: #fff; }
+.prio-p2 { background: #ca8a04; color: #fff; }
+.prio-p3 { background: #16a34a; color: #fff; }
+.prio-p4 { background: #7c3aed; color: #fff; }
+
+.section-intro {
+  background: #f9fafb; border-left: 3px solid #d1d5db;
+  padding: 8px 14px; margin: 4px 0 14px;
+  color: #374151; font-size: 12.5px;
+}
+.section-intro b { color: #111827; }
+
+.qa-block {
+  background: #fff; border: 1px solid #e5e7eb;
+  border-radius: 8px; margin-bottom: 14px;
+  overflow: hidden;
+}
+.qa-q {
+  background: #f9fafb; padding: 10px 14px;
+  border-bottom: 1px solid #e5e7eb;
+  display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start;
+}
+.qa-q .qno {
+  font-weight: 800; color: #1e40af; font-size: 15px; min-width: 34px;
+}
+.qa-q .qtext { font-weight: 600; color: #111827; }
+.qa-q .sample {
+  font-size: 11px; color: #0f766e; white-space: nowrap;
+  background: #ccfbf1; padding: 2px 8px; border-radius: 999px; font-weight: 600;
+  border: 1px solid #5eead4; align-self: center;
+}
+.qa-hint {
+  font-size: 11.5px; color: #6b7280; font-weight: 400; margin-top: 4px;
+  padding-left: 4px;
+}
+.qa-hint code {
+  background: #f3f4f6; border: 1px solid #e5e7eb;
+  padding: 1px 5px; border-radius: 3px; font-family: inherit;
+  color: #374151; font-size: 11px;
+}
+
+.qa-a {
+  padding: 12px 16px 16px;
+}
+
+.choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 8px 16px; margin-bottom: 10px;
+}
+.choice {
+  display: flex; align-items: flex-start; gap: 8px;
+  padding: 6px 8px; border: 1px dashed #cbd5e1; border-radius: 6px;
+  background: #fafafa;
+}
+.choice .cb {
+  width: 14px; height: 14px; border: 1.5px solid #475569;
+  border-radius: 3px; flex-shrink: 0; margin-top: 2px;
+}
+.choice .ctxt { flex: 1; font-size: 12.5px; color: #1f2937; }
+.choice .ctxt b { color: #111827; }
+.choice .ctxt small { color: #6b7280; display: block; margin-top: 2px; }
+
+.answer-line {
+  margin-top: 10px; padding-top: 10px; border-top: 1px dashed #d1d5db;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.al-row {
+  display: flex; align-items: baseline; gap: 10px;
+}
+.al-row .al-label {
+  font-weight: 600; color: #374151; min-width: 92px;
+  font-size: 12.5px;
+}
+.al-row .al-blank {
+  border-bottom: 1px solid #6b7280; flex: 1; min-height: 22px;
+}
+.al-row .al-blank.short { flex: 0 0 120px; }
+.al-row .al-blank.med { flex: 0 0 220px; }
+
+.signatures {
+  margin-top: 40px; display: grid;
+  grid-template-columns: repeat(3, 1fr); gap: 30px;
+  padding-top: 24px; border-top: 2px solid #374151;
+}
+.sig-col { text-align: center; }
+.sig-line {
+  width: 85%; margin: 0 auto 6px; border-bottom: 1px solid #111827; height: 44px;
+}
+
+.section-ref {
+  background: #fefce8; border: 1px solid #fde68a;
+  border-radius: 8px; padding: 12px 18px; margin: 20px 0 8px;
+  color: #854d0e; font-size: 12.5px;
+}
+.section-ref b { color: #713f12; }
+
+@media print {
+  html, body { padding: 12px 16px; font-size: 12.5px; }
+  h2 { break-after: avoid; }
+  .qa-block { break-inside: avoid; }
+  .meeting-meta { break-inside: avoid; }
+  .signatures { break-inside: avoid; margin-top: 30px; }
+  .section-ref { break-inside: avoid; }
+}
+@page { size: A4; margin: 14mm 16mm; }
+</style>
+</head>
+<body>
+
+<h1>📋 利润核算与提成规则 — 财务口径确认清单</h1>
+<div class="doc-sub">
+  配套文档：《财务对账_代表性出库单_20260831.xlsx/.html》（20 张样本出库单，覆盖 13 类业务场景）
+  ｜　目的：把开发团队"拍脑袋"的 18+ 个硬编码假设，逐一替换成财务确认的权威口径
+</div>
+
+<!-- 会议元信息 -->
+<div class="meeting-meta">
+  <div class="meta-row"><span class="k">会议日期：</span><div class="v"></div></div>
+  <div class="meta-row"><span class="k">会议地点：</span><div class="v"></div></div>
+  <div class="meta-row"><span class="k">第几次讨论：</span><div class="v"></div></div>
+  <div class="meta-row"><span class="k">财务出席：</span><div class="v"></div></div>
+  <div class="meta-row"><span class="k">业务出席：</span><div class="v"></div></div>
+  <div class="meta-row"><span class="k">系统对接人：</span><div class="v"></div></div>
+</div>
+
+<div class="section-ref">
+  <b>📌 使用方法：</b>
+  ① 每个问题先由财务在 A/B/C/D 选项里打勾选择（若选"其他"请注明）；
+  ② 然后在底部"财务确认答案 / 补充规则"里手写最终口径；
+  ③ 每张样本订单的数字差异直接填在「财务对账清单」卡片备注框中；
+  ④ 最后三方签字，作为系统后续改代码的<b>唯一基准文档</b>。
+</div>
+
+<!-- ============================================================ -->
+<!--                        P0 提成发放规则（🔴最高优先级）          -->
+<!-- ============================================================ -->
+<h2 class="p0"><span class="prio-badge prio-p0">P0</span> 一、提成发放规则 <small style="font-size:12px;font-weight:500;color:#7f1d1d">（不确认 → 系统提成可发金额永远为 0，全部锁在 TRIAL 试算状态）</small></h2>
+<div class="section-intro">
+  <b>当前系统假设（错的概率极高）：</b>提成基数 = 订单利润（销售额 − 采购成本 − 订单费用 ± 利润调整）；比例 = 每人规则或默认 10%（默认已 DISABLED）；
+  发放门槛 = 100% 回款；回款比例 = 0。—— 以上<b>全部未经财务确认</b>。
+</div>
+
+<!-- Q1 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q1</span>
+    <div class="qtext">
+      业务员提成的<b>基数</b>到底按什么算？
+      <div class="qa-hint">当前系统假设是 A（订单利润）。请务必确认。</div>
+    </div>
+    <span class="sample">样本覆盖：S01~S06 全部</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 按「订单利润」</b><small>= 销售额 − 采购成本 − 订单费用 ± 利润调整</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 按「产品毛利」</b><small>= 销售额 − 采购成本（不减费用和调整）</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 按「销售额」</b><small>不管利润有没有、有多少</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>D. 按「已回款金额」</b><small>回到多少，按回到的那笔算提成</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>E. 其他 / 分情况</b><small>例：按客户等级分 / 按产品类目分</small></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">补充细则：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Q2 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q2</span>
+    <div class="qtext">
+      提成<b>比例</b>怎么定？（跟什么挂钩？如何差异化？）
+      <div class="qa-hint">当前系统只有「每人一条规则」或「全员默认 10%（已禁用）」两种模式。</div>
+    </div>
+    <span class="sample">样本：S04 高毛利 / S05 低毛利 / S06 负毛利</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 全员统一比例</b><small>比如所有人都是 X%</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 每人单独比例</b><small>比如张三 8%，李四 12%</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 跟「毛利率」阶梯挂钩</b><small>例：毛利率>30% 提 15%，20~30% 提 10%，＜20% 提 5%</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>D. 跟「产品类目」挂钩</b><small>例：设备提 8%，耗材提 3%，模具另算</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>E. 跟「客户等级」挂钩</b><small>例：战略客户提成比例减半或额外加成</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>F. 其他 / 组合规则</b><small>例：毛利率 X% 但保底下限 ¥Y / 单</small></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">阶梯/差异表：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">规则生效日：</span><div class="al-blank short"></div>
+        <span class="al-label" style="margin-left:20px">老订单追溯？</span><div class="al-blank med"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Q3 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q3</span>
+    <div class="qtext">
+      <b>回款门槛</b>——提成在什么条件下变成"可发"？
+      <div class="qa-hint">这是当前最大的阻塞点。系统中 <code>available_commission = 0</code>，提成状态不可能出现 AVAILABLE。</div>
+    </div>
+    <span class="sample">样本：S01 全额 / S02 部分 / S03 未回款</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 必须 100% 回款才发提成</b><small>没回完 = 可发 = 0</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 按回款比例发</b><small>例：回了 60%，就发 60% 的提成</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 分段门槛</b><small>例：回 ≥30% 先发 20%，回 ≥80% 发 70%，回 100% 发剩余</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>D. 发货即发，与回款无关</b><small>风险公司兜</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>E. 按"回款到账月"结算</b><small>不看出库月，哪月回款算哪月的提成工资</small></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">分段明细：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Q4 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q4</span>
+    <div class="qtext">
+      <b>结算周期 & 归属期</b>——提成多久算一次、并入哪个月的工资？
+    </div>
+    <span class="sample">影响：系统结算单流程</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 按月结算</b><small>每月 X 号截止，并入当月工资</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 按季度结算</b></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 单笔订单结清即发</b></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>D. 年度一起结算</b><small>年底多退少补</small></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">归属期按：</span><div class="al-blank">
+        <small style="color:#6b7280">□ 发货日期　□ 业务日期　□ 回款到账日期　□ 其他：________</small>
+      </div></div>
+      <div class="al-row"><span class="al-label">每月截止日：</span><div class="al-blank short"></div>
+        <span class="al-label" style="margin-left:20px">工资并入：</span><div class="al-blank short"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Q5 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q5</span>
+    <div class="qtext">
+      低利润 / 负利润订单，提成怎么处理？
+      <div class="qa-hint">当前系统：可计提利润最低为 0（负利润不扣），提成理论为 0。是否需要<b>从其他订单的提成里扣回</b>？</div>
+    </div>
+    <span class="sample">样本：S06 零/负毛利（2 张）、S05 低毛利（1 张）</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 就低不就高</b><small>负利润提成 = 0，不从其他订单扣</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 亏损扣回</b><small>负利润 × 比例，从该业务员同期其他订单提成里扣</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 最低保护</b><small>利润太低但至少发 ¥XXX / 单（底薪保障）</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>D. 后续抵扣</b><small>本期亏损累计到下期，下期有利润先抵扣上期亏损再算提成</small></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">保护/抵扣细则：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!--                   P1 利润核算口径（🟠 次高优先级）             -->
+<!-- ============================================================ -->
+<h2 class="p1"><span class="prio-badge prio-p1">P1</span> 二、利润核算口径 <small style="font-size:12px;font-weight:500;color:#9a3412">（公式错误 → 所有订单的利润数字都是错的）</small></h2>
+<div class="section-intro">
+  <b>当前系统硬编码公式：</b>产品毛利 = sales_amount − purchase_amount（两个值都<b>直接取自氚云销售出库主表</b>）；订单利润 = 产品毛利 − 已归集订单费用 + 利润调整净额。
+  <b>设计文档明确写着：</b>"系统不得用本地产品成本快照替换氚云采购成本"——前提是氚云的采购金额和财务口径一致，这个需要财务确认。
+</div>
+
+<!-- Q6 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q6</span>
+    <div class="qtext">
+      <b>采购成本</b>的确认标准？氚云销售出库单上的 <code>purchase_amount</code> 跟财务账是同一个口径吗？
+      <div class="qa-hint">如果财务账的"成本"和氚云不是一回事（比如氚云只是预估、财务按发票确认），那现有公式<b>基础就错了</b>。</div>
+    </div>
+    <span class="sample">样本：S09 成本异常（1 张）、S04/S06</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 口径一致</b><small>氚云 purchase_amount = 财务账采购成本</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 口径不同，氚云是"预估/暂估"</b><small>财务成本以发票/入库为准，需要另一个数据源</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 氚云缺运费/关税/商检费</b><small>这些要额外计入产品成本，而不归入订单费用</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>D. 按产品分类看情况</b></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">运费/关税/包装费/商检费处理：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">成本为 0 或空时的规则：</span><div class="al-blank">
+        <small style="color:#6b7280">□ 系统标异常但按 0 算　□ 按产品主档标准成本兜底　□ 暂停核算等人工改氚云　□ 其他：________</small>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Q7 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q7</span>
+    <div class="qtext">
+      <b>销售额 是否含税？采购成本 是否含税？增值税/销项税在利润核算里怎么处理？</b>
+      <div class="qa-hint">当前系统默认"含税销售额 − 不含税成本"这种错误混算的概率非常高！</div>
+    </div>
+    <span class="sample">样本：S01/S15 大额</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 销售和成本都按"不含税"口径</b><small>系统需要自动扣税</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 销售和成本都按"含税"口径</b><small>内部管理报表口径，税不分</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 其他（混合）</b></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">税率/抵扣规则：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Q8 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q8</span>
+    <div class="qtext">
+      哪些费用可以/必须计入"订单费用"？（直接减少该订单的利润）哪些只能走部门/公司级？
+      <div class="qa-hint">当前系统：只有 <code>expense_allocations</code> 里标 <code>CONFIRMED</code> 且 <code>target_type='SALES_OUTBOUND'</code> 的报销才算订单费用。<b>目前系统里 0 笔</b>——要么流程没跑，要么规则没告诉业务员。</div>
+    </div>
+    <span class="sample">样本：S07（0 张！请重点问）</span>
+  </div>
+  <div class="qa-a">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;margin-bottom:10px">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>📦 运费 / 快递费 / 货代</b><small>□ 必须计入　□ 视情况　□ 不计入</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>🛃 报关费 / 关税 / 商检费</b><small>□ 必须计入　□ 视情况　□ 不计入</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>🧑‍💼 业务员差旅费（客户出差）</b><small>□ 必须计入　□ 视情况　□ 不计入</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>🍶 招待费 / 客户礼品费</b><small>□ 必须计入　□ 限额外算　□ 不计入</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>🔧 安装费 / 售后费 / 现场调试</b><small>□ 必须计入　□ 视情况　□ 不计入</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>🚗 固定交通费 / 通讯费报销</b><small>□ 必须计入　□ 走部门费用　□ 不计入</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>🎪 参展费 / 广交会费（分摊到客户/订单？）</b><small>□ 逐单分摊　□ 部门费用　□ 不计入</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>📦 包装费 / 包材损耗</b><small>□ 必须计入　□ 已算进采购成本　□ 不计入</small></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认规则：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">无法归属的费用处理：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">单笔限额/比例限额：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Q9 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q9</span>
+    <div class="qtext">
+      <b>跨期费用</b>——3 月发货的订单，5 月才报销差旅费，这笔费用算几月的利润？
+      <div class="qa-hint">当前系统：报销审核确认当期直接扣"确认日期所在月"的利润，不回溯。</div>
+    </div>
+    <span class="sample">样本：所有订单</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 报销发生月（5月）扣当期利润</b><small>简单，不追溯</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 回溯调整发货月（3月）利润</b><small>需要月结/反结账机制</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 无所谓，看季度/年度合计就行</b></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>D. 超 X 天的跨期只能走当月，不能回溯</b></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!--                  P2 调整项与退货（🟡 标准化）                  -->
+<!-- ============================================================ -->
+<h2 class="p2"><span class="prio-badge prio-p2">P2</span> 三、调整项标准化 & 退货/换货/折让处理 <small style="font-size:12px;font-weight:500;color:#854d0e">（现在靠万能"利润调整"手填，没有类型标准化不利于统计和审计）</small></h2>
+
+<!-- Q10 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q10</span>
+    <div class="qtext">
+      请财务列一个<b>常见利润调整类型的清单</b>（作为系统下拉菜单的标准选项）
+      <div class="qa-hint">当前系统 <code>adjustment_type</code> 是 VARCHAR(50) 手填，不利于后续统计分类。<b>目前系统里 0 条调整记录</b>，需要财务先给出类型清单。</div>
+    </div>
+    <span class="sample">样本：S08（0 张！请重点问）</span>
+  </div>
+  <div class="qa-a">
+    <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;font-size:12.5px">
+      <thead>
+        <tr style="background:#475569;color:#fff">
+          <th style="padding:6px 8px;text-align:left;width:36px">#</th>
+          <th style="padding:6px 8px;text-align:left">调整类型名称（财务填）</th>
+          <th style="padding:6px 8px;text-align:center;width:120px">方向通常是</th>
+          <th style="padding:6px 8px;text-align:center;width:160px">默认是否参与提成</th>
+          <th style="padding:6px 8px;text-align:left">说明/举例</th>
+        </tr>
+      </thead>
+      <tbody id="adj-type-rows"></tbody>
+    </table>
+    <script>
+      // 动态生成 12 行空行供财务填写
+      const tbody = document.getElementById("adj-type-rows");
+      const templates = [
+        "折让（客户要求降价）",
+        "返利（按季/年度给客户返点）",
+        "质量扣款 / 赔偿金",
+        "运费差额补扣 / 补贴",
+        "汇率差",
+        "跨期修正（多提/少提）",
+        "税费补提 / 冲回",
+        "坏账核销",
+        "采购发票差额（到票后与暂估差异）",
+        "盘盈 / 盘亏归属",
+        "", "", ""
+      ];
+      for (let i=0;i<templates.length;i++){
+        const tr = document.createElement("tr");
+        tr.innerHTML = `<td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:center">${i+1}</td>
+        <td style="padding:5px 8px;border:1px solid #e5e7eb;background:linear-gradient(45deg,#fefce8,#fefce8 6px,#fff 6px,#fff 12px);min-height:26px">${templates[i] ? `<small style="color:#a16207">例：${templates[i]}</small>` : ""}</td>
+        <td style="padding:5px 8px;border:1px solid #e5e7eb"><small>□ PLUS 增利　□ MINUS 减利　□ 都有</small></td>
+        <td style="padding:5px 8px;border:1px solid #e5e7eb"><small>□ 是（默认影响提成）<br/>□ 否（会计修正不影响业务员）</small></td>
+        <td style="padding:5px 8px;border:1px solid #e5e7eb"></td>`;
+        tbody.appendChild(tr);
+      }
+    </script>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">是否允许"非标准类型-其他"？</span><div class="al-blank"><small style="color:#6b7280">□ 允许，但必须填写原因　□ 不允许，必须用标准项</small></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Q11 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q11</span>
+    <div class="qtext">
+      利润调整 — 哪些类型<b>默认参与提成</b>、哪些默认不参与？
+      <div class="qa-hint">系统目前有 <code>affects_commission</code> 开关由操作人手动选。需要财务给出默认规则，避免选错。</div>
+    </div>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 客户折让/返利/质量扣款</b> → 应减少利润，也<b>减少提成</b></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 会计口径修正（跨期/税差）</b> → 改利润，但<b>不影响业务员提成</b></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 汇率差</b> → <small>财务定：是否影响？</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>D. 运费差额/补贴</b> → <small>财务定：是否影响？</small></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认规则：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Q12 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q12</span>
+    <div class="qtext">
+      <b>退货 / 换货 / 红冲</b>等逆向流程的标准处理
+      <div class="qa-hint">当前系统：出库单里有负数量明细就标 <code>SPECIAL_REVIEW</code> 人工复核。没有自动化流程。</div>
+    </div>
+    <span class="sample">样本：S13 含退货/冲销行（1 张）</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 换货（正行+负行同单）</b>：按净额算利润？还是退一张、发一张分别算？</div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 纯退货（仅负）</b>：扣发货月利润？还是扣退货当月？</div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 已发过提成的订单，后来退货了</b>：提成怎么扣回？（下期扣？从该业务员其他单扣？现金退回？）</div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>D. 客户折让（事后降价）</b>：需要单独的标准化流程还是走利润调整？</div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">已发提成扣回规则：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!--                 P3 结账与锁定机制（🟢 流程规范）               -->
+<!-- ============================================================ -->
+<h2 class="p3"><span class="prio-badge prio-p3">P3</span> 四、月结锁定 & 结算后变更处理 <small style="font-size:12px;font-weight:500;color:#166534">（现在完全没做，但财务一定有类似概念）</small></h2>
+
+<!-- Q13 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q13</span>
+    <div class="qtext">有没有"月度结账"概念？关账后之前月份的利润/提成还能改吗？</div>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 有严格月结</b>：每月 X 号关账，关账后历史数据<b>完全不能改</b>，只能通过当月调整单</div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 有月结但可反结账</b>：权限控制（仅财务经理），反结账留审计日志</div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 没有严格月结</b>：随时能改历史订单，系统不需要做锁定</div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">关账日 / 流程：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Q14 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q14</span>
+    <div class="qtext">
+      提成<b>结算发放后</b>，如果对应的订单成本/费用/回款变了，系统应该怎么处理？
+      <div class="qa-hint">例：1 月提成已发，2 月发现一张 1 月订单漏了 5,000 运费。设计文档要求"结算后成本变化必须预警，不得静默改历史工资"。</div>
+    </div>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 自动在下个月的提成里做调整单补扣/补发</b></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 生成异常单，财务人工决定</b></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 只要发放了就完全锁定，差异走营业外收支</b></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">允许变动的时效：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Q15 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q15</span>
+    <div class="qtext">
+      系统算出的"订单利润合计 / 提成合计"，应该对得上财务账上的<b>哪些科目</b>？（月度对账基准）
+    </div>
+  </div>
+  <div class="qa-a">
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">销售总额对科目：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">采购成本对科目：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">订单费用对科目：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">订单利润合计对：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">提成合计对科目：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">对账频率：</span><div class="al-blank"><small style="color:#6b7280">□ 月度　□ 季度　□ 年度　□ 其他</small></div></div>
+      <div class="al-row"><span class="al-label">需要的维度报表：</span><div class="al-blank">
+        <small style="color:#6b7280">□ 按业务员　□ 按部门　□ 按客户　□ 按产品类目　□ 按月份/季度　□ 其他：________</small>
+      </div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!--              P4 数据校验和异常边界（🟣 边界 & 体验）           -->
+<!-- ============================================================ -->
+<h2 class="p4"><span class="prio-badge prio-p4">P4</span> 五、数据校验边界 & 历史数据</h2>
+
+<!-- Q16 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q16</span>
+    <div class="qtext">
+      采购成本为空/零/负数的订单，系统应该怎么处理？
+      <div class="qa-hint">当前：标 <code>cost_abnormal</code>，但仍然按 0 成本核算（利润虚高）。财务是希望"停算等修正"还是"按标准成本兜底"？</div>
+    </div>
+    <span class="sample">样本：S09 成本异常（1 张）</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 暂停核算 + 异常通知</b><small>等业务员/采购修正氚云数据后再算</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 按产品主档"标准成本"兜底</b><small>设计文档明确禁止，但请财务最终定</small></div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 就按 0 算，异常标红提醒不影响流程</b></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Q17 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q17</span>
+    <div class="qtext">
+      费用报销单的"分配总额 > 报销审批额"，应该允许还是禁止？
+      <div class="qa-hint">设计文档写的是禁止，但代码里还没实现校验。</div>
+    </div>
+    <span class="sample">场景：S07（0 笔归集，先定规则）</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 严格禁止</b>，保存时直接报错</div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 允许但标黄</b>（财务复核时看原因）</div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 允许分配额 = 审批额 × 允许分摊系数（如 1.0~1.2）</b></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- Q18 -->
+<div class="qa-block">
+  <div class="qa-q">
+    <span class="qno">Q18</span>
+    <div class="qtext">
+      历史订单（2026-01-01 之前）的利润/提成需要系统管吗？
+      <div class="qa-hint">代码里写死了 2026-01-01 之后才算"日常核算范围"。之前的在财务账上应该已经结完了？</div>
+    </div>
+    <span class="sample">样本：S14 历史订单（1 张，2026 前发货）</span>
+  </div>
+  <div class="qa-a">
+    <div class="choice-grid">
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>A. 已经结完不管</b>，系统只做 2026 年及以后（建议答案）</div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>B. 需要导入历史数据</b>，按同样口径追溯重算（工作量极大）</div></div>
+      <div class="choice"><div class="cb"></div><div class="ctxt"><b>C. 只算提成结算未清部分</b></div></div>
+    </div>
+    <div class="answer-line">
+      <div class="al-row"><span class="al-label">财务确认：</span><div class="al-blank"></div></div>
+      <div class="al-row"><span class="al-label">核算起始日期：</span><div class="al-blank short"></div>
+        <span class="al-label" style="margin-left:20px">日期字段按：</span><div class="al-blank med">
+          <small style="color:#6b7280">□ 发货日期　□ 业务日期　□ 出库确认日期　□ 其他</small>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!--                      收尾：额外问题 & 签字                     -->
+<!-- ============================================================ -->
+<h2 class="p2" style="margin-top:40px"><span class="prio-badge prio-p2">开放题</span> 六、财务还有哪些开发团队没考虑到的？</h2>
+<div class="qa-block">
+  <div class="qa-a">
+    <div style="min-height:80px;border:1.5px dashed #a78bfa;border-radius:8px;padding:10px 14px;background:#faf5ff;color:#4c1d95">
+      请财务自由补充：
+      <div style="margin-top:18px;border-bottom:1px solid #9333ea"></div>
+      <div style="margin-top:18px;border-bottom:1px solid #9333ea"></div>
+      <div style="margin-top:18px;border-bottom:1px solid #9333ea"></div>
+      <div style="margin-top:18px;border-bottom:1px solid #9333ea"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!--                      20 张样本出库单索引                      -->
+<!-- ============================================================ -->
+<h2 class="p4"><span class="prio-badge prio-p4">附录</span> 本次讨论配套的 20 张样本订单索引（场景→订单号）</h2>
+<div class="section-intro">
+  每一个问题都可以快速对照附录里的样本订单号找到具体那张卡片，在上面直接对数字。
+</div>
+<div id="sample-index" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px 14px;margin-bottom:24px">
+  <!-- 以下场景代码 + 描述，在实际打开时通过查询DB填充？不，直接写成静态锚点即可。因为用户需要打印出来，所以直接保留空表单即可，手写填单号就行 -->
+</div>
+<script>
+  const samples = [
+    ["S01","正常-全额回款(已收=应收)","2 张", "tagbg-S01"],
+    ["S02","正常-部分回款(有已收有未收)","2 张","tagbg-S02"],
+    ["S03","正常-尚未回款(已收=0)","2 张","tagbg-S03"],
+    ["S04","高毛利(毛利率>30%)","2 张","tagbg-S04"],
+    ["S05","低毛利(毛利率<10%且>0)","1 张","tagbg-S05"],
+    ["S06","零/负毛利(毛利<=0)","2 张","tagbg-S06"],
+    ["S07","有确认订单费用(已归集)","⚠ 0 张 — 请财务确认原因","tagbg-S07"],
+    ["S08","有利润调整记录","⚠ 0 张 — 请财务确认原因","tagbg-S08"],
+    ["S09","采购成本异常(为空/零/负)","1 张","tagbg-S09"],
+    ["S10","员工未映射(employee_id NULL)","1 张","tagbg-S10"],
+    ["S11","客户未匹配(customer_id NULL)","1 张","tagbg-S11"],
+    ["S12","回款金额校验异常","0 张（数据干净）","tagbg-S12"],
+    ["S13","包含退货/冲销行(明细负数量)","1 张","tagbg-S13"],
+    ["S14","历史订单(2026前发货)","1 张","tagbg-S14"],
+    ["S15","大额订单(销售额TOP)","1 张","tagbg-S15"],
+    ["S16","补充-代表性正常订单(填充)","3 张","tagbg-S16"],
+  ];
+  const el = document.getElementById("sample-index");
+  const styleMap = {
+    S01:"#16a34a", S02:"#16a34a", S03:"#16a34a",
+    S04:"#2563eb", S05:"#2563eb", S06:"#2563eb",
+    S07:"#4f46e5", S08:"#4f46e5",
+    S09:"#dc2626", S10:"#dc2626", S11:"#dc2626", S12:"#dc2626", S13:"#dc2626",
+    S14:"#d97706", S15:"#d97706",
+    S16:"#6b7280", S17:"#6b7280"
+  };
+  el.innerHTML = samples.map(s => {
+    const color = styleMap[s[0]] || "#6b7280";
+    return `<div style="border:1px solid #e5e7eb;background:#fff;border-left:4px solid ${color};border-radius:6px;padding:8px 10px">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:4px">
+        <b style="font-size:14px;color:#111827">${s[0]}</b>
+        <small style="color:#6b7280">${s[2]}</small>
+      </div>
+      <div style="font-size:11.5px;color:#374151;margin-bottom:5px">${s[1]}</div>
+      <div style="border-bottom:1px dashed #9ca3af;min-height:18px;padding:2px 0;font-size:11px;color:#a78bfa;font-style:italic">单号：________　________</div>
+    </div>`;
+  }).join("");
+</script>
+
+<!-- 签字 -->
+<div class="signatures">
+  <div class="sig-col">
+    <div class="sig-line"></div>
+    <div style="font-weight:600;color:#7f1d1d;font-size:14px">财务负责人（确认口径方）</div>
+    <div style="margin-top:4px;color:#6b7280;font-size:12px">签字：________________</div>
+    <div style="margin-top:4px;color:#6b7280;font-size:12px">日期：________年____月____日</div>
+  </div>
+  <div class="sig-col">
+    <div class="sig-line"></div>
+    <div style="font-weight:600;color:#92400e;font-size:14px">业务负责人（确认业务规则方）</div>
+    <div style="margin-top:4px;color:#6b7280;font-size:12px">签字：________________</div>
+    <div style="margin-top:4px;color:#6b7280;font-size:12px">日期：________年____月____日</div>
+  </div>
+  <div class="sig-col">
+    <div class="sig-line"></div>
+    <div style="font-weight:600;color:#1e3a8a;font-size:14px">系统对接人（开发改代码方）</div>
+    <div style="margin-top:4px;color:#6b7280;font-size:12px">签字：________________</div>
+    <div style="margin-top:4px;color:#6b7280;font-size:12px">日期：________年____月____日</div>
+  </div>
+</div>
+
+</body>
+</html>

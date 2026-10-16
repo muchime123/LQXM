@@ -10,8 +10,8 @@ import org.springframework.stereotype.Component;
 @ConfigurationProperties(prefix = "app.security")
 public class SecurityProperties {
 
-    /** 是否允许通过 X-Employee-Id / X-User-Name 请求头声明身份（仅开发环境）。 */
-    private boolean allowEmployeeHeader = true;
+    /** 是否允许通过 X-Employee-Id / X-User-Name 请求头声明身份（仅开发环境）。默认关闭，开发实例显式开启。 */
+    private boolean allowEmployeeHeader = false;
 
     /** 是否启用旧版 compatibility-admin 匿名超管模式（已废弃，生产必须 false）。 */
     private boolean compatibilityAdmin = false;

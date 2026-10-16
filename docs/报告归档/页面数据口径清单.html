@@ -1,0 +1,788 @@
+<style>
+:root {
+  --color-text: #1f2937;
+  --color-text-muted: #6b7280;
+  --color-text-faint: #9ca3af;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f8fafc;
+  --color-border: #e5e7eb;
+  --color-border-strong: #d1d5db;
+  --color-brand: #7c3aed;
+  --color-brand-muted: #ede9fe;
+  --color-success: #059669;
+  --color-success-muted: #d1fae5;
+  --color-warning: #d97706;
+  --color-warning-muted: #fef3c7;
+  --color-danger: #dc2626;
+  --color-danger-muted: #fee2e2;
+  --color-chart-1: #7c3aed;
+  --color-chart-2: #0ea5e9;
+  --color-chart-3: #059669;
+  --color-chart-4: #f59e0b;
+  --radius: 8px;
+  --radius-card: 12px;
+  --radius-full: 999px;
+  --spacer-4: 4px;
+  --spacer-8: 8px;
+  --spacer-12: 12px;
+  --spacer-16: 16px;
+  --spacer-20: 20px;
+  --spacer-24: 24px;
+  --text-caption: 12px/18px;
+  --text-code: 13px/20px;
+  --text-body: 14px/20px;
+  --text-title: 16px/24px;
+  --weight-medium: 500;
+  --weight-strong: 600;
+}
+:root[data-widget-theme="dark"] {
+  --color-text: #f3f4f6;
+  --color-text-muted: #9ca3af;
+  --color-text-faint: #6b7280;
+  --color-surface: #111827;
+  --color-surface-muted: #1f2937;
+  --color-border: #374151;
+  --color-border-strong: #4b5563;
+  --color-brand-muted: #2e1065;
+  --color-success-muted: #064e3b;
+  --color-warning-muted: #451a03;
+  --color-danger-muted: #450a0a;
+}
+* { box-sizing: border-box; }
+[data-dynamic-ui-widget] {
+  width: 100%;
+  font: var(--text-body) -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--color-text);
+  padding: var(--spacer-16);
+}
+.widget-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--spacer-20);
+  gap: var(--spacer-16);
+  flex-wrap: wrap;
+}
+.widget-title {
+  font: var(--weight-strong) var(--text-title);
+  margin: 0;
+}
+.widget-subtitle {
+  margin: var(--spacer-4) 0 0 0;
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+}
+.legend-row {
+  display: flex;
+  gap: var(--spacer-12);
+  flex-wrap: wrap;
+  align-items: center;
+}
+.legend-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacer-6);
+  padding: var(--spacer-4) var(--spacer-12);
+  border-radius: var(--radius-full);
+  font: var(--text-caption);
+  font-weight: var(--weight-medium);
+}
+.legend-chip.ok { background: var(--color-success-muted); color: var(--color-success); }
+.legend-chip.warn { background: var(--color-warning-muted); color: var(--color-warning); }
+.legend-chip.bad { background: var(--color-danger-muted); color: var(--color-danger); }
+.legend-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: currentColor;
+}
+
+.summary-bar {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacer-12);
+  margin-bottom: var(--spacer-20);
+}
+@media (max-width: 640px) {
+  .summary-bar { grid-template-columns: repeat(2, 1fr); }
+}
+.stat-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--spacer-16);
+}
+.stat-label {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacer-8);
+}
+.stat-value {
+  font: var(--weight-strong) 24px/28px;
+}
+.stat-ok .stat-value { color: var(--color-success); }
+.stat-warn .stat-value { color: var(--color-warning); }
+.stat-bad .stat-value { color: var(--color-danger); }
+.stat-neutral .stat-value { color: var(--color-brand); }
+
+.table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 1100px;
+  font: var(--text-body);
+}
+thead th {
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--spacer-12) var(--spacer-16);
+  text-align: left;
+  font: var(--weight-medium) var(--text-caption);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+}
+tbody td {
+  padding: var(--spacer-12) var(--spacer-16);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover { background: var(--color-surface-muted); }
+
+.service-cell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-4);
+  min-width: 160px;
+}
+.service-name {
+  font-weight: var(--weight-medium);
+}
+.service-tag {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  padding: 2px var(--spacer-8);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius);
+  align-self: flex-start;
+}
+.page-col { min-width: 100px; }
+.method-col { min-width: 180px; }
+.formula-col { min-width: 260px; }
+.predicate-col { min-width: 240px; }
+
+.formula-block, .predicate-block {
+  font: var(--text-code) ui-monospace, "SF Mono", Menlo, monospace;
+  padding: var(--spacer-8) var(--spacer-12);
+  background: var(--color-surface-muted);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.6;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacer-6);
+  padding: 4px var(--spacer-12);
+  border-radius: var(--radius-full);
+  font: var(--weight-medium) var(--text-caption);
+  white-space: nowrap;
+}
+.status-badge.ok { background: var(--color-success-muted); color: var(--color-success); }
+.status-badge.warn { background: var(--color-warning-muted); color: var(--color-warning); }
+.status-badge.bad { background: var(--color-danger-muted); color: var(--color-danger); }
+.status-icon {
+  width: 14px; height: 14px;
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 12px; line-height: 1;
+}
+
+.priority-tag {
+  display: inline-block;
+  padding: 2px var(--spacer-8);
+  border-radius: var(--radius);
+  font: var(--weight-medium) var(--text-caption);
+  margin-top: var(--spacer-4);
+}
+.priority-high { background: var(--color-danger-muted); color: var(--color-danger); }
+.priority-mid { background: var(--color-warning-muted); color: var(--color-warning); }
+.priority-low { background: var(--color-success-muted); color: var(--color-success); }
+.priority-none { background: var(--color-surface-muted); color: var(--color-text-muted); }
+
+.note-cell {
+  font: var(--text-body);
+  color: var(--color-text-muted);
+  max-width: 220px;
+}
+
+.section-divider {
+  height: 1px;
+  background: var(--color-border-strong);
+  margin: var(--spacer-20) 0;
+}
+
+.predicate-ref-card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-left: 3px solid var(--color-brand);
+  border-radius: var(--radius-card);
+  padding: var(--spacer-16);
+  margin-top: var(--spacer-20);
+}
+.ref-title {
+  font: var(--weight-medium) var(--text-title);
+  margin-bottom: var(--spacer-12);
+  color: var(--color-brand);
+}
+.ref-item { margin-bottom: var(--spacer-8); }
+.ref-key {
+  font: var(--weight-medium) var(--text-caption);
+  color: var(--color-text-muted);
+}
+.ref-value {
+  font: var(--text-code) ui-monospace, monospace;
+  background: var(--color-surface-muted);
+  padding: var(--spacer-8) var(--spacer-12);
+  border-radius: var(--radius);
+  border: 1px solid var(--color-border);
+  margin-top: var(--spacer-4);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+</style>
+
+<div data-dynamic-ui-widget data-template="compact-table-visual">
+  <div class="widget-header">
+    <div>
+      <h2 class="widget-title">页面数据口径清单 · 六层架构 P6（页面消费层）</h2>
+      <p class="widget-subtitle">8 个核心消费端 × 18 个金额取数点，对照 SettlementLedgerService 统一白名单的偏差审计</p>
+    </div>
+    <div class="legend-row">
+      <span class="legend-chip ok"><span class="legend-dot"></span>✅ 已统一（3）</span>
+      <span class="legend-chip warn"><span class="legend-dot"></span>⚠️ 旧谓词（4）</span>
+      <span class="legend-chip bad"><span class="legend-dot"></span>❌ 无排除（11）</span>
+    </div>
+  </div>
+
+  <div class="summary-bar">
+    <div class="stat-card stat-neutral">
+      <div class="stat-label">审计取数点</div>
+      <div class="stat-value">18</div>
+    </div>
+    <div class="stat-card stat-ok">
+      <div class="stat-label">已统一收口 ✅</div>
+      <div class="stat-value">3</div>
+    </div>
+    <div class="stat-card stat-warn">
+      <div class="stat-label">旧谓词需迁移 ⚠️</div>
+      <div class="stat-value">4</div>
+    </div>
+    <div class="stat-card stat-bad">
+      <div class="stat-label">完全无排除 ❌</div>
+      <div class="stat-value">11</div>
+    </div>
+  </div>
+
+  <div class="table-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>服务 / 模块</th>
+          <th>页面</th>
+          <th>方法 / 字段</th>
+          <th>金额公式 / 数据来源</th>
+          <th>现有谓词</th>
+          <th>状态</th>
+          <th>整改优先级 / 备注</th>
+        </tr>
+      </thead>
+      <tbody>
+        <!-- ========== SalesOutboundSettlementService (回款管理) ========== -->
+        <tr>
+          <td rowspan="5">
+            <div class="service-cell">
+              <span class="service-name">SalesOutboundSettlementService</span>
+              <span class="service-tag">回款管理 · 出库结算</span>
+            </div>
+          </td>
+          <td class="page-col">出库看板</td>
+          <td class="method-col">outboundSummary()<br>· 本月收款金额<br>· 本月收款笔数</td>
+          <td class="formula-col">
+            <div class="formula-block">SUM(receipt_amount)
+FROM receipts
+WHERE receipt_date
+  BETWEEN ? AND ?</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">status <> '草稿'
++ 数据范围权限</div>
+          </td>
+          <td><span class="status-badge bad"><span class="status-icon">❌</span>无排除</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-high">P0 高</span>
+            <div style="margin-top:8px;">未排除 legacy_migrated_tag，会把 92,625 条已迁出的 OUTBOUND_EMBEDDED（2.8 亿）重复计入</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="page-col">收款看板</td>
+          <td class="method-col">receiptSummary()<br>· total_receipt_amount<br>· total_allocated<br>· total_unallocated</td>
+          <td class="formula-col">
+            <div class="formula-block">SUM(receipt_amount)
+SUM(allocated_amount)
+SUM(unallocated_amount)
+FROM receipts</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">status IN ('已生效','CONFIRMED')
+AND external_source
+  &lt;&gt; 'H3YUN_OUTBOUND_EMBED'</div>
+          </td>
+          <td><span class="status-badge warn"><span class="status-icon">⚠️</span>旧谓词</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-mid">P1 中</span>
+            <div style="margin-top:8px;">用旧 external_source 谓词，需迁移为 legacy_migrated_tag IS NULL 白名单</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="page-col">收款列表</td>
+          <td class="method-col">listReceipts()<br>· 分页列表 / 数量 / 金额</td>
+          <td class="formula-col">
+            <div class="formula-block">SELECT receipt_no,
+  customer_name, receipt_amount,
+  allocated_amount, unallocated_amount
+FROM receipts
+WHERE status IN (有效)
+  + 关键字 + 核销状态</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">status IN ('已生效','CONFIRMED')
+AND external_source
+  &lt;&gt; 'H3YUN_OUTBOUND_EMBED'</div>
+          </td>
+          <td><span class="status-badge warn"><span class="status-icon">⚠️</span>旧谓词</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-mid">P1 中</span>
+            <div style="margin-top:8px;">列表行漏出 EMBED 收据的风险（已在 V171 打标 MIGRATED，需切白名单）</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="page-col">收款详情</td>
+          <td class="method-col">receiptDetail(id)<br>· 分配明细 JOIN</td>
+          <td class="formula-col">
+            <div class="formula-block">JOIN receipt_allocations
+WHERE receipt_id=?</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">receipts 端：
+external_source &lt;&gt; 'H3YUN_OUTBOUND_EMBED'
+
+allocations 端：
+无白名单</div>
+          </td>
+          <td><span class="status-badge warn"><span class="status-icon">⚠️</span>旧谓词</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-mid">P1 中</span>
+            <div style="margin-top:8px;">分配明细未加 allocation_origin='DIRECT' 过滤</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="page-col">出库回款快照</td>
+          <td class="method-col">refreshOutboundSnapshot()<br>→ computeOutboundLedger()</td>
+          <td class="formula-col">
+            <div class="formula-block">✅ 已改调用
+SettlementLedgerService
+.computeOutboundLedger(id)
+
+公式 A1：白名单 CONFIRMED
+分配 SUM(ra.allocated_amount)
+公式 A2：快照表兜底
++ display_received 展示口径</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">ra.allocation_status='CONFIRMED'
+AND ra.allocation_origin='DIRECT'
+AND r.legacy_migrated_tag IS NULL
+
+（FACT_ALLOCATION_PREDICATE）</div>
+          </td>
+          <td><span class="status-badge ok"><span class="status-icon">✅</span>统一</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-none">无需</span>
+            <div style="margin-top:8px;">所有下游依赖 received_amount 的页面（利润/提成/未收）均已间接统一</div>
+          </td>
+        </tr>
+
+        <!-- ========== H3BusinessQueryService ========== -->
+        <tr>
+          <td rowspan="2">
+            <div class="service-cell">
+              <span class="service-name">H3BusinessQueryService</span>
+              <span class="service-tag">业务详情 · 氚云业务中心</span>
+            </div>
+          </td>
+          <td class="page-col">业务详情</td>
+          <td class="method-col">businessDetail()<br>· receipts 关联收据列表</td>
+          <td class="formula-col">
+            <div class="formula-block">JOIN receipt_allocations a
+JOIN receipts r
+  ON r.id = a.receipt_id
+WHERE a.target_business_order_id = ?</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">r.legacy_migrated_tag IS NULL
+AND a.allocation_origin='DIRECT'</div>
+          </td>
+          <td><span class="status-badge ok"><span class="status-icon">✅</span>统一</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-none">无需</span>
+            <div style="margin-top:8px;">已在第4步改造，使用完整双条件白名单</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="page-col">业务时间线</td>
+          <td class="method-col">businessTimeline()<br>· FACT_ALLOCATION 事件</td>
+          <td class="formula-col">
+            <div class="formula-block">SELECT 核销事件行
+FROM receipt_allocations
+  JOIN receipts</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">FACT_ALLOCATION_PREDICATE
+（常量复用）</div>
+          </td>
+          <td><span class="status-badge ok"><span class="status-icon">✅</span>统一</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-none">无需</span>
+          </td>
+        </tr>
+
+        <!-- ========== BossDashboardService ========== -->
+        <tr>
+          <td rowspan="3">
+            <div class="service-cell">
+              <span class="service-name">BossDashboardService</span>
+              <span class="service-tag">老板经营看板</span>
+            </div>
+          </td>
+          <td class="page-col">总览 KPI</td>
+          <td class="method-col">overview()<br>· 本月收款 / 上月对比<br>· 年初至今收款 ytdReceived</td>
+          <td class="formula-col">
+            <div class="formula-block">monthAggregateReceipt():
+SUM(receipt_amount)
+FROM receipts
+WHERE receipt_date BETWEEN ? AND ?
+
+YTD:
+SUM(receipt_amount)
+WHERE receipt_date >= ?</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">仅 status &lt;&gt; '草稿'
+
+无 legacy_migrated_tag
+无 allocation_origin
+过滤</div>
+          </td>
+          <td><span class="status-badge bad"><span class="status-icon">❌</span>无排除</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-high">P0 高</span>
+            <div style="margin-top:8px;">老板视角的经营数据含 2.8 亿 EMBED 干扰，直接影响经营判断准确性。影响 4 个 Metric</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="page-col">业务员排行</td>
+          <td class="method-col">salespeopleRanking()<br>· 每人 r_amt 收款额</td>
+          <td class="formula-col">
+            <div class="formula-block">(SELECT SUM(r.receipt_amount)
+ FROM receipts r
+ WHERE r.salesperson_name
+        &lt;=&gt; t.name)</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">仅 status &lt;&gt; '草稿'
++ 本月日期范围</div>
+          </td>
+          <td><span class="status-badge bad"><span class="status-icon">❌</span>无排除</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-high">P0 高</span>
+            <div style="margin-top:8px;">业务员排名失真，含 EMBED 收据会虚增收款成绩</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="page-col">客户排行</td>
+          <td class="method-col">topCustomers()<br>· 每人 r_amt / r_cnt</td>
+          <td class="formula-col">
+            <div class="formula-block">SUM(r.receipt_amount)
+  关联客户
+COUNT(r.id)</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">仅 status &lt;&gt; '草稿'</div>
+          </td>
+          <td><span class="status-badge bad"><span class="status-icon">❌</span>无排除</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-mid">P1 中</span>
+          </td>
+        </tr>
+
+        <!-- ========== MyWorkbenchService ========== -->
+        <tr>
+          <td rowspan="3">
+            <div class="service-cell">
+              <span class="service-name">MyWorkbenchService</span>
+              <span class="service-tag">个人工作台</span>
+            </div>
+          </td>
+          <td class="page-col">我的看板</td>
+          <td class="method-col">myDashboard()<br>· rc_cnt / rc_amt<br>（本月收款笔数/金额）</td>
+          <td class="formula-col">
+            <div class="formula-block">COUNT(*) AS rc_cnt
+SUM(receipt_amount) AS rc_amt
+FROM receipts
+WHERE salesperson_name = ?</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">仅 status &lt;&gt; '草稿'
++ 本月日期范围
++ 业务员权限</div>
+          </td>
+          <td><span class="status-badge bad"><span class="status-icon">❌</span>无排除</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-high">P0 高</span>
+            <div style="margin-top:8px;">业务员个人看板虚增自己的收款金额，影响 KPI 感知</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="page-col">客户链路</td>
+          <td class="method-col">customerLink()<br>· rc 计数 / tr 收款合计</td>
+          <td class="formula-col">
+            <div class="formula-col">COUNT(*) rc (计数)
+SUM(received_amount) tr
+  (sales_outbounds 快照列)</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">rc 计数：无条件
+
+tr（快照）：
+outbound_status='CONFIRMED'
+（✅ 快照已统一）</div>
+          </td>
+          <td><span class="status-badge bad"><span class="status-icon">❌</span>无排除</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-mid">P1 中</span>
+            <div style="margin-top:8px;">rc 笔数失真；tr 金额由快照驱动已 OK</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="page-col">客户详情</td>
+          <td class="method-col">customerDetail()<br>· receipts 客户收款明细列表</td>
+          <td class="formula-col">
+            <div class="formula-block">SELECT receipt_no, receipt_amount,
+  allocated_amount, unallocated_amount
+FROM receipts r
+WHERE r.customer_name &lt;=&gt; ?</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">r.external_source
+  &lt;&gt; 'H3YUN_OUTBOUND_EMBED'</div>
+          </td>
+          <td><span class="status-badge warn"><span class="status-icon">⚠️</span>旧谓词</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-mid">P1 中</span>
+            <div style="margin-top:8px;">同 SOSS 收款列表，需切白名单</div>
+          </td>
+        </tr>
+
+        <!-- ========== BusinessProfitService ========== -->
+        <tr>
+          <td>
+            <div class="service-cell">
+              <span class="service-name">BusinessProfitService</span>
+              <span class="service-tag">利润核算</span>
+            </div>
+          </td>
+          <td class="page-col">利润计算</td>
+          <td class="method-col">calculate(id)<br>· revenue / cost<br>（利润不直接依赖回款）</td>
+          <td class="formula-col">
+            <div class="formula-block">revenue = SUM(so.sales_amount)
+  WHERE outbound_status='CONFIRMED'
+
+gross = revenue - cost
+profit = gross - expense
+  - adjustments</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">不查 receipts / allocations
+
+（通过 SLA 快照
+  received_amount 列间接
+  进入提成层）</div>
+          </td>
+          <td><span class="status-badge ok"><span class="status-icon">✅</span>统一（间接）</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-none">无需</span>
+            <div style="margin-top:8px;">利润本身=销售额-成本-费用，不涉及回款口径；下游提成通过快照列继承</div>
+          </td>
+        </tr>
+
+        <!-- ========== BusinessCommissionService ========== -->
+        <tr>
+          <td>
+            <div class="service-cell">
+              <span class="service-name">BusinessCommissionService</span>
+              <span class="service-tag">提成计算</span>
+            </div>
+          </td>
+          <td class="page-col">提成计算</td>
+          <td class="method-col">calculate(id)<br>· received_amount 回款基数<br>· receipt_ratio_pct 回款率</td>
+          <td class="formula-col">
+            <div class="formula-block">received =
+SUM( LEAST(
+  COALESCE(so.received_amount, 0),
+  COALESCE(so.sales_amount, 0)
+) )
+FROM sales_outbounds so
+WHERE outbound_status='CONFIRMED'</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">不直接查 receipts
+
+完全依赖
+sales_outbounds.received_amount
+（SLA 快照列）</div>
+          </td>
+          <td><span class="status-badge ok"><span class="status-icon">✅</span>统一（间接）</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-none">无需</span>
+            <div style="margin-top:8px;">通过 SOSS.refreshOutboundSnapshot → SettlementLedgerService 链路已统一。前提：refreshOutboundSnapshot 必须定期执行</div>
+          </td>
+        </tr>
+
+        <!-- ========== ReceiptReconciliationService ========== -->
+        <tr>
+          <td>
+            <div class="service-cell">
+              <span class="service-name">ReceiptReconciliationService</span>
+              <span class="service-tag">回款对账 · 财务</span>
+            </div>
+          </td>
+          <td class="page-col">对账执行</td>
+          <td class="method-col">reconcile()<br>· receipt_amount vs 氚云源数据</td>
+          <td class="formula-col">
+            <div class="formula-block">SELECT r.receipt_amount,
+  r.receipt_type, r.external_id
+FROM receipts r
+  JOIN h3_import_rows raw
+比对 RECEIPT: 本次收款金额
+比对 SETTLEMENT: 合计已收金额</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">r.legacy_migrated_tag IS NULL
+AND r.status IN
+  ('已生效','CONFIRMED')
+
+（✅ FACT_RECEIPT_PREDICATE）</div>
+          </td>
+          <td><span class="status-badge ok"><span class="status-icon">✅</span>统一</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-none">无需</span>
+            <div style="margin-top:8px;">第4步已改造完成，仅对账正式收款单</div>
+          </td>
+        </tr>
+
+        <!-- ========== BusinessRelationAuditService ========== -->
+        <tr>
+          <td rowspan="2">
+            <div class="service-cell">
+              <span class="service-name">BusinessRelationAuditService</span>
+              <span class="service-tag">关系审计 · 运维</span>
+            </div>
+          </td>
+          <td class="page-col">关系审计</td>
+          <td class="method-col">auditReceiptOutboundLink()<br>· allocation 总数 / 未关联数</td>
+          <td class="formula-col">
+            <div class="formula-block">全表统计：
+COUNT(*) FROM receipt_allocations
+
+分组统计有无
+sales_outbound_id</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">无条件（全表）
+
+⚠️ 包含 OUTBOUND_EMBEDDED
+（allocation_origin 非 DIRECT）</div>
+          </td>
+          <td><span class="status-badge bad"><span class="status-icon">❌</span>无排除</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-low">P2 低</span>
+            <div style="margin-top:8px;">审计工具视角可接受全量，但建议拆"正式事实/历史"两栏显示</div>
+          </td>
+        </tr>
+        <tr>
+          <td class="page-col">关系审计</td>
+          <td class="method-col">auditReceiptAmountConsistency()<br>· receipt 金额 vs 分配合计</td>
+          <td class="formula-col">
+            <div class="formula-block">r.receipt_amount
+  vs r.allocated_amount
+  vs SUM(ra.allocated_amount)</div>
+          </td>
+          <td class="predicate-col">
+            <div class="predicate-block">仅 status IN
+  ('已生效','CONFIRMED')
+
+无 legacy_migrated_tag
+过滤</div>
+          </td>
+          <td><span class="status-badge bad"><span class="status-icon">❌</span>无排除</span></td>
+          <td class="note-cell">
+            <span class="priority-tag priority-mid">P1 中</span>
+            <div style="margin-top:8px;">审计"有效收款"时混入已迁出 EMBED 收据（92,625 条），指标会虚高</div>
+          </td>
+        </tr>
+
+      </tbody>
+    </table>
+  </div>
+
+  <div class="predicate-ref-card">
+    <div class="ref-title">📌 统一白名单谓词参考（SettlementLedgerService 常量）</div>
+    <div style="display:grid; grid-template-columns: 1fr 1fr; gap: var(--spacer-16);">
+      <div class="ref-item">
+        <div class="ref-key">FACT_RECEIPT_PREDICATE（用于 receipts 表别名 r）</div>
+        <div class="ref-value">r.legacy_migrated_tag IS NULL
+
+→ 排除 V171 打标的 92,625 条
+ OUTBOUND_EMBEDDED 已迁出快照收据
+（legacy_migrated_tag =
+ 'MIGRATED_OUT_TO_SNAPSHOT'）</div>
+      </div>
+      <div class="ref-item">
+        <div class="ref-key">FACT_ALLOCATION_PREDICATE（用于 receipt_allocations 表别名 ra JOIN receipts r）</div>
+        <div class="ref-value">ra.allocation_origin = 'DIRECT'
+  AND r.legacy_migrated_tag IS NULL
+
+→ 双重保险：
+① allocation 端排除 OUTBOUND_EMBEDDED 打标分配
+② receipt 端再次排除历史迁移行</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="margin-top: var(--spacer-20); padding: var(--spacer-16); background: var(--color-surface); border: 1px solid var(--color-border); border-radius: var(--radius-card);">
+    <div style="font: var(--weight-medium) var(--text-title); margin-bottom: var(--spacer-12); color: var(--color-danger);">🎯 整改路线建议（影响由大到小）</div>
+    <div style="display: grid; gap: var(--spacer-8); font: var(--text-body);">
+      <div><b style="color:var(--color-danger)">P0（立即处理，共 4 个取数点）：</b>BossDashboardService 全部 3 处 + MyWorkbenchService.myDashboard → 老板与业务员的核心 KPI，影响经营决策</div>
+      <div><b style="color:var(--color-warning)">P1（本迭代内，共 5 个取数点）：</b>SOSS 的 listReceipts / receiptDetail / receiptSummary + MyWorkbenchService 客户详情 + BRAS 金额一致性审计 → 日常操作高频入口</div>
+      <div><b style="color:var(--color-success)">P2（下迭代优化，共 2 个取数点）：</b>MyWorkbenchService.customerLink rc 计数 + BRAS 分配关联审计 → 数据量较小/审计视角可容忍</div>
+    </div>
+  </div>
+</div>

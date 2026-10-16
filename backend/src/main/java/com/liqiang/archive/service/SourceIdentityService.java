@@ -1404,9 +1404,8 @@ public class SourceIdentityService {
             SELECT (SELECT COUNT(*) FROM sales_outbounds WHERE customer_id=?)
                  + (SELECT COUNT(*) FROM receipts WHERE customer_id=?)
                  + (SELECT COUNT(*) FROM production_orders WHERE customer_id=?)
-                 + (SELECT COUNT(*) FROM manufacturing_orders WHERE customer_id=?)
                  + (SELECT COUNT(*) FROM sales_contracts WHERE customer_id=?)
-            """, Long.class, customerId, customerId, customerId, customerId, customerId);
+            """, Long.class, customerId, customerId, customerId, customerId);
         if (facts != null && facts == 0) {
             jdbc.update("""
                 UPDATE customers SET deleted_at=NOW(),status='INACTIVE',updated_at=NOW(),
@@ -1740,7 +1739,7 @@ public class SourceIdentityService {
 
     /** 业务事实表：引用 customer_id 的全部事实表都要跟着合并，漏一张就会留下孤儿引用。 */
     private static final List<String> MERGE_FACT_TABLES = List.of(
-            "manufacturing_orders", "production_orders", "receipts", "sales_outbounds");
+            "production_orders", "receipts", "sales_outbounds");
 
     /** 档案子表：同样引用 customer_id，合并后归到主客户名下。 */
     private static final List<String> MERGE_PROFILE_TABLES = List.of(

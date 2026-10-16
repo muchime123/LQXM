@@ -7,6 +7,7 @@ import com.liqiang.archive.entity.CompanyAsset;
 import com.liqiang.archive.entity.CompanyCertification;
 import com.liqiang.archive.entity.CompanyTeamMember;
 import com.liqiang.archive.entity.Certificate;
+import com.liqiang.archive.entity.EmployeeFile;
 import com.liqiang.archive.entity.PackagingAsset;
 import com.liqiang.archive.entity.ProductAsset;
 
@@ -22,6 +23,8 @@ public class FileDtos {
         PACKAGING_VARIANT("packaging_variant"),
         COMPANY("company"),
         CERTIFICATE("certificate"),
+        /** 员工档案文件（身份证、劳动合同、学历证明等）。 */
+        EMPLOYEE("employee"),
         /** 仅为历史文件定位兼容保留，不再注册独立业务适配器。 */
         DOCUMENT("document");
 
@@ -162,6 +165,29 @@ public class FileDtos {
                     asset.getUpdatedAt(),
                     asset.getCoverFileName(),
                     FileAssetCapabilities.COMPANY_ASSET
+            );
+        }
+
+        public static FileHandle from(EmployeeFile file) {
+            return new FileHandle(
+                    file.getId(),
+                    OwnerType.EMPLOYEE,
+                    file.getEmployeeId(),
+                    file.getCategory(),
+                    "employee_file",
+                    file.getEmployeeId(),
+                    file.getFileName(),
+                    file.getOriginalFileName() != null ? file.getOriginalFileName() : file.getFileName(),
+                    file.getMimeType(),
+                    file.getFileSize(),
+                    file.getTags(),
+                    file.getDefaultAsset(),
+                    file.getSortOrder(),
+                    file.getDeletedAt() != null,
+                    file.getCreatedAt(),
+                    file.getUpdatedAt(),
+                    null,
+                    FileAssetCapabilities.EMPLOYEE_FILE
             );
         }
 

@@ -2,8 +2,12 @@ package com.liqiang.archive.controller;
 
 import com.liqiang.archive.dto.EmployeeDtos.*;
 import com.liqiang.archive.dto.EmployeeExternalImportDtos.*;
+import com.liqiang.archive.dto.FileDtos.FileHandle;
+import com.liqiang.archive.entity.EmployeeFile;
+import com.liqiang.archive.repository.EmployeeFileRepository;
 import com.liqiang.archive.service.EmployeeExternalImportService;
 import com.liqiang.archive.service.EmployeeService;
+import com.liqiang.archive.service.FileHandleMapper;
 import com.liqiang.archive.security.RequirePermission;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +28,8 @@ public class EmployeeController {
 
     private final EmployeeService employeeService;
     private final EmployeeExternalImportService externalImportService;
+    private final EmployeeFileRepository employeeFileRepository;
+    private final FileHandleMapper fileHandleMapper;
 
     // ==================== 查询 ====================
 
@@ -118,5 +124,38 @@ public class EmployeeController {
             @RequestBody List<ApplyIdentityItem> items,
             @RequestHeader(value = "X-User-Name", required = false) String operator) {
         return externalImportService.apply(items, operator);
+    }
+
+    // ==================== 档案文件 ====================
+
+    /**
+     * 注册员工档案文件（物理上传由 POST /api/files/upload 完成，本端点写库登记）。
+     * 类别白名单：id_card / labor_contract / education_cert / resignation_cert / health_cert / other
+     */
+    @PostMapping("/{id}/files")
+    @ResponseStatus(HttpStatus.CREATED)
+    public FileHandle registerFile(@PathVariable Long id, @RequestBody EmployeeFileRegistration payload) {
+        employeeService.get(id); // 确保员工存在
+        if (payload == null || payload.category() == null || payload.category().isBlank()
+                || payload.fileName() == null || payload.fileName().isBlank()) {
+            throw new IllegalArgumentException("category 和 fileName 不能为空");
+        }
+        EmployeeFile file = new EmployeeFile();
+        file.setEmployeeId(id);
+        file.setCategory(payload.category());
+        file.setFileName(payload.fileName());
+        file.setOriginalFileName(payload.originalFileName());
+        file.setMimeType(payload.mimeType());
+        file.setFileSize(payload.fileSize());
+        return fileHandleMapper.from(employeeFileRepository.save(file));
+    }
+
+    public record EmployeeFileRegistration(
+            String category,
+            String fileName,
+            String originalFileName,
+            String mimeType,
+            Long fileSize
+    ) {
     }
 }

@@ -5,6 +5,7 @@ export type FileOwnerType =
   | 'packaging_variant'
   | 'company'
   | 'certificate'
+  | 'employee'
   | 'document'
 
 /**
@@ -19,6 +20,7 @@ export const FILE_OWNER_TYPE_KEYS = {
   packagingVariant: 'packaging_variant',
   company: 'company',
   certificate: 'certificate',
+  employee: 'employee',
   document: 'document'
 } as const
 
@@ -29,6 +31,7 @@ export const FILE_OWNER_TYPES: readonly FileOwnerType[] = [
   FILE_OWNER_TYPE_KEYS.packagingVariant,
   FILE_OWNER_TYPE_KEYS.company,
   FILE_OWNER_TYPE_KEYS.certificate,
+  FILE_OWNER_TYPE_KEYS.employee,
   FILE_OWNER_TYPE_KEYS.document
 ]
 

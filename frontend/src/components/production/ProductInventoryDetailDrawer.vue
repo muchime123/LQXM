@@ -22,8 +22,8 @@
           type="warning"
           :closable="false"
           show-icon
-          title="产品信息台账缺该编号"
-          description="仓库明细有该编号、产品信息台账没有：数量有效，但采购价缺失、库存金额无法计算。在氚云补全产品信息后重新导入产品信息台账即可。"
+          title="产品信息台账里找不到该产品"
+          description="仓库明细有这个产品，但按编号、按产品名称都没能在产品信息台账里匹配到对应行：数量有效，但采购价缺失、库存金额无法计算。在氚云补全产品信息后重新导入产品信息台账即可。"
         />
         <el-alert
           v-else-if="!row.purchasePrice"
@@ -32,7 +32,7 @@
           :closable="false"
           show-icon
           title="采购价缺失"
-          description="编号能对上，但产品信息台账采购价为空或 0，本行库存金额为空。补价后重新导入产品信息台账。"
+          description="产品信息已匹配上，但该产品的采购价为空或 0，本行库存金额为空。补价后重新导入产品信息台账。"
         />
         <el-alert
           v-if="row.codeConflict"
@@ -40,8 +40,8 @@
           type="warning"
           :closable="false"
           show-icon
-          title="该编号在两张台账里指向不同产品"
-          description="氚云编号漂移：本行名称取自仓库明细、采购价取自产品信息台账中同编号的另一产品，金额仅供参考，请人工核对。"
+          :title="conflictTitle"
+          :description="conflictDescription"
         />
 
         <!-- 区块一：本行库存概览 -->
@@ -234,6 +234,17 @@ const stockHistory = ref<LedgerRowHistoryEntry[]>([])
 const drawerTitle = computed(() =>
   props.row ? `库存详情 · ${props.row.productName || props.row.productCode}` : '库存详情'
 )
+
+// 氚云侧是按产品名称关联的，编号是人工填写的文本（写错不影响氚云自身流转）。
+// 编号与名称所指产品不一致时以名称匹配为准，这里把差异摊开，让人回氚云订正。
+const codeRewritten = computed(() =>
+  !!props.row?.resolvedCode && props.row.resolvedCode !== props.row.productCode
+)
+const conflictTitle = computed(() => codeRewritten.value ? '氚云录入的编号与该行名称不符' : '该编号在两张台账里指向不同产品')
+const conflictDescription = computed(() => codeRewritten.value
+  ? `氚云按产品名称关联，编号是人工填写的文本。该行名称在产品信息里对应编号「${props.row?.resolvedCode}」，`
+    + '采购价 / 类目已按它取用；建议在氚云订正编号。'
+  : '编号撞号：本行名称取自仓库明细、采购价取自产品信息台账里同编号的另一个产品，金额仅供参考，请人工核对。')
 
 const historyGroups = computed(() =>
   [

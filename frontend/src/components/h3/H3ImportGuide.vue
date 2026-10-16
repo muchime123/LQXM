@@ -55,7 +55,7 @@ import { computed, ref } from 'vue'
 
 export type H3GuideAction =
   | 'reset' | 'product' | 'stock' | 'dealer' | 'outbound' | 'production' | 'receipt' | 'settlement'
-  | 'identity' | 'ledger' | 'customers' | 'commission'
+  | 'ledger' | 'customers' | 'commission'
 
 defineEmits<{ close: []; reset: []; action: [action: H3GuideAction] }>()
 const mode = ref<'rebuild' | 'daily'>('rebuild')
@@ -84,13 +84,14 @@ export interface H3GuideStep {
 const rebuildSteps: H3GuideStep[] = [
   { no: 1, title: '清理旧来源', tone: 'guard', description: '选择保留或重新评估身份映射，创建保护快照后输入令牌执行来源重置。客户、员工和产品主档不会删除；已有提成核算版本引用来源时禁止重置。', actions: [importAction('重导准备', 'reset', true)] },
   { no: 2, title: '导入核心与基础数据', tone: 'core', description: '先导入产品信息与仓库明细（库存快照的两份来源，经销商按需），再导入销售出库——它是客户、金额、回款、未收款与提成的权威来源。', actions: [importAction('产品信息', 'product'), importAction('仓库明细', 'stock'), importAction('经销商信息', 'dealer'), importAction('导入销售出库', 'outbound', true)] },
-  { no: 3, title: '系统自动建立关联', tone: 'auto', description: '销售出库确认后自动识别客户、员工、产品与仓库，并刷新收款状态与利润结果。可以确定的关联不需要人工介入。', actions: [importAction('销售出库关联', 'identity', true)] },
+  // 2026-10-06 下线「销售出库关联」工作台后，本步降为纯说明步骤（关联由导入流程自动完成，无人工入口）。
+  { no: 3, title: '系统自动建立关联', tone: 'auto', description: '销售出库确认后自动识别客户、员工、产品与仓库，并刷新收款状态与利润结果。可以确定的关联不需要人工介入。', actions: [] },
   { no: 4, title: '处理剩余异常并核对结果', tone: 'check', description: '只处理系统无法确定的少量异常（缺客户、缺员工、退换货性质），然后核对未收款与月度提成。确认一致后本次重导完成。', actions: [importAction('查看历史台账', 'ledger'), importAction('月度提成核算', 'commission', true)] }
 ]
 const dailySteps: H3GuideStep[] = [
   { no: 1, title: '导入最新销售出库', tone: 'core', description: '通常只需要更新销售出库。建议持续使用同一种导出方式，并在预览中重点检查“更新”记录。', actions: [importAction('导入销售出库', 'outbound', true)] },
   { no: 2, title: '按变化补充其他数据', tone: 'fact', optional: true, description: '只有产品、仓库或经销商发生变化时才上传对应文件，不要求每次全部导入。生产工单、收款记录与多订单结清仅在补历史时从「历史数据导入」归档组进入。', actions: [importAction('产品信息', 'product'), importAction('仓库明细', 'stock'), importAction('经销商信息', 'dealer')] },
-  { no: 3, title: '处理异常并完成核对', tone: 'check', description: '检查批次错误、销售出库关联完整度和出库更新明细，然后核对本期未收款与月度提成。', actions: [importAction('销售出库关联', 'identity'), importAction('月度提成核算', 'commission', true)] }
+  { no: 3, title: '处理异常并完成核对', tone: 'check', description: '检查批次错误与出库更新明细，然后核对本期未收款与月度提成。', actions: [importAction('月度提成核算', 'commission', true)] }
 ]
 const activeSteps = computed(() => mode.value === 'rebuild' ? rebuildSteps : dailySteps)
 </script>

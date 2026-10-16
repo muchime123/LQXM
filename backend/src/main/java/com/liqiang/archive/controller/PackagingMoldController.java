@@ -46,6 +46,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/packaging-molds")
+@RequirePermission("mold.read")
 @RequiredArgsConstructor
 public class PackagingMoldController {
 

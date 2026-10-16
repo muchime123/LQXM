@@ -36,7 +36,7 @@ public class AuthController {
     private final AuthService authService;
     private final CurrentUserService users;
 
-    @Value("${app.security.allow-employee-header:true}")
+    @Value("${app.security.allow-employee-header:false}")
     private boolean allowEmployeeHeader;
 
     public record LoginPayload(String username, String password) {

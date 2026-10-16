@@ -16,13 +16,14 @@ export type {
  * 库存清单行 = 氚云「产品信息台账 × 仓库明细」合并结果。
  *
  * - warehouseId/warehouseName 为 null 表示该产品在仓库明细里没有任何记录（warehouseRecorded=0）
- * - codeConflict=1 表示该编号在两张台账里指向不同产品，采购价可能取自别的产品
+ * - productCode 是氚云里**实际录入**的编号；resolvedCode 是按产品名称匹配出的权威编号。
+ *   两者不同说明该行编号录错了（氚云是按名称关联的），采购价/类目已按 resolvedCode 取
+ * - codeConflict=1 表示编号不可信（编号与名称所指产品不一致），需人工核对
  */
 export interface ProductInventoryBalance {
-  id: number | null; balanceId?: number | null; hasBalance?: number
+  id: number | null
   warehouseId: number | null; warehouseName: string | null; warehouseRecorded?: number
-  salesProductId: number | null
-  productCode: string; productName: string; specification?: string; unit: string
+  productCode: string; resolvedCode?: string; productName: string; specification?: string; unit: string
   quantity: number; purchasePrice?: number | null; stockAmount?: number | null
   category?: string; isCustomized?: boolean; codeConflict?: number; updatedAt: string | null
   /** 生命周期状态（V304，本地管理列，导入不覆盖）：只在产品信息台账有该编号时存在 */
@@ -33,15 +34,6 @@ export interface ProductInventoryBalance {
 export interface ProductInventorySummary { total: number; productCount: number; warehouseCount: number; zeroCount: number; totalAmount: number }
 export interface ProductInventoryPage { items: ProductInventoryBalance[]; total: number; page: number; size: number; summary: ProductInventorySummary; categories: string[]; warehouses: Array<{ id: number; warehouseCode: string; warehouseName: string }> }
 export const fetchProductInventory = async (params: Record<string, unknown>) => (await http.get<ProductInventoryPage>('/product-inventory/balances', { params })).data
-export interface ConfiguredProductIdentity { id:number; productCode:string; skuKey:string; productName:string; specification?:string; unit:string; status:string; createdAt:string; outputCount:number }
-export interface ConfiguredProductCandidate { id:number; productCode:string; productName:string; specification?:string; unit:string; status:string }
-export interface ConfiguredOutputQueueItem { id:number;orderId:number;orderNo:string;productName:string;specification?:string;unit:string;skuKey:string;plannedQuantity:number;receivedQuantity:number;orderStatus:string }
-export const fetchConfiguredProducts = async (params:Record<string,unknown>) =>
-  (await http.get<{items:ConfiguredProductIdentity[];total:number;page:number;size:number;queuedOutputs:ConfiguredOutputQueueItem[];queuedTotal:number}>('/product-inventory/configured-products',{params})).data
-export const fetchConfiguredProductCandidates = async (id:number,keyword:string) =>
-  (await http.get<ConfiguredProductCandidate[]>(`/product-inventory/configured-products/${id}/candidates`,{params:{keyword}})).data
-export const reviewConfiguredProduct = async (id:number,payload:{action:'CONFIRM_NEW'|'MERGE_EXISTING';targetProductId?:number}) =>
-  (await http.post(`/product-inventory/configured-products/${id}/review`,payload)).data
 
 // ===== 单行库存详情（2026-09-16）：本行快照 + 两份来源台账行 + 同编号跨仓库分布 =====
 /**
@@ -122,7 +114,7 @@ export const INVENTORY_ISSUE_STATUS_TEXT: Record<InventoryIssueStatus, string> =
   NO_PRICE_NEEDED: '无需计价'
 }
 export const INVENTORY_ISSUE_TYPE_TEXT: Record<InventoryIssueType, string> = {
-  MISSING_PRODUCT: '缺产品信息',
+  MISSING_PRODUCT: '编号未匹配',
   MISSING_PRICE: '缺采购价'
 }
 /**
@@ -148,21 +140,20 @@ export interface SnapshotIssueRow {
 /**
  * 库存快照元信息：两份来源批次 + 导出时间差 + 异常统计。
  *
- * 异常口径三层收敛（2026-09-16 第三阶段）：
+ * 当前异常口径：
  * 1. 与清单同口径——只看页面清单里看得见的行（仓库映射得上、非费用项）；
- * 2. 按是否影响金额分层——数量为 0 的行乘任何价都是 0，归「仅台账残留」；
- * 3. 扣除已处置——标记过结论的行不再计入待处理，因此异常数能真正收敛到 0。
- * 前端口径条主数字用 `affectedCount`，不要再用两个 count 相加（那是历史虚高口径）。
+ * 2. 只处理非零库存；零库存历史定制品暂不治理；
+ * 3. 扣除已处置——标记过结论的行不再计入待处理。
  */
 export interface ProductInventorySnapshotInfo {
   catalogBatch: SnapshotBatchMeta
   stockBatch: SnapshotBatchMeta
   /** 两份台账完成导入时间的差（秒）；任一缺失为 null */
   gapSeconds: number | null
-  /** 待处理·缺产品 行数（已排除费用项、已扣除已处置） */
+  /** 待处理·编号未匹配 行数（仅非零库存，已排除费用项、已扣除已处置） */
   missingProductCount: number
   missingProductCodes: number
-  /** 待处理·缺产品里数量非 0 的行数（真正影响库存金额） */
+  /** 兼容字段：当前与 missingProductCount 相同 */
   missingProductInStockCount: number
   /** 待处理·缺价 行数（缺价天然要求数量非 0） */
   missingPriceCount: number
@@ -170,9 +161,9 @@ export interface ProductInventorySnapshotInfo {
   missingPriceInStockCount: number
   /** 已处置行数（两类合计） */
   disposedCount: number
-  /** 真正影响库存金额的待处理行数 = 缺产品有量 + 缺价（口径条主数字） */
+  /** 兼容字段：当前与 pendingCount 相同 */
   affectedCount: number
-  /** 待处理合计（含零库存残留，用于说明「为什么还有个更大的数」） */
+  /** 非零库存待处理合计 */
   pendingCount: number
   /** 被费用项过滤挡掉的行数：历史口径多报的部分，让口径变化有据可查 */
   feeExcludedCount: number
@@ -188,8 +179,6 @@ export interface ProductInventorySnapshotInfo {
   /** 仓库明细台账：长期未被覆盖的行（数量仍在清单里，需核对导出范围或记处置结论） */
   staleStockCount: number
   staleStockRows: StaleStockRow[]
-  /** 后端保留的对账偏离字段（正式库存账冻结期前端不消费，仅为 API 契约完整） */
-  balanceVanished: number; balanceDrifted: number
 }
 /** 覆盖报告·产品信息台账行 */
 export interface StaleCatalogRow {

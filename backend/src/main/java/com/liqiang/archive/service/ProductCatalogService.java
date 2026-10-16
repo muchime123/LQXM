@@ -329,8 +329,9 @@ public class ProductCatalogService {
         // 官网发布字段
         if (payload.getWebsiteEnabled() != null) model.setWebsiteEnabled(payload.getWebsiteEnabled());
         if (payload.getWebsiteFeatured() != null) model.setWebsiteFeatured(payload.getWebsiteFeatured());
-        if (payload.getWebsiteSlug() != null) model.setWebsiteSlug(payload.getWebsiteSlug());
-        if (payload.getWebsiteSummary() != null) model.setWebsiteSummary(payload.getWebsiteSummary());
+        // 空白必须归一成 NULL，不能原样入库：见 normalizeWebsiteText 的说明
+        if (payload.getWebsiteSlug() != null) model.setWebsiteSlug(normalizeWebsiteText(payload.getWebsiteSlug()));
+        if (payload.getWebsiteSummary() != null) model.setWebsiteSummary(normalizeWebsiteText(payload.getWebsiteSummary()));
         if (payload.getApplicationTags() != null) model.setApplicationTags(payload.getApplicationTags());
         if (payload.getContainerTags() != null) model.setContainerTags(payload.getContainerTags());
         if (payload.getPackagingProcessTags() != null) model.setPackagingProcessTags(payload.getPackagingProcessTags());
@@ -1031,11 +1032,28 @@ public class ProductCatalogService {
             switch (key) {
                 case "websiteEnabled" -> model.setWebsiteEnabled(parseBoolean(value));
                 case "websiteFeatured" -> model.setWebsiteFeatured(parseBoolean(value));
-                case "websiteSlug" -> model.setWebsiteSlug(value.isBlank() ? null : value.trim());
-                case "websiteSummary" -> model.setWebsiteSummary(value.isBlank() ? null : value.trim());
+                case "websiteSlug" -> model.setWebsiteSlug(normalizeWebsiteText(value));
+                case "websiteSummary" -> model.setWebsiteSummary(normalizeWebsiteText(value));
                 default -> { /* 白名单已校验，不会进入 */ }
             }
         });
+    }
+
+    /**
+     * 官网可空文本字段（websiteSlug / websiteSummary）归一：去首尾空白，空白一律落 NULL。
+     *
+     * <p>⚠️ {@code product_models.website_slug} 上有唯一索引 {@code uk_website_slug}。MySQL 的唯一索引
+     * 把多个 NULL 视为互不相同、允许并存；但 {@code ''} 是真实值，全表只能有一行。编辑器表单
+     * （{@code useCatalogEditors.blankModel()}）的 slug 默认值正是 {@code ''}，一旦原样入库，第一行空 slug
+     * 记录就会永久占住 {@code ''} 槽位，之后任何「空 slug 新建 / 清空 slug 保存」都会撞
+     * {@code Duplicate entry '' for key 'product_models.uk_website_slug'}。
+     *
+     * <p>因此编辑器路径与批量路径必须共用本方法，禁止各写一套（两套分叉正是本故障的指因）。
+     */
+    private static String normalizeWebsiteText(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
     }
 
     /**

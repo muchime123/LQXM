@@ -203,6 +203,7 @@ public class FileAssetLocationService {
         return switch (FileCategory.scopeOf(category)) {
             case FLAT -> fileRoot.resolve(folder).resolve(handle.fileName()).normalize();
             case PACKAGING -> fileStorageService.packagingDir(storageOwnerId).resolve(folder).resolve(handle.fileName()).normalize();
+            case EMPLOYEE -> fileStorageService.employeeDir(storageOwnerId).resolve(folder).resolve(handle.fileName()).normalize();
             case PRODUCT -> resolveProductFile(storageOwnerId, folder, handle.fileName());
         };
     }
@@ -290,6 +291,7 @@ public class FileAssetLocationService {
         return switch (scope) {
             case FLAT -> fileRoot.resolve(folder).normalize();
             case PACKAGING -> fileStorageService.packagingDir(storageOwnerId).resolve(folder).normalize();
+            case EMPLOYEE -> fileStorageService.employeeDir(storageOwnerId).resolve(folder).normalize();
             case PRODUCT -> fileStorageService.productDir(storageOwnerId).resolve(folder).normalize();
         };
     }
@@ -319,6 +321,7 @@ public class FileAssetLocationService {
         return switch (FileCategory.scopeOf(category)) {
             case FLAT -> fileRoot.resolve(folder).resolve(fileName).normalize();
             case PACKAGING -> fileStorageService.packagingDir(ownerId).resolve(folder).resolve(fileName).normalize();
+            case EMPLOYEE -> fileStorageService.employeeDir(ownerId).resolve(folder).resolve(fileName).normalize();
             case PRODUCT -> resolveProductFile(ownerId, folder, fileName);
         };
     }

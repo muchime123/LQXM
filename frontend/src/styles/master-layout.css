@@ -1,5 +1,17 @@
 /* ===== 通用主从工作台布局（MasterLayout 与所有 catalog 型页面共用） ===== */
 
+/* 工作区页面宿主：App.vue 的 Suspense 宿主是 display:contents 包装层，
+   真正成为 DefaultLayout .workspace__body flex 项的是其中的页面根节点。
+   DefaultLayout 的 scoped `> *` 带自身作用域属性，匹配不到插槽内容（死规则），
+   缺了这条，页面根会以默认 flex-shrink:1 被工作区高度压缩——
+   产品页工具栏在窄屏换行后第二行叠进列表面板，即此因。 */
+.workspace__body > .route-host > * {
+  flex: 1 0 auto;
+  width: 100%;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
 .catalog-view {
   display: flex;
   flex-direction: column;

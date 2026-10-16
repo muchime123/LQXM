@@ -1,6 +1,7 @@
 package com.liqiang.archive.service;
 
 import com.liqiang.archive.security.CurrentUserService;
+import com.liqiang.archive.util.H3LedgerMatchKey;
 import com.liqiang.archive.util.ProductFeeFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -8,12 +9,75 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.time.LocalDateTime;
 import java.util.*;
 
 @Service @RequiredArgsConstructor
 public class ProductInventoryService {
     private final JdbcTemplate jdbc;private final CurrentUserService users;
+
+    public record ConfiguredProduct(long id,long canonicalId,String productCode,String status,
+                                    boolean created,boolean matchedExisting) {}
+
+    /**
+     * 把结构化生产配置解析为唯一库存产品身份。
+     *
+     * <p>解析顺序固定为：skuKey 已有映射 → 名称/规格/单位唯一精确命中的存量产品 →
+     * 新建 CFG- 待审核档案。模糊匹配和多候选均不自动合并，避免把两件货不可逆地并成一件。
+     */
+    @Transactional
+    public ConfiguredProduct resolveConfiguredProduct(String skuKey,String name,String specification,String unit){
+        String key=clean(skuKey);
+        if(key.isEmpty())throw new IllegalArgumentException("配置产品缺少身份键");
+        var mapped=jdbc.queryForList("SELECT id,COALESCE(canonical_product_id,id) canonicalId,product_code productCode,status"
+                + " FROM sales_products WHERE sku_key=? LIMIT 1",key);
+        if(!mapped.isEmpty()){
+            var row=mapped.getFirst();
+            jdbc.update("UPDATE sales_products SET deleted_at=NULL WHERE id=?",row.get("id"));
+            return configured(row,false,false);
+        }
+        var exact=jdbc.queryForList("SELECT id,COALESCE(canonical_product_id,id) canonicalId,product_code productCode,status"
+                + " FROM sales_products WHERE deleted_at IS NULL AND sku_key IS NULL AND product_name=?"
+                + " AND COALESCE(specification,'')=? AND COALESCE(unit,'')=? ORDER BY id",
+                requiredText(name,"产品名称"),clean(specification),requiredText(unit,"单位"));
+        if(exact.size()==1){
+            var row=exact.getFirst();
+            int changed=jdbc.update("UPDATE sales_products SET sku_key=? WHERE id=? AND sku_key IS NULL",key,row.get("id"));
+            if(changed==1)return configured(row,false,true);
+            mapped=jdbc.queryForList("SELECT id,COALESCE(canonical_product_id,id) canonicalId,product_code productCode,status"
+                    + " FROM sales_products WHERE sku_key=? LIMIT 1",key);
+            if(!mapped.isEmpty())return configured(mapped.getFirst(),false,false);
+        }
+        String code="CFG-"+sha256(key).substring(0,24).toUpperCase(Locale.ROOT);
+        jdbc.update("INSERT IGNORE INTO sales_products(product_code,sku_key,product_name,specification,unit,source,status,is_customized,remark)"
+                + " VALUES(?,?,?,?,?,'MANUFACTURING_CONFIG','PENDING_REVIEW',0,'由生产配置身份键自动建立，待产品管理员复核')",
+                code,key,requiredText(name,"产品名称"),clean(specification),requiredText(unit,"单位"));
+        mapped=jdbc.queryForList("SELECT id,COALESCE(canonical_product_id,id) canonicalId,product_code productCode,status"
+                + " FROM sales_products WHERE sku_key=? LIMIT 1",key);
+        if(mapped.isEmpty())throw new IllegalStateException("配置产品身份建立失败，请检查产品编号或身份键冲突");
+        var row=mapped.getFirst();
+        long id=((Number)row.get("id")).longValue();
+        jdbc.update("UPDATE sales_products SET canonical_product_id=id WHERE id=? AND canonical_product_id IS NULL",id);
+        row.put("canonicalId",id);
+        return configured(row,true,false);
+    }
+
+    private ConfiguredProduct configured(Map<String,Object> row,boolean created,boolean matchedExisting){
+        long id=((Number)row.get("id")).longValue();
+        Object canonical=row.get("canonicalId");
+        return new ConfiguredProduct(id,canonical==null?id:((Number)canonical).longValue(),
+                String.valueOf(row.get("productCode")),String.valueOf(row.get("status")),created,matchedExisting);
+    }
+
+    private static String requiredText(String value,String label){
+        String text=clean(value);if(text.isEmpty())throw new IllegalArgumentException(label+"不能为空");return text;
+    }
+    private static String sha256(String value){
+        try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8)));}
+        catch(Exception e){throw new IllegalStateException("无法生成配置产品编号",e);}
+    }
 
     /**
      * 确保一张正式生产任务有一个「交易产品身份」，并返回该身份 id。
@@ -30,38 +94,6 @@ public class ProductInventoryService {
      * 错合并两件不同的货是不可逆的，各自独立只是暂时没聚合——两者代价不对称。
      */
     /**
-     * 取（或建立）工单的产出产品身份。
-     *
-     * <p>⚠️ <b>P3（V322）起，收货路径不再经过这里</b>。原因见
-     * {@code 完工入库到销售出库的身份断链与闭环设计-20260921.md} §4.3：本方法按
-     * {@code MFG-<工单号>} <b>给每张工单造一个独立产品身份</b>，而 V320 的归一策略是
-     * 「按 (名称,规格,单位) 精确匹配唯一的 H3-」，实测历史 4 个 {@code MFG-}
-     * <b>全部匹配 0 个</b>（名字来自自由文本，与 SKU 规范名不一致）→ 归一实际不会发生，
-     * 库存仍会按单号分裂。现在收货按<b>工单产出清单</b>取 SKU，身份在建单时就已经是标准 SKU。
-     *
-     * <p><b>保留原因</b>（Q1 拍板「保留 {@code MFG-} 编码机制」）：它是「主数据里确实没有这件货」
-     * （新品 / 非标订做件）时**唯一**能产生新身份的入口，未来由「清单项建档」场景调用，
-     * 且必须伴随 {@code PENDING_REVIEW} 审批。删掉它会让非标件无路可走 —— 于是又回到自由文本。
-     *
-     * <p>当前无调用点（保留待接线），**不要因为 grep 不到调用方就直接删除**。
-     */
-    @Transactional
-    public long ensureManufacturingProduct(long orderId,String orderNo,String name,String specification,String unit){
-        Long linked=jdbc.queryForObject("SELECT sales_product_id FROM manufacturing_orders WHERE id=?",Long.class,orderId);if(linked!=null)return linked;
-        Long exact=findCanonicalProduct(name,specification,unit);
-        long productId;
-        if(exact!=null){productId=exact;}
-        else{
-            String code="MFG-"+orderNo;
-            jdbc.update("INSERT INTO sales_products(product_code,product_name,specification,unit,source,status,remark) VALUES(?,?,?,?, 'MANUFACTURING','PENDING_REVIEW','由正式生产任务自动建立的交易产品身份') ON DUPLICATE KEY UPDATE id=id",code,name,blank(specification),unit);
-            productId=jdbc.queryForObject("SELECT id FROM sales_products WHERE product_code=?",Long.class,code);
-            // 新造的身份先归自身；若将来同一件货在氚云建了标准 SKU，由归一迁移一次性回填
-            jdbc.update("UPDATE sales_products SET canonical_product_id=? WHERE id=? AND canonical_product_id IS NULL",productId,productId);
-        }
-        jdbc.update("UPDATE manufacturing_orders SET sales_product_id=? WHERE id=? AND sales_product_id IS NULL",productId,orderId);return productId;
-    }
-
-    /**
      * 归一口径**唯一实现**（与 V320 回填同口径，勿在别处另写一份）。
      *
      * <p>按 (名称, 规格, 单位) 精确匹配、且限定 {@code external_id IS NOT NULL}（只归一到氚云标准 SKU，
@@ -72,63 +104,6 @@ public class ProductInventoryService {
     private Long findCanonicalProduct(String name,String specification,String unit){
         var hits=jdbc.queryForList("SELECT id FROM sales_products WHERE deleted_at IS NULL AND external_id IS NOT NULL AND product_name=? AND COALESCE(specification,'')=? AND COALESCE(unit,'')=?",Long.class,name,clean(specification),clean(unit));
         return hits.size()==1?hits.getFirst():null;
-    }
-
-    /** 产品身份的库存聚合口径（{@code canonical_product_id}）；未设置或查不到时回退自身。 */
-    private long canonicalOf(long productId){
-        var rows=jdbc.queryForList("SELECT COALESCE(canonical_product_id,id) c FROM sales_products WHERE id=?",Long.class,productId);
-        return rows.isEmpty()?productId:rows.getFirst();
-    }
-
-    /**
-     * 记一笔库存变动：余额按 **canonical 口径**聚合，流水同时记业务身份与归一口径。
-     *
-     * <p>为什么余额用 canonical 而不是 {@code sales_product_id}（2026-09-21 / Q1）：
-     * `MFG-<工单号>` 是按单造的身份，若余额按它唯一，同一件商品会分裂成 N 行、各 1 件，
-     * 「有货直接出库」永远判断不出来。改按 canonical 聚合后，多张工单产出的同款货累加在一行，
-     * 而流水仍保留 {@code sales_product_id} 供追溯「这笔货是哪张单产出的」。
-     *
-     * <p>库存不足抛异常 → 由调用方事务整体回滚（余额、流水、单据三者同生共死）。
-     */
-    @Transactional
-    public void post(long warehouseId,long productId,Long lotId,String name,String specification,String unit,String type,BigDecimal change,String sourceType,long sourceId,String sourceNo,LocalDateTime at,String remark){
-        long canonicalId=canonicalOf(productId);
-        jdbc.update("INSERT INTO product_inventory_balances(warehouse_id,sales_product_id,canonical_product_id,unit,quantity) VALUES(?,?,?,?,0) ON DUPLICATE KEY UPDATE id=id",warehouseId,productId,canonicalId,unit);
-        var balance=jdbc.queryForMap("SELECT id,quantity FROM product_inventory_balances WHERE warehouse_id=? AND canonical_product_id=? AND unit=? FOR UPDATE",warehouseId,canonicalId,unit);BigDecimal after=((BigDecimal)balance.get("quantity")).add(change);if(after.signum()<0)throw new IllegalStateException("统一产品库存不足，不能完成操作");
-        jdbc.update("UPDATE product_inventory_balances SET quantity=? WHERE id=?",after,balance.get("id"));String tmp="PENDING-"+UUID.randomUUID();var user=users.current();jdbc.update("INSERT INTO product_inventory_transactions(transaction_no,warehouse_id,sales_product_id,canonical_product_id,finished_goods_lot_id,product_name_snapshot,specification_snapshot,unit,transaction_type,quantity_change,balance_after,source_type,source_id,source_no,operator_employee_id,operator_name,occurred_at,remark) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",tmp,warehouseId,productId,canonicalId,lotId,name,blank(specification),unit,type,change,after,sourceType,sourceId,sourceNo,user.employeeId(),user.name(),at,blank(remark));long id=jdbc.queryForObject("SELECT id FROM product_inventory_transactions WHERE transaction_no=?",Long.class,tmp);jdbc.update("UPDATE product_inventory_transactions SET transaction_no=? WHERE id=?","PI"+String.format("%08d",id),id);
-    }
-
-    /**
-     * 某产品身份的库存流水（含归一到它的、以及它归一出去的那些）。
-     *
-     * <p>按 canonical 检索而非按 {@code sales_product_id}：否则用 {@code MFG-} 身份造的行
-     * 在标准 SKU 的流水页里看不见（反之亦然），用户会以为「库存凭空变了」。
-     */
-    public List<Map<String,Object>> transactions(long productId){
-        return jdbc.queryForList("SELECT t.*,w.warehouse_name warehouseName FROM product_inventory_transactions t JOIN warehouses w ON w.id=t.warehouse_id WHERE t.canonical_product_id=? ORDER BY t.occurred_at DESC,t.id DESC LIMIT 500",canonicalOf(productId));
-    }
-
-    /**
-     * 可售库存（canonical 口径，数量 &gt; 0），供 ERP 出库选货。
-     *
-     * <p>只列真正有货的行——「选不到货」本身就是业务信号（该下生产任务），不是错误。
-     */
-    public List<Map<String,Object>> availableStock(String keyword,Long warehouseId,int limit){
-        StringBuilder where=new StringBuilder(" WHERE b.quantity>0");List<Object> p=new ArrayList<>();
-        if(warehouseId!=null){where.append(" AND b.warehouse_id=?");p.add(warehouseId);}
-        if(keyword!=null&&!keyword.isBlank()){
-            where.append(" AND (sp.product_code LIKE ? OR sp.product_name LIKE ? OR COALESCE(sp.specification,'') LIKE ?)");
-            String k="%"+keyword.trim()+"%";p.add(k);p.add(k);p.add(k);
-        }
-        p.add(Math.max(1,Math.min(limit,200)));
-        return jdbc.queryForList(
-                "SELECT b.id balanceId,b.warehouse_id warehouseId,w.warehouse_name warehouseName," +
-                " b.sales_product_id salesProductId,b.canonical_product_id canonicalProductId," +
-                " sp.product_code productCode,sp.product_name productName,sp.specification,sp.unit,b.quantity available" +
-                " FROM product_inventory_balances b" +
-                " JOIN sales_products sp ON sp.id=b.canonical_product_id AND sp.deleted_at IS NULL" +
-                " JOIN warehouses w ON w.id=b.warehouse_id" + where +
-                " ORDER BY sp.product_name,sp.specification,b.warehouse_id LIMIT ?",p.toArray());
     }
 
     private static String clean(String s){return s==null?"":s.trim();}private static String blank(String s){s=clean(s);return s.isEmpty()?null:s;}
@@ -145,32 +120,43 @@ public class ProductInventoryService {
      *   <li>仓库明细里<b>实际出现</b>的 (氚云编号, 仓库) 组合。不做「产品 × 全仓」笛卡尔
      *       展开——仓库明细是各仓自己的台账，未出现的仓库存关系并不存在，展开会凭空造出
      *       2/3 的伪零行（实测 13726 个产品只出现在 1 个仓库）。</li>
-     *   <li>产品信息台账里有、但仓库明细完全没有该编号的产品，各补一行、仓库留空
-     *       （前端显示「未记录仓库」）。</li>
+     *   <li>产品信息台账里有、但仓库明细里既没有该编号、该编号也未被任何明细行的名称
+     *       认领的产品，各补一行、仓库留空（前端显示「未记录仓库」）。</li>
      * </ol>
-     * 实测驱动集 16866 行 = 16273（组合）+ 593（台账独有），覆盖 15586 个产品。
+     * 实测驱动集（按名称匹配口径）17111 → 16806 行，覆盖 15213 个明细编号。
+     *
+     * <p><b>两表怎么关联</b>：见 {@link H3LedgerMatchKey} —— <b>名称优先、编号兜底</b>。
+     * 氚云侧本来就是按产品名称关联的，编号是人工填写的文本；实测 296 行编号查不到产品信息
+     * 而名称 100% 查得到。派生表 {@code v} 因此同时带 {@code product_code}（氚云录入的原编号，
+     * 用于展示与下钻）与 {@code match_code}（名称匹配出的权威编号，用于关联产品信息）。
      *
      * <p>字段口径：类目/名称以产品信息台账优先并可被仓库明细补齐；数量与采购价以台账为准。
-     * 余额表不参与字段取值（实测仅 1 行与台账分叉），只在取到当页数据后单独查询，
-     * 用于提供「查看流水」入口与更新时间——这样每页 5 次汇总查询也不必付连接成本。
+     * 全部字段均取自氚云这两张台账，不涉及任何本地库存账（2026-10-07：产品库存只认台账，
+     * 原「余额表 → 查看流水入口」的挂线已随库存账设计下线一并移除）。
      */
-    private static final String VIEW_FROM =
+    /** 清单视图的组装（包级可见：让契约测试直接对 SQL 断言，不必绕打分页接口）。 */
+    static final String VIEW_FROM =
             " FROM (" +
-            " SELECT TRIM(ws.product_code) product_code,COALESCE(m.warehouse_id,w.id) warehouse_id," +
+            " SELECT TRIM(ws.product_code) product_code," +
+            " " + H3LedgerMatchKey.matchCode("ws.product_code", "nm") + " match_code," +
+            " COALESCE(m.warehouse_id,w.id) warehouse_id," +
             " w.warehouse_name,ws.product_name,ws.specification,ws.unit," +
             " ws.product_category,ws.quantity,ws.purchase_price" +
             " FROM h3_warehouse_stock ws" +
+            " LEFT JOIN " + H3LedgerMatchKey.UNIQUE_NAME_CODE + " nm" +
+            " ON " + H3LedgerMatchKey.nameJoinOn("nm", "ws.product_name") +
             " LEFT JOIN h3_warehouse_name_mappings m ON m.source_name=TRIM(ws.warehouse)" +
             " LEFT JOIN warehouses w ON w.active=1 AND TRIM(w.warehouse_name)=TRIM(ws.warehouse)" +
             " WHERE COALESCE(m.warehouse_id,w.id) IS NOT NULL" +
             " UNION ALL" +
-            " SELECT TRIM(pc.product_code),NULL,NULL,pc.product_name,pc.specification,pc.unit," +
+            " SELECT TRIM(pc.product_code),TRIM(pc.product_code),NULL,NULL,pc.product_name,pc.specification,pc.unit," +
             " pc.product_category,NULL,pc.purchase_price" +
             " FROM h3_product_catalog pc" +
             " WHERE NOT EXISTS (SELECT 1 FROM h3_warehouse_stock x" +
             " WHERE TRIM(x.product_code)=TRIM(pc.product_code))" +
+            " AND " + H3LedgerMatchKey.notClaimed("pc.product_code") +
             ") v" +
-            " LEFT JOIN h3_product_catalog pc ON pc.product_code=v.product_code";
+            " LEFT JOIN h3_product_catalog pc ON pc.product_code=v.match_code";
 
     /** 类目：产品信息台账优先，仓库明细补齐。 */
     private static final String CATEGORY_EXPR =
@@ -195,16 +181,17 @@ public class ProductInventoryService {
             "CASE WHEN "+NAME_EXPR+" LIKE '%定做%' OR "+NAME_EXPR+" LIKE '%订做%'" +
             " OR v.product_code LIKE '%定做%' OR v.product_code LIKE '%订做%' THEN 1 ELSE 0 END";
     /**
-     * 编码冲突标记：台账同编号存在、但名称与该仓库明细行不一致。
+     * 编号不可信标记：氚云录入的编号与「该行名称所指产品」的编号不一致。
      *
-     * <p>实测有 47 个编号在两张台账里指向完全不同的产品（如编号 1733YX 在台账是
-     * 「公主的渔大连海鲜」、在仓库明细是「手抓卤虾黄底」）。这类行的编号不可信，
-     * 页面据此打标提醒人工核对，不再静默采信。
+     * <p>实测两类成因：① 编号写错、名称把它救了回来（296 行编号在产品信息里查不到，
+     * 加 29 行编号撞号）；② 编号撞号且名称也救不回（名称在产品信息里根本不存在）。
+     * 这类行的编号不可信，页面据此打标提醒人工核对，不再静默采信。
+     *
+     * <p>判据统一在 {@link H3LedgerMatchKey#codeConflict}；此处只把它接到清单视图的别名上
+     * （外层拿不到派生表内的 nm，故直接传派生表列 {@code v.match_code}）。
      */
     private static final String CODE_CONFLICT_EXPR=
-            "CASE WHEN pc.product_code IS NOT NULL AND TRIM(COALESCE(v.product_name,''))<>''" +
-            " AND LOWER(CONVERT(TRIM(pc.product_name) USING utf8mb4))" +
-            " <> LOWER(CONVERT(TRIM(v.product_name) USING utf8mb4)) THEN 1 ELSE 0 END";
+            H3LedgerMatchKey.codeConflict("v.product_code","v.product_name","v.match_code","pc");
 
     /**
      * 费用/非产品项过滤：这些行的「数量」列装的是金额（运费 120813、定制片材 1344071 等），
@@ -231,9 +218,10 @@ public class ProductInventoryService {
     /** 异常行视图（别名 ws/pc）的费用过滤：与清单同一份名单，杜绝两处漂移。 */
     private static final String ISSUE_FEE_FILTER=feeFilter(ISSUE_CATEGORY_EXPR,"ws.product_code");
 
-    private static final String VIEW_COLUMNS=
+    /** 清单视图的列（包级可见：供契约测试断言 codeConflict / resolvedCode）。 */
+    static final String VIEW_COLUMNS=
             "SELECT v.warehouse_id warehouseId,v.warehouse_name warehouseName," +
-            " v.product_code productCode," +
+            " v.product_code productCode,v.match_code resolvedCode," +
             " "+NAME_EXPR+" productName,"+SPEC_EXPR+" specification,"+UNIT_EXPR+" unit," +
             " "+QUANTITY_EXPR+" quantity,"+PRICE_EXPR+" purchasePrice,"+AMOUNT_EXPR+" stockAmount," +
             " "+CATEGORY_EXPR+" category,"+CUSTOMIZED_EXPR+" isCustomized," +
@@ -270,8 +258,10 @@ public class ProductInventoryService {
         StringBuilder where=new StringBuilder(" WHERE 1=1").append(FEE_FILTER);List<Object> p=new ArrayList<>();
         if(warehouseId!=null){where.append(" AND v.warehouse_id=?");p.add(warehouseId);}
         if(keyword!=null&&!keyword.isBlank()){
-            where.append(" AND (v.product_code LIKE ? OR "+NAME_EXPR+" LIKE ? OR "+SPEC_EXPR+" LIKE ?)");
-            String k="%"+keyword.trim()+"%";p.add(k);p.add(k);p.add(k);
+            // 关键词同时匹配「氚云录入的原编号」与「按名称解析出的实体编号」：编号写错的行，
+            // 用户按产品信息里的正确编号（或从销售出库分析页带过来的编号）搜也要能搜到。
+            where.append(" AND (v.product_code LIKE ? OR v.match_code LIKE ? OR "+NAME_EXPR+" LIKE ? OR "+SPEC_EXPR+" LIKE ?)");
+            String k="%"+keyword.trim()+"%";p.add(k);p.add(k);p.add(k);p.add(k);
         }
         if(category!=null&&!category.isBlank()){where.append(" AND "+CATEGORY_EXPR+"=?");p.add(category.trim());}
         if(onlyInStock)where.append(" AND NOT "+ZERO_CONDITION);
@@ -284,13 +274,12 @@ public class ProductInventoryService {
         var items=jdbc.queryForList(VIEW_COLUMNS+from+
                 " ORDER BY "+ZERO_CONDITION+" ASC,(v.warehouse_id IS NULL) ASC,v.warehouse_id,"+NAME_EXPR+
                 " LIMIT ? OFFSET ?",pp.toArray());
-        attachBalances(items);
         // 类目下拉与所选类目条件解耦，保证切换类目时选项完整；仓库/关键词维度参与（选项应随之收窄）
         StringBuilder cw=new StringBuilder(" WHERE 1=1").append(FEE_FILTER);List<Object> cp=new ArrayList<>();
         if(warehouseId!=null){cw.append(" AND v.warehouse_id=?");cp.add(warehouseId);}
         if(keyword!=null&&!keyword.isBlank()){
-            cw.append(" AND (v.product_code LIKE ? OR "+NAME_EXPR+" LIKE ? OR "+SPEC_EXPR+" LIKE ?)");
-            String k="%"+keyword.trim()+"%";cp.add(k);cp.add(k);cp.add(k);
+            cw.append(" AND (v.product_code LIKE ? OR v.match_code LIKE ? OR "+NAME_EXPR+" LIKE ? OR "+SPEC_EXPR+" LIKE ?)");
+            String k="%"+keyword.trim()+"%";cp.add(k);cp.add(k);cp.add(k);cp.add(k);
         }
         if(onlyInStock)cw.append(" AND NOT "+ZERO_CONDITION);
         cw.append(shelfFilter(shelfStatus,cp));
@@ -309,73 +298,61 @@ public class ProductInventoryService {
         return result;
     }
 
-    /**
-     * 给当页行补上已确认库存信息（余额行 id、交易产品 id、更新时间）。
-     *
-     * <p>余额表不参与清单字段取值，只用来判断这一行「是否已确认入库」并给出流水入口。
-     * 当页最多 100 行，一次 IN 查询即可，避免在主视图上对 1.7 万行做两次左连接。
-     */
-    private void attachBalances(List<Map<String,Object>> items){
-        if(items.isEmpty())return;
-        StringBuilder in=new StringBuilder();
-        List<Object> args=new ArrayList<>();
-        for(Map<String,Object> r:items){
-            Object wid=r.get("warehouseId");Object code=r.get("productCode");
-            if(wid==null||code==null)continue;
-            if(in.length()>0)in.append(',');
-            in.append("(?,?)");args.add(String.valueOf(code));args.add(wid);
-        }
-        if(in.isEmpty()){
-            for(Map<String,Object> r:items){r.put("salesProductId",null);r.put("hasBalance",0);r.put("balanceId",null);r.put("updatedAt",null);}
-            return;
-        }
-        Map<String,Map<String,Object>> byKey=new HashMap<>();
-        jdbc.queryForList("SELECT sp.external_id productCode,b.warehouse_id warehouseId,sp.id salesProductId," +
-                        " b.id balanceId,b.updated_at updatedAt FROM product_inventory_balances b" +
-                        " JOIN sales_products sp ON sp.id=b.sales_product_id AND sp.deleted_at IS NULL" +
-                        " WHERE (sp.external_id,b.warehouse_id) IN ("+in+")",args.toArray())
-                .forEach(m->byKey.putIfAbsent(m.get("productCode")+"\u0001"+m.get("warehouseId"),m));
-        for(Map<String,Object> r:items){
-            Map<String,Object> hit=byKey.get(r.get("productCode")+"\u0001"+r.get("warehouseId"));
-            r.put("salesProductId",hit==null?null:hit.get("salesProductId"));
-            r.put("balanceId",hit==null?null:hit.get("balanceId"));
-            r.put("updatedAt",hit==null?null:hit.get("updatedAt"));
-            r.put("hasBalance",hit==null?0:1);
-        }
-    }
-
     private static long num(Object v){return v==null?0L:((Number)v).longValue();}
 
     /** 异常行视图的表连接（含处置结论左连接；业务键与 uk_h3ws_wh_code_unit 一致）。 */
     private static final String ISSUE_JOINS=
             " FROM h3_warehouse_stock ws" +
+            " LEFT JOIN " + H3LedgerMatchKey.UNIQUE_NAME_CODE + " nm" +
+            " ON " + H3LedgerMatchKey.nameJoinOn("nm", "ws.product_name") +
             " LEFT JOIN h3_warehouse_name_mappings m ON m.source_name=TRIM(ws.warehouse)" +
             " LEFT JOIN warehouses w ON w.active=1 AND TRIM(w.warehouse_name)=TRIM(ws.warehouse)" +
-            " LEFT JOIN h3_product_catalog pc ON TRIM(pc.product_code)=TRIM(ws.product_code)" +
+            " LEFT JOIN h3_product_catalog pc ON TRIM(pc.product_code)=" +
+            H3LedgerMatchKey.matchCode("ws.product_code", "nm") +
             " LEFT JOIN h3_inventory_issue_dispositions d" +
             " ON d.warehouse_name=TRIM(COALESCE(ws.warehouse,''))" +
             " AND d.product_code=TRIM(ws.product_code) AND d.unit=COALESCE(TRIM(ws.unit),'')";
 
     /**
-     * 异常判定（不含费用过滤）：「清单里看得见」且命中缺产品或缺价。
+     * 异常判定（不含费用过滤）：只看清单里可见的非零库存行，按「关联不上产品信息」或缺价分类。
+     *
+     * <p>关联口径与清单一致（{@link H3LedgerMatchKey}：名称优先、编号兜底），
+     * 所以「缺产品」指的是<b>名称与编号都没能落到产品信息上</b>。
      *
      * <p>仓库映射不上的行在清单里根本不出现（VIEW_FROM 要求
      * {@code COALESCE(m.warehouse_id,w.id) IS NOT NULL}），不该出现在异常里。
+     * 零库存历史定制品暂不治理；负库存属于非零库存，仍需核查。
      */
     private static final String ISSUE_WHERE=
             " WHERE COALESCE(m.warehouse_id,w.id) IS NOT NULL" +
-            " AND (pc.id IS NULL OR (COALESCE(ws.quantity,0)>0 AND COALESCE(pc.purchase_price,0)<=0))";
+            " AND COALESCE(ws.quantity,0)<>0" +
+            " AND (pc.id IS NULL OR COALESCE(pc.purchase_price,0)<=0)";
 
     /** 异常行统一视图：与清单同口径（可见性 + 费用过滤），并带处置状态。 */
     private static final String ISSUE_FROM=ISSUE_JOINS+ISSUE_WHERE+ISSUE_FEE_FILTER;
 
     private static final String ISSUE_COLUMNS=
-            "SELECT TRIM(ws.product_code) productCode,ws.product_name productName," +
+            "SELECT TRIM(ws.product_code) productCode," +
+            " " + H3LedgerMatchKey.matchCode("ws.product_code", "nm") + " resolvedCode," +
+            " ws.product_name productName," +
             " TRIM(COALESCE(ws.warehouse,'')) warehouseName,COALESCE(m.warehouse_id,w.id) warehouseId," +
             " ws.specification,COALESCE(TRIM(ws.unit),'') unit,COALESCE(ws.quantity,0) quantity," +
             " CASE WHEN pc.id IS NULL THEN 'MISSING_PRODUCT' ELSE 'MISSING_PRICE' END issueType," +
             " d.id dispositionId,d.status dispositionStatus,d.remark dispositionRemark," +
             " d.disposed_by dispositionBy,d.disposed_at dispositionAt";
+
+    /**
+     * 陈旧库存抽样/计数的表连接：与清单同口径按名称匹配产品信息。
+     *
+     * <p>不改的话，编号写错的行取不到 shelf_status → 落到 {@code COALESCE(...,'ON_SHELF')}
+     * 的兜底分支，会被<b>永远当成「在用」</b>，抽样里持续冒出已经下架的产品。
+     */
+    private static final String STALE_STOCK_FROM=
+            " FROM h3_warehouse_stock ws" +
+            " LEFT JOIN " + H3LedgerMatchKey.UNIQUE_NAME_CODE + " nm" +
+            " ON " + H3LedgerMatchKey.nameJoinOn("nm", "ws.product_name") +
+            " LEFT JOIN h3_product_catalog pc ON pc.product_code=" +
+            H3LedgerMatchKey.matchCode("ws.product_code", "nm");
 
     /** 处置结论合法取值（与 V302 迁移注释、前端下拉一一对应）。 */
     private static final Set<String> DISPOSITION_STATUSES=Set.of("PENDING_H3","DATA_RESIDUE","NO_PRICE_NEEDED");
@@ -384,32 +361,28 @@ public class ProductInventoryService {
     private static final Set<String> ISSUE_TYPES=Set.of("MISSING_PRODUCT","MISSING_PRICE");
 
     /**
-     * 库存快照元信息 + 待处理异常（2026-09-16 第二阶段；处置口径于同日第三阶段修正）。
+     * 库存快照元信息 + 非零库存待处理异常。
      *
      * <p>本页定位是「氚云库存快照」：产品信息台账（维表：名称/规格/单位/采购价）
      * × 仓库明细台账（事实：仓库/数量）的组合视图，两份来源的批次与导出时间差
      * 决定了快照的新鲜度——时间差过大说明两份文件不是同一时点导出的，金额口径
      * 会偏，前端据此黄标提示。
      *
-     * <p><b>异常口径三层收敛（第三阶段修正的核心）</b>：历史实现直接对
-     * {@code h3_warehouse_stock} 跑两个 join，报出 331 行，而真正影响库存金额的只有
-     * 28 行——用户面对一个既无法处理、又看不出该处理哪几行的数字。三层收敛后：
+     * <p><b>异常口径</b>：
      * <ol>
      *   <li><b>与清单同口径</b>：只统计清单里看得见的行（仓库映射得上、不命中
      *       {@link ProductFeeFilter}）。历史漏套费用过滤，把 7 行费用项（运费×3 /
      *       优惠 / 加急费 / 样品费×2，其「数量」列里装的是金额）报成「缺价待处理」，
      *       而它们在清单里已被排除，用户点进去找不到对应行。</li>
-     *   <li><b>按是否影响金额分层</b>：数量为 0 的行乘任何价都是 0，不影响库存总额，
-     *       归「仅台账残留」；只有数量非 0 才算「影响金额」。历史把 296 行零库存缺产品
-     *       与 28 行真影响混成一个数字。</li>
+     *   <li><b>仅非零库存</b>：零库存历史定制品暂不治理，不进入统计、明细和导出。</li>
      *   <li><b>扣除已处置</b>：命中 {@code h3_inventory_issue_dispositions} 的行不再计入
      *       待处理（人已给出结论），单独回显为「已处置」——异常数因此能真正收敛到 0，
      *       而不是每次重导后原样冒出来。</li>
      * </ol>
      *
-     * <p>两类异常（互斥）：{@code MISSING_PRODUCT} 缺产品——仓库明细有该编号、产品信息
-     * 台账没有，数量有效但金额算不出（对应合并预览 PRODUCT_NOT_FOUND）；
-     * {@code MISSING_PRICE} 缺价——编号两边都能对上、数量非 0，但产品信息台账采购价
+     * <p>两类异常（互斥）：{@code MISSING_PRODUCT} 缺产品——仓库明细有该行，但名称与编号
+     * 都没能关联到产品信息台账（见 {@link H3LedgerMatchKey}），数量有效但金额算不出；
+     * {@code MISSING_PRICE} 缺价——关联上了、数量非 0，但产品信息台账采购价
      * 为空或 0（对应合并预览 PRICE_MISSING）。
      */
     public Map<String,Object> snapshotInfo(){
@@ -424,7 +397,7 @@ public class ProductInventoryService {
         Map<String,Map<String,Object>> agg=new HashMap<>();
         jdbc.queryForList(
                 "SELECT issueType,SUM(dispositionId IS NULL) pending," +
-                " SUM(dispositionId IS NULL AND quantity>0) affected," +
+                " SUM(dispositionId IS NULL AND quantity<>0) affected," +
                 " SUM(dispositionId IS NOT NULL) disposed," +
                 " COUNT(DISTINCT CASE WHEN dispositionId IS NULL THEN productCode END) pendingCodes" +
                 " FROM ("+ISSUE_COLUMNS+ISSUE_FROM+") t GROUP BY issueType")
@@ -445,7 +418,7 @@ public class ProductInventoryService {
         result.put("missingPriceCodes",num(pr.get("pendingCodes")));
         result.put("missingPriceInStockCount",num(pr.get("affected")));
         result.put("disposedCount",num(mp.get("disposed"))+num(pr.get("disposed")));
-        // 前端口径条主数字：真正影响库存金额的待处理行（零库存行金额本就是 0，不计）
+        // 当前仅治理非零库存：零库存历史定制品不进入待处理统计。
         result.put("affectedCount",num(mp.get("affected"))+num(pr.get("affected")));
         result.put("pendingCount",num(mp.get("pending"))+num(pr.get("pending")));
         result.put("feeExcludedCount",rawAll-keptAll);
@@ -466,35 +439,14 @@ public class ProductInventoryService {
                 " WHERE shelf_status='ON_SHELF' AND "+staleCond("last_seen_at")+
                 " ORDER BY last_seen_at,product_code LIMIT 200"));
         result.put("staleStockCount",num(jdbc.queryForMap(
-                "SELECT COUNT(*) c FROM h3_warehouse_stock ws" +
-                " LEFT JOIN h3_product_catalog pc ON pc.product_code=ws.product_code" +
+                "SELECT COUNT(*) c" + STALE_STOCK_FROM +
                 " WHERE COALESCE(pc.shelf_status,'ON_SHELF')='ON_SHELF' AND "+staleCond("ws.last_seen_at")).get("c")));
         result.put("staleStockRows",jdbc.queryForList(
                 "SELECT TRIM(ws.product_code) productCode,ws.product_name productName,ws.warehouse," +
-                " ws.specification,ws.unit,ws.quantity,ws.last_seen_at lastSeenAt FROM h3_warehouse_stock ws" +
-                " LEFT JOIN h3_product_catalog pc ON pc.product_code=ws.product_code" +
+                " ws.specification,ws.unit,ws.quantity,ws.last_seen_at lastSeenAt" + STALE_STOCK_FROM +
                 " WHERE COALESCE(pc.shelf_status,'ON_SHELF')='ON_SHELF' AND "+staleCond("ws.last_seen_at")+
                 " ORDER BY ws.last_seen_at,ws.product_code LIMIT 200"));
         result.put("staleDays",STALE_DAYS);
-
-        // 正式账偏离（L3 vs L2 快照）：数量>0 的余额行里，台账快照已无此行（vanished）或
-        // 数量与当前台账不一致（drifted）。>0 即提示「该跑库存对账了」——把对账时机从
-        // 靠人记变成系统提醒。键口径与合并预览一致：编号(trim)+单位+仓库(映射后 id)。
-        Map<String,Object> divergence=jdbc.queryForMap(
-                "SELECT COALESCE(SUM(ws.code IS NULL),0) vanished," +
-                " COALESCE(SUM(ws.code IS NOT NULL AND ws.qty<>b.quantity),0) drifted" +
-                " FROM product_inventory_balances b" +
-                " JOIN sales_products sp ON sp.id=b.sales_product_id AND sp.deleted_at IS NULL AND sp.external_id IS NOT NULL" +
-                " LEFT JOIN ( SELECT TRIM(x.product_code) code,x.unit,COALESCE(m.warehouse_id,w.id) wid,SUM(x.quantity) qty" +
-                "   FROM h3_warehouse_stock x" +
-                "   LEFT JOIN h3_warehouse_name_mappings m ON m.source_name=TRIM(x.warehouse)" +
-                "   LEFT JOIN warehouses w ON w.active=1 AND TRIM(w.warehouse_name)=TRIM(x.warehouse)" +
-                "   WHERE COALESCE(m.warehouse_id,w.id) IS NOT NULL" +
-                "   GROUP BY TRIM(x.product_code),x.unit,COALESCE(m.warehouse_id,w.id)) ws" +
-                " ON ws.code=TRIM(sp.external_id) AND ws.unit=b.unit AND ws.wid=b.warehouse_id" +
-                " WHERE b.quantity>0");
-        result.put("balanceVanished",num(divergence.get("vanished")));
-        result.put("balanceDrifted",num(divergence.get("drifted")));
         return result;
     }
 
@@ -656,9 +608,13 @@ public class ProductInventoryService {
         if(found.isEmpty())
             throw new IllegalArgumentException("未找到库存行："+(wantUnit==null?code:code+" / "+wantUnit));
         Map<String,Object> row=new LinkedHashMap<>(found.getFirst());
-        attachBalances(List.of(row));
 
-        // 来源①：产品信息台账行（唯一键 product_code，至多一行）
+        // 来源①：产品信息台账行（唯一键 product_code，至多一行）。
+        // 按本行的**实体编号**查（名称匹配出的权威编号）：氚云录入编号写错时 resolvedCode 与
+        // productCode 不同，若仍按原编号查会查空，让详情页误报「产品信息台账缺该编号」，
+        // 而实际上采购价是按名称匹配取到的。
+        Object resolvedRaw=row.get("resolvedCode");
+        String resolvedCode=resolvedRaw==null?"":String.valueOf(resolvedRaw).trim();
         Map<String,Object> catalog=firstOrNull(
                 "SELECT id,import_batch_id batchId,product_category category,TRIM(product_code) productCode," +
                         " product_name productName,specification,unit,purchase_price purchasePrice," +
@@ -666,7 +622,8 @@ public class ProductInventoryService {
                         " department_name departmentName,owner_name ownerName,data_status dataStatus," +
                         " source_created_at sourceCreatedAt,source_modified_at sourceModifiedAt," +
                         " last_synced_at lastSyncedAt,created_at createdAt,updated_at updatedAt" +
-                        " FROM h3_product_catalog WHERE TRIM(product_code)=?",code);
+                        " FROM h3_product_catalog WHERE TRIM(product_code)=?",
+                resolvedCode.isEmpty()?code:resolvedCode);
         // 来源②：仓库明细行——按 (仓库映射后 id, 编号) 取候选，再按与 UNIT_EXPR 同口径的单位选出该行，
         // 避免「仓库明细单位为空、单位取自产品信息台账」时错配到别的单位行
         List<Map<String,Object>> stockRows=warehouseId==null?List.of():jdbc.queryForList(

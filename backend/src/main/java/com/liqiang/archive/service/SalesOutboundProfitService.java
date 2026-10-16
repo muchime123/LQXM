@@ -67,18 +67,15 @@ public class SalesOutboundProfitService {
     private final DataScopeSupport scopeSupport;
     private final CurrentUserService currentUsers;
     private final AuditLogService auditLogService;
-    private final SalesOutboundCommissionService commissionService;
 
     public SalesOutboundProfitService(JdbcTemplate jdbc,
                                       DataScopeSupport scopeSupport,
                                       CurrentUserService currentUsers,
-                                      AuditLogService auditLogService,
-                                      SalesOutboundCommissionService commissionService) {
+                                      AuditLogService auditLogService) {
         this.jdbc = jdbc;
         this.scopeSupport = scopeSupport;
         this.currentUsers = currentUsers;
         this.auditLogService = auditLogService;
-        this.commissionService = commissionService;
     }
 
     // ==================== 核心计算 ====================
@@ -148,53 +145,11 @@ public class SalesOutboundProfitService {
         Long profitId = jdbc.queryForObject(
                 "SELECT id FROM sales_outbound_profits WHERE sales_outbound_id=?", Long.class, outboundId);
 
-        // 联动提成（同事务内）
-        commissionService.recalculate(outboundId, profitId, commissionable, operatorName);
-
         auditLogService.log("SalesOutboundProfit", outboundId, "订单利润", "PROFIT_RECALCULATE",
                 "重算出库 " + o.get("outboundNo") + " 利润：毛利 " + gross + "，费用 " + expense
                         + "，调整 " + adjAll + "，实际利润 " + accountingProfit + "，可计提 " + commissionable
                         + "，操作人 " + operatorName);
         return outboundProfitDetail(outboundId);
-    }
-
-    // ==================== 利润调整 ====================
-
-    /** 新增利润调整并立即重算。 */
-    @Transactional
-    public Map<String, Object> addAdjustment(Long outboundId, String type, BigDecimal amount,
-                                             boolean plus, boolean affectsCommission, String reason) {
-        requireOutboundVisible(outboundId);
-        if (type == null || type.isBlank()) throw new IllegalArgumentException("请填写调整类型");
-        if (amount == null || amount.signum() <= 0) throw new IllegalArgumentException("调整金额必须大于 0");
-        if (reason == null || reason.isBlank()) throw new IllegalArgumentException("请填写调整原因");
-        String operator = operatorName();
-        jdbc.update("""
-            INSERT INTO sales_outbound_profit_adjustments(sales_outbound_id, adjustment_type, amount,
-                direction, affects_commission, reason, created_by)
-            VALUES(?,?,?,?,?,?,?)
-            """, outboundId, type.trim(), amount, plus ? "PLUS" : "MINUS", affectsCommission ? 1 : 0, reason.trim(), operator);
-        auditLogService.log("SalesOutboundProfitAdjustment", null, "利润调整", "ADJUSTMENT_CREATE",
-                "出库 " + outboundId + " 新增调整 " + type + " ¥" + amount + "（" + (plus ? "增加" : "减少")
-                        + (affectsCommission ? "，参与提成" : "，不参与提成") + "），原因：" + reason + "，操作人 " + operator);
-        return recalculate(outboundId, operator);
-    }
-
-    /** 撤销利润调整并立即重算。 */
-    @Transactional
-    public Map<String, Object> reverseAdjustment(Long adjustmentId) {
-        Map<String, Object> a = oneOrNull("SELECT * FROM sales_outbound_profit_adjustments WHERE id=?", adjustmentId);
-        if (a == null) throw new IllegalArgumentException("利润调整不存在");
-        if ("REVERSED".equals(a.get("status"))) throw new IllegalArgumentException("该调整已撤销");
-        requireOutboundVisible(((Number) a.get("salesOutboundId")).longValue());
-        String operator = operatorName();
-        jdbc.update("""
-            UPDATE sales_outbound_profit_adjustments SET status='REVERSED', reversed_by=?, reversed_at=NOW()
-            WHERE id=?
-            """, operator, adjustmentId);
-        auditLogService.log("SalesOutboundProfitAdjustment", adjustmentId, "利润调整", "ADJUSTMENT_REVERSE",
-                "撤销调整 " + a.get("adjustmentType") + " ¥" + a.get("amount") + "，操作人 " + operator);
-        return recalculate(((Number) a.get("salesOutboundId")).longValue(), operator);
     }
 
     // ==================== 查询 ====================

@@ -1,0 +1,31 @@
+-- Human-confirmed quantity attribution. Imported source rows can be deleted/reinserted on reimport;
+-- retain their IDs and snapshots so changed sources become stale rather than silently reallocated.
+CREATE TABLE production_outbound_allocations (
+  id BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  production_order_id BIGINT NOT NULL,
+  purchase_receipt_item_id BIGINT NOT NULL,
+  sales_outbound_item_id BIGINT NOT NULL,
+  purchase_receipt_no VARCHAR(64) NOT NULL,
+  sales_outbound_no VARCHAR(50) NOT NULL,
+  product_code VARCHAR(100) NOT NULL,
+  unit VARCHAR(32) NOT NULL,
+  allocated_quantity DECIMAL(18,4) NOT NULL,
+  receipt_quantity_snapshot DECIMAL(18,4) NOT NULL,
+  sale_quantity_snapshot DECIMAL(18,4) NOT NULL,
+  receipt_date_snapshot DATE NOT NULL,
+  sale_date_snapshot DATE NOT NULL,
+  status VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+  reason VARCHAR(500) NOT NULL,
+  request_key VARCHAR(100) NOT NULL,
+  confirmed_by_employee_id BIGINT NOT NULL,
+  confirmed_by_name VARCHAR(100) NOT NULL,
+  confirmed_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  revoked_by_employee_id BIGINT NULL,
+  revoked_by_name VARCHAR(100) NULL,
+  revoked_at DATETIME NULL,
+  revoke_reason VARCHAR(500) NULL,
+  UNIQUE KEY uk_poa_request (request_key),
+  KEY idx_poa_order (production_order_id,status),
+  KEY idx_poa_receipt_item (purchase_receipt_item_id,status),
+  KEY idx_poa_sale_item (sales_outbound_item_id,status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='生产任务单入库明细到销售出库明细的人工数量归属';

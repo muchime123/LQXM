@@ -108,6 +108,12 @@ frontend/*.timestamp-*.mjs
 /db_cleanup_*/
 /$null
 
+# --- 稳定发布实例（冻结给同事用的产物，由 scripts/publish-stable.ps1 生成） ---
+/release/
+
+# --- 本地运行副本（后端从 _lqxm_run/dev-local/app.jar 启动，避免锁住 backend/target 里的 jar） ---
+/_lqxm_run/
+
 # --- Root-level one-off analysis & exports (HTML reports, CSV snapshots, temp binaries) ---
 /*.html
 /*.csv
@@ -145,6 +151,19 @@ frontend/*.timestamp-*.mjs
 /_*.json
 /journal_probe*.txt
 /p_journal*.py
+
+# --- 本地一次性诊断/运行副本/大体积快照（不入库） ---
+/_*
+/db_backup_*/
+/docs/product-line-review-*/
+/backend/jrx.exe
+/tools/_pwout/
+/tools/_*.txt
+/tools/_probe_*.java
+/frontend/_tmp-*.mjs
+/frontend/e2e/_tmp-*.spec.ts
+/frontend/e2e/__screenshots__/_*.png
+/tools/_git_size_check.py
 
 # --- Local edit backups & empty probe files (added 2026-09-18) ---
 *.bak-*

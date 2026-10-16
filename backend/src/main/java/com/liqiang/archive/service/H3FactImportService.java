@@ -646,16 +646,17 @@ clearConflicts(FactType.PRODUCTION, g);
 }
 jdbc.update("""
 INSERT INTO production_orders(external_source,external_id,work_order_no,status,plan_type,application_date,
-required_completion_date,expected_completion_date,actual_completion_date,salesperson_id,employee_id,salesperson_name,
+required_completion_date,expected_completion_date,actual_completion_date,schedule_time,salesperson_id,employee_id,salesperson_name,
 customer_id,customer_name,product_name,required_quantity,completed_quantity,warehoused_quantity,
 production_progress,warehousing_progress,production_completed,warehousing_completed,box_size,box_shape,
 box_material,mold_layout,voltage,plug_type,brand,optional_configuration,production_requirement,process_name,
 production_line,order_receiver,warehouse_operator,linked_sales_order_no,linked_sales_order_ref,
 product_order_external_id,department_name,source_created_by,source_created_at,source_updated_at,source_hash,last_synced_at)
-VALUES('H3YUN',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())
+VALUES('H3YUN',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())
 ON DUPLICATE KEY UPDATE work_order_no=VALUES(work_order_no),status=VALUES(status),plan_type=VALUES(plan_type),
 application_date=VALUES(application_date),required_completion_date=VALUES(required_completion_date),
 expected_completion_date=VALUES(expected_completion_date),actual_completion_date=VALUES(actual_completion_date),
+schedule_time=VALUES(schedule_time),
 salesperson_id=VALUES(salesperson_id),employee_id=VALUES(employee_id),salesperson_name=VALUES(salesperson_name),customer_id=VALUES(customer_id),
 customer_name=VALUES(customer_name),product_name=VALUES(product_name),required_quantity=VALUES(required_quantity),
 completed_quantity=VALUES(completed_quantity),warehoused_quantity=VALUES(warehoused_quantity),
@@ -670,6 +671,7 @@ department_name=VALUES(department_name),source_created_by=VALUES(source_created_
 source_updated_at=VALUES(source_updated_at),source_hash=VALUES(source_hash),last_synced_at=NOW()
 """, g.externalId(), g.key(), m.get("数据状态"), m.get("计划类型"), date(m.get("工单申请日期")),
 date(m.get("订单要求生产完成日期(必填)")), date(m.get("预计生产完成日期")), date(m.get("实际生产完成日期")),
+dateTime(m.get("排产时间")),
 salespersonId, employeeId, m.get("业务员(必填)"), customerId, first(m,"客户选择","客户信息"), m.get("产品名称"),
 decimal(m.get("需求数量")), decimal(m.get("生产完成数")), decimal(first(m,"入库数量_数值","入库数量")),
 first(m,"生产进度","生产进度_停用"), m.get("入库进度"), bool(m.get("是否生产完成")), bool(m.get("是否入库完成")),

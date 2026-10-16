@@ -42,6 +42,7 @@ import lombok.RequiredArgsConstructor;
 
 @RestController
 @RequestMapping("/api/customers")
+@RequirePermission("customer.read")
 @RequiredArgsConstructor
 public class CustomerController {
 

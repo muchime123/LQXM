@@ -46,9 +46,6 @@ export interface ExpenseStats {
   totalValidClaims: number
   thisMonthAmount: number
   awaitingMappingCount: number
-  pendingAllocationCount: number
-  /** 待归集核定金额合计（对公付款待核对金额） */
-  pendingAllocationAmount?: number
 }
 
 export interface ClaimRow {
@@ -67,10 +64,6 @@ export interface ClaimRow {
   remark: string | null
   createdAt: string | null
   updatedAt: string | null
-  // ===== P6.2 归集进度聚合（列表页批量一次 JOIN 计算；历史接口可返回 null）=====
-  confirmedAllocationSum?: number | null
-  confirmedAllocationCount?: number | null
-  allocationPct?: number | null
 }
 
 export interface ClaimItemRow {
@@ -121,71 +114,6 @@ export function fetchExpenses(params?: Record<string, any>) {
 // ===== 详情（含明细） =====
 export function fetchExpenseDetail(id: number) {
   return http.get<ClaimDetail>(`/expenses/${id}`).then(r => r.data)
-}
-
-export interface AllocationRow {
-  id: number
-  expenseClaimId: number
-  expenseItemId: number | null
-  targetType: string
-  targetId: number
-  targetNoSnapshot: string | null
-  targetNameSnapshot: string | null
-  allocationRatioPct: number | null
-  allocatedAmount: number
-  allocationStatus: string
-  allocationSource: 'MANUAL' | 'AUTO_RULE' | 'ADJUSTMENT' | string | null
-  allocationRuleId: number | null
-  allocationRunId: number | null
-  hitRuleName: string | null
-  remark: string | null
-  createdBy: string | null
-  createdAt: string | null
-  updatedAt: string | null
-}
-
-export interface AllocationSummary {
-  approvedAmount: number
-  confirmedSum: number
-  remainingToAllocate: number
-  confirmedAllocationCount: number
-  reversedSum: number
-  reversedAllocationCount: number
-}
-
-export interface TargetCandidate {
-  targetType: string
-  targetId: number
-  targetNo: string
-  targetName: string
-  extraInfo: string
-}
-
-// ===== API =====
-
-export function fetchAllocationSummary(claimId: number) {
-  return http.get<AllocationSummary>(`/expenses/${claimId}/allocations/summary`).then(r => r.data)
-}
-
-export function fetchAllocations(claimId: number, includeReversed = false) {
-  return http.get<{ items: AllocationRow[]; total: number }>(
-    `/expenses/${claimId}/allocations`, { params: { includeReversed } }
-  ).then(r => r.data)
-}
-
-export function reverseAllocation(allocationId: number, reason?: string) {
-  return http.post<AllocationRow>(
-    `/expenses/allocations/${allocationId}/reverse`,
-    null,
-    { params: { reason } }
-  ).then(r => r.data)
-}
-
-export function searchAllocationTargets(targetType: string, keyword?: string, page = 1, size = 20) {
-  return http.get<PageResult<TargetCandidate>>(
-    '/expenses/allocations/targets/search',
-    { params: { targetType, keyword, page, size } }
-  ).then(r => r.data)
 }
 
 // ==================== 钉钉报销 Excel 导入（2026-08-26） ====================
@@ -249,35 +177,5 @@ export function confirmExpenseImport(file: File, approvalNos?: string[]) {
   fd.append('file', file)
   ;(approvalNos ?? []).forEach(no => fd.append('approvalNos', no))
   return http.post<ExpenseImportResult>('/expenses/import/confirm', fd, { timeout: 300000 }).then(r => r.data)
-}
-
-export interface PendingOutboundAllocation {
-  allocationId: number
-  expenseClaimId: number
-  claimNo: string
-  claimTitle: string
-  submitterName?: string | null
-  outboundId: number
-  outboundNo: string
-  customerName?: string | null
-  allocatedAmount: number
-  allocationStatus: string
-  allocationSource?: string | null
-  matchMethod?: string | null
-  confidence?: number | null
-  remark?: string | null
-  createdAt?: string | null
-}
-
-// ===== API =====
-
-export function confirmAllocation(allocationId: number) {
-  return http.post<AllocationRow>(`/expenses/allocations/${allocationId}/confirm`).then(r => r.data)
-}
-
-export function fetchPendingOutboundAllocations(page = 1, size = 20) {
-  return http.get<PageResult<PendingOutboundAllocation>>('/expenses/allocations/pending-outbound', {
-    params: { page, size }
-  }).then(r => r.data)
 }
 

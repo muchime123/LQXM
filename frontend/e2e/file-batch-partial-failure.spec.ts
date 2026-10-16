@@ -29,8 +29,21 @@ test('refreshes partial changes and reports completed count when a batch delete 
     const module = await (0, eval)("import('/src/composables/upload/useFileAssetActions.ts')")
     const notifications: Array<{ message: string; type?: string }> = []
     let changedCount = 0
+    // notify 必须满足 NotifyFn 契约：实现里失败路径走 notify.errorWithDetail，
+    // 只给一个裸函数会让它抛 TypeError 并顶掉真正的批量失败错误。
+    const push = (message: string, type?: string) => notifications.push({ message, type })
+    const detailOf = (err: unknown) => (err instanceof Error ? err.message : String(err ?? ''))
+    const notify = Object.assign(push, {
+      success: (message: string) => push(message, 'success'),
+      error: (message: string) => push(message, 'error'),
+      warning: (message: string) => push(message, 'warning'),
+      errorWithDetail: (prefix: string, err: unknown) => {
+        const detail = detailOf(err)
+        push(detail ? `${prefix}：${detail}` : prefix, 'error')
+      }
+    })
     const actions = module.useFileAssetActions({
-      notify: (message: string, type?: string) => notifications.push({ message, type }),
+      notify,
       onChanged: () => { changedCount += 1 }
     })
     let thrown = ''

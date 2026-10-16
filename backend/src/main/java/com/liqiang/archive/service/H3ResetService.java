@@ -158,9 +158,6 @@ public class H3ResetService {
         if (tableExists("customer_product_match_memory")) {
             jdbc.update("UPDATE customer_product_match_memory SET last_outbound_id=NULL WHERE last_outbound_id IN (SELECT id FROM tmp_h3_reset_outbounds)");
         }
-        if (tableExists("expense_allocations")) {
-            jdbc.update("DELETE FROM expense_allocations WHERE target_type='SALES_OUTBOUND' AND target_id IN (SELECT id FROM tmp_h3_reset_outbounds)");
-        }
         jdbc.update("UPDATE sales_outbounds SET original_outbound_id=NULL WHERE original_outbound_id IN (SELECT id FROM tmp_h3_reset_outbounds)");
         deleteByIdsIfPresent("sales_outbound_items", "sales_outbound_id", "tmp_h3_reset_outbounds");
 

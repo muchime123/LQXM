@@ -1,0 +1,3637 @@
+<!DOCTYPE html>
+<html lang="zh-CN"><head>
+<meta charset="UTF-8" />
+<title>财务对账 · 代表性销售出库单样本 (20260831) · 卡片式</title>
+<style>
+* { box-sizing: border-box; }
+html, body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  margin: 0; padding: 22px 24px; color: #1f2937; background: #f3f4f6;
+  font-size: 13px; line-height: 1.55;
+}
+h1 { margin: 0 0 4px; font-size: 22px; }
+.sub { color: #6b7280; margin-bottom: 18px; font-size: 12.5px; }
+h2 {
+  margin: 30px 0 12px; padding-left: 10px; border-left: 4px solid #2563eb;
+  font-size: 16px; display: flex; align-items: center; gap: 8px;
+}
+
+/* 顶部汇总卡片 */
+.summary-box {
+  display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 10px;
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 14px 18px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,0.04);
+}
+.summary-box .k { color: #6b7280; font-size: 11.5px; }
+.summary-box .v { font-size: 18px; font-weight: 600; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.summary-box .v.pos { color: #059669; }
+.summary-box .v.neg { color: #dc2626; }
+.summary-box .v.warn { color: #d97706; }
+
+/* 图例 */
+.legend {
+  background: #fffbeb; border: 1px solid #fde68a; border-radius: 10px;
+  padding: 12px 18px; margin-bottom: 20px; color: #92400e; font-size: 12.5px;
+}
+.legend b { color: #78350f; }
+.legend ul { margin: 6px 0 0 18px; padding: 0; }
+.legend li { margin: 2px 0; }
+
+/* 场景对照网格 */
+.scene-ref-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px; margin-bottom: 8px;
+}
+.scene-ref-card {
+  background: #fff; border-radius: 8px; padding: 10px 12px; border: 1px solid #e5e7eb;
+  display: grid; grid-template-columns: 44px 1fr; grid-template-rows: auto auto; gap: 2px 10px;
+}
+.tagbg-S01,.tagbg-S02,.tagbg-S03 { border-left: 4px solid #16a34a; }
+.tagbg-S04,.tagbg-S05,.tagbg-S06 { border-left: 4px solid #2563eb; }
+.tagbg-S07,.tagbg-S08 { border-left: 4px solid #4f46e5; }
+.tagbg-S09,.tagbg-S10,.tagbg-S11,.tagbg-S12,.tagbg-S13 { border-left: 4px solid #dc2626; }
+.tagbg-S14,.tagbg-S15 { border-left: 4px solid #d97706; }
+.tagbg-S16,.tagbg-S17 { border-left: 4px solid #6b7280; }
+.src-code {
+  grid-row: span 2; font-weight: 700; font-size: 16px; color: #334155;
+  display: flex; align-items: center; justify-content: center;
+  background: #f1f5f9; border-radius: 6px;
+}
+.src-cat { font-size: 10.5px; color: #64748b; letter-spacing: 0.04em; }
+.src-name { font-size: 12.5px; color: #0f172a; font-weight: 500; }
+.src-count {
+  grid-column: 2; font-size: 11px; color: #6b7280; margin-top: 2px;
+}
+
+/* 订单卡片网格 */
+.cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(640px, 1fr));
+  gap: 16px;
+}
+
+/* 单张订单卡片 */
+.order-card {
+  background: #fff; border: 1px solid #e5e7eb; border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05); overflow: hidden;
+  display: flex; flex-direction: column;
+}
+
+.card-head {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+  border-bottom: 1px solid #e5e7eb; padding: 12px 16px;
+}
+.card-no { font-size: 15px; color: #111827; margin-bottom: 4px; }
+.card-no b { letter-spacing: 0.02em; }
+.card-meta {
+  display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center;
+  margin-top: 2px; font-size: 12.5px; color: #374151;
+}
+.meta-pill {
+  background: #f1f5f9; border-radius: 999px; padding: 3px 10px;
+}
+.card-warns { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.warn-chip {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 500;
+}
+.warn-chip-red { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+.warn-chip-amber { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.status-chip {
+  display: inline-block; padding: 2px 9px; border-radius: 999px;
+  font-size: 11px; font-weight: 600; border: 1px solid transparent;
+}
+.sc-green { background: #d1fae5; color: #065f46; border-color: #6ee7b7; }
+.sc-amber { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+.sc-blue  { background: #dbeafe; color: #1e40af; border-color: #93c5fd; }
+.sc-gray  { background: #f3f4f6; color: #374151; border-color: #d1d5db; }
+.sc-purple{ background: #ede9fe; color: #5b21b6; border-color: #c4b5fd; }
+
+/* 标签 */
+.tag {
+  display: inline-block; padding: 2px 8px; border-radius: 10px;
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.tag-S01,.tag-S02,.tag-S03 { background: #dcfce7; color: #166534; }
+.tag-S04,.tag-S05,.tag-S06 { background: #dbeafe; color: #1e3a8a; }
+.tag-S07,.tag-S08 { background: #e0e7ff; color: #3730a3; }
+.tag-S09,.tag-S10,.tag-S11,.tag-S12,.tag-S13 { background: #fee2e2; color: #991b1b; }
+.tag-S14,.tag-S15 { background: #fef3c7; color: #92400e; }
+.tag-S16,.tag-S17 { background: #e5e7eb; color: #374151; }
+
+/* 指标对区域（每行 = 左侧系统值 / 右侧财务填写） */
+.card-metrics {
+  display: flex; flex-direction: column;
+}
+.mp-row {
+  display: grid;
+  grid-template-columns: 200px 1fr 1.1fr;
+  border-bottom: 1px dashed #e5e7eb;
+  align-items: stretch; min-height: 44px;
+}
+.mp-row:last-of-type { border-bottom: none; }
+.mp-label {
+  padding: 9px 12px; font-weight: 500; font-size: 12.5px; color: #374151;
+  border-right: 1px solid #f1f5f9; display: flex; align-items: center;
+  background: #fafafa;
+}
+.mp-sys {
+  padding: 7px 12px; display: grid;
+  grid-template-columns: 36px 1fr; gap: 0 8px; align-items: center;
+  border-right: 1px solid #f3e8ff;
+}
+.mp-sys-tag {
+  background: #111827; color: #fff; font-size: 10px;
+  padding: 2px 6px; border-radius: 4px; text-align: center;
+  letter-spacing: 0.05em;
+}
+.mp-sys-val {
+  font-weight: 600; font-size: 13.5px; font-variant-numeric: tabular-nums;
+  text-align: right; color: #111827;
+}
+.mp-sys-val.neg { color: #dc2626; }
+.mp-sys-val.pos { color: #059669; }
+.mp-sys-val.warn { color: #d97706; }
+.mp-fin {
+  background: repeating-linear-gradient(45deg, #f5f3ff, #f5f3ff 6px, #ede9fe 6px, #ede9fe 12px);
+  padding: 7px 12px; display: grid;
+  grid-template-columns: 48px 1fr; gap: 0 8px; align-items: center;
+}
+.mp-fin-tag {
+  background: #7c3aed; color: #fff; font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 4px; text-align: center;
+}
+.mp-fin-input {
+  border: 1.5px dashed #a78bfa; background: #fff; border-radius: 6px;
+  min-height: 28px; padding: 3px 8px; color: #4c1d95;
+  font-style: italic; display: flex; align-items: center; justify-content: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 卡片抽屉（产品/费用/调整） */
+.card-drawer {
+  border-top: 1px solid #e5e7eb;
+}
+.card-drawer > summary {
+  cursor: pointer; padding: 9px 16px; background: #f8fafc;
+  font-weight: 600; color: #1e3a8a; list-style: none; font-size: 12.5px;
+  border-top: 1px dashed #cbd5e1;
+}
+.card-drawer > summary::-webkit-details-marker { display: none; }
+.card-drawer > summary::before {
+  content: "▶ "; color: #94a3b8; font-size: 10px; margin-right: 4px;
+}
+.card-drawer[open] > summary::before { content: "▼ "; color: #2563eb; }
+.card-drawer-inner {
+  padding: 10px 16px 14px; background: #fafafa;
+  border-top: 1px solid #f1f5f9;
+}
+.card-drawer-inner h4 {
+  margin: 10px 0 6px; font-size: 12px; color: #334155;
+  padding-left: 6px; border-left: 3px solid #0ea5e9;
+}
+.scroll-wrap { overflow-x: auto; }
+.det-tbl {
+  width: 100%; border-collapse: collapse; background: #fff;
+  border: 1px solid #e2e8f0; font-size: 11.5px;
+}
+.det-tbl th {
+  background: #475569; color: #fff; font-weight: 500;
+  padding: 5px 9px; text-align: left; border: 1px solid #475569;
+  white-space: nowrap;
+}
+.det-tbl td { padding: 4px 8px; border: 1px solid #e2e8f0; vertical-align: top; }
+.det-tbl tr:nth-child(even) td { background: #f8fafc; }
+.det-tbl td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.det-tbl td.neg { color: #dc2626; }
+
+/* 备注块 */
+.remark-block {
+  border-top: 2px solid #c4b5fd; padding: 10px 16px 14px;
+  background: repeating-linear-gradient(45deg, #f5f3ff, #f5f3ff 6px, #ede9fe 6px, #ede9fe 12px);
+}
+.remark-title {
+  font-weight: 700; font-size: 12.5px; color: #5b21b6; margin-bottom: 6px;
+}
+.remark-box {
+  min-height: 72px; background: #fff; border: 1.5px dashed #a78bfa;
+  border-radius: 8px; padding: 8px 12px; color: #4c1d95;
+  font-style: italic;
+}
+.remark-box ul { margin: 4px 0 0 18px; padding: 0; }
+.remark-box li { margin: 1px 0; font-size: 11.5px; opacity: 0.7; }
+
+/* 签字区 */
+.sign-area {
+  margin-top: 40px; display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 24px; padding-top: 20px; border-top: 1px dashed #9ca3af;
+  background: #fff; border-radius: 10px 10px 0 0; padding: 20px 24px 10px;
+}
+.sign-area .col { text-align: center; }
+.sign-area .line {
+  border-bottom: 1px solid #1f2937; width: 80%; margin: 0 auto 6px; height: 40px;
+}
+
+/* 打印样式 */
+@media print {
+  html, body { padding: 8px; background: #fff; font-size: 11px; }
+  .summary-box { break-inside: avoid; grid-template-columns: repeat(3, 1fr); }
+  .scene-ref-grid { break-inside: avoid; }
+  .order-card { break-inside: avoid; box-shadow: none; margin-bottom: 10px; border: 1px solid #9ca3af; }
+  .card-drawer, .card-drawer>summary { display: block; }
+  .card-drawer[open] .card-drawer-inner { break-inside: avoid; }
+  .cards-grid { grid-template-columns: 1fr; }
+  .sign-area { break-inside: avoid; }
+}
+</style>
+</head><body><h1>📋 财务对账 · 代表性销售出库单样本（卡片式）</h1>
+<div class="sub">生成时间：2026/8/31 13:43:00　|　样本来源：product_archive.sales_outbounds　|　样本数：20 张 / 覆盖 13 个业务场景</div>
+
+<div class="summary-box">
+  <div><div class="k">样本 销售总额</div><div class="v">¥754,424.50</div></div>
+  <div><div class="k">样本 采购成本总额</div><div class="v warn">¥555,794.98</div></div>
+  <div><div class="k">样本 产品毛利总额</div><div class="v pos">¥198,629.52</div></div>
+  <div><div class="k">样本 系统订单利润</div><div class="v pos">¥17,319.42</div></div>
+  <div><div class="k">样本 已回款总额</div><div class="v">¥728,469.60</div></div>
+  <div><div class="k">样本 理论提成合计</div><div class="v warn">¥1,815.44</div></div>
+</div>
+
+<div class="legend">
+  <b>📌 使用说明（卡片式）：</b>
+  <ul>
+    <li>每张订单 = 一块独立卡片。卡片分三部分：<b>顶部基本信息</b> / <b>左侧系统计算值</b> / <b>右侧财务填写区（紫色斜纹 = 唯一权威口径）</b>。</li>
+    <li>系统值 = 系统硬编码公式算出的<b>未经确认</b>的值；财务填写列是需要手写确认的权威数字。</li>
+    <li>每张卡片底部有 ▶ <b>产品明细 / 费用归集 / 利润调整</b> 展开抽屉 + <b>大备注框</b>。</li>
+    <li>卡片右上角颜色标签 = 场景编号（S01-S17），对应打印清单首页的场景对照表。</li>
+    <li>建议先对完头部 6 个大数字，再逐张卡片对小数字，<b>最后把每张卡片的差异原因填进备注框</b>，签字确认。</li>
+  </ul>
+</div>
+<h2>📇 场景对照表（共 13 类）</h2><div class="scene-ref-grid"><div class="scene-ref-card tagbg-S01">
+      <div class="src-code">S01</div>
+      <div class="src-cat">正常回款</div>
+      <div class="src-name">正常-全额回款(已收=应收)</div>
+      <div class="src-count">2 张</div>
+    </div><div class="scene-ref-card tagbg-S02">
+      <div class="src-code">S02</div>
+      <div class="src-cat">正常回款</div>
+      <div class="src-name">正常-部分回款(有已收有未收)</div>
+      <div class="src-count">2 张</div>
+    </div><div class="scene-ref-card tagbg-S03">
+      <div class="src-code">S03</div>
+      <div class="src-cat">正常回款</div>
+      <div class="src-name">正常-尚未回款(已收=0)</div>
+      <div class="src-count">2 张</div>
+    </div><div class="scene-ref-card tagbg-S04">
+      <div class="src-code">S04</div>
+      <div class="src-cat">毛利梯度</div>
+      <div class="src-name">高毛利(毛利率&gt;30%)</div>
+      <div class="src-count">2 张</div>
+    </div><div class="scene-ref-card tagbg-S05">
+      <div class="src-code">S05</div>
+      <div class="src-cat">毛利梯度</div>
+      <div class="src-name">低毛利(毛利率&lt;10%且&gt;0)</div>
+      <div class="src-count">1 张</div>
+    </div><div class="scene-ref-card tagbg-S06">
+      <div class="src-code">S06</div>
+      <div class="src-cat">毛利梯度</div>
+      <div class="src-name">零/负毛利(毛利&lt;=0)</div>
+      <div class="src-count">2 张</div>
+    </div><div class="scene-ref-card tagbg-S09">
+      <div class="src-code">S09</div>
+      <div class="src-cat">异常</div>
+      <div class="src-name">采购成本异常(为空/零/负)</div>
+      <div class="src-count">1 张</div>
+    </div><div class="scene-ref-card tagbg-S10">
+      <div class="src-code">S10</div>
+      <div class="src-cat">异常</div>
+      <div class="src-name">员工未映射(employee_id NULL)</div>
+      <div class="src-count">1 张</div>
+    </div><div class="scene-ref-card tagbg-S11">
+      <div class="src-code">S11</div>
+      <div class="src-cat">异常</div>
+      <div class="src-name">客户未匹配(customer_id NULL)</div>
+      <div class="src-count">1 张</div>
+    </div><div class="scene-ref-card tagbg-S13">
+      <div class="src-code">S13</div>
+      <div class="src-cat">异常</div>
+      <div class="src-name">包含退货/冲销行(明细有负数量)</div>
+      <div class="src-count">1 张</div>
+    </div><div class="scene-ref-card tagbg-S14">
+      <div class="src-code">S14</div>
+      <div class="src-cat">时间与规模</div>
+      <div class="src-name">历史订单(2026年前发货)</div>
+      <div class="src-count">1 张</div>
+    </div><div class="scene-ref-card tagbg-S15">
+      <div class="src-code">S15</div>
+      <div class="src-cat">时间与规模</div>
+      <div class="src-name">大额订单(销售额TOP级别)</div>
+      <div class="src-count">1 张</div>
+    </div><div class="scene-ref-card tagbg-S16">
+      <div class="src-code">S16</div>
+      <div class="src-cat">补充填充</div>
+      <div class="src-name">补充-代表性正常订单(填充)</div>
+      <div class="src-count">3 张</div>
+    </div></div><h2>S01 · 正常-全额回款(已收=应收)（2 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20260830108431</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S01">S01</span>
+      <span class="meta-pill">📅 发货 2026-08-31 / 业务 2026-08-30</span>
+      <span class="meta-pill">
+        👤 李晓梅
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 王利杰
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-amber">试算</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">388.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">202.80</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 47.73%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">185.20</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val pos">185.20</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">185.20</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 100.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">388.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">18.52</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（1 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>250-2000ml乳白-260只（加强筋）</b><br/>
+              <small style="color:#6b7280">规格 30g　编码 080YW　单位 箱</small>
+            </td>
+            <td class="num">2.0000</td>
+            <td class="num">194.00</td>
+            <td class="num">388.00</td>
+            <td class="num">101.40</td>
+            <td class="num">202.80</td>
+            <td class="num">185.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#2 · <b>CK20260831108435</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S01">S01</span>
+      <span class="meta-pill">📅 发货 2026-08-31 / 业务 2026-08-31</span>
+      <span class="meta-pill">
+        👤 李晓梅
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 吴生
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-amber">试算</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">774.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">495.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 36.05%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">279.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val pos">279.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">279.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 100.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">774.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">27.90</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（1 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>1812*3.5透明-1200只</b><br/>
+              <small style="color:#6b7280">规格 11g　编码 019SLH　单位 箱</small>
+            </td>
+            <td class="num">3.0000</td>
+            <td class="num">258.00</td>
+            <td class="num">774.00</td>
+            <td class="num">165.00</td>
+            <td class="num">495.00</td>
+            <td class="num">279.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S02 · 正常-部分回款(有已收有未收)（2 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20260829108370</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S02">S02</span>
+      <span class="meta-pill">📅 发货 2026-08-29 / 业务 2026-08-29</span>
+      <span class="meta-pill">
+        👤 徐恩永
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 何凯凯
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-amber">试算</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">26,489.50</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">15,965.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 39.73%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">10,524.50</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val pos">10,524.50</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">10,524.50</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 71.12%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">18,839.60 <span style="color:#6b7280">/</span> 7,649.90</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">1,052.45</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（2 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>订做181x113手推自动卷膜 塑料盒</b><br/>
+              <small style="color:#6b7280">规格 方形　编码 506定做手推自动　单位 台</small>
+            </td>
+            <td class="num">4.0000</td>
+            <td class="num">3,800.00</td>
+            <td class="num">15,200.00</td>
+            <td class="num">2,400.00</td>
+            <td class="num">9,600.00</td>
+            <td class="num">5,600.00</td>
+          </tr><tr>
+            <td>2</td>
+            <td><b>230pet透明膜</b><br/>
+              <small style="color:#6b7280">规格 pet　编码 837YX　单位 kg</small>
+            </td>
+            <td class="num">335.0000</td>
+            <td class="num">33.70</td>
+            <td class="num">11,289.50</td>
+            <td class="num">19.00</td>
+            <td class="num">6,365.00</td>
+            <td class="num">4,925.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#2 · <b>CK20260828108254</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S02">S02</span>
+      <span class="meta-pill">📅 发货 2026-08-28 / 业务 2026-08-28</span>
+      <span class="meta-pill">
+        👤 李水云
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 郭琳
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-amber">试算</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">21,120.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">18,900.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 10.51%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">2,220.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val pos">2,220.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">2,220.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 9.76%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">2,062.00 <span style="color:#6b7280">/</span> 19,058.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">222.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（1 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>3020*5透明-840只</b><br/>
+              <small style="color:#6b7280">规格 30g　编码 097SLH　单位 箱</small>
+            </td>
+            <td class="num">60.0000</td>
+            <td class="num">352.00</td>
+            <td class="num">21,120.00</td>
+            <td class="num">315.00</td>
+            <td class="num">18,900.00</td>
+            <td class="num">2,220.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S03 · 正常-尚未回款(已收=0)（2 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20260829108398</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S03">S03</span>
+      <span class="meta-pill">📅 发货 2026-08-30 / 业务 2026-08-29</span>
+      <span class="meta-pill">
+        👤 徐恩永
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 张冰，
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-amber">试算</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">352.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">249.60</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 29.09%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">102.40</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val pos">102.40</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">102.40</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 0.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00 <span style="color:#6b7280">/</span> 352.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">10.24</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（2 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>175-1500ml乳白-640只（加强筋）</b><br/>
+              <small style="color:#6b7280">规格 30g　编码 024YW　单位 箱</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">307.00</td>
+            <td class="num">307.00</td>
+            <td class="num">249.60</td>
+            <td class="num">249.60</td>
+            <td class="num">57.00</td>
+          </tr><tr>
+            <td>2</td>
+            <td><b>运费</b><br/>
+              <small style="color:#6b7280">规格 —　编码 运费</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">45.00</td>
+            <td class="num">45.00</td>
+            <td class="num">0.00</td>
+            <td class="num">0.00</td>
+            <td class="num">45.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#2 · <b>CK20260829108399</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S03">S03</span>
+      <span class="meta-pill">📅 发货 2026-08-30 / 业务 2026-08-29</span>
+      <span class="meta-pill">
+        👤 徐恩永
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 怀化朱迪家，
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-amber">试算</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">975.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">675.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 30.77%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">300.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val pos">300.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">300.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 0.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00 <span style="color:#6b7280">/</span> 975.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">30.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（2 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>1812*2.5透明-1200只</b><br/>
+              <small style="color:#6b7280">规格 9g　编码 347SLH　单位 箱</small>
+            </td>
+            <td class="num">5.0000</td>
+            <td class="num">165.00</td>
+            <td class="num">825.00</td>
+            <td class="num">135.00</td>
+            <td class="num">675.00</td>
+            <td class="num">150.00</td>
+          </tr><tr>
+            <td>2</td>
+            <td><b>运费</b><br/>
+              <small style="color:#6b7280">规格 —　编码 运费</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">150.00</td>
+            <td class="num">150.00</td>
+            <td class="num">0.00</td>
+            <td class="num">0.00</td>
+            <td class="num">150.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S04 · 高毛利(毛利率&gt;30%)（2 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20260829108372</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S04">S04</span>
+      <span class="meta-pill">📅 发货 2026-08-30 / 业务 2026-08-29</span>
+      <span class="meta-pill">
+        👤 李水云
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 李东旭
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-amber">试算</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">3,255.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">2,040.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 37.33%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">1,215.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val pos">1,215.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">1,215.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 100.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">3,255.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">121.50</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（2 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>2014*3.5透明-1200只</b><br/>
+              <small style="color:#6b7280">规格 13g　编码 049SLH　单位 箱</small>
+            </td>
+            <td class="num">7.0000</td>
+            <td class="num">315.00</td>
+            <td class="num">2,205.00</td>
+            <td class="num">195.00</td>
+            <td class="num">1,365.00</td>
+            <td class="num">840.00</td>
+          </tr><tr>
+            <td>2</td>
+            <td><b>2014*5.5透明-1200只</b><br/>
+              <small style="color:#6b7280">规格 15g　编码 054SLH　单位 箱</small>
+            </td>
+            <td class="num">3.0000</td>
+            <td class="num">350.00</td>
+            <td class="num">1,050.00</td>
+            <td class="num">225.00</td>
+            <td class="num">675.00</td>
+            <td class="num">375.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#2 · <b>CK20260829108381</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S04">S04</span>
+      <span class="meta-pill">📅 发货 2026-08-30 / 业务 2026-08-29</span>
+      <span class="meta-pill">
+        👤 李晓梅
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 荆荆
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-amber">试算</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">338.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">184.68</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 45.36%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">153.32</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val pos">153.32</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">153.32</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 100.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">338.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">15.33</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（1 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>定做180*6.5乳白-720只</b><br/>
+              <small style="color:#6b7280">规格 19g　编码 303定做盒　单位 箱</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">338.00</td>
+            <td class="num">338.00</td>
+            <td class="num">184.68</td>
+            <td class="num">184.68</td>
+            <td class="num">153.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S05 · 低毛利(毛利率&lt;10%且&gt;0)（1 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20260829108388</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S05">S05</span>
+      <span class="meta-pill">📅 发货 2026-08-29 / 业务 2026-08-29</span>
+      <span class="meta-pill">
+        👤 徐恩永
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 谢
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-amber">试算</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">2,075.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">1,900.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 8.43%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">175.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val pos">175.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">175.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 100.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">2,075.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">17.50</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（3 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>250按钮全自动片膜</b><br/>
+              <small style="color:#6b7280">规格 圆形　编码 015ANZD　单位 台</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">1,900.00</td>
+            <td class="num">1,900.00</td>
+            <td class="num">1,800.00</td>
+            <td class="num">1,800.00</td>
+            <td class="num">100.00</td>
+          </tr><tr>
+            <td>2</td>
+            <td><b>套250用184x128模具</b><br/>
+              <small style="color:#6b7280">规格 方形模具　编码 015模具　单位 个</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">110.00</td>
+            <td class="num">110.00</td>
+            <td class="num">100.00</td>
+            <td class="num">100.00</td>
+            <td class="num">10.00</td>
+          </tr><tr>
+            <td>3</td>
+            <td><b>运费</b><br/>
+              <small style="color:#6b7280">规格 —　编码 运费</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">65.00</td>
+            <td class="num">65.00</td>
+            <td class="num">0.00</td>
+            <td class="num">0.00</td>
+            <td class="num">65.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S06 · 零/负毛利(毛利&lt;=0)（2 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20260828108301</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S06">S06</span>
+      <span class="meta-pill">📅 发货 2026-08-28 / 业务 2026-08-28</span>
+      <span class="meta-pill">
+        👤 徐恩永
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 小五自行车烤串，
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-gray">不可用</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">300.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">300.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 0.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 0.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00 <span style="color:#6b7280">/</span> 300.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（1 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>330x225互换250手动片膜上加热块</b><br/>
+              <small style="color:#6b7280">规格 圆形　编码 模具487　单位 个</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">300.00</td>
+            <td class="num">300.00</td>
+            <td class="num">300.00</td>
+            <td class="num">300.00</td>
+            <td class="num">0.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#2 · <b>CK20260826108098</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S06">S06</span>
+      <span class="meta-pill">📅 发货 2026-08-26 / 业务 2026-08-26</span>
+      <span class="meta-pill">
+        👤 陈圆缘
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 林先生7143
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-gray">-</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">1,500.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">1,500.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 0.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 -</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">1,500.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（1 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>封口机配件</b><br/>
+              <small style="color:#6b7280">规格 —　编码 004配件　单位 套</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">1,500.00</td>
+            <td class="num">1,500.00</td>
+            <td class="num">1,500.00</td>
+            <td class="num">1,500.00</td>
+            <td class="num">0.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S09 · 采购成本异常(为空/零/负)（1 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20260828108302</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S09">S09</span>
+      <span class="meta-pill">📅 发货 2026-08-29 / 业务 2026-08-28</span>
+      <span class="meta-pill">
+        👤 陈圆缘
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 向初田
+      </span>
+    </div>
+    <div class="card-warns"><div class="warn-chip warn-chip-red">⚠ 成本异常</div><span class="status-chip sc-amber">试算</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">3,000.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00 <small style="color:#dc2626">异常</small></div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 100.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">3,000.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val pos">3,000.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">3,000.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 100.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">3,000.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">300.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（1 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>封口机配件</b><br/>
+              <small style="color:#6b7280">规格 —　编码 004配件　单位 套</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">3,000.00</td>
+            <td class="num">3,000.00</td>
+            <td class="num">0.00</td>
+            <td class="num">0.00</td>
+            <td class="num">3,000.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S10 · 员工未映射(employee_id NULL)（1 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20230804025361</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S10">S10</span>
+      <span class="meta-pill">📅 发货 2023-07-31 / 业务 2023-07-31</span>
+      <span class="meta-pill">
+        👤 <span style="color:#dc2626">⚠未映射</span>
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 中金国际物流有限公司
+      </span>
+    </div>
+    <div class="card-warns"><div class="warn-chip warn-chip-amber">⚠ 员工未映射</div><span class="status-chip sc-gray">-</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">19,100.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">13,800.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 27.75%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">5,300.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 -</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">19,100.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（2 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>三边封液体自动包装机</b><br/>
+              <small style="color:#6b7280">规格 —　编码 102博科　单位 台</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">18,800.00</td>
+            <td class="num">18,800.00</td>
+            <td class="num">13,800.00</td>
+            <td class="num">13,800.00</td>
+            <td class="num">-</td>
+          </tr><tr>
+            <td>2</td>
+            <td><b>配件</b><br/>
+              <small style="color:#6b7280">规格 —　编码 配件　单位 套</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">300.00</td>
+            <td class="num">300.00</td>
+            <td class="num">0.00</td>
+            <td class="num">0.00</td>
+            <td class="num">-</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S11 · 客户未匹配(customer_id NULL)（1 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20260205094327</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S11">S11</span>
+      <span class="meta-pill">📅 发货 2026-02-05 / 业务 2026-02-05</span>
+      <span class="meta-pill">
+        👤 徐恩永
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 <span style="color:#dc2626">⚠未匹配</span>
+      </span>
+    </div>
+    <div class="card-warns"><div class="warn-chip warn-chip-amber">⚠ 客户未匹配</div><span class="status-chip sc-gray">不可用</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">25.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 0.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">-25.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">-25.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 0.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（1 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>其他配件</b><br/>
+              <small style="color:#6b7280">规格 —　编码 181其他　单位 套</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">0.00</td>
+            <td class="num">0.00</td>
+            <td class="num">25.00</td>
+            <td class="num">25.00</td>
+            <td class="num">-25.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S13 · 包含退货/冲销行(明细有负数量)（1 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20260829108324</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S13">S13</span>
+      <span class="meta-pill">📅 发货 2026-08-29 / 业务 2026-08-29</span>
+      <span class="meta-pill">
+        👤 段亚威
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 田改利
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-gray">不可用</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">-2,380.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">-1,570.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 0.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">-810.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">-810.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 0.00%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00 <span style="color:#6b7280">/</span> -2,380.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（2 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>2216半自动卷膜</b><br/>
+              <small style="color:#6b7280">规格 方形　编码 013BZD　单位 台</small>
+            </td>
+            <td class="num neg">-1.0000</td>
+            <td class="num">2,230.00</td>
+            <td class="num">-2,230.00</td>
+            <td class="num">1,500.00</td>
+            <td class="num">-1,500.00</td>
+            <td class="num">-730.00</td>
+          </tr><tr>
+            <td>2</td>
+            <td><b>270透明膜-5kg</b><br/>
+              <small style="color:#6b7280">规格 270*190　编码 014TMM　单位 卷</small>
+            </td>
+            <td class="num neg">-1.0000</td>
+            <td class="num">150.00</td>
+            <td class="num">-150.00</td>
+            <td class="num">70.00</td>
+            <td class="num">-70.00</td>
+            <td class="num">-80.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S14 · 历史订单(2026年前发货)（1 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20251230090521</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S14">S14</span>
+      <span class="meta-pill">📅 发货 2025-12-31 / 业务 2025-12-30</span>
+      <span class="meta-pill">
+        👤 陈圆缘
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 AE LOGISITCS 0220985067，
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-gray">-</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">30,721.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">25,773.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 16.11%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">4,948.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 -</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">30,721.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（4 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>订做220x170气动一出四卷膜</b><br/>
+              <small style="color:#6b7280">规格 方形　编码 892QD　单位 台</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">11,000.00</td>
+            <td class="num">11,000.00</td>
+            <td class="num">7,500.00</td>
+            <td class="num">7,500.00</td>
+            <td class="num">3,500.00</td>
+          </tr><tr>
+            <td>2</td>
+            <td><b>1.5kw空压机</b><br/>
+              <small style="color:#6b7280">规格 —　编码 015空压机　单位 台</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">800.00</td>
+            <td class="num">800.00</td>
+            <td class="num">660.00</td>
+            <td class="num">660.00</td>
+            <td class="num">140.00</td>
+          </tr><tr>
+            <td>3</td>
+            <td><b>制版费</b><br/>
+              <small style="color:#6b7280">规格 —　编码 制版费　单位 色</small>
+            </td>
+            <td class="num">4.0000</td>
+            <td class="num">210.00</td>
+            <td class="num">840.00</td>
+            <td class="num">252.00</td>
+            <td class="num">1,008.00</td>
+            <td class="num">-168.00</td>
+          </tr><tr>
+            <td>4</td>
+            <td><b>定制MYCOLEAF-PET进口防雾膜</b><br/>
+              <small style="color:#6b7280">规格 —　编码 518YY　单位 kg</small>
+            </td>
+            <td class="num">369.0000</td>
+            <td class="num">49.00</td>
+            <td class="num">18,081.00</td>
+            <td class="num">45.00</td>
+            <td class="num">16,605.00</td>
+            <td class="num">1,476.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S15 · 大额订单(销售额TOP级别)（1 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20250121066172</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S15">S15</span>
+      <span class="meta-pill">📅 发货 2025-01-21 / 业务 2025-01-21</span>
+      <span class="meta-pill">
+        👤 李水云
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 王迪
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-gray">-</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">644,100.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">473,500.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 26.49%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">170,600.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 -</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">644,100.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（4 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>LQ750-141x119一出六连续式+直线型</b><br/>
+              <small style="color:#6b7280">规格 —　编码 089QZDQTJ　单位 台</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">101,800.00</td>
+            <td class="num">101,800.00</td>
+            <td class="num">80,000.00</td>
+            <td class="num">80,000.00</td>
+            <td class="num">21,800.00</td>
+          </tr><tr>
+            <td>2</td>
+            <td><b>LQ750-141x119一出六连续式+7字型</b><br/>
+              <small style="color:#6b7280">规格 —　编码 090QZDQTJ　单位 台</small>
+            </td>
+            <td class="num">2.0000</td>
+            <td class="num">101,800.00</td>
+            <td class="num">203,600.00</td>
+            <td class="num">80,000.00</td>
+            <td class="num">160,000.00</td>
+            <td class="num">43,600.00</td>
+          </tr><tr>
+            <td>3</td>
+            <td><b>LQ750D-141x119一出四连续式+92一出六共用+灌装</b><br/>
+              <small style="color:#6b7280">规格 —　编码 091QZDQTJ　单位 台</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">177,100.00</td>
+            <td class="num">177,100.00</td>
+            <td class="num">123,500.00</td>
+            <td class="num">123,500.00</td>
+            <td class="num">53,600.00</td>
+          </tr><tr>
+            <td>4</td>
+            <td><b>LQ750D-141x119一出四连续式+92一出六共用</b><br/>
+              <small style="color:#6b7280">规格 —　编码 092QZDQTJ　单位 台</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">161,600.00</td>
+            <td class="num">161,600.00</td>
+            <td class="num">110,000.00</td>
+            <td class="num">110,000.00</td>
+            <td class="num">51,600.00</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><h2>S16 · 补充-代表性正常订单(填充)（3 张）</h2><div class="cards-grid"><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#1 · <b>CK20240603049037</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S16">S16</span>
+      <span class="meta-pill">📅 发货 2024-06-03 / 业务 2024-05-29</span>
+      <span class="meta-pill">
+        👤 李晓梅
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 刘伟
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-gray">-</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">159.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">137.50</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 13.52%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">21.50</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 -</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">159.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（1 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>2014*2黑色-1000只</b><br/>
+              <small style="color:#6b7280">规格 11g　编码 SLH239　单位 箱</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">159.00</td>
+            <td class="num">159.00</td>
+            <td class="num">137.50</td>
+            <td class="num">137.50</td>
+            <td class="num">-</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#2 · <b>CK20220825007195</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S16">S16</span>
+      <span class="meta-pill">📅 发货 2022-08-25 / 业务 2022-08-25</span>
+      <span class="meta-pill">
+        👤 李晓梅
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 王金铭,
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-gray">-</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">590.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">355.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 39.83%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">235.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 -</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">590.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（2 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>128*450ml盒</b><br/>
+              <small style="color:#6b7280">规格 圆形　编码 012LBH　单位 只</small>
+            </td>
+            <td class="num">500.0000</td>
+            <td class="num">1.18</td>
+            <td class="num">590.00</td>
+            <td class="num">0.50</td>
+            <td class="num">250.00</td>
+            <td class="num">-</td>
+          </tr><tr>
+            <td>2</td>
+            <td><b>128铝箔盖</b><br/>
+              <small style="color:#6b7280">规格 圆形　编码 006LBG　单位 片</small>
+            </td>
+            <td class="num">500.0000</td>
+            <td class="num">0.00</td>
+            <td class="num">0.00</td>
+            <td class="num">0.21</td>
+            <td class="num">105.00</td>
+            <td class="num">-</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article><article class="order-card">
+  
+<div class="card-head">
+  <div class="card-head-left">
+    <div class="card-no">#3 · <b>CK20230706023736</b></div>
+    <div class="card-meta">
+      <span class="tag tag-S16">S16</span>
+      <span class="meta-pill">📅 发货 2023-07-06 / 业务 2023-07-06</span>
+      <span class="meta-pill">
+        👤 李水云
+        <small style="color:#6b7280">（浙江利强包装科技有限公司）</small>
+      </span>
+      <span class="meta-pill">
+        🏢 陈达盛
+      </span>
+    </div>
+    <div class="card-warns"><span class="status-chip sc-gray">-</span></div>
+  </div>
+</div>
+  <div class="card-metrics">
+    
+<div class="mp-row">
+  <div class="mp-label">① 销售额（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">1,568.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">② 采购成本（元）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">1,362.40</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">③ 产品毛利（①-②） <small style="color:#6b7280">毛利率 13.11%</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">205.60</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">④ 确认订单费用（已归集已确认）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑤ 利润调整净额（增利+ / 减利−）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑥ 订单利润（③-④+⑤）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">⑦ 可计提利润（参与提成部分，最低为0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val neg">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">回款情况：已收 / 未收　<small style="color:#6b7280">回款率 -</small></div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val ">1,568.00 <span style="color:#6b7280">/</span> 0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+<div class="mp-row">
+  <div class="mp-label">系统理论提成（锁：试算 TRIAl，available=0）</div>
+  <div class="mp-sys">
+    <div class="mp-sys-tag">系统</div>
+    <div class="mp-sys-val warn">0.00</div>
+  </div>
+  <div class="mp-fin">
+    <div class="mp-fin-tag">财务✓</div>
+    <div class="mp-fin-input">财务填写 ________</div>
+  </div>
+</div>
+  </div>
+  <details class="card-drawer">
+  <summary>▶ 展开详情：产品明细（4 行）/ 费用归集（0 笔）/ 利润调整（0 笔）</summary>
+  <div class="card-drawer-inner">
+    <h4>📦 产品明细</h4><div class="scroll-wrap"><table class="det-tbl"><thead><tr>
+          <th>行号</th><th>产品名称 / 规格 / 编码</th><th class="num">数量</th>
+          <th class="num">销售单价</th><th class="num">销售小计</th>
+          <th class="num">采购单价</th><th class="num">采购小计</th>
+          <th class="num">源毛利</th></tr></thead><tbody><tr>
+            <td>1</td>
+            <td><b>3020*5透明-840只</b><br/>
+              <small style="color:#6b7280">规格 30g　编码 SLH97　单位 箱</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">353.00</td>
+            <td class="num">353.00</td>
+            <td class="num">327.60</td>
+            <td class="num">327.60</td>
+            <td class="num">-</td>
+          </tr><tr>
+            <td>2</td>
+            <td><b>3020*8透明-560只</b><br/>
+              <small style="color:#6b7280">规格 45g　编码 SLH98　单位 箱</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">353.00</td>
+            <td class="num">353.00</td>
+            <td class="num">327.60</td>
+            <td class="num">327.60</td>
+            <td class="num">-</td>
+          </tr><tr>
+            <td>3</td>
+            <td><b>3020*11透明-560只</b><br/>
+              <small style="color:#6b7280">规格 50g　编码 SLH99　单位 箱</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">392.00</td>
+            <td class="num">392.00</td>
+            <td class="num">364.00</td>
+            <td class="num">364.00</td>
+            <td class="num">-</td>
+          </tr><tr>
+            <td>4</td>
+            <td><b>3020*14透明-480只</b><br/>
+              <small style="color:#6b7280">规格 55g　编码 SLH204　单位 箱</small>
+            </td>
+            <td class="num">1.0000</td>
+            <td class="num">370.00</td>
+            <td class="num">370.00</td>
+            <td class="num">343.20</td>
+            <td class="num">343.20</td>
+            <td class="num">-</td>
+          </tr></tbody></table></div>
+    <h4>💳 费用归集明细（本订单直接关联的报销，仅 CONFIRMED 才扣利润）</h4><p style="color:#9ca3af;margin:0">— 系统里本订单尚未归集任何订单费用（财务请确认：是没发生，还是发生了但没挂？）—</p>
+    <h4>✏️ 利润调整记录（PLUS 增利 / MINUS 减利；是否参与提成影响第⑦项基数）</h4><p style="color:#9ca3af;margin:0">— 无利润调整记录 —</p>
+  </div>
+</details>
+  <div class="remark-block">
+  <div class="remark-title">✒️ 差异 / 备注（财务填写）：</div>
+  <div class="remark-box">请在此标注系统值与财务账的差异原因，例如：
+    <ul>
+      <li>销售金额是否含税？是否应扣除运费 2,300 元？</li>
+      <li>采购成本是否应加上关税 8,400 元？</li>
+      <li>回款是否含 3 月到账的 50,000 元？</li>
+      <li>提成是否应按"销售额 × 5%"而不是"利润 × 10%"？</li>
+    </ul>
+  </div>
+</div>
+</article></div><div class="sign-area">
+    <div class="col"><div class="line"></div>财务负责人签字<br/><small>日期：______年____月____日</small></div>
+    <div class="col"><div class="line"></div>业务负责人签字<br/><small>日期：______年____月____日</small></div>
+    <div class="col"><div class="line"></div>系统对接人签字<br/><small>日期：______年____月____日</small></div>
+  </div></body></html>

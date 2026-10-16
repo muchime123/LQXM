@@ -11,8 +11,6 @@ public final class FeatureCode {
 
     /** 销售业务总览（旧） */
     public static final String BUSINESS = "BUSINESS";
-    /** 销售出库与核销（旧） */
-    public static final String SALES_OUTBOUND = "SALES_OUTBOUND";
     /** 销售出库费用（旧） */
     public static final String ORDER_EXPENSE = "ORDER_EXPENSE";
     /** 销售出库利润（旧） */
@@ -29,6 +27,4 @@ public final class FeatureCode {
     public static final String MONTHLY_COMMISSION = "MONTHLY_COMMISSION";
     /** 生产制造 */
     public static final String MANUFACTURING = "MANUFACTURING";
-    /** 采购订单（外采） */
-    public static final String PURCHASE_ORDER = "PURCHASE_ORDER";
 }

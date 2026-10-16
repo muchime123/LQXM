@@ -1,8 +1,10 @@
 import { expect, test } from '@playwright/test'
 
 async function mountHarness(page: import('@playwright/test').Page, assetId: number | null = 41) {
-  await page.goto('/#/products')
-  await page.waitForURL('**/#/products')
+  // 夹具只需要一个同源文档来动态 import 组件，不依赖应用外壳。
+  // 原先 goto('/#/products') 会触发登录守卫（后端未登录返回 401 → 跳登录页），
+  // 与随后的 waitForURL 形成竞态：8 worker 并行时重定向常先到，用例随机 30s 超时。
+  await page.goto('/e2e/fixtures/harness.html')
   await page.evaluate(async id => {
     document.body.innerHTML = '<div id="e2e-app"></div>'
     const vue = await (0, eval)("import('/node_modules/.vite/deps/vue.js')")

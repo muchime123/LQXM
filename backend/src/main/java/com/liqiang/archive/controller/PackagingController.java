@@ -39,6 +39,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/packaging")
+@RequirePermission("packaging.read")
 @RequiredArgsConstructor
 public class PackagingController {
 

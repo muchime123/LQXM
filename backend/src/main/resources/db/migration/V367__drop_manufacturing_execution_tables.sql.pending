@@ -1,0 +1,36 @@
+﻿-- V367: 删除旧本地制造执行链全部表（manufacturing_orders 及所有子表/成品批次表）
+-- 背景：生产执行链（排产/报工/冲正/检验/异常/返工/完工入库/领料退料/产出清单/收货明细）已整体下线。
+--       氚云生产任务台账走 production_orders（H3 导入），不再依赖本地 manufacturing_orders。
+--       制程主数据（manufacturing_operations / manufacturing_process_templates / workshops /
+--       task_config_items / manufacturing_product_config_rules）保留。
+--       sales_contracts / sales_outbound_commissions 表保留（客户统计 / 利润读取依赖）。
+
+-- 1. 解除归档/活跃表对 manufacturing_orders 与 finished_goods_lots 的外键引用。
+--    归档表（V359 重命名 / V366 重命名）保留行，仅摘除外键；活跃表同理。
+ALTER TABLE production_tracking_state_legacy_20261008 DROP FOREIGN KEY fk_pts_order;
+ALTER TABLE production_tracking_entries_legacy_20261008 DROP FOREIGN KEY fk_pte_order;
+ALTER TABLE manufacturing_order_follow_ups_archive_20261007 DROP FOREIGN KEY fk_mofu_order;
+ALTER TABLE product_inventory_transactions DROP FOREIGN KEY fk_pit_lot;
+ALTER TABLE sales_outbound_finished_goods_allocations DROP FOREIGN KEY fk_outbound_lot_allocation_lot;
+
+-- 2. 丢弃 production_orders 上回链本地工单的死列（无外键，仅索引）。
+ALTER TABLE production_orders
+  DROP COLUMN linked_manufacturing_order_id,
+  DROP COLUMN linked_manufacturing_order_no;
+
+-- 3. 按依赖反序 DROP 全部执行链子表 → 主表（含成品批次与流水）。
+DROP TABLE IF EXISTS manufacturing_completion_receipt_items;
+DROP TABLE IF EXISTS manufacturing_order_outputs;
+DROP TABLE IF EXISTS manufacturing_material_returns;
+DROP TABLE IF EXISTS manufacturing_material_issues;
+DROP TABLE IF EXISTS manufacturing_material_movements;
+DROP TABLE IF EXISTS manufacturing_material_requirements;
+DROP TABLE IF EXISTS manufacturing_reworks;
+DROP TABLE IF EXISTS manufacturing_completion_receipts;
+DROP TABLE IF EXISTS manufacturing_work_reports;
+DROP TABLE IF EXISTS manufacturing_issues;
+DROP TABLE IF EXISTS manufacturing_inspections;
+DROP TABLE IF EXISTS manufacturing_order_operations;
+DROP TABLE IF EXISTS finished_goods_movements;
+DROP TABLE IF EXISTS finished_goods_lots;
+DROP TABLE IF EXISTS manufacturing_orders;

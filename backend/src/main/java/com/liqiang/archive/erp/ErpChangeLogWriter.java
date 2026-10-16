@@ -28,7 +28,7 @@ import java.util.Map;
  * {@code archiveAuditWriter}，审计表以 {@code erp.row_change_log} 限定名写入同一事务；
  * erp 内业务用 {@code erpAuditWriter}。
  *
- * <p><b>target_table 口径</b>：统一带 schema 限定名（{@code product_archive.manufacturing_work_reports}
+ * <p><b>target_table 口径</b>：统一带 schema 限定名（{@code product_archive.manufacturing_operations}
  * / {@code erp.party}）。两侧表名可能重名，不带限定的裸表名会让「改了哪张表」产生歧义。
  */
 @Slf4j

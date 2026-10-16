@@ -887,6 +887,36 @@ watch(
   text-overflow: ellipsis;
 }
 
+/* 小屏侧栏密度：全局 responsive.css 收窄 --sidebar-width 后，同步收紧侧栏
+   内边距与导航字号，否则长菜单名（如「销售出库产品分析」需约 196px）会截断。 */
+@media (max-width: 1440px) {
+  .sidebar {
+    padding: 18px 14px;
+  }
+
+  .nav-item {
+    gap: 10px;
+    padding: 9px 12px;
+    font-size: var(--fs-base);
+  }
+}
+
+@media (max-width: 1024px) {
+  .sidebar {
+    padding: 16px 11px;
+  }
+
+  .nav-item {
+    gap: 8px;
+    padding: 8px 10px;
+    font-size: var(--fs-sm);
+  }
+
+  .nav-item--child {
+    padding: 6px 10px;
+  }
+}
+
 @media (max-width: 767px) {
   .shell {
     height: auto;

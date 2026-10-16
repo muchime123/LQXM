@@ -1,6 +1,5 @@
 package com.liqiang.archive.erp;
 
-import com.liqiang.archive.service.ErpApprovalService;
 import org.junit.jupiter.api.Test;
 
 import java.io.IOException;
@@ -49,49 +48,11 @@ class AuditChannelHygieneTest {
      * <p>新增 ERP 业务类后应加入本清单 —— 否则它可能在无人察觉的情况下写回 {@code audit_logs}。
      */
     private static final List<String> ERP_SINGLE_CHANNEL_CLASSES = List.of(
-            "com/liqiang/archive/service/SalesOutboundService.java",
-            "com/liqiang/archive/service/ManufacturingService.java",
             "com/liqiang/archive/service/ManufacturingExecutionService.java",
-            "com/liqiang/archive/controller/ManufacturingTaskConfigController.java",
-            "com/liqiang/archive/service/ErpSalesOrderService.java",
-            "com/liqiang/archive/service/ErpPurchaseOrderService.java",
-            "com/liqiang/archive/service/ErpApprovalService.java",
-            "com/liqiang/archive/service/H3ProductionExecutionService.java",
-            "com/liqiang/archive/service/H3ProductionCompletionService.java",
-            "com/liqiang/archive/service/H3ProductionReworkService.java"
+            "com/liqiang/archive/controller/ManufacturingTaskConfigController.java"
     );
 
-    /**
-     * 僵尸域豁免：材料 / 领料段。
-     *
-     * <p>决策 #17 已判「不建领料单、不建材料库存账、不建 BOM」，且实测
-     * {@code material_items} / {@code material_inventory_balances} /
-     * {@code material_inventory_transactions} / {@code manufacturing_material_requirements}
-     * **四张表全 0 行、前端无路由入口** —— 属待整体清理的僵尸代码。
-     *
-     * <p>给僵尸代码补依赖会制造「它还活着」的假象，故**不改造、显式豁免**，
-     * 而不是靠「忘了改」蒙混过关（后者会让豁免清单失去意义）。
-     */
-    private static final List<String> ZOMBIE_EXEMPT_CLASSES = List.of(
-            "com/liqiang/archive/service/ManufacturingMaterialService.java",
-            "com/liqiang/archive/service/MaterialInventoryService.java"
-    );
-
-    /**
-     * 僵尸域的**已知超长实体名**：{@code {相对路径, 实体名字面量}}。
-     *
-     * <p>{@code ManufacturingMaterialService} 用的是
-     * {@code ManufacturingMaterialRequirement}（32 字符），已超 {@code varchar(30)} ——
-     * 在 STRICT 模式下**该端点一旦被调用即 1406 报错**，是实打实的缺陷而非风格问题。
-     *
-     * <p>为什么不顺手改掉：决策 #17 已判材料 / 领料域不建 —— 四张表全 0 行、前端 API 虽已定义
-     * 但**无任何页面调用**（后端路由仍在 {@code ManufacturingController}）。给僵尸代码改名会
-     * 制造「它还活着」的假象，故与豁免清单一起显式记账，并由
-     * {@link #zombieOverlongEntityTypesAreStillDocumentedOrShouldBeFixed()} 钉住不腐烂。
-     */
-    private static final List<String[]> ZOMBIE_OVERLONG_ENTITY_TYPES = List.<String[]>of(
-            new String[]{"com/liqiang/archive/service/ManufacturingMaterialService.java",
-                    "ManufacturingMaterialRequirement"});
+    private static final List<String> ZOMBIE_EXEMPT_CLASSES = List.of();
 
     /** {@code audit_logs.entity_type} 是 varchar(30)，且库为 STRICT 模式 → 超长直接报错。 */
     private static final int AUDIT_ENTITY_TYPE_MAX = 30;
@@ -171,34 +132,6 @@ class AuditChannelHygieneTest {
                 "row_change_log.target_table 必须为 schema 限定表名：\n  " + String.join("\n  ", violations));
     }
 
-    /**
-     * 通用审批服务把 target_table 收进了 {@link ErpApprovalService.DocType} 注册表，
-     * 调用点传的是**枚举访问器**而不是字面量 —— 上面的源码扫描看不见它。
-     *
-     * <p>扫不到 ≠ 合规：这里对注册表**逐项**断言，把同一条口径补回门禁，而不是让
-     * 「正则扫不到」冒充「没问题」。同时钉住「审计目标名 = schema + 裸表名」，
-     * 防止将来有人把 schema 限定名反向塞进 SQL 标识符 —— 那会让跑在隔离 schema 里的
-     * 契约测试**绕过被测 schema 直接打到真表**上。
-     */
-    @Test
-    void approvalRegistryTargetTablesAreSchemaQualified() {
-        ErpApprovalService.DocType[] types = ErpApprovalService.DocType.values();
-        assertTrue(types.length > 0, "DocType 注册表为空 —— 本测试变成空转");
-
-        List<String> violations = new ArrayList<>();
-        for (ErpApprovalService.DocType type : types) {
-            if (!type.auditTarget().matches("[A-Za-z0-9_]+\\.[A-Za-z0-9_]+")) {
-                violations.add(type.name() + " → auditTarget=\"" + type.auditTarget() + "\"");
-            }
-            if (!type.auditTarget().equals(ErpApprovalService.AUDIT_SCHEMA + "." + type.table())) {
-                violations.add(type.name() + " → 审计目标名与裸表名不一致：\""
-                        + type.auditTarget() + "\" vs " + type.table());
-            }
-        }
-        assertTrue(violations.isEmpty(),
-                "DocType 的审计目标表必须为「schema.裸表名」：\n  " + String.join("\n  ", violations));
-    }
-
     // ==================== 3. 长度硬上限 ====================
 
     /**
@@ -233,28 +166,6 @@ class AuditChannelHygieneTest {
         assertTrue(violations.isEmpty(),
                 "audit_logs.entity_type 为 varchar(30) 且 STRICT，超长会直接报错：\n  "
                         + String.join("\n  ", violations));
-    }
-
-    /**
-     * 僵尸域的已知超长实体名必须仍被如实记账。一旦该域被清理（字面量消失或文件被删），
-     * 本条失败并提示把清单一起删掉 —— 与 {@link #zombieExemptionsStillNeededOrShouldBeDropped()}
-     * 同一原则：豁免可以存在，但**不允许靠「忘了改」蒙混过关**。
-     */
-    @Test
-    void zombieOverlongEntityTypesAreStillDocumentedOrShouldBeFixed() throws IOException {
-        List<String> stale = new ArrayList<>();
-        for (String[] pair : ZOMBIE_OVERLONG_ENTITY_TYPES) {
-            String relative = pair[0];
-            if (!Files.exists(MAIN_JAVA.resolve(relative))) {
-                stale.add(relative + " → 文件已不存在，请从已知缺陷清单移除");
-                continue;
-            }
-            if (!read(relative).contains("\"" + pair[1] + "\"")) {
-                stale.add(relative + " → 已不再出现实体名 \"" + pair[1] + "\"，请从已知缺陷清单移除");
-            }
-        }
-        assertTrue(stale.isEmpty(),
-                "僵尸域超长实体名清单已过期，请更新 AuditChannelHygieneTest：\n  " + String.join("\n  ", stale));
     }
 
     /** 文件是否落在僵尸域豁免清单内（材料 / 领料段）。 */

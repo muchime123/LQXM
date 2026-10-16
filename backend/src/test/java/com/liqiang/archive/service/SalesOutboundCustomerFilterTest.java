@@ -25,8 +25,7 @@ class SalesOutboundCustomerFilterTest {
             return null;
         }).when(scope).appendByEmployeeId(any(), anyList(), eq("o.employee_id"), eq("e.department"), eq(FeatureCode.ORDER_PROFIT));
         SalesOutboundProfitService service = new SalesOutboundProfitService(jdbc, scope,
-                mock(CurrentUserService.class), mock(AuditLogService.class),
-                mock(SalesOutboundCommissionService.class));
+                mock(CurrentUserService.class), mock(AuditLogService.class));
 
         service.pageOutboundProfits(null, null, 0, 20, 42L);
 

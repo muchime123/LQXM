@@ -21,6 +21,86 @@ public class H3BusinessQueryService {
     private final JdbcTemplate jdbc;
     private final CurrentUserService currentUsers;
     private final DataScopeSupport scopeSupport;
+    // ===== 台账排序白名单（2026-10-08）=====
+    // 背景：20 类台账原先一律 ORDER BY id DESC（= 导入顺序），id 只随「导入批次 + 批内 Excel 行序」增长，
+    // 与业务时间/单号无关 —— 同一天的出库散落在不同批次里，列表看着乱。
+    // 现每类声明「可排序键 → SQL 表达式」+ 默认序；前端只传 key 与方向，非白名单 key 静默回落默认序。
+    // 方向只作用于主键，兜底键固定 DESC（禁止 cmp.reversed() 那种把兜底链一起翻转的写法）。
+    static final LedgerSort.Spec OUTBOUND_SORT = LedgerSort.Spec.of(
+            "COALESCE(o.ship_date,o.business_date) DESC,o.id DESC", "o.id",
+            LedgerSort.TIME, "COALESCE(o.ship_date,o.business_date)",
+            LedgerSort.CODE, "o.outbound_no",
+            LedgerSort.AMOUNT, "o.sales_amount",
+            LedgerSort.NAME, "o.customer_name");
+    static final LedgerSort.Spec PRODUCTION_SORT = LedgerSort.Spec.of(
+            "p.source_created_at DESC,p.id DESC", "p.id",
+            LedgerSort.TIME, "p.source_created_at",
+            LedgerSort.CODE, "p.work_order_no",
+            LedgerSort.NAME, "p.customer_name");
+    static final LedgerSort.Spec RECEIPT_SORT = LedgerSort.Spec.of(
+            "r.receipt_date DESC,r.id DESC", "r.id",
+            LedgerSort.TIME, "r.receipt_date",
+            LedgerSort.CODE, "r.receipt_no",
+            LedgerSort.AMOUNT, "r.receipt_amount",
+            LedgerSort.NAME, "r.customer_name");
+    static final LedgerSort.Spec SUPPLIER_SORT = LedgerSort.Spec.of(
+            "s.source_created_at DESC,s.id DESC", "s.id",
+            LedgerSort.TIME, "s.source_created_at",
+            LedgerSort.NAME, "s.name");
+    static final LedgerSort.Spec PURCHASE_SORT = LedgerSort.Spec.of(
+            "p.purchase_date DESC,p.id DESC", "p.id",
+            LedgerSort.TIME, "p.purchase_date",
+            LedgerSort.CODE, "p.source_no",
+            LedgerSort.AMOUNT, "p.total_amount",
+            LedgerSort.NAME, "s.name");
+    static final LedgerSort.Spec OTHER_MOVEMENT_SORT = LedgerSort.Spec.of(
+            "m.movement_date DESC,m.id DESC", "m.id",
+            LedgerSort.TIME, "m.movement_date",
+            LedgerSort.CODE, "m.source_no",
+            LedgerSort.AMOUNT, "m.total_amount");
+    static final LedgerSort.Spec TRANSFER_SORT = LedgerSort.Spec.of(
+            "t.transfer_date DESC,t.id DESC", "t.id",
+            LedgerSort.TIME, "t.transfer_date",
+            LedgerSort.CODE, "t.source_no");
+    static final LedgerSort.Spec INVOICE_PROFILE_SORT = LedgerSort.Spec.of(
+            "p.source_updated_at DESC,p.id DESC", "p.id",
+            LedgerSort.TIME, "p.source_updated_at",
+            LedgerSort.NAME, "p.customer_name");
+    static final LedgerSort.Spec INVOICE_REQUEST_SORT = LedgerSort.Spec.of(
+            "r.request_date DESC,r.id DESC", "r.id",
+            LedgerSort.TIME, "r.request_date",
+            LedgerSort.CODE, "r.source_no",
+            LedgerSort.AMOUNT, "r.request_amount",
+            LedgerSort.NAME, "r.customer_name");
+    static final LedgerSort.Spec PRODUCTION_REPORT_SORT = LedgerSort.Spec.of(
+            "r.report_time DESC,r.id DESC", "r.id",
+            LedgerSort.TIME, "r.report_time",
+            LedgerSort.CODE, "r.work_order_no");
+    static final LedgerSort.Spec INVOICE_INPUT_SORT = LedgerSort.Spec.of(
+            "r.invoice_date DESC,r.id DESC", "r.id",
+            LedgerSort.TIME, "r.invoice_date",
+            LedgerSort.CODE, "r.source_no",
+            LedgerSort.AMOUNT, "r.total_amount",
+            LedgerSort.NAME, "r.seller_name");
+    static final LedgerSort.Spec INVOICE_SALES_SORT = LedgerSort.Spec.of(
+            "r.invoice_date DESC,r.id DESC", "r.id",
+            LedgerSort.TIME, "r.invoice_date",
+            LedgerSort.CODE, "r.source_no",
+            LedgerSort.AMOUNT, "r.total_amount",
+            LedgerSort.NAME, "r.buyer_name");
+    static final LedgerSort.Spec SUPPLIER_PAYABLE_SORT = LedgerSort.Spec.of(
+            "r.supplier_name,r.month_no,r.id", "r.id",
+            LedgerSort.TIME, "r.pay_date",
+            LedgerSort.NAME, "r.supplier_name",
+            LedgerSort.CODE, "r.month_no");
+    static final LedgerSort.Spec CASHFLOW_JOURNAL_SORT = LedgerSort.Spec.of(
+            "r.account_name,r.entry_date,r.id", "r.id",
+            LedgerSort.TIME, "r.entry_date",
+            LedgerSort.NAME, "r.account_name");
+    static final LedgerSort.Spec CASHIER_LOG_SORT = LedgerSort.Spec.of(
+            "r.tx_time DESC,r.id DESC", "r.id",
+            LedgerSort.TIME, "r.tx_time",
+            LedgerSort.AMOUNT, "r.amount");
 
     /**
      * [历史台账] 销售出库台账：仅展示氚云导入的销售出库原始数据镜像
@@ -29,12 +109,40 @@ public class H3BusinessQueryService {
      * 行级不可变原始快照由 h3_import_rows 永久留存，可随批次追溯。
      */
     public Map<String,Object> outboundLedger(String keyword, int page, int size) {
+        return outboundLedger(keyword,null,null,page,size,null,null);
+    }
+
+    public Map<String,Object> outboundLedger(String keyword, String productCode, String category, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE o.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (keyword != null && !keyword.isBlank()) {
             String k = "%" + keyword.trim() + "%";
             where.append(" AND (o.outbound_no LIKE ? OR o.customer_name LIKE ? OR o.dealer_name LIKE ? OR o.salesperson_name LIKE ?)");
             params.add(k); params.add(k); params.add(k); params.add(k);
+        }
+        if(productCode!=null&&!productCode.isBlank()) {
+            // 编号可以是逗号分隔的多个值：销售出库产品分析页按「名称优先」解析出实体编号后，
+            // 会把这一行在氚云里实际用过的原始编号一起带过来（同一产品常有 2~4 种写法，
+            // 实测 12,737 个组合最多 4 个），这样点「查看出库」看到的是完整的一批出库单。
+            // ⚠️ 名称解析口径只存在于 H3SalesProductAnalysisService / H3LedgerMatchKey，
+            // 本方法不做任何名称解析——只按传进来的编号精确匹配（氚云只读，不订正）。
+            String[] codes=productCode.split(",");
+            StringBuilder in=new StringBuilder();
+            for(String raw:codes) {
+                String code=raw.trim();
+                if(code.isEmpty())continue;
+                if(in.length()>0)in.append(',');
+                in.append('?');
+                params.add(code);
+            }
+            if(in.length()==0)in.append("NULL");   // 全为空白 → IN (NULL) 恒不成立，而不是退化成全表
+            where.append(" AND EXISTS (SELECT 1 FROM sales_outbound_items pi WHERE pi.sales_outbound_id=o.id"+
+                    " AND pi.line_type='PRODUCT' AND pi.quantity>0 AND TRIM(pi.product_code) IN ("+in+")");
+            if(category!=null&&!category.isBlank()) {
+                where.append(" AND COALESCE(NULLIF(TRIM(pi.category),''),'未分类')=?");
+                params.add(category.trim());
+            }
+            where.append(")");
         }
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM sales_outbounds o" + where, Long.class, params.toArray());
         params.add(size); params.add((page - 1) * size);
@@ -55,7 +163,7 @@ public class H3BusinessQueryService {
                   FROM sales_outbounds o
                   LEFT JOIN customers c ON c.id=o.customer_id AND c.deleted_at IS NULL
                   LEFT JOIN employees e ON e.id=o.employee_id
-                """ + where + " ORDER BY o.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(OUTBOUND_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -124,7 +232,7 @@ public class H3BusinessQueryService {
      * [历史台账] 生产任务工单台账：仅展示氚云导入的生产工单原始数据，不参与业务编排。
      * 只作为来源台账展示，不再接入已经下线的正式生产设计。
      */
-    public Map<String,Object> productionLedger(String keyword,String filter,int page,int size) {
+    public Map<String,Object> productionLedger(String keyword,String filter,int page,int size,String sort,String direction) {
         String base=" WHERE p.external_source='H3YUN'";
         StringBuilder where=new StringBuilder(base);
         java.util.ArrayList<Object> params=new java.util.ArrayList<>();
@@ -144,7 +252,7 @@ public class H3BusinessQueryService {
                        p.department_name,p.source_created_by,p.source_created_at,
                        (SELECT COUNT(*) FROM production_order_components c WHERE c.production_order_id=p.id) component_count
                   FROM production_orders p
-                """+where+" ORDER BY p.id DESC LIMIT ? OFFSET ?",this::row,params.toArray());
+                """+where+LedgerSort.orderBy(PRODUCTION_SORT, sort, direction) + " LIMIT ? OFFSET ?",this::row,params.toArray());
         return page(items,total,page,size);
     }
 
@@ -152,7 +260,7 @@ public class H3BusinessQueryService {
      * [历史台账] 收款/结清台账：receipt_type=SINGLE_OUTBOUND 为收款记录，MULTI_OUTBOUND 为多订单结清。
      * 仅展示氚云导入的原始数据，不与销售出库分配关联。
      */
-    public Map<String,Object> receiptLedger(boolean settlement, String keyword, int page, int size) {
+    public Map<String,Object> receiptLedger(boolean settlement, String keyword, int page, int size, String sort, String direction) {
         String receiptType = settlement ? "MULTI_OUTBOUND" : "SINGLE_OUTBOUND";
         StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN' AND r.receipt_type=?");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
@@ -172,7 +280,7 @@ public class H3BusinessQueryService {
                        (SELECT l.outbound_no FROM receipt_outbound_links l WHERE l.receipt_id=r.id ORDER BY l.sequence_no LIMIT 1) AS outbound_no,
                        (SELECT l.sales_order_date FROM receipt_outbound_links l WHERE l.receipt_id=r.id ORDER BY l.sequence_no LIMIT 1) AS sales_order_date
                   FROM receipts r
-                """ + where + " ORDER BY r.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(RECEIPT_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         // 多订单结清台账展开「覆盖哪些出库单」：明细来自 settlement_outbound_links（V222 保存的导入原始关联）
         if (settlement && !items.isEmpty()) {
             List<Long> ids = items.stream().map(i -> ((Number) i.get("id")).longValue()).toList();
@@ -303,7 +411,7 @@ public class H3BusinessQueryService {
      * 供应商主数据台账列表：含别名引用数（历史单据引用文本数）与内部/脏值标记，
      * 便于一眼识别 4 条内部车间与 2 条串名脏值。
      */
-    public Map<String,Object> supplierLedger(String keyword, int page, int size) {
+    public Map<String,Object> supplierLedger(String keyword, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE s.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (keyword != null && !keyword.isBlank()) {
@@ -319,7 +427,7 @@ public class H3BusinessQueryService {
                        s.source_created_at,s.source_updated_at,
                        (SELECT COUNT(*) FROM h3_supplier_aliases a WHERE a.supplier_id=s.id) alias_count
                   FROM h3_supplier_catalog s
-                """ + where + " ORDER BY s.id LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(SUPPLIER_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -327,7 +435,7 @@ public class H3BusinessQueryService {
      * 采购入库台账列表：主表摘要 + 明细行数 + 供应商解析状态。
      * supplier_id 为空 = 解析失败（不静默新建，待人工核对）；data_status='草稿' 不进正式口径。
      */
-    public Map<String,Object> purchaseLedger(String keyword, int page, int size) {
+    public Map<String,Object> purchaseLedger(String keyword, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE p.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (keyword != null && !keyword.isBlank()) {
@@ -346,7 +454,7 @@ public class H3BusinessQueryService {
                        (SELECT COUNT(*) FROM purchase_receipt_items i WHERE i.purchase_receipt_id=p.id) item_count
                   FROM purchase_receipts p
                   LEFT JOIN h3_supplier_catalog s ON s.id=p.supplier_id
-                """ + where + " ORDER BY p.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(PURCHASE_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -406,7 +514,7 @@ public class H3BusinessQueryService {
      * 两份导出件同构且明细前缀都叫「其他出库明细.」→ 落库合并为一张表，靠方向区分；
      * data_status='草稿' 仅标记保留、不进正式口径（与采购入库/调拨同口径）。
      */
-    public Map<String,Object> otherMovementLedger(boolean inbound, String keyword, int page, int size) {
+    public Map<String,Object> otherMovementLedger(boolean inbound, String keyword, int page, int size, String sort, String direction) {
         // dir 为字面量常量（非用户输入），无注入面
         String dir = inbound ? "IN" : "OUT";
         StringBuilder where = new StringBuilder(" WHERE m.external_source='H3YUN' AND m.direction='" + dir + "'");
@@ -426,7 +534,7 @@ public class H3BusinessQueryService {
                        m.source_title,m.department_name,m.source_created_at,m.source_updated_at,
                        (SELECT COUNT(*) FROM h3_other_stock_movement_items i WHERE i.movement_id=m.id) item_count
                   FROM h3_other_stock_movements m
-                """ + where + " ORDER BY m.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(OTHER_MOVEMENT_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -459,7 +567,7 @@ public class H3BusinessQueryService {
      * 库存调拨台账列表（V307）：双仓库（调出/调入）与双仓管员，故不合并方向位。
      * data_status 非「已生效」（草稿/已取消）仅标记保留、不进正式口径。
      */
-    public Map<String,Object> transferLedger(String keyword, int page, int size) {
+    public Map<String,Object> transferLedger(String keyword, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE t.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (keyword != null && !keyword.isBlank()) {
@@ -480,7 +588,7 @@ public class H3BusinessQueryService {
                        (SELECT COUNT(*) FROM h3_inventory_transfer_items i WHERE i.transfer_id=t.id) item_count,
                        (SELECT COALESCE(SUM(i.quantity),0) FROM h3_inventory_transfer_items i WHERE i.transfer_id=t.id) total_quantity
                   FROM h3_inventory_transfers t
-                """ + where + " ORDER BY t.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(TRANSFER_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -537,7 +645,7 @@ public class H3BusinessQueryService {
      * 开票资料台账列表（V309）：44 组同名户名是合法事实，搜索覆盖户名/税号/开户行。
      * customer_id 为空 = 未关联 customers（外协/一次性户名属正常，仅标记）。
      */
-    public Map<String,Object> invoiceProfileLedger(String keyword, int page, int size) {
+    public Map<String,Object> invoiceProfileLedger(String keyword, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE p.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (keyword != null && !keyword.isBlank()) {
@@ -555,7 +663,7 @@ public class H3BusinessQueryService {
                        c.customer_name AS linked_customer_name
                   FROM h3_customer_invoice_profiles p
                   LEFT JOIN customers c ON c.id=p.customer_id
-                """ + where + " ORDER BY p.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(INVOICE_PROFILE_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -579,7 +687,7 @@ public class H3BusinessQueryService {
      * 开票申请台账列表（V309）：本系统唯一开票口径来源；18 单流水号为空（source_no 存数据ID兜底）。
      * 收款情况只建引用不写 receipts（收款权威=销售出库）。
      */
-    public Map<String,Object> invoiceRequestLedger(String keyword, int page, int size) {
+    public Map<String,Object> invoiceRequestLedger(String keyword, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (keyword != null && !keyword.isBlank()) {
@@ -601,7 +709,7 @@ public class H3BusinessQueryService {
                          LEFT JOIN customers c ON c.id=p.customer_id
                          WHERE p.external_id=r.profile_external_id LIMIT 1) linked_customer_name
                   FROM h3_invoice_requests r
-                """ + where + " ORDER BY r.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(INVOICE_REQUEST_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -641,7 +749,7 @@ public class H3BusinessQueryService {
      * 生产报工台账列表（V311，第 15 类）：工序完工报工（工单×零部件制程粒度）。
      * 搜索覆盖工单号/工序/报工人/部门/产线；无往来单位关联。
      */
-    public Map<String,Object> productionReportLedger(String keyword, int page, int size) {
+    public Map<String,Object> productionReportLedger(String keyword, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (keyword != null && !keyword.isBlank()) {
@@ -658,7 +766,7 @@ public class H3BusinessQueryService {
                        r.report_qty,r.reporter,r.reporter_assist,r.reporter_dept,r.production_line,
                        r.stock_in_clerk,r.order_clerk,r.data_status,r.source_updated_at
                   FROM h3_production_reports r
-                """ + where + " ORDER BY r.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(PRODUCTION_REPORT_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -683,7 +791,7 @@ public class H3BusinessQueryService {
      * 进项发票台账（V312，第 16 类）：税务平台全量导出（幂等键=数电发票号码）。
      * 搜索覆盖销方名称/税号/票种/状态/开票人。
      */
-    public Map<String,Object> invoiceInputLedger(String keyword, int page, int size) {
+    public Map<String,Object> invoiceInputLedger(String keyword, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (keyword != null && !keyword.isBlank()) {
@@ -700,7 +808,7 @@ public class H3BusinessQueryService {
                        r.amount,r.tax_amount,r.total_amount,r.invoice_kind,r.invoice_status,
                        r.is_positive,r.drawer,r.invoice_date
                   FROM h3_input_invoices r
-                """ + where + " ORDER BY r.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(INVOICE_INPUT_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -721,7 +829,7 @@ public class H3BusinessQueryService {
      * 销项发票台账（V312，第 16 类）：4 174 张 + 收款子行（校验源，收款权威=销售出库 §9.3）。
      * 搜索覆盖购买方/票号/付款方式/业务员/状态。
      */
-    public Map<String,Object> invoiceSalesLedger(String keyword, int page, int size) {
+    public Map<String,Object> invoiceSalesLedger(String keyword, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (keyword != null && !keyword.isBlank()) {
@@ -740,7 +848,7 @@ public class H3BusinessQueryService {
                        r.invoice_kind,r.invoice_status,r.is_positive,
                        (SELECT COUNT(*) FROM h3_sales_invoice_receipts x WHERE x.invoice_id=r.id) receipt_count
                   FROM h3_sales_invoices r
-                """ + where + " ORDER BY r.id DESC LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(INVOICE_SALES_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -769,7 +877,7 @@ public class H3BusinessQueryService {
      * 搜索覆盖供应商/月份/付款方式/折让。resolved_* 由 RK 反查脚本回填（可空）。
      * {@code supplier} 为 sheet 维度（= supplier_name）精确筛选，配合 {@link #supplierPayableSuppliers()} 汇总条使用。
      */
-    public Map<String,Object> supplierPayableLedger(String keyword, String supplier, int page, int size) {
+    public Map<String,Object> supplierPayableLedger(String keyword, String supplier, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (supplier != null && !supplier.isBlank()) {
@@ -790,7 +898,7 @@ public class H3BusinessQueryService {
                        r.allowance,r.pay_date,r.pay_method,r.pay_amount,r.remaining_amount,
                        r.resolved_supplier_id,r.resolved_supplier_name
                   FROM h3_supplier_payables r
-                """ + where + " ORDER BY r.supplier_name, r.month_no, r.id LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(SUPPLIER_PAYABLE_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -835,7 +943,7 @@ public class H3BusinessQueryService {
      * 账户维度（期初余额/币种/35 个账户）在 h3_cash_accounts，不在本台账；搜索覆盖账户/摘要/供应商/客户/报销人。
      * {@code account} 为 sheet 维度（= account_name）精确筛选，配合 {@link #cashflowJournalAccounts()} 汇总条使用。
      */
-    public Map<String,Object> cashflowJournalLedger(String keyword, String account, int page, int size) {
+    public Map<String,Object> cashflowJournalLedger(String keyword, String account, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (account != null && !account.isBlank()) {
@@ -856,7 +964,7 @@ public class H3BusinessQueryService {
                        r.counterparty_raw,r.reimbursed_by,r.invoiced,r.income,r.expense,r.balance,
                        r.fx_rate,r.fx_cny,r.settle_rate,r.settle_cny,r.fx_gain_loss
                   FROM h3_cashflow_entries r
-                """ + where + " ORDER BY r.account_name, r.entry_date, r.id LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(CASHFLOW_JOURNAL_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 
@@ -900,7 +1008,7 @@ public class H3BusinessQueryService {
      * 收银通收单流水台账（V316，第 19 类）：6 088 行微信收单记录（校验源）。
      * 搜索覆盖摘要/业务员/付款人识别号/交易状态。
      */
-    public Map<String,Object> cashierLogLedger(String keyword, int page, int size) {
+    public Map<String,Object> cashierLogLedger(String keyword, int page, int size, String sort, String direction) {
         StringBuilder where = new StringBuilder(" WHERE r.external_source='H3YUN'");
         java.util.ArrayList<Object> params = new java.util.ArrayList<>();
         if (keyword != null && !keyword.isBlank()) {
@@ -915,7 +1023,7 @@ public class H3BusinessQueryService {
         List<Map<String,Object>> items = jdbc.query("""
                 SELECT r.id,r.tx_time,r.status,r.amount,r.fee,r.payer_openid,r.summary,r.salesperson
                   FROM h3_cashier_log r
-                """ + where + " ORDER BY r.tx_time, r.id LIMIT ? OFFSET ?", this::row, params.toArray());
+                """ + where + LedgerSort.orderBy(CASHIER_LOG_SORT, sort, direction) + " LIMIT ? OFFSET ?", this::row, params.toArray());
         return page(items, total, page, size);
     }
 

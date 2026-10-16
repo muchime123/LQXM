@@ -3,7 +3,6 @@ import com.liqiang.archive.dto.H3FactImportDtos.Result;
 import com.liqiang.archive.dto.H3FactImportDtos.StageAccepted;
 import com.liqiang.archive.security.RequirePermission;
 import com.liqiang.archive.service.ProductInventoryLedgerImportService;
-import com.liqiang.archive.service.ProductInventoryMergeService;
 import com.liqiang.archive.service.ProductInventoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
@@ -17,7 +16,6 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ProductInventoryController {
     private final ProductInventoryService service;
-    private final ProductInventoryMergeService mergeService;
     private final ProductInventoryLedgerImportService importService;
 
     @GetMapping("/balances")
@@ -29,11 +27,6 @@ public class ProductInventoryController {
                                         @RequestParam(defaultValue = "1") int page,
                                         @RequestParam(defaultValue = "50") int size) {
         return service.balances(keyword, warehouseId, category, onlyInStock, shelfStatus, page, size);
-    }
-
-    @GetMapping("/products/{id}/transactions")
-    public List<Map<String, Object>> transactions(@PathVariable long id) {
-        return service.transactions(id);
     }
 
     /**
@@ -132,19 +125,4 @@ public class ProductInventoryController {
     public Result confirmLedger(@PathVariable Long id) {
         return importService.confirm(id);
     }
-
-    // ===== 合并入库 =====
-
-    @PostMapping("/merge/preview")
-    public ProductInventoryMergeService.MergePreview mergePreview() {
-        return mergeService.preview();
-    }
-
-    @PostMapping("/merge/confirm")
-    @RequirePermission("product_inventory.manage")
-    public Map<String, Object> mergeConfirm(@RequestBody MergeConfirmRequest req) {
-        return mergeService.confirm(req.items());
-    }
-
-    record MergeConfirmRequest(List<ProductInventoryMergeService.MergedItem> items) {}
 }

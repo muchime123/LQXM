@@ -370,6 +370,16 @@ public class FileStorageService {
         return fileRoot.resolve("packaging").resolve(String.valueOf(modelId));
     }
 
+    /**
+     * 员工文件子目录路径: fileRoot/employees/{employeeId}
+     */
+    public Path employeeDir(Long employeeId) {
+        if (employeeId == null) {
+            return fileRoot.resolve("employees");
+        }
+        return fileRoot.resolve("employees").resolve(String.valueOf(employeeId));
+    }
+
     private void validateExtension(String fileName, String category) {
         int dot = fileName.lastIndexOf('.');
         if (dot < 0) {
@@ -411,6 +421,7 @@ public class FileStorageService {
                 || "company".equals(category) || "company_finance".equals(category)
                 || "document".equals(category)
                 || "patent".equals(category) || "other".equals(category)
+                || "employee_file".equals(category)
                 || "pkg_spec_sheet".equals(category) || "pkg_package".equals(category)) {
             return IMAGE_AND_DOC_EXTENSIONS;
         }
@@ -504,6 +515,9 @@ public class FileStorageService {
         if (scope == FileCategory.StorageScope.PACKAGING) {
             return packagingDir(modelId).resolve(folder).resolve(THUMBNAIL_DIR).resolve("thumb_" + fileName);
         }
+        if (scope == FileCategory.StorageScope.EMPLOYEE) {
+            return employeeDir(modelId).resolve(folder).resolve(THUMBNAIL_DIR).resolve("thumb_" + fileName);
+        }
         for (Path dir : productDirs(modelId)) {
             Path thumbnail = dir.resolve(folder).resolve(THUMBNAIL_DIR).resolve("thumb_" + fileName);
             if (Files.isRegularFile(thumbnail)) {
@@ -548,6 +562,9 @@ public class FileStorageService {
         }
         if (scope == FileCategory.StorageScope.PACKAGING) {
             return packagingDir(modelId);
+        }
+        if (scope == FileCategory.StorageScope.EMPLOYEE) {
+            return employeeDir(modelId);
         }
         return productDir(modelId);
     }

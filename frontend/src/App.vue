@@ -13,7 +13,7 @@
       <Transition name="route-fade" mode="out-in">
         <KeepAlive :max="20" :include="cachedViewNames">
           <Suspense>
-            <div style="display: contents">
+            <div class="route-host" style="display: contents">
               <component :is="Component" :key="componentKey" />
             </div>
             <template #fallback>

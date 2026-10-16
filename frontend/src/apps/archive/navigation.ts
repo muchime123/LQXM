@@ -23,20 +23,24 @@ export const archiveNavItems: NavItem[] = [
         to: '/h3-imports',
         permission: 'integration.h3',
         label: '氚云导入中心',
-        description: '导入六类氚云数据，查看批次、原始台账、销售出库关联和重导准备。',
+        description: '导入六类氚云数据，查看批次与原始台账，并做重导准备。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M12 3v12M7 8l5-5 5 5"/></svg>',
         group: 'h3'
       },
       {
-        to: '/h3-outbound-relations',
+        to: '/h3-sales-products',
         permission: 'integration.h3',
-        label: '销售出库关联',
-        description: '以销售出库为核心检查客户、员工、产品归类和仓库关系。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M10 13a5 5 0 0 0 7.1.1l2-2a5 5 0 0 0-7.1-7.1l-1.1 1.1"/><path d="M14 11a5 5 0 0 0-7.1-.1l-2 2A5 5 0 0 0 12 20l1.1-1.1"/></svg>',
+        label: '销售出库产品分析',
+        description: '按已导入的氚云出库统计常卖产品，并标出编号和名称待核项。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 3v18h18"/><path d="m6 15 5-5 4 3 5-7"/></svg>',
         group: 'h3'
       },
+      // 2026-10-06 按 LQ 决定下线「销售出库关联」工作台（/h3-outbound-relations）：
+      // 身份/关联治理能力仍由导入流程内部自动完成，不再单独占用侧栏入口。
+      // 视图、路由与侧栏项已删；后端 /api/h3-imports/outbound-relations* 端点保留。
       {
         to: '/customers',
+        permission: 'customer.read',
         label: '客户档案',
         description: '客户主档：销售订单锚定的客户 ID 与联系人地址。聚合关联的销售出库、合并历史与案例素材。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
@@ -51,13 +55,33 @@ export const archiveNavItems: NavItem[] = [
         group: 'h3'
       },
       {
-        to: '/h3-production-execution',
-        permission: ['manufacturing.report', 'manufacturing.report.override', 'manufacturing.inspect', 'manufacturing.followup', 'manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'],
-        label: '车间执行',
-        description: '氚云任务的制程进度、本地报工与冲正、来源报工记录。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M2 20h20"/><path d="M6 20V9l6-4 6 4v11"/><path d="M10 20v-5h4v5"/></svg>',
+        to: '/production-tracking',
+        permission: ['manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'],
+        label: '生产跟单',
+        description: '按预计完工查看生产任务，推进车间节点；预计完工来不及完成时登记延期至的日期。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
         group: 'h3'
       },
+      // 生产主数据（2026-10-06 恢复）：09-30 那次「聚合页下线」把它们一并摘了，但它们不是
+      // ERP 交易页，而是生产任务单的取数底座（后端 /api/manufacturing/master/* 从未删），
+      // 属「入口丢」而非功能下线。ERP 前端下线不涉及这两页。
+      {
+        to: '/manufacturing-process-management',
+        permission: 'manufacturing.template.manage',
+        label: '制程与工序管理',
+        description: '维护车间工序主数据与制程模板（生产任务单的联动数据源）；模板修改不影响已下达任务，任务工序为快照。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></svg>',
+        group: 'h3'
+      },
+      {
+        to: '/manufacturing-task-configs',
+        permission: 'manufacturing.template.manage',
+        label: '任务单产品与配置',
+        description: '维护各产线可下单的产品名称与可选配置，是新建任务单的联动数据源与产品身份锚点。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="15" width="18" height="5" rx="1.5"/><circle cx="8" cy="7.5" r="1.2"/></svg>',
+        group: 'h3'
+      },
+      // 2026-10-06 按 LQ 决定下线「车间执行」导航项与页面（/h3-production-execution）。留底 commit 23a0eda。
       {
         to: '/monthly-commission',
         permission: ['monthly_commission.read.self', 'monthly_commission.read.department', 'monthly_commission.read.all'],
@@ -79,6 +103,7 @@ export const archiveNavItems: NavItem[] = [
     children: [
       {
         to: '/products',
+        permission: 'product.read',
         label: '产品管理',
         description: '产品档案、技术资料、定价、营销资产与官网发布。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M20 7h-7l-2-2H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/></svg>',
@@ -86,6 +111,7 @@ export const archiveNavItems: NavItem[] = [
       },
       {
         to: '/device-videos',
+        permission: 'product.read',
         label: '设备视频库',
         description: '跨产品按用途、机型和展示参数查找设备演示视频。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="5" width="15" height="14" rx="2"/><path d="M18 10l4-3v10l-4-3z"/><path d="M9 9l4 3-4 3z"/></svg>',
@@ -93,6 +119,7 @@ export const archiveNavItems: NavItem[] = [
       },
       {
         to: '/packaging',
+        permission: 'packaging.read',
         label: '包材管理',
         description: '包材系列、规格卡片、质量信息与素材资产。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><path d="M7.5 4.21 12 6.81l4.5-2.6"/><path d="M7.5 19.79V14.6L3 12"/><path d="M21 12l-4.5 2.6v5.19"/><path d="M3.27 6.96 12 12.01l8.73-5.05"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>',
@@ -100,6 +127,7 @@ export const archiveNavItems: NavItem[] = [
       },
       {
         to: '/molds',
+        permission: 'mold.read',
         label: '模具资产',
         description: '包材模具编号、出模数、刻字版本与配件台账。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/><path d="M9 7h6M9 11h6M10 15h4"/></svg>',
@@ -107,6 +135,7 @@ export const archiveNavItems: NavItem[] = [
       },
       {
         to: '/certificates',
+        permission: 'certificate.read',
         label: '知识产权',
         description: '专利、商标、软著档案，管理缴费状态与证书文件。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>',
@@ -114,6 +143,7 @@ export const archiveNavItems: NavItem[] = [
       },
       {
         to: '/office-assets',
+        permission: 'officeAsset.read',
         label: '物品资产',
         description: '统一管理办公资产档案、扫码流转与标签打印。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h10M7 12h4"/><rect x="14" y="11" width="4" height="4"/></svg>',
@@ -185,6 +215,7 @@ export const archiveNavItems: NavItem[] = [
     children: [
       {
         to: '/company',
+        permission: 'company.read',
         label: '公司信息',
         description: '维护公司概览、品牌资产、账户和组织资料。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>',
@@ -192,6 +223,7 @@ export const archiveNavItems: NavItem[] = [
       },
       {
         to: '/company/certifications',
+        permission: 'company.read',
         label: '资质合规',
         description: '检测报告、营业执照、ISO 认证等时效性合规文件。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M12 2l8 4v6c0 5-3.5 9-8 10-4.5-1-8-5-8-10V6l8-4z"/><path d="M9 12l2 2 4-4"/></svg>',
@@ -199,6 +231,7 @@ export const archiveNavItems: NavItem[] = [
       },
       {
         to: '/media',
+        permission: 'media.read',
         label: '自媒体账号',
         description: '维护账号资料、运营状态和发布数据。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z"/><rect x="2" y="9" width="4" height="12"/><circle cx="4" cy="4" r="2"/></svg>',

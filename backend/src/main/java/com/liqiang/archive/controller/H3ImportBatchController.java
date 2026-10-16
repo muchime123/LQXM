@@ -115,8 +115,6 @@ public class H3ImportBatchController {
     @RequirePermission({"integration.h3", "product_inventory.read"})
     public Object preview(@PathVariable Long id) {
         String dataType = queryService.importBatchDataType(id);
-        // 合并入库批次的 preview 来自 mergeService（事务性写入，无 staging）
-        if ("INVENTORY_MERGE".equals(dataType)) return mergeService.mergePreviewOf(id);
         return isLedgerDataType(dataType)
                 ? ledgerService.previewOf(id)
                 : factService.getPreviewFromStaging(id);
@@ -127,37 +125,43 @@ public class H3ImportBatchController {
      * kind ∈ outbound / production / receipt / settlement / purchase / product / stock / dealer / supplier / otherIn / otherOut / transfer / invoiceProfile / invoiceRequest / productionReport
      * / otherIn / otherOut / transfer（V306/V307，2026-09-17）/ productionReport（V311，2026-09-17 第 15 类）。
      * production 的 filter 参数仅为旧调用兼容；生产台账当前不与正式生产任务建立关联。
+     * <p>sort / direction：台账排序。键取值 time / code / amount / name（各台账可排序键不同），
+     * 空或不在白名单时静默回落该台账默认序；方向仅 asc 为升序，缺省降序。
      */
     @GetMapping("/ledger/{kind}")
     @RequirePermission({"integration.h3", "product_inventory.read"})
     public Map<String, Object> ledger(@PathVariable String kind,
                                       @RequestParam(required = false) String keyword,
+                                      @RequestParam(required = false) String productCode,
+                                      @RequestParam(required = false) String category,
                                       @RequestParam(required = false) String filter,
                                       @RequestParam(required = false) String account,
                                       @RequestParam(required = false) String supplier,
+                                      @RequestParam(defaultValue = "") String sort,
+                                      @RequestParam(defaultValue = "") String direction,
                                       @RequestParam(defaultValue = "1") int page,
                                       @RequestParam(defaultValue = "50") int size) {
         return switch (kind) {
-            case "outbound" -> queryService.outboundLedger(keyword, page, Math.min(size, 100));
-            case "production" -> queryService.productionLedger(keyword, filter, page, Math.min(size, 100));
-            case "receipt" -> queryService.receiptLedger(false, keyword, page, Math.min(size, 100));
-            case "settlement" -> queryService.receiptLedger(true, keyword, page, Math.min(size, 100));
-            case "product" -> mergeService.productCatalogLedger(page, size, keyword);
-            case "stock" -> mergeService.warehouseStockLedger(page, size, keyword);
-            case "dealer" -> mergeService.dealerLedger(page, size, keyword);
-            case "supplier" -> queryService.supplierLedger(keyword, page, Math.min(size, 100));
-            case "purchase" -> queryService.purchaseLedger(keyword, page, Math.min(size, 100));
-            case "otherIn" -> queryService.otherMovementLedger(true, keyword, page, Math.min(size, 100));
-            case "otherOut" -> queryService.otherMovementLedger(false, keyword, page, Math.min(size, 100));
-            case "transfer" -> queryService.transferLedger(keyword, page, Math.min(size, 100));
-            case "invoiceProfile" -> queryService.invoiceProfileLedger(keyword, page, Math.min(size, 100));
-            case "invoiceRequest" -> queryService.invoiceRequestLedger(keyword, page, Math.min(size, 100));
-            case "productionReport" -> queryService.productionReportLedger(keyword, page, Math.min(size, 100));
-            case "invoiceInput" -> queryService.invoiceInputLedger(keyword, page, Math.min(size, 100));
-            case "invoiceSales" -> queryService.invoiceSalesLedger(keyword, page, Math.min(size, 100));
-            case "supplierPayable" -> queryService.supplierPayableLedger(keyword, supplier, page, Math.min(size, 100));
-            case "cashflowJournal" -> queryService.cashflowJournalLedger(keyword, account, page, Math.min(size, 100));
-            case "cashierLog" -> queryService.cashierLogLedger(keyword, page, Math.min(size, 100));
+            case "outbound" -> queryService.outboundLedger(keyword, productCode, category, page, Math.min(size, 100), sort, direction);
+            case "production" -> queryService.productionLedger(keyword, filter, page, Math.min(size, 100), sort, direction);
+            case "receipt" -> queryService.receiptLedger(false, keyword, page, Math.min(size, 100), sort, direction);
+            case "settlement" -> queryService.receiptLedger(true, keyword, page, Math.min(size, 100), sort, direction);
+            case "product" -> mergeService.productCatalogLedger(page, size, keyword, sort, direction);
+            case "stock" -> mergeService.warehouseStockLedger(page, size, keyword, sort, direction);
+            case "dealer" -> mergeService.dealerLedger(page, size, keyword, sort, direction);
+            case "supplier" -> queryService.supplierLedger(keyword, page, Math.min(size, 100), sort, direction);
+            case "purchase" -> queryService.purchaseLedger(keyword, page, Math.min(size, 100), sort, direction);
+            case "otherIn" -> queryService.otherMovementLedger(true, keyword, page, Math.min(size, 100), sort, direction);
+            case "otherOut" -> queryService.otherMovementLedger(false, keyword, page, Math.min(size, 100), sort, direction);
+            case "transfer" -> queryService.transferLedger(keyword, page, Math.min(size, 100), sort, direction);
+            case "invoiceProfile" -> queryService.invoiceProfileLedger(keyword, page, Math.min(size, 100), sort, direction);
+            case "invoiceRequest" -> queryService.invoiceRequestLedger(keyword, page, Math.min(size, 100), sort, direction);
+            case "productionReport" -> queryService.productionReportLedger(keyword, page, Math.min(size, 100), sort, direction);
+            case "invoiceInput" -> queryService.invoiceInputLedger(keyword, page, Math.min(size, 100), sort, direction);
+            case "invoiceSales" -> queryService.invoiceSalesLedger(keyword, page, Math.min(size, 100), sort, direction);
+            case "supplierPayable" -> queryService.supplierPayableLedger(keyword, supplier, page, Math.min(size, 100), sort, direction);
+            case "cashflowJournal" -> queryService.cashflowJournalLedger(keyword, account, page, Math.min(size, 100), sort, direction);
+            case "cashierLog" -> queryService.cashierLogLedger(keyword, page, Math.min(size, 100), sort, direction);
             default -> throw new IllegalArgumentException("未知台账类型：" + kind);
         };
     }

@@ -14,7 +14,6 @@ import java.util.Map;
 public class H3EmployeeIdentityService {
     private final JdbcTemplate jdbc;
     private final SourceIdentityService identities;
-    private final SalesOutboundCommissionService commissions;
     private final AuditLogService audit;
 
     public Long resolveName(String name) {
@@ -53,7 +52,6 @@ public class H3EmployeeIdentityService {
                   AND NOT EXISTS(SELECT 1 FROM sales_outbound_commissions c
                                  WHERE c.sales_outbound_id=o.id AND c.status='SETTLED')
                 """, employeeId, mapping.get("source_name"));
-            if (updated > 0) commissions.recalculateByEmployee(employeeId);
             total += updated;
         }
         audit.log("Employee", null, "氚云身份回填", "H3_IDENTITY_BACKFILL",

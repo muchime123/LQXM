@@ -1,0 +1,55 @@
+/* ===== Responsive Density — 小屏适配层 =====
+ *
+ * 问题：桌面布局的间距令牌是固定值（页面左右内边距 28px、侧栏 240px、
+ * 区块间距 16~24px），在 1366×768 / 1280×720 这类小屏笔记本与旧显示器上
+ * 内容区被压得很窄；而移动端断点（DefaultLayout ≤767px）远未触发，
+ * 中间存在「两头不靠」的空档。
+ *
+ * 方案：按视口宽度分三档收紧语义化间距令牌并收窄侧栏。所有引用这些
+ * 令牌的业务样式（DefaultLayout 工作区、ListPageLayout、卡片等）自动
+ * 生效；页面级硬编码的间距不在此层处理，由各页面自行补充。
+ *
+ * 断点依据：1440（小屏桌面显示器）/ 1280（小笔记本）/ 1024（平板横屏、
+ * 最低的「桌面形态」档位）；≤767px 仍走 DefaultLayout 的移动端布局。
+ * 注意：@media 内不能引用 var()，此处只能写字面量（与 tokens.css 约定一致）。
+ */
+
+/* ---- ≤1440：轻度收紧 ---- */
+@media (max-width: 1440px) {
+  :root {
+    --page-inline-padding: 22px;
+    --page-block-padding: 16px;
+    --card-padding: 16px;
+    --space-section-gap: 14px;
+    --space-section-gap-wide: 18px;
+    --space-card-gap: 10px;
+    --sidebar-width: 216px;
+  }
+}
+
+/* ---- ≤1280：小笔记本，中度收紧 ---- */
+@media (max-width: 1280px) {
+  :root {
+    --page-inline-padding: 18px;
+    --page-block-padding: 14px;
+    --card-padding: 14px;
+    --space-section-gap: 12px;
+    --space-section-gap-wide: 16px;
+    --space-card-gap: 10px;
+    --toolbar-min-height: 44px;
+    --sidebar-width: 204px;
+  }
+}
+
+/* ---- ≤1024：桌面形态下限，最紧一档 ---- */
+@media (max-width: 1024px) {
+  :root {
+    --page-inline-padding: 14px;
+    --page-block-padding: 12px;
+    --card-padding: 12px;
+    --space-section-gap: 10px;
+    --space-section-gap-wide: 14px;
+    --space-card-gap: 8px;
+    --sidebar-width: 200px;
+  }
+}

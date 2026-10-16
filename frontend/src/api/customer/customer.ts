@@ -12,38 +12,6 @@ export function createCustomer(data: Record<string, any>) {
   return http.post('/customers', data).then(res => res.data)
 }
 
-/** 客户档案下拉所需的轻量行（客户列表接口返回的子集）。 */
-export interface CustomerOptionRow {
-  id: number
-  customerCode: string | null
-  customerName: string
-  shortName?: string | null
-  status?: string | null
-}
-
-/**
- * 客户档案搜索（销售订单等业务页面的客户下拉）：按 名称/简称/编号/信用代码/联系人 模糊匹配。
- * 直接复用客户列表接口（keyword + 分页），**不另起一套查询口径**（列表页改条件时下拉自动跟随）。
- */
-export async function searchCustomerOptions(keyword: string, size = 20): Promise<CustomerOptionRow[]> {
-  const page = await fetchCustomers({ keyword: keyword.trim(), page: 0, size }) as { content?: CustomerOptionRow[] }
-  return page.content || []
-}
-
-/** 「就地新增客户」结果：created=false 表示档案里已有同名客户，本次未新建、直接复用。 */
-export interface CustomerQuickCreateResult {
-  customer: CustomerOptionRow
-  created: boolean
-}
-
-/**
- * 业务页面就地新增客户档案（销售订单等）：只填客户名称，其余资料之后在客户档案补全。
- * 后端按同名幂等：已有同名档案时返回既有档案（created=false），不会建出第二条。
- */
-export function quickCreateCustomer(customerName: string) {
-  return http.post<CustomerQuickCreateResult>('/customers/quick-create', { customerName }).then(res => res.data)
-}
-
 export function updateCustomer(id: number, data: Record<string, any>) {
   return http.put(`/customers/${id}`, data).then(res => res.data)
 }

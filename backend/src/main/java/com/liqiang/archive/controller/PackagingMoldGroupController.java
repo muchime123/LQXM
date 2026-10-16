@@ -11,6 +11,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/packaging-mold-groups")
+@RequirePermission("mold.read")
 @RequiredArgsConstructor
 public class PackagingMoldGroupController {
 

@@ -39,6 +39,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/media-accounts")
+@RequirePermission("media.read")
 @RequiredArgsConstructor
 public class MediaAccountController {
 

@@ -61,4 +61,17 @@ public final class FileAssetCapabilities {
             Capability.DELETE,
             Capability.OPEN_FOLDER
     );
+
+    public static final Set<Capability> EMPLOYEE_FILE = Set.of(
+            Capability.PREVIEW,
+            Capability.DOWNLOAD,
+            Capability.DELETE,
+            Capability.RESTORE,
+            Capability.PERMANENT_DELETE,
+            Capability.UPDATE_TAGS,
+            Capability.SET_DEFAULT,
+            Capability.REORDER,
+            Capability.MOVE_CATEGORY,
+            Capability.OPEN_FOLDER
+    );
 }

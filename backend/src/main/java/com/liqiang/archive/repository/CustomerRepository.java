@@ -108,4 +108,9 @@ public interface CustomerRepository extends JpaRepository<Customer, Long> {
     Long findMaxCustomerSequence();
 
     Optional<Customer> findByCustomerName(String customerName);
+
+    /**
+     * 「就地新增客户」查重：同名且未删除的客户（取最早一条）。
+     * 客户档案是客户身份的锚点，业务页面快速建档时不能凭同名再建一条，否则订单/出库口径会分叉。
+     */
 }

@@ -24,6 +24,7 @@ public enum FileCategory {
     DOCUMENT("document", StorageScope.FLAT),
     PATENT("patent", StorageScope.FLAT),
     OTHER("other", StorageScope.FLAT),
+    EMPLOYEE_FILE("employee_file", StorageScope.EMPLOYEE),
 
     PKG_MAIN_IMAGE("main_image", StorageScope.PACKAGING),
     PKG_SCENE_IMAGE("scene_image", StorageScope.PACKAGING),
@@ -87,7 +88,8 @@ public enum FileCategory {
     public enum StorageScope {
         PRODUCT,
         PACKAGING,
-        FLAT
+        FLAT,
+        EMPLOYEE
     }
 
     private static final Map<String, FileCategory> BY_NAME =

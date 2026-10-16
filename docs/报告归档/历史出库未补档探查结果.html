@@ -1,0 +1,428 @@
+<style>
+:root {
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f7f9;
+  --color-border: #e5e7eb;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-brand: #6d28d9;
+  --color-accent: #db2777;
+  --chart-series-1: #6d28d9;
+  --chart-series-2: #db2777;
+  --chart-series-3: #0891b2;
+  --chart-other: #94a3b8;
+  --radius-card: 12px;
+  --radius: 8px;
+  --radius-full: 999px;
+  --spacer-4: 4px;
+  --spacer-8: 8px;
+  --spacer-12: 12px;
+  --spacer-16: 16px;
+  --spacer-20: 20px;
+  --spacer-24: 24px;
+  --text-caption: 12px/18px system-ui, -apple-system, sans-serif;
+  --text-body: 14px/20px system-ui, -apple-system, sans-serif;
+  --text-title: 16px/24px system-ui, -apple-system, sans-serif;
+  --text-code: 13px/20px ui-monospace, SFMono-Regular, Menlo, monospace;
+  --weight-medium: 500;
+  --weight-strong: 700;
+}
+:root[data-widget-theme="dark"] {
+  --color-surface: #1e1e2e;
+  --color-surface-muted: #2a2a3d;
+  --color-border: #3f3f55;
+  --color-text: #e2e8f0;
+  --color-text-muted: #94a3b8;
+  --color-brand: #a78bfa;
+  --color-accent: #f472b6;
+  --chart-series-1: #a78bfa;
+  --chart-series-2: #f472b6;
+  --chart-series-3: #22d3ee;
+  --chart-other: #64748b;
+}
+* { box-sizing: border-box; }
+.widget {
+  font: var(--text-body);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--spacer-20);
+  width: 100%;
+}
+.title {
+  font: var(--weight-medium) var(--text-title);
+  margin: 0 0 var(--spacer-16) 0;
+  color: var(--color-text);
+}
+.subtitle {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  margin-top: -8px;
+  margin-bottom: var(--spacer-16);
+}
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacer-12);
+  margin-bottom: var(--spacer-20);
+}
+.kpi-card {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacer-12);
+}
+.kpi-label {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  margin-bottom: var(--spacer-4);
+}
+.kpi-value {
+  font: var(--weight-strong) var(--text-title);
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+}
+.kpi-accent .kpi-value { color: var(--color-accent); }
+
+.section-title {
+  font: var(--weight-medium) var(--text-body);
+  color: var(--color-text);
+  margin: 0 0 var(--spacer-12) 0;
+  padding-bottom: var(--spacer-8);
+  border-bottom: 1px solid var(--color-border);
+}
+.section { margin-bottom: var(--spacer-20); }
+.section:last-child { margin-bottom: 0; }
+
+/* 客户条形表 */
+.customer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body);
+}
+.customer-table th {
+  font: var(--weight-medium) var(--text-caption);
+  color: var(--color-text-muted);
+  text-align: left;
+  padding: var(--spacer-8) var(--spacer-12);
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+.customer-table td {
+  padding: var(--spacer-8) var(--spacer-12);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.customer-table tr:last-child td { border-bottom: none; }
+.cust-name { font: var(--weight-medium) var(--text-body); }
+.cust-name.null { color: var(--color-text-muted); font-style: italic; }
+.bar-cell { width: 180px; }
+.bar-wrap {
+  width: 100%;
+  height: 8px;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+.bar-fill {
+  height: 100%;
+  background: var(--chart-series-1);
+  border-radius: var(--radius-full);
+}
+.bar-fill.accent { background: var(--color-accent); }
+.amount-cell { text-align: right; font: var(--text-code); white-space: nowrap; }
+.count-cell { text-align: center; font: var(--text-code); }
+
+/* 月度条形图 */
+.month-row {
+  display: grid;
+  grid-template-columns: 72px 1fr 80px 64px;
+  gap: var(--spacer-12);
+  align-items: center;
+  padding: var(--spacer-8) 0;
+  border-bottom: 1px solid var(--color-border);
+}
+.month-row:last-child { border-bottom: none; }
+.month-label { font: var(--text-code); color: var(--color-text-muted); }
+.month-bar-wrap {
+  height: 14px;
+  background: var(--color-surface-muted);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+.month-bar {
+  height: 100%;
+  background: var(--chart-series-3);
+  border-radius: var(--radius-full);
+  min-width: 2px;
+}
+.month-amt {
+  font: var(--text-code);
+  text-align: right;
+  white-space: nowrap;
+}
+.month-cnt {
+  font: var(--text-caption);
+  text-align: right;
+  color: var(--color-text-muted);
+}
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font: var(--text-caption);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+}
+.tag.brand {
+  background: rgba(109, 40, 217, 0.08);
+  border-color: rgba(109, 40, 217, 0.25);
+  color: var(--color-brand);
+}
+.tag.accent {
+  background: rgba(219, 39, 119, 0.08);
+  border-color: rgba(219, 39, 119, 0.25);
+  color: var(--color-accent);
+}
+.row-inline {
+  display: flex;
+  gap: var(--spacer-8);
+  align-items: center;
+  flex-wrap: wrap;
+}
+.findings-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacer-12);
+}
+.finding-card {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacer-12);
+}
+.finding-card strong { color: var(--color-accent); }
+.highlight-num {
+  font: var(--weight-strong) var(--text-title);
+  color: var(--color-accent);
+}
+@media (max-width: 680px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .findings-grid { grid-template-columns: 1fr; }
+  .customer-table th:nth-child(3), .customer-table td:nth-child(3) { display: none; }
+  .month-row { grid-template-columns: 60px 1fr 72px; }
+  .month-cnt { display: none; }
+}
+</style>
+
+<div class="widget" data-dynamic-ui-widget data-template="compact-table-visual">
+  <h3 class="title">历史出库未补档探查结果</h3>
+  <p class="subtitle">receipt_allocations 引用了 5,309 个 sales_outbounds 中不存在的出库编号</p>
+
+  <!-- KPI -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">缺失分配行数</div>
+      <div class="kpi-value">5,374</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">缺失出库单号数</div>
+      <div class="kpi-value">5,309</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">受影响客户数</div>
+      <div class="kpi-value">366</div>
+    </div>
+    <div class="kpi-card kpi-accent">
+      <div class="kpi-label">涉及核销金额</div>
+      <div class="kpi-value">¥314.43万</div>
+    </div>
+  </div>
+
+  <!-- 关键发现 -->
+  <div class="section">
+    <div class="section-title">关键发现</div>
+    <div class="findings-grid">
+      <div class="finding-card">
+        <div class="row-inline" style="margin-bottom:8px;">
+          <span class="tag accent">编号格式</span>
+        </div>
+        <div>
+          100% 都是 <strong>标准CK单号</strong>（CK+YYYYMMDD+6位序号），不存在大小写/连字符/空格格式差异。
+        </div>
+      </div>
+      <div class="finding-card">
+        <div class="row-inline" style="margin-bottom:8px;">
+          <span class="tag brand">归一化二次匹配</span>
+        </div>
+        <div>
+          <strong>0 条</strong>可匹配，说明出库单确实不存在（不是格式差异导致的匹配失败）。
+        </div>
+      </div>
+      <div class="finding-card">
+        <div class="row-inline" style="margin-bottom:8px;">
+          <span class="tag accent">客户名NULL占比</span>
+        </div>
+        <div>
+          客户名为空的分配行 <strong>678 条 / ¥99.99 万</strong>，占总金额 31.8%，收款单数据质量问题严重。
+        </div>
+      </div>
+      <div class="finding-card">
+        <div class="row-inline" style="margin-bottom:8px;">
+          <span class="tag brand">时间集中度</span>
+        </div>
+        <div>
+          峰值集中在 <strong>2024年4~6月</strong>，合计 ¥187.52 万（占总金额 59.6%）。
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP 客户 -->
+  <div class="section">
+    <div class="section-title">受影响客户 TOP 10（按核销金额降序）</div>
+    <table class="customer-table">
+      <thead>
+        <tr>
+          <th style="width:160px;">客户名称</th>
+          <th style="width:80px;">缺失单号</th>
+          <th class="bar-cell">金额占比</th>
+          <th style="width:100px;">核销金额</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="cust-name null">（客户名NULL）</span></td>
+          <td class="count-cell">670</td>
+          <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill accent" style="width:100%;"></div></div></td>
+          <td class="amount-cell">¥999,943.03</td>
+        </tr>
+        <tr>
+          <td><span class="cust-name">林先生</span></td>
+          <td class="count-cell">2</td>
+          <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:20.3%;"></div></div></td>
+          <td class="amount-cell">¥203,000.00</td>
+        </tr>
+        <tr>
+          <td><span class="cust-name">周翔</span></td>
+          <td class="count-cell">3</td>
+          <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:14.8%;"></div></div></td>
+          <td class="amount-cell">¥148,400.00</td>
+        </tr>
+        <tr>
+          <td><span class="cust-name">祁永峰</span></td>
+          <td class="count-cell">3</td>
+          <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:11.0%;"></div></div></td>
+          <td class="amount-cell">¥110,000.00</td>
+        </tr>
+        <tr>
+          <td><span class="cust-name">王</span></td>
+          <td class="count-cell">5</td>
+          <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:10.1%;"></div></div></td>
+          <td class="amount-cell">¥101,298.78</td>
+        </tr>
+        <tr>
+          <td><span class="cust-name">倪小姐</span></td>
+          <td class="count-cell">4</td>
+          <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:8.7%;"></div></div></td>
+          <td class="amount-cell">¥87,000.00</td>
+        </tr>
+        <tr>
+          <td><span class="cust-name">温熠博</span></td>
+          <td class="count-cell">10</td>
+          <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:6.7%;"></div></div></td>
+          <td class="amount-cell">¥67,200.00</td>
+        </tr>
+        <tr>
+          <td><span class="cust-name">卢永江</span></td>
+          <td class="count-cell">2</td>
+          <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:6.3%;"></div></div></td>
+          <td class="amount-cell">¥63,000.00</td>
+        </tr>
+        <tr>
+          <td><span class="cust-name">扬名包装</span></td>
+          <td class="count-cell">1</td>
+          <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:6.0%;"></div></div></td>
+          <td class="amount-cell">¥60,000.00</td>
+        </tr>
+        <tr>
+          <td><span class="cust-name">赵月</span></td>
+          <td class="count-cell">3</td>
+          <td class="bar-cell"><div class="bar-wrap"><div class="bar-fill" style="width:5.8%;"></div></div></td>
+          <td class="amount-cell">¥57,800.00</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- 月度分布 -->
+  <div class="section">
+    <div class="section-title">按收款月份分布（2023-11 ~ 2025-01 有金额的月份）</div>
+    <div>
+      <div class="month-row">
+        <div class="month-label">2024-06</div>
+        <div class="month-bar-wrap"><div class="month-bar" style="width:100%;"></div></div>
+        <div class="month-amt">¥859,740</div>
+        <div class="month-cnt">385 行</div>
+      </div>
+      <div class="month-row">
+        <div class="month-label">2024-05</div>
+        <div class="month-bar-wrap"><div class="month-bar" style="width:65.8%;"></div></div>
+        <div class="month-amt">¥565,309</div>
+        <div class="month-cnt">1,534 行</div>
+      </div>
+      <div class="month-row">
+        <div class="month-label">2024-04</div>
+        <div class="month-bar-wrap"><div class="month-bar" style="width:52.4%;"></div></div>
+        <div class="month-amt">¥450,187</div>
+        <div class="month-cnt">299 行</div>
+      </div>
+      <div class="month-row">
+        <div class="month-label">2024-07</div>
+        <div class="month-bar-wrap"><div class="month-bar" style="width:35.7%;"></div></div>
+        <div class="month-amt">¥307,322</div>
+        <div class="month-cnt">337 行</div>
+      </div>
+      <div class="month-row">
+        <div class="month-label">2024-03</div>
+        <div class="month-bar-wrap"><div class="month-bar" style="width:37.2%;"></div></div>
+        <div class="month-amt">¥319,609</div>
+        <div class="month-cnt">255 行</div>
+      </div>
+      <div class="month-row">
+        <div class="month-label">2023-12</div>
+        <div class="month-bar-wrap"><div class="month-bar" style="width:23.6%;"></div></div>
+        <div class="month-amt">¥203,251</div>
+        <div class="month-cnt">225 行</div>
+      </div>
+      <div class="month-row">
+        <div class="month-label">2024-01</div>
+        <div class="month-bar-wrap"><div class="month-bar" style="width:12.3%;"></div></div>
+        <div class="month-amt">¥105,807</div>
+        <div class="month-cnt">374 行</div>
+      </div>
+      <div class="month-row">
+        <div class="month-label">2024-08</div>
+        <div class="month-bar-wrap"><div class="month-bar" style="width:12.1%;"></div></div>
+        <div class="month-amt">¥104,250</div>
+        <div class="month-cnt">740 行</div>
+      </div>
+      <div class="month-row">
+        <div class="month-label">2025-01</div>
+        <div class="month-bar-wrap"><div class="month-bar" style="width:15.7%;"></div></div>
+        <div class="month-amt">¥134,786</div>
+        <div class="month-cnt">95 行</div>
+      </div>
+      <div class="month-row">
+        <div class="month-label">其余月份</div>
+        <div class="month-bar-wrap"><div class="month-bar" style="width:4.2%;"></div></div>
+        <div class="month-amt">¥34,027</div>
+        <div class="month-cnt">947 行</div>
+      </div>
+    </div>
+  </div>
+</div>

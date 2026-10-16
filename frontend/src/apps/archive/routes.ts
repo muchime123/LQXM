@@ -16,10 +16,11 @@ export const archiveRoutes: RouteRecordRaw[] = [
     component: () => import('@/shell/LoginView.vue'),
     meta: { title: '登录', layout: 'auth' }
   },
-  // P5.2a：登录后默认进入「客户档案」。
-  // 客户档案归侧栏「氚云数据管理」分组（客户 ID 是出库关联与提成核算的锚点，属氚云数据链）。
-  // 销售订单抽屉内仍可就地建档，登录默认落地页仍是 /customers。
-  { path: '/', redirect: '/customers' },
+  // 默认落地页（登录后 / 直接打开根路径 `/`）由路由守卫按权限解析，**不在此静态 redirect**：
+  // 2026-10-10 按 LQ 决定默认页为「生产跟单」(`/production-tracking`)；该页带读权限门槛，
+  // 无权限者需回落「客户档案」(`/customers`)，而权限要等 `/api/auth/me` 返回才知道——
+  // 静态 redirect 是同步的，拿不到权限，会把无权限的人直接送进 403。
+  // 落点解析见 `router/index.ts` 的守卫 + `utils/defaultLanding.ts`（唯一来源）。
 
   // ---- 客户档案（氚云数据链）----
   // 2026-10-06：客户档案随侧栏归入「氚云数据管理」分组 —— 客户与产品库存同为氚云
@@ -28,7 +29,7 @@ export const archiveRoutes: RouteRecordRaw[] = [
     path: '/customers',
     name: 'customers',
     component: () => import('@/apps/archive/views/customer/CustomerView.vue'),
-    meta: { title: '客户档案', layout: 'workspace', group: 'h3' }
+    meta: { title: '客户档案', layout: 'workspace', group: 'h3', permission: 'customer.read' }
   },
 
   // ---- 产品中心 ----
@@ -36,37 +37,37 @@ export const archiveRoutes: RouteRecordRaw[] = [
     path: '/products',
     name: 'products',
     component: () => import('@/apps/archive/views/product/ProductCatalogView.vue'),
-    meta: { title: '产品管理', layout: 'workspace', group: 'product' }
+    meta: { title: '产品管理', layout: 'workspace', group: 'product', permission: 'product.read' }
   },
   {
     path: '/device-videos',
     name: 'deviceVideos',
     component: () => import('@/apps/archive/views/product/DeviceVideoLibraryView.vue'),
-    meta: { title: '设备视频库', layout: 'list', group: 'product' }
+    meta: { title: '设备视频库', layout: 'list', group: 'product', permission: 'product.read' }
   },
   {
     path: '/packaging',
     name: 'packaging',
     component: () => import('@/apps/archive/views/product/PackagingView.vue'),
-    meta: { title: '包材管理', layout: 'workspace', group: 'product' }
+    meta: { title: '包材管理', layout: 'workspace', group: 'product', permission: 'packaging.read' }
   },
   {
     path: '/molds',
     name: 'molds',
     component: () => import('@/apps/archive/views/product/mold/PackagingMoldView.vue'),
-    meta: { title: '模具资产', layout: 'workspace', group: 'product' }
+    meta: { title: '模具资产', layout: 'workspace', group: 'product', permission: 'mold.read' }
   },
   {
     path: '/certificates',
     name: 'certificates',
     component: () => import('@/apps/archive/views/product/CertificateView.vue'),
-    meta: { title: '知识产权', layout: 'list', group: 'product' }
+    meta: { title: '知识产权', layout: 'list', group: 'product', permission: 'certificate.read' }
   },
   {
     path: '/office-assets',
     name: 'officeAssets',
     component: () => import('@/apps/archive/views/product/OfficeAssetView.vue'),
-    meta: { title: '物品资产', layout: 'list', group: 'product' }
+    meta: { title: '物品资产', layout: 'list', group: 'product', permission: 'officeAsset.read' }
   },
 
   // ---- 官网运营 ----
@@ -106,19 +107,19 @@ export const archiveRoutes: RouteRecordRaw[] = [
     path: '/media',
     name: 'media',
     component: () => import('@/apps/archive/views/marketing/MediaAccountView.vue'),
-    meta: { title: '自媒体账号', layout: 'list', group: 'marketing' }
+    meta: { title: '自媒体账号', layout: 'list', group: 'marketing', permission: 'media.read' }
   },
   {
     path: '/company',
     name: 'company',
     component: () => import('@/apps/archive/views/marketing/CompanyInfoView.vue'),
-    meta: { title: '公司信息', layout: 'detail', group: 'marketing' }
+    meta: { title: '公司信息', layout: 'detail', group: 'marketing', permission: 'company.read' }
   },
   {
     path: '/company/certifications',
     name: 'companyCertifications',
     component: () => import('@/apps/archive/views/marketing/CompanyCertificationsView.vue'),
-    meta: { title: '资质合规', layout: 'list', group: 'marketing' }
+    meta: { title: '资质合规', layout: 'list', group: 'marketing', permission: 'company.read' }
   },
 
   // ---- 氚云数据管理（迁移期只读对照 + 期初来源）----
@@ -130,27 +131,51 @@ export const archiveRoutes: RouteRecordRaw[] = [
     meta: { title: '氚云导入中心', layout: 'list', permission: 'integration.h3', group: 'h3' }
   },
   {
-    path: '/h3-outbound-relations',
-    name: 'h3OutboundRelations',
-    component: () => import('@/apps/archive/views/governance/H3OutboundRelationView.vue'),
-    meta: { title: '销售出库关联工作台', layout: 'list', permission: 'integration.h3', group: 'h3' }
+    path: '/h3-sales-products',
+    name: 'h3SalesProducts',
+    component: () => import('@/apps/archive/views/governance/H3SalesProductAnalysisView.vue'),
+    meta: { title: '销售出库产品分析', layout: 'list', permission: 'integration.h3', group: 'h3' }
   },
-  {
-    path: '/h3-production-execution',
-    name: 'h3ProductionExecution',
-    component: () => import('@/apps/archive/views/production/H3ProductionExecutionView.vue'),
-    meta: {
-      title: '车间执行 · 氚云生产任务',
-      layout: 'list',
-      group: 'h3',
-      permission: ['manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all', 'manufacturing.report', 'manufacturing.report.override', 'manufacturing.inspect', 'manufacturing.followup']
-    }
-  },
+  // 2026-10-06 按 LQ 决定下线「销售出库关联」工作台（/h3-outbound-relations）：
+  // 视图 H3OutboundRelationView.vue 与侧栏项已删，后端端点保留。留底 commit 23a0eda。
+  // 2026-10-06 按 LQ 决定下线「车间执行 · 氚云生产任务」页面（/h3-production-execution），
+  // 视图与 api/manufacturing/h3Execution.ts 已删；后端端点保留。留底于 commit 23a0eda。
   {
     path: '/product-inventory',
     name: 'productInventory',
     component: () => import('@/apps/archive/views/production/ProductInventoryView.vue'),
     meta: { title: '产品库存', layout: 'list', permission: 'product_inventory.read', group: 'h3' }
+  },
+  // ⭐ 本页自 2026-10-10 起同时是**登录默认落地页**（根路径 `/` 由守卫落到这里）。
+  // 权限列表与 `utils/defaultLanding.ts` / 侧栏项三处必须一致，契约测试钉死。
+  {
+    path: '/production-tracking',
+    name: 'productionTracking',
+    component: () => import('@/apps/archive/views/production/ProductionTrackingView.vue'),
+    meta: { title: '生产跟单', layout: 'list', permission: ['manufacturing.read.self', 'manufacturing.read.department', 'manufacturing.read.all'], group: 'h3' }
+  },
+  {
+    path: '/production-tracking/analytics',
+    name: 'productionTrackingAnalytics',
+    redirect: { path: '/production-tracking', query: { analysis: '1' } }
+  },
+  // 生产主数据：车间 / 工序库 / 制程模板。2026-09-30 曾随「聚合页下线」一并摘除，
+  // 2026-10-06 恢复——页面组件、API（/api/manufacturing/master/*）与后端服务从未删除，
+  // 缺的只是路由与侧栏入口；e2e（product-configuration-rule-fields）与新建任务单抽屉
+  // 的文案至今仍指向这两条路径，长期处于跳错页状态。
+  {
+    path: '/manufacturing-process-management',
+    name: 'manufacturingProcessManagement',
+    component: () => import('@/apps/archive/views/production/ManufacturingProcessManagementView.vue'),
+    meta: { title: '制程与工序管理', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
+  },
+  // 「任务单产品与配置」原为制程管理页内的抽屉，2026-09-24 独立成页：
+  // 它是新建任务单的联动数据源，也是产品身份（可售库存口径）的锚点，需要独立演进。
+  {
+    path: '/manufacturing-task-configs',
+    name: 'manufacturingTaskConfigs',
+    component: () => import('@/apps/archive/views/production/ManufacturingTaskConfigView.vue'),
+    meta: { title: '任务单产品与配置', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
   },
   // 月度提成核算（现行简化口径，独立只读视图）：本月实际回款 − 上月运杂费，不依赖旧提成体系
   {

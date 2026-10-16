@@ -2,6 +2,7 @@
 
 /* 核心层：令牌 → 重置 → Element Plus → 工具类 → 主题 */
 @import './tokens.css';
+@import './responsive.css';
 @import './reset.css';
 @import './element-plus.css';
 @import './utilities.css';

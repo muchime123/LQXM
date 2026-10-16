@@ -29,9 +29,6 @@ public interface ExpenseClaimRepository extends JpaRepository<ExpenseClaim, Long
               AND (:category IS NULL OR :category = '' OR e.expenseCategory = :category)
               AND (:dateFrom IS NULL OR e.claimDate >= :dateFrom)
               AND (:dateTo IS NULL OR e.claimDate <= :dateTo)
-              AND (:unallocatedOnly = false OR NOT EXISTS (
-                    SELECT 1 FROM ExpenseAllocation a
-                    WHERE a.expenseClaimId = e.id AND a.allocationStatus = 'CONFIRMED'))
             ORDER BY COALESCE(e.approvalFinishedDate, e.claimDate, e.createdAt) DESC
             """)
     Page<ExpenseClaim> searchPage(
@@ -41,7 +38,6 @@ public interface ExpenseClaimRepository extends JpaRepository<ExpenseClaim, Long
             @Param("category") String category,
             @Param("dateFrom") LocalDate dateFrom,
             @Param("dateTo") LocalDate dateTo,
-            @Param("unallocatedOnly") boolean unallocatedOnly,
             Pageable pageable);
 
     @Query("SELECT COUNT(e) FROM ExpenseClaim e WHERE e.approvalStatus <> 'REJECTED' AND e.approvalStatus <> 'CANCELED' AND e.approvalStatus <> 'TERMINATED'")
@@ -52,32 +48,4 @@ public interface ExpenseClaimRepository extends JpaRepository<ExpenseClaim, Long
 
     @Query("SELECT COUNT(e) FROM ExpenseClaim e WHERE e.employeeId IS NULL AND (e.approvalStatus = 'APPROVED' OR e.approvalStatus = 'PENDING')")
     long countAwaitingMapping();
-
-    /**
-     * P6.2 待归集合计：
-     * 已通过审批（APPROVED）且 核定金额(或 fallback 申请金额)>0，但 没有任何 CONFIRMED 状态的 expense_allocations。
-     * 注意：已审批通过是归集的前提（否则金额还不确定）。
-     */
-    @Query("""
-           SELECT COUNT(e) FROM ExpenseClaim e
-           WHERE e.approvalStatus = 'APPROVED'
-             AND COALESCE(e.approvedAmount, e.totalAmount, 0) > 0
-             AND NOT EXISTS (
-                 SELECT 1 FROM ExpenseAllocation a
-                 WHERE a.expenseClaimId = e.id AND a.allocationStatus = 'CONFIRMED'
-             )
-           """)
-    long countPendingAllocation();
-
-    /** 待归集核定金额合计（口径同 countPendingAllocation） */
-    @Query("""
-           SELECT COALESCE(SUM(COALESCE(e.approvedAmount, e.totalAmount, 0)), 0) FROM ExpenseClaim e
-           WHERE e.approvalStatus = 'APPROVED'
-             AND COALESCE(e.approvedAmount, e.totalAmount, 0) > 0
-             AND NOT EXISTS (
-                 SELECT 1 FROM ExpenseAllocation a
-                 WHERE a.expenseClaimId = e.id AND a.allocationStatus = 'CONFIRMED'
-             )
-           """)
-    java.math.BigDecimal sumPendingAllocationAmount();
 }

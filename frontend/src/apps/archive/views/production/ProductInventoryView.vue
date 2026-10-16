@@ -45,8 +45,8 @@
           <el-button type="primary" plain @click="load(1)">查询</el-button>
         </div>
         <div class="toolbar__right">
-          <el-button type="warning" plain @click="configuredReviewOpen = true">配置产品审核</el-button>
-          <el-checkbox v-model="hideZero" @change="load(1)">仅看有库存</el-checkbox>
+          <el-button plain @click="openCategoryGroups">管理产品大类</el-button>
+          <el-checkbox v-model="hideZero" @change="refreshInventory">仅看非零库存</el-checkbox>
           <el-radio-group v-model="viewMode" size="small">
             <el-radio-button value="table">表格</el-radio-button>
             <el-radio-button value="category">按类目</el-radio-button>
@@ -73,17 +73,10 @@
         <span class="scope-note__sep">·</span>
         <span v-if="snap && snap.affectedCount > 0">
           <el-button link type="warning" size="small" @click="openIssues()">
-            待处理异常 {{ snap.affectedCount }} 行会影响库存金额（缺产品有量 {{ snap.missingProductInStockCount }} / 缺价 {{ snap.missingPriceInStockCount }}）→
+            非零库存待核 {{ snap.pendingCount }} 行（编号未匹配 {{ snap.missingProductCount }} / 缺价 {{ snap.missingPriceCount }}）→
           </el-button>
-          <span v-if="snap.pendingCount > snap.affectedCount" class="scope-note__quiet">
-            （另有 {{ snap.pendingCount - snap.affectedCount }} 行零库存残留，金额本就是 0）
-          </span>
         </span>
-        <span v-else-if="snap && snap.pendingCount > 0" class="scope-note__quiet">
-          影响金额的异常 0 行；另有 {{ snap.pendingCount }} 行零库存残留
-          <el-button link type="primary" size="small" @click="openIssues()">查看 →</el-button>
-        </span>
-        <span v-else-if="snap" class="scope-note__ok">缺价 / 缺产品异常 0 行</span>
+        <span v-else-if="snap" class="scope-note__ok">非零库存编号未匹配 / 缺价待核 0 行</span>
         <template v-if="snap && snap.disposedCount > 0">
           <span class="scope-note__sep">·</span>
           <span class="scope-note__quiet">已处置 {{ snap.disposedCount }} 行</span>
@@ -125,8 +118,7 @@
         <el-table-column label="编号" width="135" show-overflow-tooltip>
           <template #default="{ row }">
             <span>{{ row.productCode }}</span>
-            <el-tooltip v-if="row.codeConflict" placement="top"
-              content="该编号在产品信息台账与仓库明细里指向不同产品（氚云编号漂移），本行采购价可能取自别的产品，请人工核对">
+            <el-tooltip v-if="row.codeConflict" placement="top" :content="codeConflictTip(row)">
               <el-icon class="warn-icon"><WarningFilled /></el-icon>
             </el-tooltip>
           </template>
@@ -181,8 +173,7 @@
                 <el-tooltip v-if="row.shelfStatus === 'OFF_SHELF'" placement="top" content="该产品已标记下架（本地生命周期状态，不影响库存金额）">
                   <el-tag size="small" type="info" effect="plain" style="margin-left:4px">下架</el-tag>
                 </el-tooltip>
-                <el-tooltip v-if="row.codeConflict" placement="top"
-                  content="该编号在产品信息台账与仓库明细里指向不同产品（氚云编号漂移），本行采购价可能取自别的产品">
+                <el-tooltip v-if="row.codeConflict" placement="top" :content="codeConflictTip(row)">
                   <el-icon class="warn-icon"><WarningFilled /></el-icon>
                 </el-tooltip>
               </template>
@@ -227,31 +218,31 @@
       </div>
     </section>
 
-    <!-- 快照待处理异常抽屉：口径与清单一致 + 按是否影响金额分层 + 可标记处置结论 -->
+    <!-- 快照待处理异常抽屉：仅非零库存，与清单默认范围一致 -->
     <el-drawer v-model="issuesOpen" title="库存快照待处理异常" size="min(980px,94vw)">
       <template v-if="snap">
         <div class="issue-summary">
           <div class="issue-summary__counts">
-            <span>影响库存金额 <b class="issue-summary__strong">{{ snap.affectedCount }}</b> 行</span>
+            <span>非零库存待核 <b class="issue-summary__strong">{{ snap.pendingCount }}</b> 行</span>
             <span class="issue-summary__sep">·</span>
-            <span>待处理合计 {{ snap.pendingCount }} 行<template v-if="snap.pendingCount > snap.affectedCount">（含零库存残留 {{ snap.pendingCount - snap.affectedCount }} 行）</template></span>
+            <span>编号未匹配 {{ snap.missingProductCount }} / 缺价 {{ snap.missingPriceCount }}</span>
             <span class="issue-summary__sep">·</span>
             <span>已处置 {{ snap.disposedCount }} 行</span>
           </div>
           <el-button size="small" :loading="exporting" @click="exportIssues">导出全量明细 CSV</el-button>
         </div>
         <p class="issue-summary__note">
-          口径已与页面清单对齐：仓库映射不上的行、以及「数量」列里装的是金额的费用项（运费 / 优惠 / 加急费等）都不计入本清单<template v-if="snap.feeExcludedCount > 0">，本次自动排除 {{ snap.feeExcludedCount }} 行费用项</template>。数量为 0 的行金额本就是 0，属于台账残留，不影响库存总额。
+          本轮只核对非零库存。仓库映射不上的行、零库存行及费用项（运费 / 优惠 / 加急费等）不计入待处理<template v-if="snap.feeExcludedCount > 0">；其中自动排除 {{ snap.feeExcludedCount }} 行非零费用项</template>。编号未匹配可能是手工录入错码，应先核对产品名称、规格和单位。
         </p>
 
         <div class="issue-block">
           <div class="issue-block__head">
-            <span class="issue-block__title">缺产品信息</span>
-            <span class="issue-block__meta">待处理 {{ snap.missingProductCount }} 行 / {{ snap.missingProductCodes }} 个编号 · 其中影响金额 {{ snap.missingProductInStockCount }} 行</span>
+            <span class="issue-block__title">编号未匹配产品信息</span>
+            <span class="issue-block__meta">待核 {{ snap.missingProductCount }} 行 / {{ snap.missingProductCodes }} 个编号</span>
           </div>
           <p class="issue-hint">
-            仓库明细有该编号、产品信息台账没有：数量有效，但采购价缺失，库存金额算不出。
-            在氚云产品信息表补建产品（含采购价）后<strong>重新导入产品信息台账</strong>即可补齐——台账按编号增量写入，不需要清库，也不必重传仓库明细。
+            仓库明细编号在产品信息中找不到。氚云按产品名称关联，编号为手工录入；请先按名称、规格、单位核对是否错码。
+            确认后在氚云修正对应来源，再重新导入；不要直接补建同名产品。
           </p>
           <el-table :data="snap.missingProductRows" stripe size="small" max-height="320">
             <el-table-column prop="productCode" label="编号" width="115" show-overflow-tooltip />
@@ -265,7 +256,7 @@
                 <el-button link type="primary" size="small" @click="openDispose(row)">标记处置</el-button>
               </template>
             </el-table-column>
-            <template #empty><el-empty description="无待处理缺产品行" :image-size="60" /></template>
+            <template #empty><el-empty description="无待核编号" :image-size="60" /></template>
           </el-table>
         </div>
 
@@ -275,7 +266,7 @@
             <span class="issue-block__meta">待处理 {{ snap.missingPriceCount }} 行 / {{ snap.missingPriceCodes }} 个编号</span>
           </div>
           <p class="issue-hint">
-            编号在两张台账都能对上、数量非 0，但产品信息台账采购价为空或 0，该行库存金额为空。
+            编号在两张台账都能对上、数量非 0，但产品信息台账采购价为空或 0；先核对产品身份，再决定是否需要补价。
             在氚云补价后重新导入产品信息台账；若属设备 / 配件 / 模具类本就不按库存金额计价，可标记「无需计价」。
           </p>
           <el-table :data="snap.missingPriceRows" stripe size="small" max-height="320">
@@ -402,20 +393,59 @@
 
     <!-- 库存单行详情：本行快照 + 两份来源台账行 + 跨仓库分布 + 更新明细 -->
     <ProductInventoryDetailDrawer v-model="detailOpen" :row="detailRow" />
-    <ConfiguredProductReviewDialog v-model="configuredReviewOpen" />
+    <el-dialog v-model="categoryGroupsOpen" title="管理产品类目归属" width="min(980px,96vw)">
+      <p>将氚云原始类目归到盒子、膜或机器；归属只影响本项目的分析展示，不修改氚云台账。</p>
+      <div class="category-manager-summary">
+        <el-tag v-for="(label, group) in productGroupLabels" :key="group" :type="group === 'UNASSIGNED' ? 'warning' : 'info'">
+          {{ label }} {{ categoryGroups.filter(r => r.productGroup === group).length }}
+        </el-tag>
+      </div>
+      <div class="category-manager-toolbar">
+        <el-input v-model="categoryGroupKeyword" clearable placeholder="搜索原始类目" style="width:220px" />
+        <el-select v-model="categoryGroupFilter" style="width:145px">
+          <el-option value="ALL" label="全部归属" />
+          <el-option v-for="(label, group) in productGroupLabels" :key="group" :value="group" :label="label" />
+        </el-select>
+        <span class="category-manager-count">当前 {{ visibleCategoryGroups.length }} 类 · 已选 {{ selectedCategoryGroups.length }} 类</span>
+      </div>
+      <div class="category-manager-toolbar">
+        <el-select v-model="batchCategoryGroup" placeholder="批量归属到" style="width:170px">
+          <el-option v-for="(label, group) in productGroupLabels" :key="group" :value="group" :label="label" />
+        </el-select>
+        <el-button type="primary" :disabled="!selectedCategoryGroups.length || !batchCategoryGroup" :loading="categoryGroupsSaving" @click="saveCategoryGroupsBatch">应用到所选类目</el-button>
+        <el-button :disabled="!selectedCategoryGroups.length" @click="clearCategorySelection">清空选择</el-button>
+        <span class="category-manager-count">可用表头复选框选择当前筛选结果</span>
+      </div>
+      <el-table ref="categoryGroupTable" :data="visibleCategoryGroups" row-key="sourceCategory" max-height="460" v-loading="categoryGroupsLoading || categoryGroupsSaving" stripe @selection-change="onCategoryGroupSelectionChange">
+        <el-table-column type="selection" width="48" reserve-selection />
+        <el-table-column prop="sourceCategory" label="氚云产品类目" min-width="190" />
+        <el-table-column prop="salesLines" label="出库行" width="90" />
+        <el-table-column prop="stockRows" label="库存行" width="90" />
+        <el-table-column prop="catalogRows" label="产品档案" width="90" />
+        <el-table-column label="归属大类" width="160">
+          <template #default="{ row }">
+            <el-select :model-value="row.productGroup" @change="(v: ProductGroup) => saveCategoryGroup(row, v)">
+              <el-option v-for="(label, value) in productGroupLabels" :key="value" :label="label" :value="value" />
+            </el-select>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed, reactive, onUnmounted } from 'vue'
+import { ref, computed, reactive, onActivated, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { Search, ArrowDown, WarningFilled } from '@element-plus/icons-vue'
 import { fetchProductInventory, fetchProductInventorySnapshotInfo, fetchInventoryIssues, disposeInventoryIssue, undoInventoryIssueDisposition, setProductShelfStatus, SHELF_STATUS_TEXT, INVENTORY_ISSUE_TYPE_TEXT, INVENTORY_ISSUE_STATUS_TEXT, type ProductInventoryBalance, type ProductInventorySummary, type ProductInventorySnapshotInfo, type SnapshotIssueRow, type StaleCatalogRow, type InventoryIssueType, type InventoryIssueStatus } from '@/api/productInventory'
 import { notify } from '@/composables/ui/useToast'
 import { downloadBlob } from '@/utils/ui/downloadBlob'
 import ProductInventoryDetailDrawer from '@/components/production/ProductInventoryDetailDrawer.vue'
-import ConfiguredProductReviewDialog from '@/components/production/ConfiguredProductReviewDialog.vue'
+import { fetchH3CategoryGroups, assignH3CategoryGroup, assignH3CategoryGroupsBatch, productGroupLabels, type ProductGroup, type H3CategoryGroupRow } from '@/api/h3ProductCategoryGroups'
 
-const keyword = ref('')
+const route = useRoute()
+const keyword = ref(String(route.query.keyword || ''))
 const warehouseId = ref<number>()
 const categoryFilter = ref<string>()
 const page = ref(1)
@@ -424,8 +454,45 @@ const total = ref(0)
 const items = ref<ProductInventoryBalance[]>([])
 const warehouses = ref<Array<{ id: number; warehouseCode: string; warehouseName: string }>>([])
 const loading = ref(false)
-// 默认展示完整清单（含零库存产品）；勾选后退化为「仅有库存」口径
-const hideZero = ref(false)
+// 默认只展示非零库存；需要查看历史零库存行时可取消勾选。
+const hideZero = ref(true)
+const categoryGroupsOpen = ref(false)
+const categoryGroupsLoading = ref(false)
+const categoryGroupsSaving = ref(false)
+const categoryGroupKeyword = ref('')
+const categoryGroupFilter = ref<ProductGroup | 'ALL'>('ALL')
+const batchCategoryGroup = ref<ProductGroup | ''>('')
+const categoryGroups = ref<H3CategoryGroupRow[]>([])
+const selectedCategoryGroups = ref<H3CategoryGroupRow[]>([])
+const categoryGroupTable = ref<{ clearSelection: () => void } | null>(null)
+const visibleCategoryGroups = computed(() => categoryGroups.value.filter(r =>
+  r.sourceCategory.includes(categoryGroupKeyword.value.trim()) &&
+  (categoryGroupFilter.value === 'ALL' || r.productGroup === categoryGroupFilter.value)))
+function onCategoryGroupSelectionChange(rows: H3CategoryGroupRow[]) { selectedCategoryGroups.value = rows }
+function clearCategorySelection() { categoryGroupTable.value?.clearSelection(); selectedCategoryGroups.value = [] }
+async function openCategoryGroups() {
+  categoryGroupsOpen.value = true
+  categoryGroupsLoading.value = true
+  try { categoryGroups.value = await fetchH3CategoryGroups() }
+  catch (e) { notify.error((e as Error).message || '产品类目加载失败') }
+  finally { categoryGroupsLoading.value = false }
+}
+async function saveCategoryGroup(row: H3CategoryGroupRow, value: ProductGroup) {
+  try { await assignH3CategoryGroup(row.sourceCategory, value); row.productGroup = value; notify.success('归属已保存') }
+  catch (e) { notify.error((e as Error).message || '归属保存失败') }
+}
+async function saveCategoryGroupsBatch() {
+  if (!batchCategoryGroup.value || !selectedCategoryGroups.value.length) return
+  categoryGroupsSaving.value = true
+  try {
+    const names = selectedCategoryGroups.value.map(r => r.sourceCategory)
+    const result = await assignH3CategoryGroupsBatch(names, batchCategoryGroup.value)
+    for (const row of categoryGroups.value) if (names.includes(row.sourceCategory)) row.productGroup = batchCategoryGroup.value
+    clearCategorySelection()
+    notify.success(`已更新 ${result.updated} 个类目的归属`)
+  } catch (e) { notify.error((e as Error).message || '批量归属失败') }
+  finally { categoryGroupsSaving.value = false }
+}
 // 生命周期筛选（V304）：产品永不物理删除，下架是标注不是删除
 const shelfFilter = ref<'ALL' | 'ON_SHELF' | 'OFF_SHELF'>('ALL')
 const viewMode = ref<'table' | 'category'>('table')
@@ -458,7 +525,6 @@ const shortDate = (s?: string | null) => (s ? String(s).slice(0, 10) : '—')
 
 // 单行详情抽屉（2026-09-16）：定位键 = 仓库 + 编号 + 单位（V295 后同仓同编号可存在多单位行）
 const detailOpen = ref(false)
-const configuredReviewOpen = ref(false)
 const detailRow = ref<ProductInventoryBalance | null>(null)
 function openDetail(row: ProductInventoryBalance) {
   detailRow.value = row
@@ -481,6 +547,20 @@ const gapText = computed(() => {
 async function loadSnap() {
   try { snap.value = await fetchProductInventorySnapshotInfo() } catch { /* 快照信息失败不阻断清单 */ }
 }
+
+function refreshInventory() {
+  void Promise.all([load(1), loadSnap()])
+}
+
+// 库存页被 KeepAlive 缓存；从氚云导入中心返回时重新读取最新批次和异常。
+let inventoryActivated = false
+onActivated(() => {
+  if (!inventoryActivated) { inventoryActivated = true; return }
+  const code = String(route.query.keyword || '')
+  if (code) { keyword.value = code; page.value = 1 }
+  if (route.query.onlyInStock === '1') hideZero.value = true
+  void Promise.all([load(), loadSnap()])
+})
 
 // ===== 异常处置（只写结论，不改台账；采购价唯一来源仍是氚云） =====
 const issueTypeText = (t: string) => INVENTORY_ISSUE_TYPE_TEXT[t as InventoryIssueType] || t
@@ -582,8 +662,8 @@ async function exportIssues() {
       r.unit || '',
       r.quantity == null ? '' : String(r.quantity),
       r.issueType === 'MISSING_PRODUCT'
-        ? '氚云产品信息表补建该产品（含采购价）后重导产品信息台账'
-        : '氚云产品信息表补采购价后重导产品信息台账；设备/配件类可标记「无需计价」'
+        ? '先按产品名称、规格、单位核对编号；在氚云修正来源后重导相关台账'
+        : '先核对产品身份，再在氚云补采购价并重导产品信息台账；无需计价的可标记处置'
     ])
     const csv = [head, ...body].map((line) => line.map(csvCell).join(',')).join('\r\n')
     // 前置 BOM，Excel 才会按 UTF-8 识别中文
@@ -630,6 +710,18 @@ const groupedItems = computed(() => {
 const fmtNum = (v: unknown) => Number(v || 0).toLocaleString('zh-CN', { maximumFractionDigits: 6 })
 const fmtMoney = (v: number) => Number(v || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
+// 氚云侧是按产品名称关联的，编号是人工填写的文本（写错不影响氚云自身流转）。
+// 两者不一致时一律以名称匹配为准取产品信息，这里只负责把差异讲清楚，让人回氚云订正。
+function codeConflictTip(row: ProductInventoryBalance) {
+  const resolved = row.resolvedCode
+  if (resolved && resolved !== row.productCode) {
+    return `氚云录入的编号「${row.productCode}」与该行名称对应的产品编号「${resolved}」不一致，`
+      + '本行采购价 / 类目已按名称匹配取用，建议在氚云订正编号'
+  }
+  return `编号「${row.productCode}」在产品信息台账里指向的是另一个产品（编号撞号），`
+    + '本行采购价可能取错，请人工核对'
+}
+
 async function load(p?: number) {
   if (p) page.value = p
   loading.value = true
@@ -660,6 +752,8 @@ loadSnap()
 </script>
 
 <style scoped>
+.category-manager-summary,.category-manager-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:12px 0}
+.category-manager-count{color:var(--el-text-color-secondary);font-size:12px}
 .inventory-page { display: grid; gap: 16px; padding: 0 24px 24px; min-width: 0; }
 .inventory-page > * { min-width: 0; }
 

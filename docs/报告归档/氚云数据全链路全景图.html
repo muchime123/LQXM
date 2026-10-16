@@ -1,0 +1,204 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1180 820" font-family="-apple-system, 'Microsoft YaHei', sans-serif">
+  <defs>
+    <linearGradient id="gInbound" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4f46e5"/><stop offset="100%" stop-color="#7c3aed"/>
+    </linearGradient>
+    <linearGradient id="gFact" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#0891b2"/><stop offset="100%" stop-color="#06b6d4"/>
+    </linearGradient>
+    <linearGradient id="gLedger" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#65a30d"/><stop offset="100%" stop-color="#84cc16"/>
+    </linearGradient>
+    <linearGradient id="gStock" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#b45309"/><stop offset="100%" stop-color="#f59e0b"/>
+    </linearGradient>
+    <linearGradient id="gMoney" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#be123c"/><stop offset="100%" stop-color="#f43f5e"/>
+    </linearGradient>
+    <linearGradient id="gComm" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7c2d12"/><stop offset="100%" stop-color="#c2410c"/>
+    </linearGradient>
+    <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#94a3b8"/>
+    </marker>
+    <marker id="arrR" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#ef4444"/>
+    </marker>
+  </defs>
+
+  <rect width="1180" height="820" fill="#f8fafc"/>
+  <text x="30" y="36" font-size="20" font-weight="700" fill="#0f172a">氚云数据全链路全景图</text>
+  <text x="30" y="58" font-size="12" fill="#64748b">6 类数据源 → 事实表 → 派生计算 → 业务视图（客户档案 / 产品库存 / 月度提成 / 台账）</text>
+
+  <!-- 数据源层 -->
+  <rect x="30" y="80" width="160" height="52" rx="8" fill="url(#gInbound)"/>
+  <text x="110" y="103" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">氚云 Excel 导出</text>
+  <text x="110" y="120" text-anchor="middle" fill="#e0e7ff" font-size="10">6 类数据源</text>
+
+  <!-- 导入管线 -->
+  <rect x="240" y="80" width="180" height="52" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+  <text x="330" y="103" text-anchor="middle" fill="#4338ca" font-size="12" font-weight="700">批次化导入管线</text>
+  <text x="330" y="120" text-anchor="middle" fill="#6366f1" font-size="10">h3_import_batches / rows / staging</text>
+
+  <!-- 箭头 -->
+  <line x1="190" y1="106" x2="238" y2="106" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 6类数据源的具体说明 -->
+  <g font-size="10" fill="#475569">
+    <rect x="30" y="148" width="160" height="148" rx="8" fill="#fff" stroke="#e2e8f0"/>
+    <text x="110" y="168" text-anchor="middle" font-weight="700" fill="#0f172a">数据源清单</text>
+    <line x1="50" y1="176" x2="170" y2="176" stroke="#e2e8f0"/>
+    <text x="42" y="194">① 销售出库 OUTBOUND</text>
+    <text x="42" y="214">② 生产任务 PRODUCTION</text>
+    <text x="42" y="234">③ 收款记录 RECEIPT</text>
+    <text x="42" y="254">④ 多订单结清 SETTLEMENT</text>
+    <text x="42" y="274">⑤ 产品信息 CATALOG</text>
+    <text x="42" y="294">⑥ 仓库明细 STOCK</text>
+  </g>
+
+  <!-- 事实表层（6个框） -->
+  <!-- 销售出库 -->
+  <rect x="470" y="80" width="200" height="70" rx="8" fill="url(#gFact)"/>
+  <text x="570" y="103" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">sales_outbounds</text>
+  <text x="570" y="120" text-anchor="middle" fill="#cffafe" font-size="10">+ sales_outbound_items</text>
+  <text x="570" y="136" text-anchor="middle" fill="#cffafe" font-size="10">+ payment_snapshots（回款权威）</text>
+
+  <!-- 生产任务 -->
+  <rect x="470" y="168" width="200" height="54" rx="8" fill="url(#gFact)"/>
+  <text x="570" y="190" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">production_orders</text>
+  <text x="570" y="208" text-anchor="middle" fill="#cffafe" font-size="10">+ production_order_components</text>
+
+  <!-- 收款/结清 -->
+  <rect x="470" y="240" width="200" height="54" rx="8" fill="url(#gFact)"/>
+  <text x="570" y="262" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">receipts</text>
+  <text x="570" y="280" text-anchor="middle" fill="#cffafe" font-size="10">SINGLE_OUTBOUND / MULTI_OUTBOUND（仅台账）</text>
+
+  <!-- 产品信息台账 -->
+  <rect x="470" y="312" width="200" height="54" rx="8" fill="url(#gStock)"/>
+  <text x="570" y="334" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">h3_product_catalog</text>
+  <text x="570" y="352" text-anchor="middle" fill="#fef3c7" font-size="10">产品主数据台账（批次增改）</text>
+
+  <!-- 仓库明细台账 -->
+  <rect x="470" y="384" width="200" height="54" rx="8" fill="url(#gStock)"/>
+  <text x="570" y="406" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">h3_warehouse_stock</text>
+  <text x="570" y="424" text-anchor="middle" fill="#fef3c7" font-size="10">仓库库存台账（批次增改）</text>
+
+  <!-- 管线到各事实表的箭头 -->
+  <line x1="420" y1="106" x2="468" y2="115" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="420" y1="106" x2="468" y2="195" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="420" y1="106" x2="468" y2="267" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="420" y1="106" x2="468" y2="339" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="420" y1="106" x2="468" y2="411" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 编排层 -->
+  <rect x="720" y="80" width="150" height="54" rx="8" fill="#fef2f2" stroke="#f87171" stroke-width="1.5"/>
+  <text x="795" y="103" text-anchor="middle" fill="#b91c1c" font-size="11" font-weight="700">导入后编排</text>
+  <text x="795" y="120" text-anchor="middle" fill="#b91c1c" font-size="10">OrchestratorService</text>
+  <line x1="670" y1="115" x2="718" y2="107" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 派生：回款快照 -->
+  <rect x="720" y="156" width="150" height="64" rx="8" fill="url(#gMoney)"/>
+  <text x="795" y="178" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">回款快照刷新</text>
+  <text x="795" y="195" text-anchor="middle" fill="#fecdd3" font-size="9">refreshOutboundSnapshot</text>
+  <text x="795" y="210" text-anchor="middle" fill="#fecdd3" font-size="9">received_source / verified</text>
+  <line x1="795" y1="134" x2="795" y2="154" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="670" y1="115" x2="718" y2="188" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 派生：订单利润 -->
+  <rect x="920" y="156" width="150" height="64" rx="8" fill="url(#gMoney)"/>
+  <text x="995" y="178" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">订单利润核算</text>
+  <text x="995" y="195" text-anchor="middle" fill="#fecdd3" font-size="9">sales_outbound_profits</text>
+  <text x="995" y="210" text-anchor="middle" fill="#fecdd3" font-size="9">毛利−费用+调整→可计提</text>
+  <line x1="870" y1="188" x2="918" y2="188" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 派生：提成核算 -->
+  <rect x="920" y="242" width="150" height="70" rx="8" fill="url(#gComm)"/>
+  <text x="995" y="264" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">月度提成核算</text>
+  <text x="995" y="281" text-anchor="middle" fill="#fed7aa" font-size="9">commission_versions</text>
+  <text x="995" y="296" text-anchor="middle" fill="#fed7aa" font-size="9">(经销商回款−上月运费)</text>
+  <text x="995" y="310" text-anchor="middle" fill="#fed7aa" font-size="9">×比例 + 零售同式</text>
+  <line x1="995" y1="220" x2="995" y2="240" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 产品信息+仓库明细 → 合并入库 -->
+  <rect x="720" y="330" width="150" height="60" rx="8" fill="url(#gStock)"/>
+  <text x="795" y="352" text-anchor="middle" fill="#fff" font-size="11" font-weight="700">台账合并入库</text>
+  <text x="795" y="369" text-anchor="middle" fill="#fef3c7" font-size="9">ProductInventoryMerge</text>
+  <text x="795" y="384" text-anchor="middle" fill="#fef3c7" font-size="9">过滤费用/零库存</text>
+  <line x1="670" y1="339" x2="718" y2="350" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+  <line x1="670" y1="411" x2="718" y2="370" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 合并入库 → 产品主数据+库存余额 -->
+  <rect x="920" y="330" width="150" height="60" rx="8" fill="#f5f5f4" stroke="#a8a29e" stroke-width="1.5"/>
+  <text x="995" y="352" text-anchor="middle" fill="#44403c" font-size="11" font-weight="700">销售产品 + 库存余额</text>
+  <text x="995" y="369" text-anchor="middle" fill="#78716c" font-size="9">sales_products</text>
+  <text x="995" y="384" text-anchor="middle" fill="#78716c" font-size="9">product_inventory_balances</text>
+  <line x1="870" y1="360" x2="918" y2="360" stroke="#94a3b8" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- 客户档案层 -->
+  <rect x="30" y="430" width="200" height="90" rx="8" fill="url(#gLedger)"/>
+  <text x="130" y="452" text-anchor="middle" fill="#fff" font-size="12" font-weight="700">客户档案 customers</text>
+  <text x="130" y="470" text-anchor="middle" fill="#ecfccb" font-size="10">导入自动建档（customerId）</text>
+  <text x="130" y="486" text-anchor="middle" fill="#ecfccb" font-size="10">+ 联系人 / 业务员关系</text>
+  <text x="130" y="502" text-anchor="middle" fill="#ecfccb" font-size="10">+ 客户下钻出库/收款/库存</text>
+
+  <!-- 出库→客户 -->
+  <line x1="470" y1="115" x2="230" y2="445" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+  <line x1="470" y1="267" x2="230" y2="475" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3" marker-end="url(#arr)"/>
+
+  <!-- 历史台账层 -->
+  <rect x="30" y="560" width="1120" height="150" rx="10" fill="#f1f5f9" stroke="#cbd5e1"/>
+  <text x="50" y="585" font-size="14" font-weight="700" fill="#0f172a">氚云导入中心 · 历史台账（H3LedgerPanel，只读核对）</text>
+  <text x="50" y="603" font-size="11" fill="#64748b">所有导入确认后保留行级原始快照 h3_import_rows（永久留存，可随批次追溯）；以下为各业务表的只读镜像台账</text>
+
+  <g font-size="11">
+    <rect x="50" y="620" width="170" height="76" rx="6" fill="#fff" stroke="#06b6d4"/>
+    <text x="135" y="642" text-anchor="middle" font-weight="700" fill="#0e7490">销售出库台账</text>
+    <text x="60" y="660" fill="#475569">sales_outbounds</text>
+    <text x="60" y="676" fill="#475569">+ items 产品明细</text>
+    <text x="60" y="692" fill="#475569">external_source='H3YUN'</text>
+
+    <rect x="240" y="620" width="170" height="76" rx="6" fill="#fff" stroke="#06b6d4"/>
+    <text x="325" y="642" text-anchor="middle" font-weight="700" fill="#0e7490">生产任务台账</text>
+    <text x="250" y="660" fill="#475569">production_orders</text>
+    <text x="250" y="676" fill="#475569">+ components 制程</text>
+    <text x="250" y="692" fill="#475569">可接入制造工单</text>
+
+    <rect x="430" y="620" width="170" height="76" rx="6" fill="#fff" stroke="#06b6d4"/>
+    <text x="515" y="642" text-anchor="middle" font-weight="700" fill="#0e7490">收款记录台账</text>
+    <text x="440" y="660" fill="#475569">receipts SINGLE</text>
+    <text x="440" y="676" fill="#475569">+ receipt_outbound_links</text>
+    <text x="440" y="692" fill="#475569">仅台账不参与回款</text>
+
+    <rect x="620" y="620" width="170" height="76" rx="6" fill="#fff" stroke="#06b6d4"/>
+    <text x="705" y="642" text-anchor="middle" font-weight="700" fill="#0e7490">多订单结清台账</text>
+    <text x="630" y="660" fill="#475569">receipts MULTI</text>
+    <text x="630" y="676" fill="#475569">+ settlement_outbound_links</text>
+    <text x="630" y="692" fill="#475569">覆盖出库单展开</text>
+
+    <rect x="810" y="620" width="150" height="76" rx="6" fill="#fff" stroke="#f59e0b"/>
+    <text x="885" y="642" text-anchor="middle" font-weight="700" fill="#b45309">产品信息台账</text>
+    <text x="820" y="660" fill="#475569">h3_product_catalog</text>
+    <text x="820" y="676" fill="#475569">批次增改不覆盖</text>
+    <text x="820" y="692" fill="#475569">含采购价/规格</text>
+
+    <rect x="980" y="620" width="150" height="76" rx="6" fill="#fff" stroke="#f59e0b"/>
+    <text x="1055" y="642" text-anchor="middle" font-weight="700" fill="#b45309">仓库明细台账</text>
+    <text x="990" y="660" fill="#475569">h3_warehouse_stock</text>
+    <text x="990" y="676" fill="#475569">批次增改不覆盖</text>
+    <text x="990" y="692" fill="#475569">含数量/采购价</text>
+  </g>
+
+  <!-- 事实表→台账 连接 -->
+  <line x1="570" y1="150" x2="135" y2="620" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="570" y1="222" x2="325" y2="620" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="570" y1="294" x2="515" y2="620" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="570" y1="294" x2="705" y2="620" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="570" y1="366" x2="885" y2="620" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3"/>
+  <line x1="570" y1="438" x2="1055" y2="620" stroke="#cbd5e1" stroke-width="1" stroke-dasharray="3,3"/>
+
+  <!-- 底部关键口径说明 -->
+  <rect x="30" y="730" width="1120" height="70" rx="8" fill="#fff7ed" stroke="#fdba74"/>
+  <text x="50" y="752" font-size="12" font-weight="700" fill="#9a3412">⚠️ 关键口径（财务确认 2026-08~09）</text>
+  <text x="50" y="772" font-size="11" fill="#7c2d12">• 回款唯一权威事实 = sales_outbounds.received_amount（氚云出库内嵌「收款详细」子表 → payment_snapshots）；receipts 表仅作氚云原始台账，不参与回款计量</text>
+  <text x="50" y="790" font-size="11" fill="#7c2d12">• 提成 = (经销商回款 − 上月经销商运杂费)×经销商比例 + (零售回款 − 上月零售运杂费)×零售比例；经销商判定 = dealer_name非空 或 毛利率＜15%</text>
+</svg>

@@ -1,5 +1,5 @@
 <template>
-  <el-drawer v-model="visible" :title="`${kindLabel} · 台账详情`" size="50%" direction="rtl">
+  <el-drawer v-model="visible" :title="`${kindLabel} · 台账详情`" size="50%" direction="rtl" :append-to-body="appendToBody">
     <div v-loading="loading" class="detail-panel">
       <template v-if="!loading && !data">
         <el-empty :description="error || '未加载到详情数据'" :image-size="80" />
@@ -15,6 +15,9 @@
           </div>
           <div v-if="subtitleText" class="detail-head__sub">{{ subtitleText }}</div>
         </div>
+        <el-alert v-if="productionApplicationDateInvalid" class="detail-hint" type="error" :closable="false" show-icon
+          title="生产工单申请日期早于任务单提交日期"
+          :description="`申请日期 ${row.applicationDate}，任务单提交时间 ${fmtVal(row.sourceCreatedAt, 'dateTime')}（业务员提交生产任务单给车间审批的时间）。请核对业务员填写的申请日期；源台账原值保留。`" />
 
         <div v-if="props.ledgerType === 'outbound'" class="detail-sec nature-card">
           <div class="nature-card__head">
@@ -103,7 +106,7 @@
               label-width="118px"
             >
               <span v-if="f.fmt === 'longText' && fmtVal(row[f.key], f.fmt) !== '—'" class="d-long">{{ fmtVal(row[f.key], f.fmt) }}</span>
-              <template v-else>{{ fmtVal(row[f.key], f.fmt) }}</template>
+              <span v-else :class="{ 'source-date-error': productionApplicationDateInvalid && f.key === 'applicationDate' }">{{ fmtVal(row[f.key], f.fmt) }}</span>
             </el-descriptions-item>
           </el-descriptions>
         </div>
@@ -257,6 +260,7 @@ const props = defineProps<{
   loading: boolean
   data: LedgerDetailResult | null
   error?: string | null
+  appendToBody?: boolean
 }>()
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
@@ -265,6 +269,9 @@ const emit = defineEmits<{
 
 const visible = computed({ get: () => props.modelValue, set: v => emit('update:modelValue', v) })
 const row = computed(() => props.data?.row ?? null)
+const productionApplicationDateInvalid = computed(() => props.ledgerType === 'production'
+  && !!row.value?.applicationDate && !!row.value?.sourceCreatedAt
+  && String(row.value.applicationDate).slice(0, 10) < String(row.value.sourceCreatedAt).slice(0, 10))
 
 // ===== 更新历史（按业务键回放历次批次的 新增/更新；后端扫描批次 preview_json，见 H3LedgerRowHistoryService） =====
 const historyLoading = ref(false)
@@ -1562,6 +1569,10 @@ function statusTagType(v: any): 'success' | 'warning' | 'info' | 'primary' {
 }
 .detail-hint {
   margin-bottom: 16px;
+}
+.source-date-error {
+  color: #b42318;
+  font-weight: 700;
 }
 .detail-head {
   display: flex;

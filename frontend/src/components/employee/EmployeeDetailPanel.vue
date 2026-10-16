@@ -190,6 +190,65 @@
             <el-empty description="该员工尚未生成登录账号，请确认手机号后重新保存员工档案。" :image-size="80" />
           </div>
         </section>
+
+        <!-- 档案文件 -->
+        <section v-else-if="activeTab === 'files'" class="employee-tab-panel">
+          <div class="files-toolbar">
+            <p class="files-hint">上传和管理员工的身份证复印件、劳动合同、学历证明等档案文件。</p>
+            <div v-if="canManage" class="files-upload">
+              <el-select v-model="uploadCategory" placeholder="选择类别" size="small" style="width: 140px">
+                <el-option
+                  v-for="cat in employeeFileCategories"
+                  :key="cat.value"
+                  :label="cat.label"
+                  :value="cat.value"
+                />
+              </el-select>
+              <el-button
+                type="primary"
+                size="small"
+                :disabled="!uploadCategory || fileUploading"
+                @click="pickAndUploadFile"
+              >
+                {{ fileUploading ? '上传中…' : '上传文件' }}
+              </el-button>
+              <input ref="fileInputRef" type="file" style="display: none" @change="onFileSelected" />
+            </div>
+          </div>
+          <div v-loading="filesLoading" class="files-groups">
+            <div v-for="cat in employeeFileCategories" :key="cat.value" class="file-group">
+              <div class="file-group__header">
+                <span class="file-group__label">{{ cat.label }}</span>
+                <el-tag size="small" effect="plain">{{ groupedFiles[cat.value]?.length || 0 }}</el-tag>
+              </div>
+              <div v-if="groupedFiles[cat.value]?.length" class="file-list">
+                <div v-for="file in groupedFiles[cat.value]" :key="file.assetId" class="file-item">
+                  <div class="file-item__info">
+                    <span class="file-item__name" :title="file.originalFileName || file.fileName">
+                      {{ file.originalFileName || file.fileName }}
+                    </span>
+                    <span class="file-item__meta">
+                      {{ formatFileSize(file.fileSize) }} · {{ formatTime(file.createdAt) }}
+                    </span>
+                  </div>
+                  <div class="file-item__actions">
+                    <el-button link type="primary" size="small" @click="previewFile(file)">预览</el-button>
+                    <el-button link type="primary" size="small" @click="downloadFile(file)">下载</el-button>
+                    <el-button
+                      v-if="canManage"
+                      link
+                      type="danger"
+                      size="small"
+                      @click="confirmDeleteFile(file)"
+                      >删除</el-button
+                    >
+                  </div>
+                </div>
+              </div>
+              <el-empty v-else :image-size="40" description="暂无文件" />
+            </div>
+          </div>
+        </section>
       </div>
     </div>
   </section>
@@ -197,7 +256,10 @@
 
 <script setup lang="ts">
 import { computed, reactive, ref, watch } from 'vue'
-import { addEmployeeMapping, fetchEmployee, updateEmployeeMapping, removeEmployeeMapping } from '@/api/employees'
+import { addEmployeeMapping, fetchEmployee, updateEmployeeMapping, removeEmployeeMapping, registerEmployeeFile } from '@/api/employees'
+import { fetchFileAssets } from '@/api/file/fileAssets'
+import { fileAssetApi } from '@/api/file/fileAssetApi'
+import { uploadFile } from '@/api/file/file'
 import { fetchEmployeeRoles, fetchSystemRoles, updateEmployeeRoles, type SystemRole } from '@/api/accessControl'
 import { fetchEmployeeLoginAccount, resetLoginPassword, setLoginAccountEnabled, type LoginAccount } from '@/api/auth'
 import LqDescriptions from '@/components/common/LqDescriptions.vue'
@@ -212,6 +274,7 @@ import type {
   EmployeeMappingSummary,
   EmployeeMappingPayload
 } from '@/types/employee'
+import type { FileHandle } from '@/types/fileAsset'
 import { formatDateTime } from '@/utils/common/dateUtils'
 
 const props = withDefaults(
@@ -249,7 +312,8 @@ const detailTabs = computed<MasterDetailTab[]>(() => [
   { key: 'basic', label: '基本信息' },
   { key: 'mappings', label: '身份映射', badge: detail.value?.mappings.length ?? 0 },
   { key: 'roles', label: '角色权限' },
-  { key: 'loginAccount', label: '登录账号' }
+  { key: 'loginAccount', label: '登录账号' },
+  { key: 'files', label: '档案文件', badge: employeeFiles.value.filter(f => !f.deleted).length }
 ])
 
 function statusTagType(status: string): string {
@@ -479,6 +543,113 @@ async function resetAccountPassword() {
   }
 }
 
+// ===== 档案文件 =====
+
+const employeeFileCategories = [
+  { value: 'id_card', label: '身份证复印件' },
+  { value: 'labor_contract', label: '劳动合同' },
+  { value: 'education_cert', label: '学历证明' },
+  { value: 'resignation_cert', label: '离职证明' },
+  { value: 'health_cert', label: '健康证' },
+  { value: 'other', label: '其他' }
+]
+
+const employeeFiles = ref<FileHandle[]>([])
+const filesLoading = ref(false)
+const fileUploading = ref(false)
+const uploadCategory = ref('')
+const fileInputRef = ref<HTMLInputElement | null>(null)
+
+const groupedFiles = computed(() => {
+  const groups: Record<string, FileHandle[]> = {}
+  for (const file of employeeFiles.value) {
+    if (file.deleted) continue
+    const cat = file.category || 'other'
+    if (!groups[cat]) groups[cat] = []
+    groups[cat].push(file)
+  }
+  return groups
+})
+
+function formatFileSize(size: number | null | undefined): string {
+  if (!size) return '—'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${Math.round(size / 1024)} KB`
+  return `${Math.round((size / 1024 / 1024) * 100) / 100} MB`
+}
+
+async function loadEmployeeFiles(employeeId: number) {
+  filesLoading.value = true
+  try {
+    employeeFiles.value = await fetchFileAssets('employee', employeeId)
+  } catch {
+    employeeFiles.value = []
+  } finally {
+    filesLoading.value = false
+  }
+}
+
+function pickAndUploadFile() {
+  fileInputRef.value?.click()
+}
+
+async function onFileSelected(event: Event) {
+  if (!detail.value || !uploadCategory.value) return
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+  fileUploading.value = true
+  try {
+    const result = await uploadFile('employee_file', file, detail.value.id)
+    // PhysicalUploadResult.fileName 可选；缺失则无法登记，直接失败而不是写一条空文件名的记录
+    const uploadedName = result.fileName || result.data?.fileName
+    if (!uploadedName) throw new Error('上传未返回文件名，无法登记档案')
+    await registerEmployeeFile(detail.value.id, {
+      category: uploadCategory.value,
+      fileName: uploadedName,
+      originalFileName: file.name,
+      mimeType: file.type || undefined,
+      fileSize: result.size
+    })
+    notify.success('文件已上传')
+    await loadEmployeeFiles(detail.value.id)
+  } catch (e: any) {
+    notify.error(e?.message || '上传失败')
+  } finally {
+    fileUploading.value = false
+    if (input) input.value = ''
+  }
+}
+
+function previewFile(file: FileHandle) {
+  const url = fileAssetApi('employee').previewUrl(file.assetId)
+  window.open(url, '_blank')
+}
+
+function downloadFile(file: FileHandle) {
+  const url = fileAssetApi('employee').downloadUrl(file.assetId)
+  window.open(url, '_blank')
+}
+
+async function confirmDeleteFile(file: FileHandle) {
+  if (!detail.value || !props.canManage) return
+  const ok = await askConfirm({
+    title: '确认删除档案文件？',
+    message: `${file.originalFileName || file.fileName} 将从员工档案中移除，删除后本页不再显示。`,
+    confirmText: '删除',
+    cancelText: '取消',
+    danger: true
+  })
+  if (!ok) return
+  try {
+    await fileAssetApi('employee').delete(file.assetId)
+    notify.success('文件已删除')
+    await loadEmployeeFiles(detail.value.id)
+  } catch (e: any) {
+    notify.error(e?.message || '删除失败')
+  }
+}
+
 // ===== 加载 =====
 
 async function reload() {
@@ -496,12 +667,15 @@ watch(
     activeTab.value = 'basic'
     detail.value = null
     detailAccount.value = null
+    employeeFiles.value = []
     if (!id) return
     loading.value = true
     try {
       detail.value = await fetchEmployee(id)
       loadRoleConfig(id)
       loadDetailAccount(id)
+      // 档案文件必须随详情一起加载，否则「档案文件」Tab 列表与徽标恒为空
+      loadEmployeeFiles(id)
     } catch (e: any) {
       notify.error(e?.message || '加载员工详情失败')
     } finally {

@@ -38,7 +38,7 @@ public class CurrentUserService {
     @Value("${app.security.compatibility-admin:false}")
     private boolean compatibilityAdmin;
 
-    @Value("${app.security.allow-employee-header:true}")
+    @Value("${app.security.allow-employee-header:false}")
     private boolean allowEmployeeHeader;
 
     /** 当前登录用户（请求内缓存，避免同一次请求重复解析/查库）。 */

@@ -17,6 +17,7 @@ describe('file asset runtime types', () => {
       'packaging_variant',
       'company',
       'certificate',
+      'employee',
       'document'
     ])
     expect(isFileOwnerType('company')).toBe(true)

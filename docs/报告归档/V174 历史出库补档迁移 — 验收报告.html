@@ -1,0 +1,372 @@
+<style>
+:root {
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  --font-metric: "SF Mono", "Cascadia Code", "Consolas", monospace;
+  --weight-medium: 500;
+  --weight-strong: 700;
+  --text-caption: 12px/18px;
+  --text-code: 13px/20px;
+  --text-body: 14px/20px;
+  --text-title: 16px/24px;
+  --radius: 8px;
+  --radius-card: 12px;
+  --radius-full: 999px;
+  --spacer-4: 4px;
+  --spacer-8: 8px;
+  --spacer-12: 12px;
+  --spacer-16: 16px;
+  --spacer-20: 20px;
+  --spacer-24: 24px;
+  --surface: #ffffff;
+  --surface-muted: #f5f5f7;
+  --border: #e0e0e3;
+  --text: #1a1a1a;
+  --text-muted: #6b6b70;
+  --brand: #6b4eff;
+  --brand-soft: #f0edff;
+  --accent: #00a990;
+  --chart-series-1: #6b4eff;
+  --chart-series-2: #00a990;
+  --chart-series-3: #ff8c42;
+  --chart-other: #94a3b8;
+  --warn: #e67e22;
+  --warn-soft: #fff5eb;
+  --ok: #22a06b;
+  --ok-soft: #e3fcef;
+}
+:root[data-widget-theme="dark"] {
+  --surface: #1a1a2e;
+  --surface-muted: #161623;
+  --border: #2a2a3e;
+  --text: #e8e8f0;
+  --text-muted: #9999aa;
+  --brand: #9b7eff;
+  --brand-soft: #2a2348;
+  --accent: #2dd4bf;
+  --chart-series-1: #9b7eff;
+  --chart-series-2: #2dd4bf;
+  --chart-series-3: #ffa552;
+  --chart-other: #64748b;
+  --warn: #f39c12;
+  --warn-soft: #2e2118;
+  --ok: #22c55e;
+  --ok-soft: #142a1e;
+}
+[data-dynamic-ui-widget] {
+  font-family: var(--font-sans);
+  color: var(--text);
+  background: var(--surface);
+  border-radius: var(--radius-card);
+  border: 1px solid var(--border);
+  padding: var(--spacer-24);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-20);
+}
+.rpt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacer-12);
+  flex-wrap: wrap;
+}
+.rpt-title {
+  font: var(--weight-strong) var(--text-title) var(--font-sans);
+  margin: 0;
+}
+.rpt-sub {
+  font: var(--text-caption) var(--font-sans);
+  color: var(--text-muted);
+  margin: 0;
+}
+.rpt-badge {
+  font: var(--weight-medium) var(--text-caption) var(--font-sans);
+  padding: var(--spacer-4) var(--spacer-12);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  white-space: nowrap;
+}
+.rpt-badge.ok { background: var(--ok-soft); color: var(--ok); border-color: var(--ok); }
+.rpt-badge.warn { background: var(--warn-soft); color: var(--warn); border-color: var(--warn); }
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--spacer-12);
+}
+.kpi-card {
+  background: var(--surface-muted);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: var(--spacer-12) var(--spacer-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-4);
+}
+.kpi-label {
+  font: var(--text-caption) var(--font-sans);
+  color: var(--text-muted);
+}
+.kpi-value {
+  font: var(--weight-strong) var(--text-title) var(--font-metric);
+}
+.kpi-sub {
+  font: var(--text-caption) var(--font-sans);
+  color: var(--text-muted);
+}
+.kpi-card.focus { border-color: var(--brand); background: var(--brand-soft); }
+.kpi-card.focus .kpi-value { color: var(--brand); }
+.section-title {
+  font: var(--weight-medium) var(--text-title) var(--font-sans);
+  margin: 0;
+  padding-bottom: var(--spacer-8);
+  border-bottom: 1px solid var(--border);
+}
+.bar-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacer-12);
+  padding: var(--spacer-8) 0;
+}
+.bar-label {
+  font: var(--text-body) var(--font-sans);
+  min-width: 80px;
+  flex-shrink: 0;
+}
+.bar-track {
+  flex: 1;
+  height: 22px;
+  background: var(--surface-muted);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+.bar-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--spacer-8);
+  transition: width 0.3s ease;
+}
+.bar-fill.s1 { background: var(--chart-series-1); }
+.bar-fill.s2 { background: var(--chart-series-2); }
+.bar-fill.s3 { background: var(--chart-series-3); }
+.bar-val {
+  font: var(--weight-medium) var(--text-caption) var(--font-metric);
+  color: #fff;
+  white-space: nowrap;
+}
+.bar-pct {
+  font: var(--text-caption) var(--font-metric);
+  color: var(--text-muted);
+  min-width: 56px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.warn-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacer-12);
+}
+.warn-item {
+  display: flex;
+  gap: var(--spacer-12);
+  align-items: flex-start;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  border-radius: var(--radius);
+  padding: var(--spacer-12) var(--spacer-16);
+}
+.warn-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-full);
+  background: var(--warn);
+  color: #fff;
+  font: var(--weight-strong) 11px var(--font-sans);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.warn-text { display: flex; flex-direction: column; gap: var(--spacer-4); }
+.warn-title { font: var(--weight-medium) var(--text-body) var(--font-sans); color: var(--warn); }
+.warn-desc { font: var(--text-caption) var(--font-sans); color: var(--text-muted); }
+.check-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body) var(--font-sans);
+}
+.check-table th {
+  font: var(--weight-medium) var(--text-caption) var(--font-sans);
+  color: var(--text-muted);
+  text-align: left;
+  padding: var(--spacer-8) var(--spacer-12);
+  border-bottom: 1px solid var(--border);
+}
+.check-table td {
+  padding: var(--spacer-8) var(--spacer-12);
+  border-bottom: 1px solid var(--border);
+  font: var(--text-code) var(--font-metric);
+}
+.check-table td:first-child { font: var(--text-body) var(--font-sans); }
+.check-pass { color: var(--ok); font: var(--weight-strong) var(--text-caption) var(--font-sans); }
+.rpt-footer {
+  font: var(--text-caption) var(--font-sans);
+  color: var(--text-muted);
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacer-12);
+  flex-wrap: wrap;
+  padding-top: var(--spacer-8);
+  border-top: 1px solid var(--border);
+}
+.flow-steps {
+  display: flex;
+  align-items: center;
+  gap: var(--spacer-4);
+  flex-wrap: wrap;
+}
+.flow-step {
+  font: var(--text-caption) var(--font-sans);
+  padding: var(--spacer-4) var(--spacer-12);
+  border-radius: var(--radius-full);
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  white-space: nowrap;
+}
+.flow-step.active { background: var(--brand-soft); border-color: var(--brand); color: var(--brand); font-weight: var(--weight-medium); }
+.flow-arrow { color: var(--text-muted); font-size: 11px; }
+</style>
+
+<div data-dynamic-ui-widget data-template="compact-table-visual" data-mounted="true">
+
+  <div class="rpt-header">
+    <div>
+      <h2 class="rpt-title">V174 历史出库补档迁移 — 验收报告</h2>
+      <p class="rpt-sub">2026-08-26 16:33 · 执行耗时 5.99s · Flyway V174 + HistoricalOutboundRecoveryService</p>
+    </div>
+    <span class="rpt-badge warn">WARN（核心通过）</span>
+  </div>
+
+  <div class="flow-steps">
+    <span class="flow-step active">V174 Flyway DML</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step active">JSON_TABLE 提取 5,309</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step active">外键回填 5,368</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step active">快照刷新 5,309</span>
+    <span class="flow-arrow">→</span>
+    <span class="flow-step active">自检九项</span>
+  </div>
+
+  <h3 class="section-title">核心指标</h3>
+  <div class="kpi-grid">
+    <div class="kpi-card focus">
+      <span class="kpi-label">补档出库单数</span>
+      <span class="kpi-value">5,309</span>
+      <span class="kpi-sub">= 基准缺失数 ✓</span>
+    </div>
+    <div class="kpi-card focus">
+      <span class="kpi-label">已关联分配行</span>
+      <span class="kpi-value">5,368</span>
+      <span class="kpi-sub">100% 外键回填 ✓</span>
+    </div>
+    <div class="kpi-card focus">
+      <span class="kpi-label">剩余孤儿分配</span>
+      <span class="kpi-value">0</span>
+      <span class="kpi-sub">孤儿引用清零 ✓</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">刷新收款单</span>
+      <span class="kpi-value">797</span>
+      <span class="kpi-sub">allocated/unallocated 同步</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">补档销售总额</span>
+      <span class="kpi-value">¥1,399.23万</span>
+      <span class="kpi-sub">5,309 张出库合计</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">补档回款总额</span>
+      <span class="kpi-value">¥278.67万</span>
+      <span class="kpi-sub">displayReceived 口径</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">已核销金额</span>
+      <span class="kpi-value">¥314.43万</span>
+      <span class="kpi-sub">> 回款（含跨期核销）</span>
+    </div>
+    <div class="kpi-card">
+      <span class="kpi-label">数据来源覆盖率</span>
+      <span class="kpi-value">100%</span>
+      <span class="kpi-sub">5,309/5,309 源于 h3_import_rows</span>
+    </div>
+  </div>
+
+  <h3 class="section-title">回款状态分布</h3>
+  <div>
+    <div class="bar-row">
+      <span class="bar-label">未回款</span>
+      <div class="bar-track"><div class="bar-fill s1" style="width:92.3%"></div></div>
+      <span class="bar-pct">4,897 · 92.3%</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">部分回款</span>
+      <div class="bar-track"><div class="bar-fill s3" style="width:4.9%"></div></div>
+      <span class="bar-pct">259 · 4.9%</span>
+    </div>
+    <div class="bar-row">
+      <span class="bar-label">已结清</span>
+      <div class="bar-track"><div class="bar-fill s2" style="width:2.9%"></div></div>
+      <span class="bar-pct">153 · 2.9%</span>
+    </div>
+  </div>
+
+  <h3 class="section-title">自检矩阵（C1–C9）</h3>
+  <table class="check-table">
+    <thead>
+      <tr><th>检查项</th><th>指标</th><th>结果</th><th>状态</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>C1 补档出库总数</td><td>5,309</td><td>= 基准缺失</td><td class="check-pass">PASS</td></tr>
+      <tr><td>C2 已关联 allocation</td><td>5,368</td><td>= V174 回填</td><td class="check-pass">PASS</td></tr>
+      <tr><td>C3 孤儿分配行</td><td>0</td><td>清零</td><td class="check-pass">PASS</td></tr>
+      <tr><td>C4 补档销售合计</td><td>¥1,399.23万</td><td>合理</td><td class="check-pass">PASS</td></tr>
+      <tr><td>C5 已核销金额</td><td>¥314.43万</td><td>≈ C4·回款</td><td class="check-pass">PASS</td></tr>
+      <tr><td>C6 payment_status</td><td>3 级分布</td><td>未回款主导</td><td class="check-pass">PASS</td></tr>
+      <tr><td>C7 settlement_status</td><td>3 级分布</td><td>UNSETTLED 主导</td><td class="check-pass">PASS</td></tr>
+      <tr><td>C8 负数快照</td><td>17</td><td>0.3% 异常</td><td class="check-pass">WARN</td></tr>
+      <tr><td>C9 内嵌差额>1元</td><td>54</td><td>1.0% 尾差</td><td class="check-pass">WARN</td></tr>
+    </tbody>
+  </table>
+
+  <h3 class="section-title">警告项说明</h3>
+  <div class="warn-list">
+    <div class="warn-item">
+      <div class="warn-icon">!</div>
+      <div class="warn-text">
+        <span class="warn-title">NEGATIVE_SNAPSHOTS = 17（0.3%）</span>
+        <span class="warn-desc">17 张出库的 received_amount 或 outstanding_amount &lt; 0。根因：历史数据中部分 received_amount &gt; sales_amount，导致 outstanding 被截断前为负值。不影响补档正确性，属对账层尾差，可后续在 SettlementLedgerService 中加 GREATEST(0, ...) 兜底。</span>
+      </div>
+    </div>
+    <div class="warn-item">
+      <div class="warn-icon">!</div>
+      <div class="warn-text">
+        <span class="warn-title">receivedDiffGt1Yuan = 54（1.0%）</span>
+        <span class="warn-desc">54 张出库的氚云内嵌登记金额与系统核销分配差额 &gt;1 元。此为已知的"29.9% 分配与出库列 received_amount 对不上"问题的子集，属历史数据质量问题，不影响 V174 补档逻辑。</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="rpt-footer">
+    <span>迁移脚本: V174__recover_historical_outbounds_from_h3.sql</span>
+    <span>服务: HistoricalOutboundRecoveryService · SalesOutboundSettlementController</span>
+    <span>验收结论: 核心通过 · 2 项 WARN 属历史尾差</span>
+  </div>
+
+</div>

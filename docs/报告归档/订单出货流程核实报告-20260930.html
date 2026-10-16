@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>订单出货流程核实报告 · 2026-09-30</title>
+<style>
+  :root {
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text: #0f172a;
+    --text-muted: #475569;
+    --text-soft: #64748b;
+    --primary: #2563eb;
+    --primary-soft: #dbeafe;
+    --success: #16a34a;
+    --success-soft: #dcfce7;
+    --warn: #d97706;
+    --warn-soft: #fef3c7;
+    --danger: #dc2626;
+    --danger-soft: #fee2e2;
+    --purple: #7c3aed;
+    --purple-soft: #ede9fe;
+    --teal: #0d9488;
+    --teal-soft: #ccfbf1;
+    --code-bg: #f1f5f9;
+    --shadow: 0 1px 3px rgba(15,23,42,0.04), 0 1px 2px rgba(15,23,42,0.06);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.65;
+    padding: 0;
+    font-size: 14px;
+  }
+  .container { max-width: 1100px; margin: 0 auto; padding: 32px 28px 80px; }
+
+  /* Header */
+  .report-header {
+    background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 50%, #0d9488 100%);
+    color: white;
+    padding: 40px 32px;
+    border-radius: 14px;
+    box-shadow: 0 10px 30px rgba(37,99,235,0.18);
+    margin-bottom: 32px;
+  }
+  .report-header .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    opacity: 0.85;
+    margin-bottom: 8px;
+  }
+  .report-header h1 { font-size: 28px; font-weight: 700; margin-bottom: 6px; }
+  .report-header .subtitle { font-size: 14px; opacity: 0.9; }
+  .report-header .meta {
+    margin-top: 18px;
+    display: flex;
+    gap: 20px;
+    font-size: 12px;
+    opacity: 0.88;
+    flex-wrap: wrap;
+  }
+  .report-header .meta span::before {
+    content: "·";
+    margin-right: 6px;
+    opacity: 0.6;
+  }
+  .report-header .meta span:first-child::before { content: ""; margin: 0; }
+
+  /* TOC */
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 24px;
+    margin-bottom: 32px;
+    box-shadow: var(--shadow);
+  }
+  .toc h3 { font-size: 13px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 12px; }
+  .toc ol { padding-left: 22px; }
+  .toc li { margin-bottom: 6px; }
+  .toc a { color: var(--primary); text-decoration: none; font-size: 13px; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* Section */
+  section {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 24px 28px;
+    margin-bottom: 20px;
+    box-shadow: var(--shadow);
+  }
+  section h2 {
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--text);
+    padding-bottom: 10px;
+    border-bottom: 2px solid var(--border);
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  section h2 .num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px; height: 28px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    font-size: 14px;
+    font-weight: 700;
+  }
+  section h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 18px 0 10px;
+    padding-left: 10px;
+    border-left: 3px solid var(--primary);
+  }
+  section p { margin-bottom: 10px; color: var(--text); }
+  section ul, section ol { padding-left: 22px; margin-bottom: 10px; }
+  section li { margin-bottom: 5px; }
+  section code {
+    background: var(--code-bg);
+    color: var(--text);
+    padding: 1.5px 6px;
+    border-radius: 4px;
+    font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+    font-size: 12.5px;
+  }
+  section pre {
+    background: var(--code-bg);
+    padding: 12px 14px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin: 10px 0;
+    font-family: "JetBrains Mono", "Fira Code", "Consolas", monospace;
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  section pre code { background: transparent; padding: 0; font-size: 12px; }
+
+  /* Flow Diagram (SVG container) */
+  .flow-diagram {
+    background: #fafbfc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin: 12px 0;
+    text-align: center;
+  }
+  .flow-diagram svg { max-width: 100%; height: auto; }
+
+  /* Cards / Status */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 10px 0;
+  }
+  .card-title { font-weight: 600; font-size: 13.5px; margin-bottom: 6px; color: var(--text); }
+  .card-path { font-family: monospace; font-size: 12px; color: var(--text-muted); background: var(--code-bg); padding: 2px 6px; border-radius: 4px; display: inline-block; margin-bottom: 8px; }
+
+  /* Badges */
+  .badge {
+    display: inline-block;
+    padding: 2px 9px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    margin: 0 4px 0 0;
+    vertical-align: middle;
+  }
+  .badge-success { background: var(--success-soft); color: var(--success); border: 1px solid #86efac; }
+  .badge-warn { background: var(--warn-soft); color: var(--warn); border: 1px solid #fcd34d; }
+  .badge-danger { background: var(--danger-soft); color: var(--danger); border: 1px solid #fca5a5; }
+  .badge-info { background: var(--primary-soft); color: var(--primary); border: 1px solid #93c5fd; }
+  .badge-purple { background: var(--purple-soft); color: var(--purple); border: 1px solid #c4b5fd; }
+  .badge-teal { background: var(--teal-soft); color: var(--teal); border: 1px solid #5eead4; }
+
+  /* Callouts */
+  .callout {
+    border-left: 4px solid;
+    padding: 12px 16px;
+    border-radius: 6px;
+    margin: 12px 0;
+    font-size: 13px;
+  }
+  .callout-danger { background: var(--danger-soft); border-color: var(--danger); color: #7f1d1d; }
+  .callout-warn { background: var(--warn-soft); border-color: var(--warn); color: #78350f; }
+  .callout-success { background: var(--success-soft); border-color: var(--success); color: #14532d; }
+  .callout-info { background: var(--primary-soft); border-color: var(--primary); color: #1e3a8a; }
+  .callout strong { font-weight: 700; }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 13px;
+    background: var(--surface);
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  th { background: #f1f5f9; font-weight: 600; color: var(--text); }
+  tr:nth-child(even) td { background: #fafbfc; }
+
+  /* Verdict box (for problem conclusions) */
+  .verdict {
+    border-radius: 8px;
+    padding: 16px 20px;
+    margin: 14px 0;
+    border: 1px solid;
+  }
+  .verdict-title { font-weight: 700; font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .verdict-body { font-size: 13px; line-height: 1.7; }
+  .verdict-body p { margin-bottom: 8px; }
+  .verdict-body code { font-size: 12px; }
+  .verdict-bug { background: #fef2f2; border-color: #fecaca; }
+  .verdict-bug .verdict-title { color: var(--danger); }
+  .verdict-ok { background: #f0fdf4; border-color: #bbf7d0; }
+  .verdict-ok .verdict-title { color: var(--success); }
+  .verdict-ux { background: #fffbeb; border-color: #fde68a; }
+  .verdict-ux .verdict-title { color: var(--warn); }
+
+  .evidence {
+    font-size: 12px;
+    color: var(--text-soft);
+    background: #f8fafc;
+    border: 1px dashed var(--border-strong);
+    border-radius: 4px;
+    padding: 8px 12px;
+    margin-top: 8px;
+    font-family: monospace;
+  }
+  .evidence::before { content: "证据 "; color: var(--text-soft); font-weight: 600; }
+
+  /* Summary box */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px;
+    margin: 16px 0;
+  }
+  .stat {
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .stat-label { font-size: 11px; color: var(--text-soft); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 6px; }
+  .stat-value { font-size: 20px; font-weight: 700; color: var(--text); }
+  .stat-hint { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+
+  /* Footer */
+  footer {
+    text-align: center;
+    padding: 20px;
+    color: var(--text-soft);
+    font-size: 12px;
+    border-top: 1px solid var(--border);
+    margin-top: 32px;
+  }
+  footer p { margin-bottom: 4px; }
+
+  /* Anchor offset for sticky scroll */
+  [id] { scroll-margin-top: 20px; }
+</style>
+</head>
+<body>
+
+<div class="report-header">
+  <div class="eyebrow">ERP · 销售链路核实</div>
+  <h1>订单出货流程核实报告</h1>
+  <div class="subtitle">从新建销售订单到销售出库的端到端流程梳理与问题核实</div>
+  <div class="meta">
+    <span>报告日期：2026-09-30</span>
+    <span>核实范围：frontend/src/apps/erp + backend Service</span>
+    <span>主轴：销售订单 → 履约评审 → 生产/采购 → 完工入库 → 销售出库</span>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="toc">
+    <h3>目录</h3>
+    <ol>
+      <li><a href="#sec1">主轴流程图</a></li>
+      <li><a href="#sec2">节点逐一说明</a></li>
+      <li><a href="#sec3">3 个严重问题核实结论</a></li>
+      <li><a href="#sec4">UX 待改进问题清单</a></li>
+      <li><a href="#sec5">关键流转约束表</a></li>
+      <li><a href="#sec6">综合结论</a></li>
+    </ol>
+  </div>
+
+  <!-- ========== Section 1 ========== -->
+  <section id="sec1">
+    <h2><span class="num">1</span>主轴流程图</h2>
+    <p>ERP 主轴 5 节点：销售订单 → 履约评审 → 生产 / 采购 → 完工入库 → 销售出库。每个节点衍生一个子模块（需求挂账 / 异常单 / 报工返工质检 / 代发直发 / 利润提成结算）。</p>
+
+    <div class="flow-diagram">
+      <svg viewBox="0 0 1080 720" xmlns="http://www.w3.org/2000/svg" font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', sans-serif">
+        <defs>
+          <marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+          </marker>
+          <marker id="arrG" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#16a34a"/>
+          </marker>
+          <marker id="arrW" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+            <path d="M0,0 L10,5 L0,10 z" fill="#d97706"/>
+          </marker>
+          <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#fafbfc"/>
+            <stop offset="1" stop-color="#eef2f7"/>
+          </linearGradient>
+        </defs>
+
+        <rect width="1080" height="720" fill="url(#bg)"/>
+
+        <text x="540" y="34" text-anchor="middle" font-size="20" font-weight="700" fill="#0f172a">从新建销售订单到销售出库 · 主轴流程</text>
+        <text x="540" y="56" text-anchor="middle" font-size="12" fill="#64748b">销售订单 → 履约评审 → 生产 / 采购 → 完工入库 → 销售出库</text>
+
+        <!-- ① 销售订单 -->
+        <g>
+          <rect x="40" y="90" width="240" height="170" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+          <rect x="40" y="90" width="240" height="32" rx="10" fill="#2563eb"/>
+          <rect x="40" y="110" width="240" height="12" fill="#2563eb"/>
+          <text x="160" y="111" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">① 销售订单</text>
+          <text x="160" y="143" text-anchor="middle" font-size="12" font-weight="600" fill="#1e293b">/sales-orders</text>
+          <text x="160" y="163" text-anchor="middle" font-size="11" fill="#475569">入口：列表「新建订单」抽屉</text>
+          <text x="160" y="183" text-anchor="middle" font-size="11" fill="#475569">客户必须锚定客户档案</text>
+          <text x="160" y="203" text-anchor="middle" font-size="11" fill="#475569">明细行供货方式：</text>
+          <text x="160" y="220" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">STOCK · MAKE · BUY · 待定</text>
+          <rect x="55" y="234" width="60" height="18" rx="9" fill="#e0f2fe" stroke="#0284c7"/>
+          <text x="85" y="247" text-anchor="middle" font-size="10" fill="#0c4a6e">草稿</text>
+          <text x="120" y="247" font-size="11" fill="#64748b">→</text>
+          <rect x="135" y="234" width="60" height="18" rx="9" fill="#fef3c7" stroke="#d97706"/>
+          <text x="165" y="247" text-anchor="middle" font-size="10" fill="#92400e">待审批</text>
+          <text x="200" y="247" font-size="11" fill="#64748b">→</text>
+          <rect x="215" y="234" width="60" height="18" rx="9" fill="#dcfce7" stroke="#16a34a"/>
+          <text x="245" y="247" text-anchor="middle" font-size="10" fill="#15803d">已确认</text>
+        </g>
+
+        <path d="M280 175 L320 175" stroke="#475569" stroke-width="2" marker-end="url(#arr)" fill="none"/>
+        <text x="300" y="168" text-anchor="middle" font-size="10" fill="#475569">送评</text>
+
+        <!-- ② 履约评审 -->
+        <g>
+          <rect x="320" y="90" width="220" height="170" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+          <rect x="320" y="90" width="220" height="32" rx="10" fill="#7c3aed"/>
+          <rect x="320" y="110" width="220" height="12" fill="#7c3aed"/>
+          <text x="430" y="111" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">② 履约评审</text>
+          <text x="430" y="143" text-anchor="middle" font-size="12" font-weight="600" fill="#1e293b">/sales-fulfillment-reviews</text>
+          <text x="430" y="163" text-anchor="middle" font-size="11" fill="#475569">分两岗：车间·自产 / 采购·外采</text>
+          <text x="430" y="181" text-anchor="middle" font-size="11" fill="#475569">仅 MAKE / BUY 行需评审</text>
+          <text x="430" y="199" text-anchor="middle" font-size="11" fill="#475569">结论：通过 / 需调整</text>
+          <text x="430" y="217" text-anchor="middle" font-size="11" fill="#475569">改配置 / 数量 / 交期 → 意见失效</text>
+          <text x="430" y="237" text-anchor="middle" font-size="11" font-style="italic" fill="#9333ea">已确认订单变更也在此复评</text>
+        </g>
+
+        <path d="M430 90 Q 430 60 160 60 L 160 88" stroke="#475569" stroke-width="2" stroke-dasharray="4 3" fill="none" marker-end="url(#arr)"/>
+        <text x="295" y="55" text-anchor="middle" font-size="10" fill="#475569">通过后回订单提交审批</text>
+
+        <!-- 订单协作详情 -->
+        <g>
+          <rect x="580" y="90" width="240" height="170" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+          <rect x="580" y="90" width="240" height="32" rx="10" fill="#0f766e"/>
+          <rect x="580" y="110" width="240" height="12" fill="#0f766e"/>
+          <text x="700" y="111" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">订单协作详情</text>
+          <text x="700" y="143" text-anchor="middle" font-size="12" font-weight="600" fill="#1e293b">/sales-orders/:id</text>
+          <text x="700" y="162" text-anchor="middle" font-size="11" fill="#475569">4 步流程条：</text>
+          <text x="700" y="178" text-anchor="middle" font-size="11" fill="#0f172a">客户需求 → 履约确认</text>
+          <text x="700" y="194" text-anchor="middle" font-size="11" fill="#0f172a">→ 供应准备 → 发货交付</text>
+          <text x="700" y="214" text-anchor="middle" font-size="11" fill="#475569">每个明细按供货方式分支：</text>
+          <text x="700" y="231" text-anchor="middle" font-size="11" font-weight="600" fill="#0f172a">查 MO / 查采购单 / 安排发货</text>
+        </g>
+
+        <path d="M280 175 L575 175" stroke="#475569" stroke-width="2" stroke-dasharray="3 3" marker-end="url(#arr)" fill="none"/>
+        <text x="290" y="170" font-size="10" fill="#64748b">查看订单</text>
+
+        <path d="M700 260 L700 295" stroke="#475569" stroke-width="2" marker-end="url(#arr)" fill="none"/>
+        <text x="715" y="280" font-size="10" fill="#475569">确认后</text>
+        <text x="715" y="293" font-size="10" fill="#475569">分流</text>
+
+        <!-- STOCK -->
+        <g>
+          <rect x="40" y="300" width="200" height="120" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+          <rect x="40" y="300" width="200" height="28" rx="10" fill="#0891b2"/>
+          <rect x="40" y="318" width="200" height="10" fill="#0891b2"/>
+          <text x="140" y="319" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">STOCK · 现货</text>
+          <text x="140" y="349" text-anchor="middle" font-size="11" fill="#475569">订单行直接选「可售库存」</text>
+          <text x="140" y="367" text-anchor="middle" font-size="11" fill="#475569">缺货 → 「改为自产」</text>
+          <text x="140" y="385" text-anchor="middle" font-size="11" fill="#475569">直接进入生产链</text>
+          <text x="140" y="405" text-anchor="middle" font-size="10" font-style="italic" fill="#0891b2">无需履约评审</text>
+        </g>
+
+        <!-- MAKE -->
+        <g>
+          <rect x="280" y="300" width="280" height="120" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+          <rect x="280" y="300" width="280" height="28" rx="10" fill="#ea580c"/>
+          <rect x="280" y="318" width="280" height="10" fill="#ea580c"/>
+          <text x="420" y="319" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">③a MAKE · 自产 → 生产任务</text>
+          <text x="420" y="349" text-anchor="middle" font-size="11" fill="#475569">/local-manufacturing-execution</text>
+          <text x="420" y="367" text-anchor="middle" font-size="11" fill="#0f172a">下达 → 报工 → 检验 → 完工入库</text>
+          <text x="420" y="385" text-anchor="middle" font-size="11" fill="#475569">写入 product_inventory_balances</text>
+          <text x="420" y="405" text-anchor="middle" font-size="10" font-style="italic" fill="#ea580c">多道工序报工；可返工；终态 COMPLETED</text>
+        </g>
+
+        <!-- BUY -->
+        <g>
+          <rect x="600" y="300" width="280" height="120" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.5"/>
+          <rect x="600" y="300" width="280" height="28" rx="10" fill="#9333ea"/>
+          <rect x="600" y="318" width="280" height="10" fill="#9333ea"/>
+          <text x="740" y="319" text-anchor="middle" font-size="13" font-weight="700" fill="#fff">③b BUY · 外采 → 采购订单</text>
+          <text x="740" y="349" text-anchor="middle" font-size="11" fill="#475569">/purchase-orders</text>
+          <text x="740" y="367" text-anchor="middle" font-size="11" fill="#0f172a">选供应商 + 履约方式</text>
+          <text x="740" y="385" text-anchor="middle" font-size="11" fill="#475569">到货入库（增库存）</text>
+          <text x="740" y="403" text-anchor="middle" font-size="11" font-weight="600" fill="#9333ea">供应商直发客户（不入本地仓）</text>
+        </g>
+
+        <!-- ④ 完工入库 -->
+        <g>
+          <rect x="160" y="450" width="760" height="60" rx="10" fill="#fff" stroke="#16a34a" stroke-width="1.8" stroke-dasharray="6 3"/>
+          <text x="540" y="475" text-anchor="middle" font-size="14" font-weight="700" fill="#15803d">④ 完工入库 / 到货入库  →  写入可售库存（product_inventory_balances）</text>
+          <text x="540" y="495" text-anchor="middle" font-size="11" fill="#475569">生产 Tab 内次级 Tab「完工交仓」· 不独立成页 · 采购到货入库写入同一余额表</text>
+        </g>
+
+        <path d="M420 420 L420 448" stroke="#16a34a" stroke-width="2" marker-end="url(#arrG)" fill="none"/>
+        <path d="M740 420 L740 448" stroke="#16a34a" stroke-width="2" marker-end="url(#arrG)" fill="none"/>
+
+        <path d="M140 420 L140 600 L320 600" stroke="#d97706" stroke-width="2" stroke-dasharray="4 3" fill="none" marker-end="url(#arrW)"/>
+        <text x="155" y="570" font-size="10" fill="#d97706">现货直接发货</text>
+
+        <path d="M840 360 L1010 360 L1010 600 L840 600" stroke="#9333ea" stroke-width="2" stroke-dasharray="4 3" fill="none" marker-end="url(#arr)"/>
+        <text x="1020" y="480" font-size="10" fill="#9333ea" transform="rotate(90 1020 480)">供应商直发客户</text>
+
+        <!-- ⑤ 销售出库 -->
+        <g>
+          <rect x="320" y="570" width="520" height="120" rx="10" fill="#fff" stroke="#cbd5e1" stroke-width="1.8"/>
+          <rect x="320" y="570" width="520" height="32" rx="10" fill="#be123c"/>
+          <rect x="320" y="590" width="520" height="12" fill="#be123c"/>
+          <text x="580" y="591" text-anchor="middle" font-size="14" font-weight="700" fill="#fff">⑤ 销售出库</text>
+          <text x="580" y="623" text-anchor="middle" font-size="12" font-weight="600" fill="#1e293b">/sales-outbounds</text>
+          <text x="580" y="643" text-anchor="middle" font-size="11" fill="#475569">不可直接新建 —— 必须从已确认订单明细「办理发货」或代发采购单生成</text>
+          <text x="580" y="661" text-anchor="middle" font-size="11" fill="#0f172a">草稿 DRAFT → 过账 POSTED（扣库存）→ 冲销 REVERSED（回补）/ 取消 CANCELLED</text>
+          <text x="580" y="679" text-anchor="middle" font-size="10" font-style="italic" fill="#be123c">草稿不扣库存；过账才形成交付事实；冲销为终态</text>
+        </g>
+
+        <path d="M540 510 L540 568" stroke="#475569" stroke-width="2" marker-end="url(#arr)" fill="none"/>
+        <text x="552" y="545" font-size="10" fill="#475569">办理发货</text>
+
+        <path d="M840 610 Q 920 610 920 175 L 825 175" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="2 3" fill="none" marker-end="url(#arr)"/>
+        <text x="930" y="395" font-size="10" fill="#94a3b8" transform="rotate(-90 930 395)">出库草稿回订单协作「分批交付记录」</text>
+      </svg>
+    </div>
+  </section>
+
+  <!-- ========== Section 2 ========== -->
+  <section id="sec2">
+    <h2><span class="num">2</span>节点逐一说明</h2>
+
+    <h3>① 销售订单 · SalesOrderView.vue</h3>
+    <div class="card">
+      <div class="card-title">入口与状态机</div>
+      <div class="card-path">/sales-orders</div>
+      <p>入口：列表「新建订单」按钮 → 抽屉。状态机：<code>DRAFT</code>（草稿）→ <code>PENDING_APPROVAL</code>（待审批）→ <code>CONFIRMED</code>（已确认）。审批是<strong>独立权限</strong> <code>sales_order.approve</code>，与 <code>sales_order.manage</code> 分离；驳回回 <code>DRAFT</code>，审批状态单独一列。</p>
+    </div>
+
+    <div class="card">
+      <div class="card-title">新建流程</div>
+      <ol>
+        <li>选客户：<strong>必须锚定客户档案</strong>（搜索/就地建档，落 <code>customers</code> 表，<code>customer_id</code> 往下游传）</li>
+        <li>加明细行，每行选供货方式：
+          <ul>
+            <li><span class="badge badge-info">STOCK</span> 从可售库存选；缺货可点「改为自产」转 MAKE</li>
+            <li><span class="badge badge-purple">MAKE</span> 点「配置自产产品」开 <code>ProductionTaskOrderDrawer</code></li>
+            <li><span class="badge badge-teal">BUY</span> 点「配置外采需求」填型号/品牌/技术要求等</li>
+            <li><span class="badge badge-warn">UNDECIDED</span> 提交审批前必须确定</li>
+          </ul>
+        </li>
+        <li>保存草稿（草稿不形成生产/采购/出库事实）</li>
+        <li>MAKE/BUY 行送履约评审</li>
+        <li>提交审批 → 老板审批通过 → <code>CONFIRMED</code></li>
+      </ol>
+    </div>
+
+    <h3>② 履约评审 · SalesFulfillmentReviewView.vue</h3>
+    <div class="card">
+      <div class="card-title">职责</div>
+      <div class="card-path">/sales-fulfillment-reviews</div>
+      <p>分两岗 Tab：车间·自产 / 采购·外采。销售订单<strong>确认前只做一次</strong>需求可行性评审。</p>
+      <ul>
+        <li>结论：<code>ACCEPTED</code>（可履约）/ <code>CHANGE_REQUIRED</code>（需调整，必填原因）</li>
+        <li>可填建议交期；销售改产品/数量/交期后意见自动失效</li>
+        <li>已确认订单变更（数量/交期）也走这里<strong>复评</strong>：纯交期调整只需客户确认，数量变要重新商业审批</li>
+      </ul>
+    </div>
+
+    <h3>订单协作详情 · ErpOrderWorkspaceView.vue（流转枢纽）</h3>
+    <div class="card">
+      <div class="card-path">/sales-orders/:id</div>
+      <p>同一张订单的流转枢纽，4 步流程条：<strong>客户需求 → 履约确认 → 供应准备 → 发货交付</strong>。</p>
+      <p>确认后每个明细按供货方式分流：</p>
+      <ul>
+        <li>MAKE：跳 <code>/local-manufacturing-execution?taskId=MO...</code></li>
+        <li>BUY：跳 <code>/purchase-orders?purchaseId=...</code></li>
+        <li>STOCK：直接「安排发货」开 <code>OrderDeliveryDialog</code> → 生成出库草稿</li>
+      </ul>
+    </div>
+
+    <h3>③a 生产任务 · ManufacturingExecutionView.vue</h3>
+    <div class="card">
+      <div class="card-path">/local-manufacturing-execution</div>
+      <p>含次级 Tab：任务单总览 / 执行看板 / 报工记录 / 返工 / 质检 / <strong>完工交仓</strong>。</p>
+      <p>状态机：<code>RELEASED</code> → <code>SCHEDULED</code> → <code>IN_PRODUCTION</code> → <code>PENDING_INSPECTION</code> → <code>PENDING_REINSPECTION</code> → <code>PENDING_RECEIPT</code> → <code>PARTIALLY_RECEIVED</code> → <code>COMPLETED</code> / <code>REWORK</code></p>
+      <p>流程：销售订单 MAKE 行确认后下达 → 多道工序报工（可累计，超额需权限）→ 全部完成 → 人工检验 → <strong>完工入库</strong>（写 <code>product_inventory_balances</code> 增加可售库存）→ 不合格走 <code>REWORK</code></p>
+    </div>
+
+    <h3>③b 采购订单 · PurchaseOrderView.vue</h3>
+    <div class="card">
+      <div class="card-path">/purchase-orders</div>
+      <p>顶部「待采购需求」卡片 = 销售订单 BUY 行确认后的待办。</p>
+      <p>履约方式两分叉：</p>
+      <ul>
+        <li><span class="badge badge-info">WAREHOUSE</span> 到货入库：分批到货入本地仓 → 增加可售库存</li>
+        <li><span class="badge badge-purple">DROP_SHIP</span> 供应商直发客户：<strong>不入本地仓</strong>，直接形成客户交付事实</li>
+      </ul>
+      <p>状态机：<code>DRAFT</code> → <code>PENDING_APPROVAL</code> → <code>CONFIRMED</code> → <code>RECEIVING</code> → <code>PARTIALLY_RECEIVED</code> → <code>RECEIVED</code></p>
+    </div>
+
+    <h3>④ 完工入库 / 到货入库（不独立成页）</h3>
+    <div class="card">
+      <p>归 <code>ManufacturingExecutionView</code> 的次级 Tab「完工交仓」。生产完工入库 + 采购到货入库 都写入 <code>product_inventory_balances</code> 余额表，被销售订单 STOCK 选品与出库选货共用同一口径。</p>
+    </div>
+
+    <h3>⑤ 销售出库 · SalesOutboundView.vue</h3>
+    <div class="card">
+      <div class="card-path">/sales-outbounds</div>
+      <p><strong>关键约束：不可直接新建</strong>，只能两个来源：</p>
+      <ol>
+        <li>销售订单确认后 STOCK 行「办理发货」→ <code>OrderDeliveryDialog</code> → 出库草稿</li>
+        <li>代发采购单 <code>DROP_SHIP</code> 后端自动生成草稿（<code>fulfillment_source=FULFILLMENT_DROP_SHIP</code>）</li>
+      </ol>
+      <p>状态机：<code>DRAFT</code>（草稿）→ <code>POSTED</code>（已过账，扣库存）→ <code>REVERSED</code>（已冲销，回补）/ <code>CANCELLED</code>（已取消）</p>
+      <p>流程：出库草稿 → 编辑（选仓库、从可售库存选货）→ 过账（扣 <code>product_inventory_balances</code>，形成交付事实）→ 如需更正走冲销（终态）</p>
+    </div>
+  </section>
+
+  <!-- ========== Section 3 ========== -->
+  <section id="sec3">
+    <h2><span class="num">3</span>3 个严重问题核实结论</h2>
+
+    <p>初步判断的 3 个严重问题，经后端代码核实后的真实定性如下。</p>
+
+    <h3>问题 1：冲销是否回退订单已发数量？</h3>
+    <div class="verdict verdict-ok">
+      <div class="verdict-title"><span class="badge badge-success">非 BUG</span> 数据天然一致 · 无需修复</div>
+      <div class="verdict-body">
+        <p>初步判断：<code>SalesOutboundService.doReverse</code> 没有更新 <code>sales_order_items.shipped_quantity</code>，疑似数据不一致。</p>
+        <p><strong>核实真相</strong>：<code>shippedQuantity</code> <strong>不是存储字段</strong>，而是实时子查询聚合。</p>
+<pre><code>-- ErpSalesOrderService.java:278-280
+(SELECT COALESCE(SUM(oi.quantity),0) FROM erp_sales_outbound_items oi
+ JOIN erp_sales_outbounds o ON o.id=oi.outbound_id
+ WHERE oi.sales_order_item_id=erp_sales_order_items.id
+   AND o.status='POSTED') shippedQuantity</code></pre>
+        <p><code>erp_sales_order_items</code> 表根本没有 <code>shipped_quantity</code> 字段（迁移脚本无任何匹配；<code>V221</code> 的 <code>shipped_quantity</code> 是已下线的 <code>formal_sales_order_items</code> 表）。</p>
+        <p>冲销把出库单 <code>status</code> 从 <code>POSTED</code> 改为 <code>REVERSED</code> 后，子查询的 <code>WHERE o.status='POSTED'</code> <strong>自动排除该出库单</strong>，<code>shippedQuantity</code> 自动回退。同理 <code>allocatedQuantity</code> 用 <code>IN ('DRAFT','POSTED')</code> 过滤，<code>REVERSED</code> 也不算在内。</p>
+        <p>代发 <code>DROP_SHIP</code> 出库单也写入 <code>erp_sales_outbounds</code>，冲销后同样被排除。<strong>数据流天然一致</strong>。</p>
+        <div class="evidence">ErpSalesOrderService.java:275-280（子查询）+ SalesOutboundService.java:577-618（doReverse）+ grep 全后端无 erp_sales_order_items.shipped_quantity 字段定义</div>
+      </div>
+    </div>
+
+    <h3>问题 2：DROP_SHIP 采购到货后销售出库草稿由谁生成？</h3>
+    <div class="verdict verdict-ok">
+      <div class="verdict-title"><span class="badge badge-success">非 BUG</span> 后端自动生成 · UX 入口待查</div>
+      <div class="verdict-body">
+        <p>初步判断：出库页禁止直接新建，DROP_SHIP 出库生成路径可能是黑洞。</p>
+        <p><strong>核实真相</strong>：后端链路完全打通。</p>
+<pre><code>// ErpPurchaseOrderService.doCreateDropShipOutbound (L521-587)
+// 采购确认到货后自动调用 SalesOutboundService.createDropShip
+// 生成 DRAFT 出库单，fulfillment_source = FULFILLMENT_DROP_SHIP
+
+// SalesOutboundService.createDropShip (L296-312) + doCreateDropShip (L380-400)
+// 向 erp_sales_outbounds 插入 DRAFT 状态记录
+// 过账时按代发豁免扣库存</code></pre>
+        <p>因此 DROP_SHIP 链路：<strong>采购确认到货 → 后端自动生成出库草稿 → 销售出库页可见 → 过账（不扣库存）</strong>。后端正确。</p>
+        <p><strong>唯一待确认</strong>：触发 <code>doCreateDropShipOutbound</code> 的前端入口在 <code>PurchaseOrderView.vue</code> 200 行之后（之前未读到）。若按钮不显眼属 UX 体验问题；若是后端事件触发则前端无感知也合理。<strong>这不是 BUG</strong>。</p>
+        <div class="evidence">ErpPurchaseOrderService.java:521-587 + SalesOutboundService.java:296-312, 380-400</div>
+      </div>
+    </div>
+
+    <h3>问题 3：STOCK 缺货转 MAKE 后评审是否失效？</h3>
+    <div class="verdict verdict-ux">
+      <div class="verdict-title"><span class="badge badge-warn">UX 提示不足</span> 后端逻辑正确</div>
+      <div class="verdict-body">
+        <p>初步判断：STOCK→MAKE 转换可能跳过评审。</p>
+        <p><strong>核实真相</strong>：评审 <code>content_hash</code> <strong>明确包含 <code>supplyMode</code></strong>，STOCK→MAKE 后 hash 变化 → <code>reviewCurrent=false</code> → 评审失效 → 提交审批被就绪度判定阻塞。<strong>后端逻辑正确</strong>。</p>
+        <p>评审 hash 参与字段：</p>
+<pre><code>productName · specification · salesProductId · supplyMode · unit
+quantity · requestedDeliveryDate · remark
+productionConfigJson · purchaseConfigJson · orderDeliveryDate</code></pre>
+        <p>hash 是 SHA-256 快照，存于 <code>erp_sales_order_fulfillment_reviews.content_hash</code>（<code>V349__sales_order_fulfillment_review.sql</code>）。</p>
+        <p><strong>真问题</strong>：<code>SalesOrderView.vue</code> 抽屉里失效行只是变色标签 + 「已失效，需重评」文字，没有强提示「这条必须重新送评才能提交」。用户可能在订单抽屉里直接点「提交审批」被后端 readiness 拦下，体验差。<strong>属 UX 缺失，不是 BUG</strong>。</p>
+        <div class="evidence">SalesFulfillmentReviewService.java:101-118, 159-182, 185-200 + V349__sales_order_fulfillment_review.sql:5-11</div>
+      </div>
+    </div>
+
+    <div class="callout callout-success">
+      <strong>3 个严重问题综合定性：</strong>0 个真 BUG，1 个 UX 提示不足，2 个后端完全正确。前一步「冲销不回退 shippedQuantity 是 BUG」的判断<strong>错误</strong>——因 <code>shipped_quantity</code> 根本不是存储字段，而是实时聚合，冲销后状态变化自动排除。
+    </div>
+  </section>
+
+  <!-- ========== Section 4 ========== -->
+  <section id="sec4">
+    <h2><span class="num">4</span>UX 待改进问题清单</h2>
+
+    <p>除问题 3 外，下列问题均属入口分散 / 信息重复 / 体验细节，非数据 BUG。</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th width="6%">#</th>
+          <th width="22%">问题</th>
+          <th width="42%">表现</th>
+          <th width="30%">建议修复</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>1</td>
+          <td>STOCK→MAKE 评审失效强提示不足</td>
+          <td>SalesOrderView 抽屉失效行只是变色标签，无「必须重新送评」强提示</td>
+          <td>失效行加红色高亮 + 提示文案，引导用户重新送评</td>
+        </tr>
+        <tr>
+          <td>2</td>
+          <td>客户档案不该在 ERP 主轴里</td>
+          <td>navigation.ts 把客户档案作为 ERP children 第二项，但它是主数据不是交易节点</td>
+          <td>移到主数据独立区或系统侧栏，销售订单已支持就地建档</td>
+        </tr>
+        <tr>
+          <td>3</td>
+          <td>评审/变更信息在两处重复</td>
+          <td>SalesOrderView 抽屉 + ErpOrderWorkspaceView 都展示评审记录、变更列表，用户不知在哪操作</td>
+          <td>SalesOrderView 抽屉只读展示，变更发起集中在 ErpOrderWorkspaceView</td>
+        </tr>
+        <tr>
+          <td>4</td>
+          <td>出库「办理发货」与出库页「编辑」两步割裂</td>
+          <td>OrderDeliveryDialog 生成草稿后跳 /sales-outbounds 还要再编辑选货</td>
+          <td>OrderDeliveryDialog 一次完成仓库+批次+数量选择，草稿生成立即可过账</td>
+        </tr>
+        <tr>
+          <td>5</td>
+          <td>状态机术语混乱</td>
+          <td>ErpOrderWorkspaceView 的 statuses 字典混了 SalesOrder / ManufacturingOrder / PurchaseOrder 三套状态</td>
+          <td>拆成 orderStatuses / productionStatuses / purchaseStatuses 三组</td>
+        </tr>
+        <tr>
+          <td>6</td>
+          <td>履约评审失效无强提示</td>
+          <td>SalesOrderView 抽屉里失效行无「必须重新送评」强提示</td>
+          <td>同 #1，失效行加红色高亮</td>
+        </tr>
+        <tr>
+          <td>7</td>
+          <td>完工入库进度不透传订单协作</td>
+          <td>MO 行在 ErpOrderWorkspaceView 只显示状态，没显示「已入库 X / 待入库 Y」</td>
+          <td>MO 行加数量进度，避免用户跨页查</td>
+        </tr>
+        <tr>
+          <td>8</td>
+          <td>demandItemId 跳转参数消费不明</td>
+          <td>销售订单 BUY 行点「办理采购」跳 /purchase-orders?demandItemId=...&sourceOrderId=...，但 PurchaseOrderView 前 200 行未处理</td>
+          <td>查 200 行后逻辑，确认是否预填需求项</td>
+        </tr>
+        <tr>
+          <td>9</td>
+          <td>DROP_SHIP 出库生成入口前端不可见</td>
+          <td>触发 doCreateDropShipOutbound 的前端按钮位置待查</td>
+          <td>查 PurchaseOrderView 200 行后，若按钮不显眼则加视觉强调</td>
+        </tr>
+        <tr>
+          <td>10</td>
+          <td>变更操作入口分散</td>
+          <td>SalesOrderView 抽屉 + ErpOrderWorkspaceView 两处都能发起变更操作</td>
+          <td>只在 ErpOrderWorkspaceView 集中处理，SalesOrderView 抽屉只读</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <div class="callout callout-warn">
+      <strong>优先级建议：</strong>问题 1 / 6（评审失效强提示）影响提交审批通过率，先做；问题 2（客户档案移出主轴）符合用户偏好「主轴顺下来」；问题 3 / 10（信息收敛）需配合 ErpOrderWorkspaceView 改造；其余按业务优先级排。
+    </div>
+  </section>
+
+  <!-- ========== Section 5 ========== -->
+  <section id="sec5">
+    <h2><span class="num">5</span>关键流转约束</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th width="18%">节点</th>
+          <th width="40%">守门条件</th>
+          <th width="42%">关键代码事实</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>销售订单</td>
+          <td>客户必须锚定客户档案；<code>UNDECIDED</code> 行不能提交</td>
+          <td>SalesOrderView.vue:472-478 <code>requireCustomer</code> 校验</td>
+        </tr>
+        <tr>
+          <td>履约评审</td>
+          <td>仅 MAKE/BUY 行需评；改配置/数量/交期意见失效</td>
+          <td>SalesFulfillmentReviewService.java:185-200 content_hash 包含 supplyMode</td>
+        </tr>
+        <tr>
+          <td>生产任务</td>
+          <td>完工入库写库存；不合格走返工</td>
+          <td>ManufacturingExecutionView 次级 Tab「完工交仓」</td>
+        </tr>
+        <tr>
+          <td>采购订单</td>
+          <td>WAREHOUSE 增库存；DROP_SHIP 直发不入仓</td>
+          <td>ErpPurchaseOrderService.java:379-384 DROP_SHIP 到货入库被拒</td>
+        </tr>
+        <tr>
+          <td>销售出库</td>
+          <td>不可直接新建；草稿不扣库存，过账才扣</td>
+          <td>SalesOutboundView.vue:473 <code>submitForm</code> 显式禁止直接新建</td>
+        </tr>
+        <tr>
+          <td>库存口径</td>
+          <td>product_inventory_balances 全链路统一（现货/完工/到货/出库扣减）</td>
+          <td>出库页选货双击行从可售库存选；销售订单 STOCK 选品同源</td>
+        </tr>
+        <tr>
+          <td>已发数量</td>
+          <td>实时聚合，非存储字段；冲销自动排除</td>
+          <td>ErpSalesOrderService.java:275-280 子查询 <code>WHERE o.status='POSTED'</code></td>
+        </tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- ========== Section 6 ========== -->
+  <section id="sec6">
+    <h2><span class="num">6</span>综合结论</h2>
+
+    <div class="summary-grid">
+      <div class="stat">
+        <div class="stat-label">流程节点</div>
+        <div class="stat-value">5</div>
+        <div class="stat-hint">销售订单 → 履约评审 → 生产/采购 → 入库 → 出库</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">真 BUG</div>
+        <div class="stat-value">0</div>
+        <div class="stat-hint">3 个疑似严重问题核实后均非 BUG</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">UX 待改进</div>
+        <div class="stat-value">10</div>
+        <div class="stat-hint">入口分散 / 信息重复 / 提示不足</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">数据一致性</div>
+        <div class="stat-value" style="color: var(--success);">✓ 良好</div>
+        <div class="stat-hint">实时聚合设计天然防漏写</div>
+      </div>
+    </div>
+
+    <h3>核心判断</h3>
+    <div class="callout callout-success">
+      <strong>1. 数据层无 BUG。</strong>3 个疑似严重问题（冲销回退、DROP_SHIP 生成、STOCK→MAKE 评审失效）经后端代码核实，后端逻辑均正确。特别是「已发数量」采用实时聚合而非存储字段，从设计上根除「过账 increment + 冲销 decrement」的对称写入缺口，数据天然一致。
+    </div>
+    <div class="callout callout-warn">
+      <strong>2. 体验层有改进空间。</strong>10 个 UX 问题集中在「入口分散」「信息重复」「失效提示不足」。最影响业务的是评审失效的强提示（用户可能直接提交被拦下），最影响主轴清晰度的是客户档案不该在 ERP 主轴里。
+    </div>
+    <div class="callout callout-info">
+      <strong>3. 前期误判修正。</strong>前一步判断「冲销不回退 shippedQuantity 是真 BUG」是错误的——因 <code>shipped_quantity</code> 根本不是存储字段，而是子查询实时聚合，冲销后状态变化自动排除。设计反而比存储字段更安全。
+    </div>
+
+    <h3>建议下一步</h3>
+    <ol>
+      <li><strong>优先做 UX #1 / #6</strong>：评审失效行加强提示（影响提交通过率）</li>
+      <li><strong>UX #2</strong>：客户档案移出 ERP 主轴（符合用户偏好「主轴顺下来」）</li>
+      <li><strong>UX #3 / #10</strong>：变更操作收敛到 ErpOrderWorkspaceView</li>
+      <li><strong>UX #4</strong>：OrderDeliveryDialog 一次完成选货，减少跳转</li>
+      <li><strong>UX #8 / #9</strong>：读 PurchaseOrderView 200 行后，确认 demandItemId 预填与 DROP_SHIP 触发按钮位置</li>
+    </ol>
+  </section>
+
+  <footer>
+    <p>本报告基于 frontend/src/apps/erp 与 backend Service 层代码核实生成</p>
+    <p>报告日期：2026-09-30 · 利强 ERP · 销售链路核实</p>
+  </footer>
+
+</div>
+
+</body>
+</html>

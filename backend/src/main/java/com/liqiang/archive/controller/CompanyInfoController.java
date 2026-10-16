@@ -15,6 +15,7 @@ import java.util.function.Function;
 
 @RestController
 @RequestMapping("/api/company")
+@RequirePermission("company.read")
 @RequiredArgsConstructor
 public class CompanyInfoController {
 

@@ -4,21 +4,19 @@ import { isDirty, askConfirm } from '../composables'
 import { startProgress, doneProgress, failProgress } from '../composables/ui/useRouteProgress'
 import { addTabFromRoute } from '../composables/common/useMultiTabs'
 import { useCurrentUser } from '../composables/auth/useCurrentUser'
-import { erpRoutes } from '../apps/erp/routes'
 import { archiveRoutes } from '../apps/archive/routes'
+import { resolveDefaultLanding } from '../utils/defaultLanding'
 
 /**
  * 路由聚合层。
  *
- * 业务路由按应用各自维护在 `apps/{erp,archive}/routes.ts`，本文件只做两件事：
- * 拼接 + 全局守卫。原先 49 条业务路由全挤在这里，两个应用的路径交替出现
- * （ERP 的 /sales-orders 夹在档案的 /products 与 /h3-imports 之间），
- * 导致「改 ERP 会碰到档案的 diff」。
+ * 业务路由按应用维护在 `apps/archive/routes.ts`，本文件只做两件事：
+ * 拼接 + 全局守卫。
  *
- * ⚠️ 路由模式仍是 hash：改成 history 需要服务端 fallback rewrite，
- * 属于「物理分入口」那一步的前置条件，本次不动。
+ * 2026-10-06 按 LQ 决定下线 ERP 前端页面：`apps/erp/routes.ts` 随整目录删除，
+ * 后端与共享 API 层保留。留底于 commit 23a0eda。
  */
-const routes: RouteRecordRaw[] = [...erpRoutes, ...archiveRoutes]
+const routes: RouteRecordRaw[] = [...archiveRoutes]
 
 routes.push({
   path: '/403',
@@ -46,11 +44,27 @@ router.beforeEach(async (to, from) => {
   const isLoginPage = to.path === '/login'
   const isAuthPage = isLoginPage
 
+  // 默认落地页：根路径 `/` 不静态 redirect（静态 redirect 是同步的、拿不到权限），
+  // 在这里等 `/api/auth/me` 回来再按权限解析 —— 见 utils/defaultLanding.ts。
+  if (to.path === '/') {
+    await auth.load()
+    const hasAnyIdentity = auth.hasToken() || !!localStorage.getItem('lq.currentEmployeeId')
+    if (!auth.user.value && !hasAnyIdentity) {
+      // 未登录：进登录页且**不带 redirect** —— 登录后再由本处解析默认落地页，
+      // 避免把「无生产跟单权限的人」按 redirect 直接送进 403。
+      return { path: '/login', replace: true }
+    }
+    return { path: resolveDefaultLanding(auth.user.value?.permissions), replace: true }
+  }
+
   // P7 登录守卫：已登录访问登录页 → 回到目标页；未登录访问业务页 → 跳登录页
   if (isLoginPage) {
     if (auth.user.value && auth.hasToken()) {
       const redirect = to.query.redirect
-      const target = typeof redirect === 'string' && redirect.startsWith('/') ? redirect : '/customers'
+      const target =
+        typeof redirect === 'string' && redirect.startsWith('/')
+          ? redirect
+          : resolveDefaultLanding(auth.user.value?.permissions)
       return { path: target }
     }
   } else {

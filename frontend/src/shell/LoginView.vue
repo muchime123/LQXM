@@ -63,26 +63,6 @@
             </el-button>
             <p class="login-view__hint">账号默认为员工手机号，初始密码为 123456。</p>
           </el-form>
-
-          <!-- 开发环境快捷登录 -->
-          <div v-if="devQuickLoginVisible" class="login-view__dev">
-            <el-divider><span class="login-view__dev-label">开发环境快捷登录</span></el-divider>
-            <el-select
-              v-model="devEmployeeId"
-              filterable
-              placeholder="选择员工身份（仅开发环境）"
-              style="width: 100%"
-              @change="doDevQuickLogin"
-            >
-              <el-option
-                v-for="emp in employeeOptions"
-                :key="emp.id"
-                :label="`${emp.name}（${emp.department || '未分部门'}）`"
-                :value="emp.id"
-              />
-            </el-select>
-            <p class="login-view__hint">仅用于本地开发调试，生产环境已关闭。</p>
-          </div>
         </template>
 
         <el-alert
@@ -105,7 +85,7 @@ import { computed, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
-import { bootstrapAccount, getLoginConfig, getPublicEmployees, type LoginConfig } from '@/api/auth'
+import { bootstrapAccount, getPublicEmployees } from '@/api/auth'
 import { http } from '@/api/http'
 
 interface EmployeeOption {
@@ -118,7 +98,6 @@ const route = useRoute()
 const router = useRouter()
 const auth = useCurrentUser()
 
-const loginConfig = ref<LoginConfig>({ localLoginEnabled: true, allowEmployeeHeader: false })
 const bootstrapRequired = ref(false)
 const submitting = ref(false)
 const accountLoading = ref(false)
@@ -127,19 +106,20 @@ const employeeOptions = ref<EmployeeOption[]>([])
 
 const localForm = ref({ username: '', password: '' })
 const bootstrapForm = ref({ employeeId: null as number | null })
-const devEmployeeId = ref<number | null>(null)
 
-const devQuickLoginVisible = computed(() => import.meta.env.DEV && loginConfig.value.allowEmployeeHeader)
-
+/**
+ * 登录后的落点：优先回显式 redirect（被守卫拦下时带过来的原目标），
+ * 否则交给路由守卫解析默认落地页 —— 默认「生产跟单」，无权限回落「客户档案」。
+ * 落点口径唯一来源：`@/utils/defaultLanding`（此处不写死路径）。
+ */
 const redirectPath = computed(() => {
   const q = route.query.redirect
-  return typeof q === 'string' && q.startsWith('/') ? q : '/customers'
+  return typeof q === 'string' && q.startsWith('/') ? q : '/'
 })
 
 try {
-  loginConfig.value = await getLoginConfig()
   bootstrapRequired.value = (await fetchBootstrapRequired()).bootstrapRequired
-  if (bootstrapRequired.value || devQuickLoginVisible.value) {
+  if (bootstrapRequired.value) {
     await loadEmployees()
   }
 } catch {
@@ -186,17 +166,6 @@ async function doLocalLogin() {
   }
 }
 
-async function doDevQuickLogin(id: number) {
-  const emp = employeeOptions.value.find(x => x.id === id)
-  errorMessage.value = ''
-  try {
-    await auth.selectEmployee(id, emp?.name)
-    router.replace(redirectPath.value)
-  } catch (err) {
-    showError(err)
-  }
-}
-
 async function doBootstrap() {
   if (!bootstrapForm.value.employeeId) {
     errorMessage.value = '请选择管理员员工'
@@ -210,7 +179,9 @@ async function doBootstrap() {
     })
     localStorage.setItem('lq.token', result.token)
     ElMessage.success('管理员账号已创建')
-    router.replace('/customers')
+    // 落点由守卫按权限解析（见 utils/defaultLanding.ts）：此处只 setItem 了 token，
+    // 守卫的 `/` 分支会先 load 当前用户再决定进生产跟单还是客户档案。
+    router.replace(redirectPath.value)
   } catch (err) {
     showError(err)
   } finally {
@@ -302,15 +273,6 @@ async function doBootstrap() {
   font-size: 12px;
   color: var(--color-text-secondary, #6b7280);
   margin: 6px 0 0;
-}
-
-.login-view__dev {
-  margin-top: 8px;
-}
-
-.login-view__dev-label {
-  font-size: 12px;
-  color: var(--color-text-tertiary, #9ca3af);
 }
 
 .login-view__error {

@@ -15,9 +15,7 @@ import java.time.LocalDateTime;
 /**
  * 费用报销明细（1 条 claim = N 条消费明细）。
  * <p>
- * P6.1 仅做钉钉同步只读镜像；费用归集（分摊到业务 / 部门 / 公司）
- * 在 P6.2 通过独立 expense_allocations 表建立，不在此处直接放 business_order_id，
- * 因为 ChatGPT 总体设计 §十一 明确要求 UI 支持 1 条费用 → 多条 allocation。
+ * P6.1 仅做钉钉同步只读镜像；费用仅作台账留档。
  *
  * @since V138
  */

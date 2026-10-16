@@ -1,11 +1,12 @@
 import 'vue-router'
 
 /**
- * 业务分组。拆应用（2026-09-29）后收敛为实际在用的五个：
+ * 业务分组。拆应用（2026-09-29）后收敛为实际在用的四个：
  * 原先还列着 sales / production / inventory / settlement 四个分组，
  * 但全仓已无任何路由或导航项使用它们 —— 枚举与实现漂移，已删除。
+ * `erp` 分组随 ERP 前端下线（2026-10-06）一并移除，理由相同：全仓零匹配。
  */
-export type RouteGroup = 'erp' | 'h3' | 'product' | 'marketing' | 'system'
+export type RouteGroup = 'h3' | 'product' | 'marketing' | 'system'
 
 declare module 'vue-router' {
   interface RouteMeta {

@@ -20,6 +20,7 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/api/office-assets")
+@RequirePermission("officeAsset.read")
 @RequiredArgsConstructor
 public class OfficeAssetController {
     private static final Set<String> SORTS = Set.of("assetCode", "name", "category", "status", "department", "updatedAt");

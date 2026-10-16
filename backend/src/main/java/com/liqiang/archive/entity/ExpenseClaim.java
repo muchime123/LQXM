@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
  * 费用报销单（P6.1 钉钉日常报销同步只读事实层）。
  * <p>
  * 来源系统写入：DINGTALK = 钉钉审批流。
- * P6.1 不允许业务层直接改写本数据；归集关系走独立的 expense_allocations 表（P6.2 上线）。
+ * P6.1 不允许业务层直接改写本数据；费用仅作台账留档。
  * 员工关联：优先 employee_id（DINGTALK userId → employee_external_mappings → employees），
  * 失败则置 NULL 但保留 dingtalk_user_id + submitter_name_snapshot 供管理员后续人工映射。
  *

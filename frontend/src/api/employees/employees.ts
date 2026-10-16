@@ -61,3 +61,17 @@ export function parseExternalIdentities(hyFile?: File, ddFile?: File, rosterFile
 export function applyExternalIdentities(items: Array<Record<string, any>>) {
   return http.post('/employees/external-identities/apply', items).then(res => res.data)
 }
+
+// ==================== 档案文件 ====================
+
+export interface EmployeeFileRegistration {
+  category: string
+  fileName: string
+  originalFileName?: string
+  mimeType?: string
+  fileSize?: number
+}
+
+export function registerEmployeeFile(employeeId: number, payload: EmployeeFileRegistration) {
+  return http.post(`/employees/${employeeId}/files`, payload).then(res => res.data)
+}

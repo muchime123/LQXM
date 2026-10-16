@@ -96,6 +96,15 @@ public class FileController {
             return ResponseEntity.notFound().build();
         }
 
+        FileCategory.StorageScope scope = FileCategory.scopeOf(category);
+        if (scope == FileCategory.StorageScope.EMPLOYEE) {
+            Path file = fileStorageService.employeeDir(modelId).resolve(folder).resolve(fileName).normalize();
+            if (file.startsWith(fileRoot) && Files.isRegularFile(file)) {
+                return serveFile(file);
+            }
+            return ResponseEntity.notFound().build();
+        }
+
         if (FileCategory.isPackaging(category)) {
             Path file = fileStorageService.packagingDir(modelId).resolve(folder).resolve(fileName).normalize();
             if (file.startsWith(fileRoot) && Files.isRegularFile(file)) {
@@ -351,6 +360,14 @@ public class FileController {
     }
 
     private Path findProductFile(Long modelId, String folder, String fileName) {
+        FileCategory.StorageScope scope = FileCategory.scopeOf(folder);
+        if (scope == FileCategory.StorageScope.EMPLOYEE) {
+            Path file = fileStorageService.employeeDir(modelId).resolve(folder).resolve(fileName).normalize();
+            if (file.startsWith(fileRoot) && Files.isRegularFile(file)) {
+                return file;
+            }
+            return null;
+        }
         if (FileCategory.isPackaging(folder)) {
             Path file = fileStorageService.packagingDir(modelId).resolve(folder).resolve(fileName).normalize();
             if (file.startsWith(fileRoot) && Files.isRegularFile(file)) {

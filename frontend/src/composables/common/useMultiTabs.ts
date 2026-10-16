@@ -83,7 +83,7 @@ let persistTimer: ReturnType<typeof setTimeout> | null = null
 
 /** 路径是否可建标签：必须在 navItems 中且非 '/' redirect */
 function isTabable(path: string): boolean {
-  return path !== '/' && (tabablePaths.has(path) || /^\/sales-orders\/\d+$/.test(path))
+  return path !== '/' && tabablePaths.has(path)
 }
 
 /** 从 navItems（含子菜单）查找 icon */

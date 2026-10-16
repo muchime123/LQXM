@@ -1,0 +1,455 @@
+<style>
+:root {
+  --color-surface: #ffffff;
+  --color-surface-muted: #f6f7f9;
+  --color-border: #e5e7eb;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-brand: #6d28d9;
+  --color-accent: #db2777;
+  --color-success: #059669;
+  --chart-series-1: #059669;
+  --chart-series-2: #6d28d9;
+  --chart-other: #f1f5f9;
+  --radius-card: 12px;
+  --radius: 8px;
+  --radius-full: 999px;
+  --spacer-4: 4px;
+  --spacer-8: 8px;
+  --spacer-12: 12px;
+  --spacer-16: 16px;
+  --spacer-20: 20px;
+  --spacer-24: 24px;
+  --text-caption: 12px/18px system-ui, -apple-system, sans-serif;
+  --text-body: 14px/20px system-ui, -apple-system, sans-serif;
+  --text-title: 16px/24px system-ui, -apple-system, sans-serif;
+  --text-code: 13px/20px ui-monospace, SFMono-Regular, Menlo, monospace;
+  --weight-medium: 500;
+  --weight-strong: 700;
+}
+:root[data-widget-theme="dark"] {
+  --color-surface: #1e1e2e;
+  --color-surface-muted: #2a2a3d;
+  --color-border: #3f3f55;
+  --color-text: #e2e8f0;
+  --color-text-muted: #94a3b8;
+  --color-brand: #a78bfa;
+  --color-accent: #f472b6;
+  --color-success: #34d399;
+  --chart-series-1: #34d399;
+  --chart-series-2: #a78bfa;
+  --chart-other: #334155;
+}
+* { box-sizing: border-box; }
+.widget {
+  font: var(--text-body);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-card);
+  padding: var(--spacer-20);
+  width: 100%;
+}
+.title {
+  font: var(--weight-medium) var(--text-title);
+  margin: 0 0 var(--spacer-4) 0;
+}
+.subtitle {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--spacer-16) 0;
+}
+
+/* Coverage Hero */
+.coverage-hero {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: var(--spacer-20);
+  margin-bottom: var(--spacer-20);
+  padding: var(--spacer-20);
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+.hero-left {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--spacer-4);
+}
+.hero-pct {
+  font: var(--weight-strong) 56px/60px system-ui, -apple-system, sans-serif;
+  color: var(--color-success);
+  letter-spacing: -0.03em;
+}
+.hero-label {
+  font: var(--weight-medium) var(--text-title);
+  color: var(--color-text);
+}
+.hero-desc {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  margin-top: var(--spacer-8);
+}
+.hero-right {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--spacer-12);
+}
+.hero-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacer-8) var(--spacer-12);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+.hero-row-label {
+  font: var(--text-body);
+  color: var(--color-text-muted);
+}
+.hero-row-value {
+  font: var(--weight-medium) var(--text-code);
+  color: var(--color-text);
+}
+
+/* KPI Grid */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--spacer-12);
+  margin-bottom: var(--spacer-20);
+}
+.kpi-card {
+  background: var(--color-surface-muted);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--spacer-12);
+}
+.kpi-label { font: var(--text-caption); color: var(--color-text-muted); margin-bottom: var(--spacer-4); }
+.kpi-value { font: var(--weight-strong) var(--text-title); letter-spacing: -0.01em; }
+.kpi-value.success { color: var(--color-success); }
+.kpi-value.muted { color: var(--color-text-muted); }
+
+/* Sections */
+.section-title {
+  font: var(--weight-medium) var(--text-body);
+  margin: 0 0 var(--spacer-12) 0;
+  padding-bottom: var(--spacer-8);
+  border-bottom: 1px solid var(--color-border);
+}
+.section { margin-bottom: var(--spacer-20); }
+.section:last-child { margin-bottom: 0; }
+
+/* Donut + Legend */
+.donut-wrap {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: var(--spacer-20);
+  align-items: center;
+}
+.donut-shell {
+  width: 100%;
+  aspect-ratio: 1;
+  max-width: 220px;
+  margin: 0 auto;
+  position: relative;
+}
+.donut-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+.donut-center-num {
+  font: var(--weight-strong) var(--text-title);
+  color: var(--color-text);
+}
+.donut-center-label {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+.legend-list { display: flex; flex-direction: column; gap: var(--spacer-12); }
+.legend-item {
+  display: grid;
+  grid-template-columns: 14px 1fr auto auto;
+  gap: var(--spacer-12);
+  align-items: center;
+  padding: var(--spacer-8) 0;
+}
+.legend-dot {
+  width: 14px; height: 14px;
+  border-radius: var(--radius-full);
+}
+.legend-title {
+  font: var(--weight-medium) var(--text-body);
+}
+.legend-sub {
+  font: var(--text-caption);
+  color: var(--color-text-muted);
+  margin-top: 2px;
+}
+.legend-count {
+  font: var(--weight-medium) var(--text-code);
+  text-align: right;
+}
+.legend-amt {
+  font: var(--text-code);
+  text-align: right;
+  color: var(--color-text-muted);
+  min-width: 90px;
+}
+
+/* Tag */
+.tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  font: var(--text-caption);
+  background: rgba(5, 150, 105, 0.08);
+  border: 1px solid rgba(5, 150, 105, 0.25);
+  color: var(--color-success);
+}
+.tag.brand {
+  background: rgba(109, 40, 217, 0.08);
+  border-color: rgba(109, 40, 217, 0.25);
+  color: var(--color-brand);
+}
+
+/* Table */
+.sample-table {
+  width: 100%;
+  border-collapse: collapse;
+  font: var(--text-body);
+}
+.sample-table th {
+  font: var(--weight-medium) var(--text-caption);
+  color: var(--color-text-muted);
+  text-align: left;
+  padding: var(--spacer-8) var(--spacer-12);
+  background: var(--color-surface-muted);
+  border-bottom: 1px solid var(--color-border);
+}
+.sample-table td {
+  padding: var(--spacer-8) var(--spacer-12);
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: middle;
+}
+.sample-table tr:last-child td { border-bottom: none; }
+.amt-cell { text-align: right; font: var(--text-code); white-space: nowrap; }
+.num-cell { font: var(--text-code); white-space: nowrap; }
+.cust-cell { font: var(--weight-medium) var(--text-body); white-space: nowrap; }
+.match-cell { white-space: nowrap; color: var(--color-text-muted); }
+
+@media (max-width: 720px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+  .coverage-hero { grid-template-columns: 1fr; }
+  .donut-wrap { grid-template-columns: 1fr; }
+  .sample-table th:nth-child(5), .sample-table td:nth-child(5),
+  .sample-table th:nth-child(6), .sample-table td:nth-child(6) { display: none; }
+}
+</style>
+
+<div class="widget" data-dynamic-ui-widget data-template="chart-card">
+  <h3 class="title">历史出库补档 · 氚云原始数据覆盖率</h3>
+  <p class="subtitle">5,309 个缺失出库单号全部能在 h3_import_rows.raw_data.rows[] 中找到完整明细</p>
+
+  <!-- Coverage Hero -->
+  <div class="coverage-hero">
+    <div class="hero-left">
+      <div class="hero-pct">100%</div>
+      <div class="hero-label">缺失单号覆盖率 <span class="tag">JSON_TABLE 精准提取</span></div>
+      <div class="hero-desc">
+        从 2,288 条相关氚云导入行的 rows[] 数组里，用 JSON_TABLE 提取到 14,430 条出库明细，<br/>
+        与缺失的 5,309 个单号做等值 JOIN，<b style="color:var(--color-success);">全部匹配成功</b>，无需匿名占位出库。
+      </div>
+    </div>
+    <div class="hero-right">
+      <div class="hero-row">
+        <span class="hero-row-label">缺失出库总数</span>
+        <span class="hero-row-value">5,309 单</span>
+      </div>
+      <div class="hero-row">
+        <span class="hero-row-label">涉及核销金额</span>
+        <span class="hero-row-value">¥3,144,283.16</span>
+      </div>
+      <div class="hero-row">
+        <span class="hero-row-label">提取到的出库明细</span>
+        <span class="hero-row-value">14,430 条（7,140 个单号）</span>
+      </div>
+      <div class="hero-row">
+        <span class="hero-row-label">相关 h3 导入行数</span>
+        <span class="hero-row-value">仅 2,288 行</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPI -->
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-label">Tier1：客户+日期+金额 齐全</div>
+      <div class="kpi-value success">5,249 / 98.87%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Tier2：客户 + 日期/金额</div>
+      <div class="kpi-value success">60 / 1.13%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Tier3~5 质量降级</div>
+      <div class="kpi-value muted">0 / 0%</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">未匹配需匿名占位</div>
+      <div class="kpi-value muted">0 / ¥0</div>
+    </div>
+  </div>
+
+  <!-- Tier Donut + Legend -->
+  <div class="section">
+    <div class="section-title">匹配质量分层</div>
+    <div class="donut-wrap">
+      <div class="donut-shell">
+        <!-- Donut SVG: two tier arcs -->
+        <svg viewBox="0 0 200 200" width="100%" height="100%" style="transform:rotate(-90deg);">
+          <!-- Background circle -->
+          <circle cx="100" cy="100" r="72" fill="none" stroke="var(--chart-other)" stroke-width="28" />
+          <!-- Tier1 arc: 98.87% ≈ circumference*0.9887, C=452.39 -->
+          <circle cx="100" cy="100" r="72" fill="none" stroke="var(--chart-series-1)" stroke-width="28"
+                  stroke-dasharray="447.3 452.39" stroke-dashoffset="0" stroke-linecap="butt"/>
+          <!-- Tier2 arc starts after Tier1: dashoffset = -447.3 -->
+          <circle cx="100" cy="100" r="72" fill="none" stroke="var(--chart-series-2)" stroke-width="28"
+                  stroke-dasharray="5.09 452.39" stroke-dashoffset="-447.3" stroke-linecap="butt"/>
+        </svg>
+        <div class="donut-center">
+          <div class="donut-center-num">5,309</div>
+          <div class="donut-center-label">总匹配单数</div>
+        </div>
+      </div>
+      <div class="legend-list">
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--chart-series-1);"></div>
+          <div>
+            <div class="legend-title">Tier 1 · 客户+日期+金额 齐全 <span class="tag">可直接补档</span></div>
+            <div class="legend-sub">choose_label 含「日期 客户 金额」，可解析出客户名</div>
+          </div>
+          <div class="legend-count">5,249 单</div>
+          <div class="legend-amt">¥7,657,780</div>
+        </div>
+        <div class="legend-item">
+          <div class="legend-dot" style="background:var(--chart-series-2);"></div>
+          <div>
+            <div class="legend-title">Tier 2 · 客户 + 日期/金额 <span class="tag brand">字段部分</span></div>
+            <div class="legend-sub">choose_label 存在但销售日期/金额缺其一，补齐即可补档</div>
+          </div>
+          <div class="legend-count">60 单</div>
+          <div class="legend-amt">¥0.42</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP 10 Sample -->
+  <div class="section">
+    <div class="section-title">TOP 10 匹配抽样（¥3.5万+ 缺失单号解析明细）</div>
+    <table class="sample-table">
+      <thead>
+        <tr>
+          <th style="width:170px;">缺失单号</th>
+          <th style="width:100px;">客户</th>
+          <th style="width:100px;">销售日期</th>
+          <th class="amt-cell" style="width:100px;">h3销售金额</th>
+          <th class="amt-cell" style="width:100px;">h3已收款</th>
+          <th class="amt-cell" style="width:110px;">Receipt核销金额</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="num-cell">CK20240710051555</td>
+          <td class="cust-cell">裴总</td>
+          <td class="match-cell">2024-07-11</td>
+          <td class="amt-cell">¥190,800</td>
+          <td class="amt-cell">¥170,000</td>
+          <td class="amt-cell">¥170,000</td>
+        </tr>
+        <tr>
+          <td class="num-cell">CK20240515047904</td>
+          <td class="cust-cell">林先生</td>
+          <td class="match-cell">2024-05-15</td>
+          <td class="amt-cell">¥84,000</td>
+          <td class="amt-cell">¥81,500</td>
+          <td class="amt-cell">¥163,000</td>
+        </tr>
+        <tr>
+          <td class="num-cell">CK20240413045910</td>
+          <td class="cust-cell">周翔</td>
+          <td class="match-cell">2024-04-13</td>
+          <td class="amt-cell">¥77,000</td>
+          <td class="amt-cell">¥71,200</td>
+          <td class="amt-cell">¥142,400</td>
+        </tr>
+        <tr>
+          <td class="num-cell">CK20240615049951</td>
+          <td class="cust-cell">祁永峰收</td>
+          <td class="match-cell">2024-06-15</td>
+          <td class="amt-cell">¥115,000</td>
+          <td class="amt-cell">¥100,000</td>
+          <td class="amt-cell">¥100,000</td>
+        </tr>
+        <tr>
+          <td class="num-cell">CK20240307043554</td>
+          <td class="cust-cell">许彬</td>
+          <td class="match-cell">2024-03-15</td>
+          <td class="amt-cell">¥46,390</td>
+          <td class="amt-cell">¥40,000</td>
+          <td class="amt-cell">¥80,000</td>
+        </tr>
+        <tr>
+          <td class="num-cell">CK20240316044183</td>
+          <td class="cust-cell">涌溢物流</td>
+          <td class="match-cell">2024-03-18</td>
+          <td class="amt-cell">¥118,999</td>
+          <td class="amt-cell">¥78,287</td>
+          <td class="amt-cell">¥78,287</td>
+        </tr>
+        <tr>
+          <td class="num-cell">CK20240323044602</td>
+          <td class="cust-cell">母建生</td>
+          <td class="match-cell">2024-03-23</td>
+          <td class="amt-cell">¥68,688</td>
+          <td class="amt-cell">¥68,688</td>
+          <td class="amt-cell">¥68,688</td>
+        </tr>
+        <tr>
+          <td class="num-cell">CK20231207036455</td>
+          <td class="cust-cell">郑阳升</td>
+          <td class="match-cell">2023-12-07</td>
+          <td class="amt-cell">¥62,000</td>
+          <td class="amt-cell">¥68,470</td>
+          <td class="amt-cell">¥68,470</td>
+        </tr>
+        <tr>
+          <td class="num-cell">CK20240611049593</td>
+          <td class="cust-cell">卢永江</td>
+          <td class="match-cell">2024-06-11</td>
+          <td class="amt-cell">¥64,476</td>
+          <td class="amt-cell">¥63,000</td>
+          <td class="amt-cell">¥63,000</td>
+        </tr>
+        <tr>
+          <td class="num-cell">CK20240604049176</td>
+          <td class="cust-cell">扬名包装</td>
+          <td class="match-cell">2024-06-06</td>
+          <td class="amt-cell">¥61,808</td>
+          <td class="amt-cell">¥60,000</td>
+          <td class="amt-cell">¥60,000</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
