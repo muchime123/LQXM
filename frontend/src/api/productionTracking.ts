@@ -7,7 +7,7 @@ export type TrackingMilestoneStatus = 'PENDING' | 'IN_PROGRESS' | 'DONE'
 /**
  * 跟单待办提醒代码（派生，不落库）：把「业务事实已经走到前面、跟单记录还没跟上」的单挑出来。
  * 一单只出一个代码，按严重度取第一条命中：已完工待跟单 > 已入库待跟单 > 已排产待跟单
- * > 已入库待登记（已在跟单但入库节点漏登记）> 超期未更新。
+ * > 已入库待登记（已在跟单但入库节点漏登记）> 7 天未更新。
  */
 export type TrackingActionCode =
   | 'FINISHED_PENDING'
@@ -105,8 +105,8 @@ export interface TrackingOrder {
    */
   deliveryBaseline?: string | null
   /**
-   * 入库记录交期（派生，不落库）：以交付基准（deliveryBaseline）比较入库进度对照日期。
-   * PENDING=未见入库 / ON_TIME=按期见入库 / OVERDUE=见入库逾期（天数见 deliveryOverdueDays）/ NO_BASELINE=已见入库但无基准。
+   * 生产交付结果（派生，不落库）：以交付基准（deliveryBaseline）比较实际交付日期（跟单入库确认 / 采购首次入库）。
+   * PENDING=未交付 / ON_TIME=按期交付 / OVERDUE=逾期交付（天数见 deliveryOverdueDays）/ NO_BASELINE=已交付（无基准）。
    * ⚠️ 用词：这里是「逾期」（实际交付晚于基准这一既成事实）；「延期」另有所指——车间预计完成实现不了时
    * 与业务员协商另订新完成日期的主动动作（state.forecastFinishDate / delayReason），两者不可混用。
    * ⚠️ 与下面 state 里的 deliveryResult（跟单员手工登记的交付结果）不是一份数据。
@@ -432,10 +432,71 @@ export interface TrackingAnalyticsOrder {
 }
 export const fetchTrackingAnalyticsOrders = async (params: {
   fromDate?: string; toDate?: string; workshop?: string; dateBasis?: TrackingAnalysisDateBasis; month?: string
-  bucket: string; reason?: string; page: number; size: number
+  bucket: string; reason?: string
+  /** 按原因**类别**下钻（组装 / 入库 / 工期 / 业务员 / 配件 / 模具 …），取值是后端词典的固定 key。 */
+  reasonCategory?: string
+  page: number; size: number
 }) => (await http.get<{ items: TrackingAnalyticsOrder[]; total: number; page: number; size: number }>(
   '/manufacturing/followups/analytics/orders', { params }
 )).data
+
+/**
+ * ====================== 跟单周复盘 ======================
+ * 同一个周期区间出「需完成 / 按期 / 逾期 / 未完工 + 逾期天数分档 + 原因分布」，
+ * 与「生产交期达成分析」共用同一套口径（卡片 65 = 按期 55 + 逾期 7 + 未完工 3），
+ * 区别只在组织方式：这里按跟单员手写周报的表格结构输出。
+ */
+/** 六类原因之一；OTHER＝词典未收录的写法，UNRECORDED＝没登记原因。 */
+export interface TrackingReasonCategory {
+  key: string
+  label: string
+  count: number
+  /** 占比（%），分母是该榜的总单数；无样本时为 null —— 不用 0% 冒充结论。 */
+  rate: number | null
+  /** 该类别下条数最多的几条原因原文（来自跟单员填写的原话），看板「备注」列直接展示。 */
+  samples: string[]
+}
+export interface TrackingOverdueLevel {
+  key: string
+  label: string
+  range: string
+  count: number
+  rate: number | null
+}
+export interface TrackingWeeklyReviewSummary {
+  dueTasks: number
+  onTime: number
+  overdue: number
+  open: number
+  /** 按期达成率＝按期 ÷ 应完成（周报里的「按期完工率」）；无样本时 null。 */
+  onTimeAchievementRate: number | null
+  completionRate: number | null
+  extended: number
+  extensionDays: number
+  overdueDays: number
+  averageOverdueDays: number | null
+  openOverdue: number
+  openOverdueDays: number
+  cancelled: number
+  stopped: number
+  missingExpected: number
+}
+export interface TrackingWeeklyReview {
+  period: { from: string; to: string; days: number }
+  asOf: string
+  /** 车间下拉选项，与区间内出现的车间同一份口径。 */
+  workshops: string[]
+  summary: TrackingWeeklyReviewSummary
+  /** 逾期榜的分母（＝逾期单数），与各分档、各原因之和一致。 */
+  overdueTotal: number
+  /** 延期榜的分母（＝协商延后单数）。 */
+  extensionTotal: number
+  overdueLevels: TrackingOverdueLevel[]
+  overdueReasons: TrackingReasonCategory[]
+  extensionReasons: TrackingReasonCategory[]
+}
+export const fetchTrackingWeeklyReview = async (params: { fromDate?: string; toDate?: string; workshop?: string }) =>
+  (await http.get<TrackingWeeklyReview>('/manufacturing/followups/weekly-review', { params })).data
 
 export const fetchTracking = async (params: Record<string, string | number | boolean>) =>
   (await http.get<{ items: TrackingOrder[]; total: number; page: number; size: number; visibility?: string }>('/manufacturing/followups', { params })).data

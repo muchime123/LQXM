@@ -4,16 +4,20 @@
       <div>
         <p class="eyebrow">生产任务</p>
         <h1>生产跟单</h1>
-        <p>九月起的氚云生产任务及已有跟单的历史任务在此跟进；范围内还没登记任何跟单节点的任务显示为待跟单。</p>
+        <p>默认查看需要处理的生产任务；可通过筛选查看全部任务与历史记录。</p>
       </div>
       <div class="head-actions">
         <input v-if="visibility === 'ALL'" ref="workbookInput" type="file" accept=".xlsx" hidden @change="onWorkbookSelected" />
         <el-button v-if="visibility === 'ALL'" @click="workbookInput?.click()">导入生产跟单进度表</el-button>
         <el-button v-if="visibility === 'ALL'" @click="showWorkbookRows">表格待处理{{ workbookActionable ? `（${workbookActionable}）` : '' }}</el-button>
+        <!-- 生产任务单导入：跟单员自己的入口（不需要「氚云导入中心」权限）。
+             复用导入中心的 上传→解析→预览→确认 四步，后端把类型锁定为「生产任务单」。 -->
+        <el-button v-if="canFollowup" title="上传氚云导出的生产任务单 Excel，预检确认后写入系统；与氚云导入中心同一套解析规则" @click="taskImportVisible = true">导入生产任务单</el-button>
         <input v-if="canFollowup" ref="roundTripInput" type="file" accept=".xlsx" hidden @change="onRoundTripSelected" />
         <el-button v-if="canFollowup" @click="roundTripInput?.click()">导入跟单表（回写）</el-button>
         <el-button v-if="canManageBaseline" @click="openBaseline">基准设置</el-button>
         <el-button @click="analysisVisible = true">生产分析</el-button>
+        <el-button @click="weeklyReviewVisible = true">周复盘</el-button>
         <el-button :loading="exporting" @click="openExport">导出</el-button>
         <el-button @click="refreshTracking">刷新</el-button>
       </div>
@@ -22,12 +26,14 @@
     <div ref="filterPanelRef" class="tracking-filter-panel">
       <div class="toolbar">
         <div class="tracking-filter-fields">
-      <el-input v-model="keyword" class="tracking-keyword" clearable placeholder="任务号、产品或客户" @keyup.enter="search" @clear="search" />
-      <el-input v-model="specification" class="tracking-spec" clearable placeholder="搜索规格" aria-label="规格" @keyup.enter="search" @clear="search" />
-      <el-select v-model="salespersonFilter" multiple filterable collapse-tags clearable placeholder="业务员（全部）" aria-label="业务员" @change="search"><el-option v-for="name in salespersonOptions" :key="name" :label="name" :value="name" /></el-select>
+      <!-- 搜索框唯一入口（10-19 LQ）：任务号 / 产品 / 客户 / 规格共用一个框，后端同一段谓词匹配。 -->
+      <el-input v-model="keyword" class="tracking-keyword" clearable placeholder="任务号、产品、客户或规格" aria-label="关键词（任务号、产品、客户、规格）" @keyup.enter="search" @clear="search" />
       <el-select v-model="countdownFilter" multiple collapse-tags clearable placeholder="生产倒计时（全部）" aria-label="生产倒计时" @change="search"><el-option v-for="option in COUNTDOWN_FILTER_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select>
-      <el-select v-model="deliveryFilter" multiple collapse-tags clearable placeholder="入库记录交期（全部）" aria-label="入库记录交期" @change="search"><el-option v-for="option in DELIVERY_FILTER_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select>
+      <el-select v-model="deliveryFilter" multiple collapse-tags clearable placeholder="生产交付结果（全部）" aria-label="生产交付结果" @change="search"><el-option v-for="option in DELIVERY_FILTER_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select>
+      <el-select v-model="actionFilter" aria-label="跟单待办" @change="search"><el-option label="全部跟单待办" value="all" /><el-option label="有提醒" value="any" /><el-option v-for="code in TRACKING_ACTION_CODES" :key="code" :label="actionLabel(code)" :value="code" /></el-select>
       <div class="tracking-common-date" aria-label="生产任务单提交时间" title="按生产任务单提交时间筛选"><div class="tracking-extra-date-inputs"><el-date-picker v-model="dateFilters.created.from" type="date" value-format="YYYY-MM-DD" placeholder="提交时间起" aria-label="生产任务单提交起始日期" @change="onCreatedDateChange('from')" /><span>至</span><el-date-picker v-model="dateFilters.created.to" type="date" value-format="YYYY-MM-DD" placeholder="提交时间止" aria-label="生产任务单提交截止日期" @change="onCreatedDateChange('to')" /></div></div>
+      <!-- 预计完成时间：后端口径＝车间预计完成日，车间未填时回落有效的业务员要求日。 -->
+      <div class="tracking-common-date" aria-label="预计完成时间" title="按预计完成时间筛选"><div class="tracking-extra-date-inputs"><el-date-picker v-model="dateFilters.expected.from" type="date" value-format="YYYY-MM-DD" placeholder="预计完成起" aria-label="预计完成起始日期" @change="onExpectedDateChange('from')" /><span>至</span><el-date-picker v-model="dateFilters.expected.to" type="date" value-format="YYYY-MM-DD" placeholder="预计完成止" aria-label="预计完成截止日期" @change="onExpectedDateChange('to')" /></div></div>
       <el-checkbox v-model="urgentOnly" class="tracking-urgent-only" @change="search">仅看加急</el-checkbox>
         </div>
         <div class="tracking-filter-bottom">
@@ -67,14 +73,34 @@
       <el-button v-for="preset in quickFilterPresets" :key="preset.key" size="small" :type="quickFilterActive(preset.key) ? 'primary' : 'default'" :plain="!quickFilterActive(preset.key)" @click="applyQuickFilter(preset.key)">{{ preset.label }}</el-button>
     </div>
     <div v-if="advancedFiltersVisible" class="tracking-extra-filters" aria-label="更多生产跟单筛选条件">
+      <!-- 「跟单状态」「业务员」低频，收进更多筛选（10-19 LQ），常用行留给倒计时 / 交付结果 / 待办 / 两段日期。 -->
+      <div class="tracking-extra-filter"><el-select v-model="trackingStatus" aria-label="跟单状态" @change="search"><el-option label="全部跟单状态" value="all" /><el-option label="未结束跟单" value="open" /><el-option label="待跟单" value="pending" /><el-option label="跟单中" value="in_progress" /><el-option label="跟单已完成" value="completed" /><el-option label="停止生产跟单" value="stopped" /><el-option-group label="完成方式"><el-option label="人工结案" value="closed" /></el-option-group></el-select></div>
+      <div class="tracking-extra-filter"><el-select v-model="salespersonFilter" multiple filterable collapse-tags clearable placeholder="业务员（全部）" aria-label="业务员" @change="search"><el-option v-for="name in salespersonOptions" :key="name" :label="name" :value="name" /></el-select></div>
       <div class="tracking-extra-filter"><el-select v-model="workshop" clearable filterable placeholder="车间（全部）" aria-label="车间" @change="search"><el-option v-for="line in filterOptions.workshops" :key="line" :label="shortWorkshop(line)" :value="line" /></el-select></div>
       <div class="tracking-extra-filter"><el-select v-model="sourceStatus" clearable placeholder="任务单状态（全部）" aria-label="生产任务单状态" @change="search"><el-option v-for="status in filterOptions.sourceStatuses" :key="status" :label="status" :value="status" /></el-select></div>
       <div class="tracking-extra-filter"><el-select v-model="assignee" clearable placeholder="跟单员（全部）" aria-label="跟单员" @change="search"><el-option v-for="person in filterOptions.assignees" :key="person.id" :label="person.name" :value="String(person.id)" /></el-select></div>
-      <div class="tracking-extra-filter"><el-select v-model="trackingStatus" aria-label="跟单状态" @change="search"><el-option label="全部跟单状态" value="all" /><el-option label="跟单进行中" value="open" /><el-option label="待跟单" value="pending" /><el-option label="跟单中" value="in_progress" /><el-option label="跟单已完成" value="completed" /><el-option label="已结案（人工确认）" value="closed" /><el-option label="停止生产跟单" value="stopped" /></el-select></div>
       <div class="tracking-extra-filter tracking-extra-filter-check"><el-checkbox v-model="mine" @change="search">我的跟单</el-checkbox></div>
       <div class="tracking-extra-filter"><el-select v-model="optionalStageFilter" clearable placeholder="按需工序（全部）" aria-label="按需工序" @change="search"><el-option label="全部按需工序" value="" /><el-option v-for="option in optionalStageOptions" :key="option.value" :label="option.label" :value="option.value" /></el-select></div>
-      <div class="tracking-extra-filter"><el-select v-model="actionFilter" aria-label="跟单待办" @change="search"><el-option label="全部跟单待办" value="all" /><el-option label="有提醒" value="any" /><el-option v-for="code in TRACKING_ACTION_CODES" :key="code" :label="actionLabel(code)" :value="code" /></el-select></div>
-      <div class="tracking-extra-filter"><el-select v-model="timeFilter" aria-label="时间核实" @change="search"><el-option label="全部时间核实" value="all" /><el-option label="时间待核实" value="time_attention" /><el-option label="申请日期问题" value="time_application" /><el-option label="业务员要求日期问题" value="time_required" /><el-option label="接单时间待核" value="time_acceptance" /><el-option label="车间交期待核" value="time_commitment" /><el-option label="报工时间待核" value="time_reporting" /><el-option label="入库与报工待核" value="time_inbound_reporting" /><el-option label="逾期待记录原因" value="time_overdue" /><el-option label="核实事项应跟进" value="time_due" /></el-select></div>
+      <div class="tracking-extra-filter"><el-select v-model="timeFilter" aria-label="时间核实" @change="search">
+        <el-option label="全部时间核实" value="all" />
+        <el-option label="待核实问题" value="time_attention" title="仅筛出尚待处理的问题；已核实的源日期异常不在此项中" />
+        <el-option-group label="源日期异常 · 含已核实记录">
+          <el-option label="日期异常（含已核实）" value="time_source" title="申请日期或业务员要求日期异常，包含已核实但源数据仍异常的任务" />
+          <el-option label="申请日期异常" value="time_application" title="申请日期早于任务单提交日期" />
+          <el-option label="业务员要求日期异常" value="time_required" title="要求日期早于申请日期或任务单提交日期" />
+        </el-option-group>
+        <el-option-group label="生产时间异常 · 待核实">
+          <el-option label="生产时间异常" value="time_production" title="接单、车间交期、报工或入库与报工的时间问题" />
+          <el-option label="接单时间待核" value="time_acceptance" title="排产与申请或要求日期有冲突，或已过要求日期仍未排产" />
+          <el-option label="车间交期待核" value="time_commitment" title="车间预计完成时间晚于业务要求，或协商记录与当前日期不一致" />
+          <el-option label="报工时间待核" value="time_reporting" title="报工日晚于车间预计，或已过预计日期仍未报工" />
+          <el-option label="入库与报工待核" value="time_inbound_reporting" title="已入库但未报工，或入库日期早于报工日期" />
+        </el-option-group>
+        <el-option-group label="原因与后续跟进">
+          <el-option label="逾期原因待记录" value="time_overdue" title="入库记录逾期且当前交期与入库日期尚未登记原因" />
+          <el-option label="核实事项应跟进" value="time_due" title="已登记的核实事项到达下次跟进日期" />
+        </el-option-group>
+      </el-select></div>
     </div>
     <div v-if="activeFilterChips.length" class="tracking-active-filters" aria-label="当前筛选条件"><span>已筛选：</span><el-tag v-for="chip in activeFilterChips" :key="chip.key" closable type="info" @close="clearFilterChip(chip.key)">{{ chip.label }}</el-tag><el-button link type="primary" @click="resetTrackingFilters">清除全部</el-button></div>
     </div>
@@ -139,13 +165,13 @@
           <small v-else class="muted">无采购入库</small>
         </template>
       </el-table-column>
-      <el-table-column v-if="isListColumnVisible('deliveryResult')" label="入库记录交期" width="158">
+      <el-table-column v-if="isListColumnVisible('deliveryResult')" label="生产交付结果" width="158">
         <template #default="{ row }">
           <el-tag v-if="row.stoppedAt" type="info" effect="plain">已停止跟单</el-tag>
-          <el-tag v-else-if="row.deliveryOutcome === 'OVERDUE'" type="danger" effect="light">见入库逾期 {{ row.deliveryOverdueDays }} 天</el-tag>
-          <el-tag v-else-if="row.deliveryOutcome === 'ON_TIME'" type="success" effect="light">按期见入库</el-tag>
-          <el-tag v-else-if="row.deliveryOutcome === 'NO_BASELINE'" type="info" effect="plain">已见入库</el-tag>
-          <span v-else class="muted">未见入库</span>
+          <el-tag v-else-if="row.deliveryOutcome === 'OVERDUE'" type="danger" effect="light">{{ deliveryOutcomeText(row) }}</el-tag>
+          <el-tag v-else-if="row.deliveryOutcome === 'ON_TIME'" type="success" effect="light">{{ deliveryOutcomeText(row) }}</el-tag>
+          <el-tag v-else-if="row.deliveryOutcome === 'NO_BASELINE'" type="info" effect="plain">{{ deliveryOutcomeText(row) }}</el-tag>
+          <span v-else class="muted">{{ deliveryOutcomeText(row) }}</span>
           <small v-if="!row.stoppedAt && row.deliveredDate" class="muted"> {{ shortDate(row.deliveredDate) }}</small>
           <small v-else-if="!row.stoppedAt && row.expectedFinishDate" class="muted"> {{ shortDate(row.expectedFinishDate) }}</small>
         </template>
@@ -162,7 +188,7 @@
           <small>{{ row.stageDoneCount || 0 }}/{{ row.stageTotal || rowStages(row).length }} 已完成</small>
         </template>
       </el-table-column>
-      <el-table-column v-if="isListColumnVisible('timeSignals')" label="时间核实" min-width="150"><template #default="{ row }"><div class="time-signal-list"><el-tag v-for="signal in row.stoppedAt ? [] : rowTimeSignals(row)" :key="signal" size="small" type="danger" effect="plain">{{ signal }}</el-tag><span v-if="row.stoppedAt || !rowTimeSignals(row).length" class="muted">—</span></div></template></el-table-column>
+      <el-table-column v-if="isListColumnVisible('timeSignals')" label="时间核实" min-width="150"><template #default="{ row }"><div class="time-signal-list"><el-tag v-for="signal in row.stoppedAt ? [] : rowTimeSignals(row)" :key="signal" size="small" :type="signal.endsWith('有误') ? 'info' : 'danger'" effect="plain" :title="signal.endsWith('有误') ? '已核实，源工单日期仍异常' : '尚待核实或跟进'">{{ signal }}</el-tag><span v-if="row.stoppedAt || !rowTimeSignals(row).length" class="muted">—</span></div></template></el-table-column>
       <el-table-column v-if="isListColumnVisible('salesTrace')" label="销售去向" width="150"><template #default="{ row }">
         <span v-if="row.salesTraceStale" class="is-danger">来源已变更，需复核</span>
         <span v-else-if="row.salesTraceMixedUnits">多单位，查看详情</span>
@@ -289,6 +315,9 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 生产任务单导入（跟单员自助）：与氚云导入中心同一套解析/预览/确认，只锁死导入类型。 -->
+    <ProductionTaskImportDialog v-model="taskImportVisible" @imported="onProductionTaskImported" />
 
     <el-dialog v-model="importDialog" title="导入生产跟单进度表" width="min(1180px, 96vw)">
       <template v-if="importPreview">
@@ -505,7 +534,7 @@
           <div class="metric"><el-tooltip placement="top" raw-content :content="leadDaysTooltipHtml(detail.order)"><span class="lead-detail-heading">工期（当前） ⓘ</span></el-tooltip><strong :class="{ 'is-danger': leadDaysAlarm(detail.order) }">{{ effectiveLeadDaysText(detail.order) }}<small class="lead-kind">{{ leadDaysKindText(detail.order) }}</small></strong><small v-if="otherLeadDaysText(detail.order)" class="muted">{{ otherLeadDaysText(detail.order) }}</small><small v-if="leadDaysDeltaText(detail.order)" :class="leadDeltaClass(detail.order)">{{ leadDaysDeltaText(detail.order) }}</small><small v-if="negativeLeadDays(detail.order)" class="metric-exception-text">{{ negativeLeadReason(detail.order) }}</small></div>
           <div :class="['metric', { 'metric-exception': timeException(detail.order, 'ACCEPTANCE') }]"><span>排产时间（确认是否开工）</span><strong>{{ formatMinute(detail.order.scheduleTime) || '未排产' }}</strong><small v-if="scheduleLagDays(detail.order) != null" class="muted">提交后 {{ scheduleLagDays(detail.order) }} 天排产</small><small v-if="timeException(detail.order, 'ACCEPTANCE')" class="metric-exception-text">{{ timeException(detail.order, 'ACCEPTANCE') }}</small><el-button v-if="needsTimeReason(detail.order, 'ACCEPTANCE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('ACCEPTANCE')">注明接单原因</el-button><small v-else-if="timeException(detail.order, 'ACCEPTANCE')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'ACCEPTANCE')?.reason }}</small></div>
           <div :class="['metric', { 'metric-exception': timeException(detail.order, 'COMMITMENT') }]"><div class="metric-heading"><span>车间预计完成</span><el-button link type="primary" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openDelayDialog">{{ detail.order.forecastFinishDate ? '修改延期' : '延期' }}</el-button></div><strong>{{ currentCompletionDate(detail.order) || '未定' }}</strong><small class="muted">{{ detail.order.forecastFinishDate ? '原车间预计：' : '' }}{{ expectedCompareText(detail.order) }}</small><small v-if="detail.order.forecastFinishDate" class="metric-delay">{{ forecastAdjustText(detail.order) }}<template v-if="deadlineOf(detail.order)"> · 原预计 {{ deadlineOf(detail.order) }}</template><template v-if="detail.order.delayReason"> · {{ detail.order.delayReason }}</template></small><small v-else-if="detail.order.delayReason" class="muted">原有延期 / 风险说明：{{ detail.order.delayReason }}</small><small v-if="timeException(detail.order, 'COMMITMENT')" class="metric-exception-text">{{ timeException(detail.order, 'COMMITMENT') }}</small><el-button v-if="needsTimeReason(detail.order, 'COMMITMENT')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('COMMITMENT')">注明协商原因</el-button><small v-else-if="timeException(detail.order, 'COMMITMENT')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'COMMITMENT')?.reason }}</small></div>
-          <div :class="['metric', { 'metric-exception': timeException(detail.order, 'OVERDUE') }]"><span>入库记录交期</span><strong :class="{ 'is-danger': detail.order.deliveryOutcome === 'OVERDUE' }">{{ deliveryOutcomeText(detail.order) }}</strong><small v-if="detail.order.deliveryBaseline" class="muted">基准：车间预计完成 {{ detail.order.deliveryBaseline }}</small><small class="muted">此处采用跟单入库确认或采购首次入库，仅供进度对照；整单完工看交期分析。</small><el-button v-if="needsTimeReason(detail.order, 'OVERDUE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('OVERDUE')">记录逾期原因</el-button><small v-else-if="timeException(detail.order, 'OVERDUE')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'OVERDUE')?.reason }}</small></div>
+          <div :class="['metric', { 'metric-exception': timeException(detail.order, 'OVERDUE') }]"><span>生产交付结果</span><strong :class="{ 'is-danger': detail.order.deliveryOutcome === 'OVERDUE' }">{{ deliveryOutcomeText(detail.order) }}</strong><small v-if="detail.order.deliveryBaseline" class="muted">基准：车间预计完成 {{ detail.order.deliveryBaseline }}</small><small class="muted">按实际交付（跟单入库确认或采购首次入库）对照，仅供进度参考；整单完工看交期分析。</small><el-button v-if="needsTimeReason(detail.order, 'OVERDUE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('OVERDUE')">记录逾期原因</el-button><small v-else-if="timeException(detail.order, 'OVERDUE')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'OVERDUE')?.reason }}</small></div>
           <div :class="['metric', { 'metric-exception': timeException(detail.order, 'REPORTING') }]"><span>氚云报工完工（仅供对照）</span><strong>{{ detail.order.actualFinishDate || '源工单未填' }}</strong><small v-if="!detail.order.expectedFinishDate" class="muted">车间预计未填，暂无法比较报工日期</small><small v-else-if="!timeException(detail.order, 'REPORTING') && detail.order.actualFinishDate" class="muted">{{ reportCompareText(detail.order) }}</small><small v-if="timeException(detail.order, 'REPORTING')" class="metric-exception-text">{{ timeException(detail.order, 'REPORTING') }}</small><el-button v-if="needsTimeReason(detail.order, 'REPORTING')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('REPORTING')">核实并注明原因</el-button><small v-else-if="timeException(detail.order, 'REPORTING')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'REPORTING')?.reason }}</small></div>
           <button v-if="detail.order.inboundCount" type="button" :class="['metric', 'metric-link', { 'metric-exception': inboundBeforeReporting(detail.order) }]" :disabled="purchaseLinksLoading" @click="openPurchaseReceipts">
             <span>采购入库时间（仅供对照）</span>
@@ -718,6 +747,7 @@
     </el-dialog>
     <TrackingSourceDetailDrawer v-model="purchaseDetailVisible" kind="purchase" :loading="purchaseDetailLoading" :data="purchaseDetailData" :error="purchaseDetailError" />
     <ProductionTrackingAnalyticsDrawer v-model="analysisVisible" @open-order="openFromAnalysis" />
+    <ProductionTrackingWeeklyReviewDrawer v-model="weeklyReviewVisible" @open-order="openFromAnalysis" />
   </div>
 </template>
 
@@ -729,7 +759,9 @@ import { fetchTracking } from '@/api/productionTracking'
 import type { TrackingOrder } from '@/api/productionTracking'
 import TrackingSourceDetailDrawer from '@/components/production/TrackingSourceDetailDrawer.vue'
 import ProductionSalesTracePanel from '@/components/production/ProductionSalesTracePanel.vue'
+import ProductionTaskImportDialog from '@/components/production/ProductionTaskImportDialog.vue'
 import ProductionTrackingAnalyticsDrawer from './ProductionTrackingAnalyticsDrawer.vue'
+import ProductionTrackingWeeklyReviewDrawer from './ProductionTrackingWeeklyReviewDrawer.vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { isSourceUrgent } from '@/utils/trackingUrgency'
 import { TRACKING_ACTION_CODES, trackingActionHint as actionHint, trackingActionLabel as actionLabel, trackingActionTone as actionTone } from '@/utils/trackingAction'
@@ -752,11 +784,11 @@ import { useTrackingListCompletion } from '@/composables/tracking/useTrackingLis
  * 解构出来的名字与模板一致；改筛选后做什么由 onChange＝search 决定（本页只负责分页与请求）。
  */
 const {
-  keyword, specification, advancedFiltersVisible, dateFilters, countdownFilter, deliveryFilter, optionalStageFilter,
+  keyword, advancedFiltersVisible, dateFilters, countdownFilter, deliveryFilter, optionalStageFilter,
   salespersonFilter, workshop, sourceStatus, assignee, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
   filterOptions, COUNTDOWN_FILTER_OPTIONS, DELIVERY_FILTER_OPTIONS, optionalStageOptions,
   quickFilterPresets, quickFilterActive, applyQuickFilter, activeAdvancedFilterCount,
-  activeFilterChips, clearFilterChip, resetTrackingFilters, onCreatedDateChange,
+  activeFilterChips, clearFilterChip, resetTrackingFilters, onCreatedDateChange, onExpectedDateChange,
   trackingFilters, loadOptions: loadFilterOptions
 } = useTrackingFilters({ onChange: search })
 /** 「今天」的唯一来源见 @/utils/tracking/today；这里的心跳只为让「生产倒计时」列跨天自动刷新。 */
@@ -786,6 +818,7 @@ onUnmounted(() => { filterPanelObserver?.disconnect(); filterPanelObserver = nul
 /** 后端返回的跟单可见范围：ALL=看全部（主管/管理员），其余=只看本人负责车间。 */
 const visibility = ref('ALL')
 const analysisVisible = ref(false)
+const weeklyReviewVisible = ref(false)
 const route = useRoute()
 watch(() => route.query.analysis, value => { if (value === '1') analysisVisible.value = true }, { immediate: true })
 function openFromAnalysis(id: number) { void openDetail({ id } as TrackingOrder) }
@@ -979,6 +1012,13 @@ const {
   canFollowup, roundTripInput, roundTripDialog, roundTripFile, roundTripPreview, roundTripSaving,
   roundTripStatusText, roundTripTagType, onRoundTripSelected, confirmRoundTripImport
 } = useTrackingRoundTrip({ canFollowup: () => auth.can('manufacturing.followup'), reload: () => load() })
+
+/**
+ * 生产任务单导入（跟单员自助）：弹窗负责 上传→解析→预览→确认，成功后重载列表。
+ * 新导入的工单按车间默认跟单员自动归入可见范围（与列表可见性同一判据），不需要再手工指派。
+ */
+const taskImportVisible = ref(false)
+function onProductionTaskImported() { void load(true) }
 await Promise.all([loadColumnDefaults(), load()])
 </script>
 
@@ -1020,9 +1060,8 @@ await Promise.all([loadColumnDefaults(), load()])
 .tracking-filter-panel { position: sticky; top: calc(-1 * var(--page-block-padding, 0px)); z-index: 20; overflow: hidden; border: 1px solid #dce5e3; border-radius: 12px; background: #fff; box-shadow: 0 2px 12px rgba(16, 56, 50, .035); }
 .toolbar { display: flex; gap: 10px 18px; align-items: center; flex-wrap: wrap; padding: 13px 16px; }
 .tracking-filter-fields { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; min-width: 0; }
-.tracking-filter-fields .tracking-keyword { flex: 0 0 230px; width: 230px; }
-.tracking-filter-fields .tracking-spec { flex: 0 0 180px; width: 180px; }
-.tracking-common-date { display: flex; align-items: center; flex: 0 0 340px; min-width: 0; }
+.tracking-filter-fields .tracking-keyword { flex: 0 0 260px; width: 260px; }
+.tracking-common-date { display: flex; align-items: center; flex: 0 0 296px; min-width: 0; }
 .tracking-common-date .tracking-extra-date-inputs { width: 100%; }
 .tracking-urgent-only { margin: 0 4px; white-space: nowrap; }
 .tracking-filter-fields :deep(.el-input__wrapper), .tracking-filter-fields :deep(.el-select__wrapper) { min-height: 32px; }

@@ -103,10 +103,10 @@ describe('tracking/rules · 完工 / 入库 / 交付', () => {
   })
 
   it('交付结果文案与语义色四处一致', () => {
-    expect(deliveryOutcomeText(order({ deliveryOutcome: 'OVERDUE', deliveryOverdueDays: 4 }))).toBe('逾期完工 4 天')
-    expect(deliveryOutcomeText(order({ deliveryOutcome: 'ON_TIME' }))).toBe('按期完工')
+    expect(deliveryOutcomeText(order({ deliveryOutcome: 'OVERDUE', deliveryOverdueDays: 4 }))).toBe('逾期交付 4 天')
+    expect(deliveryOutcomeText(order({ deliveryOutcome: 'ON_TIME' }))).toBe('按期交付')
     expect(deliveryOutcomeText(order({ deliveryOutcome: 'NO_BASELINE' }))).toBe('已交付（无基准）')
-    expect(deliveryOutcomeText(order({ deliveryOutcome: 'PENDING' }))).toBe('未完工')
+    expect(deliveryOutcomeText(order({ deliveryOutcome: 'PENDING' }))).toBe('未交付')
     expect(deliveryOutcomeText(order({ stoppedAt: '2026-10-01T09:00:00' }))).toBe('已停止跟单')
     expect(deliveryOutcomeTone(order({ deliveryOutcome: 'OVERDUE' }))).toBe('danger')
     expect(deliveryOutcomeTone(order({ deliveryOutcome: 'PENDING' }))).toBe('')

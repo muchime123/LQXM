@@ -49,8 +49,9 @@ describe('生产跟单：跟单待办提醒的文案与配色', () => {
     expect(trackingActionHint({ trackingAction: 'STALE_FOLLOWUP' })).toContain('无记录')
   })
 
-  it('「超期未更新」的天数与后端阈值同源（改了天数文案要跟着变）', () => {
+  it('「7 天未更新」的天数与后端阈值同源', () => {
     expect(STALE_FOLLOWUP_DAYS).toBe(7)
+    expect(trackingActionLabel('STALE_FOLLOWUP')).toBe('7 天未更新')
     expect(trackingActionHint({ trackingAction: 'STALE_FOLLOWUP', lastFollowupAt: '2026-09-20' }))
       .toContain(`${STALE_FOLLOWUP_DAYS} 天`)
   })

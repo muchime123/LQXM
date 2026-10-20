@@ -3,6 +3,7 @@ package com.liqiang.archive.controller;
 import com.liqiang.archive.security.RequirePermission;
 import com.liqiang.archive.service.ProductionTrackingService;
 import com.liqiang.archive.service.ProductionTrackingAnalyticsService;
+import com.liqiang.archive.service.ProductionTrackingWeeklyReviewService;
 import com.liqiang.archive.service.ProductionOutboundTraceService;
 import com.liqiang.archive.service.H3BusinessQueryService;
 import com.liqiang.archive.service.ProductionTrackingRoundTripService;
@@ -25,6 +26,7 @@ import java.util.stream.Collectors;
 public class ProductionTrackingController {
     private final ProductionTrackingService service;
     private final ProductionTrackingAnalyticsService analytics;
+    private final ProductionTrackingWeeklyReviewService weekly;
     private final ProductionOutboundTraceService outboundTrace;
     private final H3BusinessQueryService queryService;
     private final ProductionTrackingWorkbookImportService workbookImport;
@@ -34,7 +36,6 @@ public class ProductionTrackingController {
     @GetMapping
     @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public Map<String,Object> list(@RequestParam(defaultValue="") String keyword,
-            @RequestParam(defaultValue="") String specification,
             @RequestParam(defaultValue="") String moldLayout,
             @RequestParam(defaultValue="") String workshop,
             @RequestParam(defaultValue="all") String trackingStatus,
@@ -64,7 +65,7 @@ public class ProductionTrackingController {
         var result=service.list(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,salesperson,deliveryResult,
                 new ProductionTrackingService.DateRangeFilter(applicationFrom,applicationTo,applicationMissing),
                 new ProductionTrackingService.DateRangeFilter(scheduleFrom,scheduleTo,scheduleMissing),
-                new ProductionTrackingService.DateRangeFilter(expectedFrom,expectedTo,expectedMissing),urgent,specification,moldLayout,
+                new ProductionTrackingService.DateRangeFilter(expectedFrom,expectedTo,expectedMissing),urgent,moldLayout,
                 new ProductionTrackingService.DateRangeFilter(createdFrom,createdTo,false),optionalStage,page,size);
         @SuppressWarnings("unchecked")
         var items=(List<Map<String,Object>>)result.get("items");
@@ -85,7 +86,6 @@ public class ProductionTrackingController {
     @GetMapping("/export")
     @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public Map<String,Object> export(@RequestParam(defaultValue="") String keyword,
-            @RequestParam(defaultValue="") String specification,
             @RequestParam(defaultValue="") String moldLayout,
             @RequestParam(defaultValue="") String workshop,
             @RequestParam(defaultValue="all") String trackingStatus,
@@ -114,7 +114,7 @@ public class ProductionTrackingController {
         return service.exportRows(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,salesperson,deliveryResult,
                 new ProductionTrackingService.DateRangeFilter(applicationFrom,applicationTo,applicationMissing),
                 new ProductionTrackingService.DateRangeFilter(scheduleFrom,scheduleTo,scheduleMissing),
-                new ProductionTrackingService.DateRangeFilter(expectedFrom,expectedTo,expectedMissing),urgent,specification,moldLayout,
+                new ProductionTrackingService.DateRangeFilter(expectedFrom,expectedTo,expectedMissing),urgent,moldLayout,
                 new ProductionTrackingService.DateRangeFilter(createdFrom,createdTo,false),optionalStage,ids);}
 
     @GetMapping("/summary")
@@ -142,9 +142,22 @@ public class ProductionTrackingController {
             @RequestParam(defaultValue="") String toDate,@RequestParam(defaultValue="") String workshop,
             @RequestParam(defaultValue="baseline") String dateBasis,
             @RequestParam(defaultValue="") String month,@RequestParam String bucket,
-            @RequestParam(defaultValue="") String reason,@RequestParam(defaultValue="1") int page,
+            @RequestParam(defaultValue="") String reason,
+            @RequestParam(defaultValue="") String reasonCategory,
+            @RequestParam(defaultValue="1") int page,
             @RequestParam(defaultValue="30") int size){
-        return analytics.orders(fromDate,toDate,workshop,dateBasis,month,bucket,reason,page,size);
+        return analytics.orders(fromDate,toDate,workshop,dateBasis,month,bucket,reason,reasonCategory,page,size);
+    }
+
+    /**
+     * 跟单周复盘看板：把交期达成分析的同一批数字按周报的写法重组（含原因归类）。
+     * 周期由前端算好传 fromDate/toDate（自然周或 10.01-10.11 这类月初分段都支持）。
+     */
+    @GetMapping("/weekly-review")
+    @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    public Map<String,Object> weeklyReview(@RequestParam(defaultValue="") String fromDate,
+            @RequestParam(defaultValue="") String toDate,@RequestParam(defaultValue="") String workshop){
+        return weekly.review(fromDate,toDate,workshop);
     }
 
     @GetMapping("/{id}")
@@ -397,6 +410,22 @@ public class ProductionTrackingController {
     @RequirePermission("manufacturing.baseline.manage")
     public Map<String,Object> saveNodeBenchmarks(@RequestBody List<ProductionTrackingService.BenchmarkSave> rows){
         return service.saveNodeBenchmarks(rows);
+    }
+
+    @GetMapping("/product-node-benchmarks")
+    @RequirePermission("manufacturing.baseline.manage")
+    public List<Map<String,Object>> productNodeBenchmarks(){return service.productBenchmarkMatrix();}
+
+    @PutMapping("/product-node-benchmarks")
+    @RequirePermission("manufacturing.baseline.manage")
+    public void saveProductNodeBenchmark(@RequestBody ProductionTrackingService.ProductBenchmarkSave row){
+        service.saveProductBenchmark(row);
+    }
+
+    @PostMapping("/product-node-benchmarks/{groupId}/refresh-candidates")
+    @RequirePermission("manufacturing.baseline.manage")
+    public List<Map<String,Object>> refreshProductBenchmarkCandidates(@PathVariable long groupId){
+        return service.refreshProductBenchmarkCandidates(groupId);
     }
 
     /**

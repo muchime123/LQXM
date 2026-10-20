@@ -4,6 +4,7 @@ import com.liqiang.archive.service.H3BusinessQueryService;
 import com.liqiang.archive.service.ProductionOutboundTraceService;
 import com.liqiang.archive.service.ProductionTrackingService;
 import com.liqiang.archive.service.ProductionTrackingAnalyticsService;
+import com.liqiang.archive.service.ProductionTrackingWeeklyReviewService;
 import com.liqiang.archive.service.ProductionTrackingRoundTripService;
 import com.liqiang.archive.service.ProductionTrackingWorkbookImportService;
 import com.liqiang.archive.service.ProductionTrackingWorkbookReviewService;
@@ -19,7 +20,8 @@ class ProductionTrackingPrivacyTest {
     private final ProductionTrackingService tracking=mock(ProductionTrackingService.class);
     private final ProductionOutboundTraceService trace=mock(ProductionOutboundTraceService.class);
     private final H3BusinessQueryService ledger=mock(H3BusinessQueryService.class);
-    private final ProductionTrackingController controller=new ProductionTrackingController(tracking,mock(ProductionTrackingAnalyticsService.class),trace,ledger,
+    private final ProductionTrackingController controller=new ProductionTrackingController(tracking,mock(ProductionTrackingAnalyticsService.class),
+            mock(ProductionTrackingWeeklyReviewService.class),trace,ledger,
             mock(ProductionTrackingWorkbookImportService.class),mock(ProductionTrackingWorkbookReviewService.class),
             mock(ProductionTrackingRoundTripService.class));
 

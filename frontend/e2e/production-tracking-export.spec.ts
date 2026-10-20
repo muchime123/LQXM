@@ -257,10 +257,50 @@ test('快捷筛选、已选条件和重置共用列表查询', async ({ page }) 
   await expect(page.getByText('跟单状态：待跟单')).toHaveCount(0)
 })
 
+test('工作台默认只查待处理任务，跟单待办在常用筛选区', async ({ page }) => {
+  await stubApis(page)
+  const initialRequest = page.waitForRequest(request => {
+    const url = new URL(request.url())
+    return url.pathname.endsWith('/manufacturing/followups') && url.searchParams.get('trackingStatus') === 'open'
+  })
+  await page.goto('/')
+  await initialRequest
+  await expect(page.getByRole('button', { name: '需要处理', exact: true })).toBeVisible()
+  await expect(page.locator('.tracking-filter-fields').getByRole('combobox', { name: '跟单待办' })).toBeVisible()
+
+  const allRequest = page.waitForRequest(request => {
+    const url = new URL(request.url())
+    return url.pathname.endsWith('/manufacturing/followups') && url.searchParams.get('trackingStatus') === 'all'
+  })
+  await page.getByRole('button', { name: '需要处理', exact: true }).click()
+  await allRequest
+})
+
+test('跟单状态与时间核实按业务含义分组', async ({ page }) => {
+  await stubApis(page)
+  await page.goto('/')
+  // 跟单状态、业务员已收进「更多筛选」，常用行不再占位
+  await expect(page.locator('.tracking-filter-fields').getByRole('combobox', { name: '跟单状态' })).toHaveCount(0)
+  await expect(page.locator('.tracking-filter-fields').getByRole('combobox', { name: '业务员' })).toHaveCount(0)
+
+  await page.getByRole('button', { name: /更多筛选/ }).click()
+  await page.locator('.tracking-extra-filters .el-select:has([aria-label="跟单状态"])').click()
+  await expect(page.getByRole('option', { name: '未结束跟单' })).toBeVisible()
+  await expect(page.getByRole('option', { name: '人工结案' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await expect(page.locator('.tracking-extra-filters').getByPlaceholder('业务员（全部）')).toBeVisible()
+
+  await page.locator('.tracking-extra-filters .el-select:has([aria-label="时间核实"])').click()
+  await expect(page.getByRole('option', { name: '待核实问题' })).toBeVisible()
+  await expect(page.getByRole('option', { name: '日期异常（含已核实）' })).toBeVisible()
+  await expect(page.getByRole('option', { name: '生产时间异常', exact: true })).toBeVisible()
+})
+
 test('常用区创建时间筛选同时用于列表和导出', async ({ page }) => {
   await stubApis(page)
   await page.goto('/')
-  const creationDate = page.locator('.tracking-common-date')
+  // 常用行有两段日期（提交时间 / 预计完成时间），按 aria-label 精确取本段
+  const creationDate = page.locator('.tracking-common-date[aria-label="生产任务单提交时间"]')
   const listRequest = page.waitForRequest(request => {
     if (!new URL(request.url()).pathname.endsWith('/manufacturing/followups')) return false
     const params = new URL(request.url()).searchParams
@@ -274,6 +314,29 @@ test('常用区创建时间筛选同时用于列表和导出', async ({ page }) 
   await page.getByRole('button', { name: '导出', exact: true }).click()
   const exportRequest = page.waitForRequest(request => new URL(request.url()).pathname.endsWith('/manufacturing/followups/export')
     && new URL(request.url()).searchParams.get('createdFrom') === '2026-10-01')
+  await page.getByRole('button', { name: '导出网页' }).click()
+  await exportRequest
+})
+
+test('常用区预计完成时间筛选同时用于列表和导出', async ({ page }) => {
+  await stubApis(page)
+  await page.goto('/')
+  const expectedDate = page.locator('.tracking-common-date[aria-label="预计完成时间"]')
+  await expect(expectedDate).toBeVisible()
+  const listRequest = page.waitForRequest(request => {
+    if (!new URL(request.url()).pathname.endsWith('/manufacturing/followups')) return false
+    const params = new URL(request.url()).searchParams
+    return params.get('expectedFrom') === '2026-10-05' && params.get('expectedTo') === '2026-10-31'
+  })
+  await expectedDate.getByPlaceholder('预计完成起').fill('2026-10-05')
+  await expectedDate.getByPlaceholder('预计完成止').fill('2026-10-31')
+  await listRequest
+  await expect(page.getByText('预计完成时间：2026-10-05～2026-10-31')).toBeVisible()
+
+  await page.getByRole('button', { name: '导出', exact: true }).click()
+  const exportRequest = page.waitForRequest(request => new URL(request.url()).pathname.endsWith('/manufacturing/followups/export')
+    && new URL(request.url()).searchParams.get('expectedFrom') === '2026-10-05'
+    && new URL(request.url()).searchParams.get('expectedTo') === '2026-10-31')
   await page.getByRole('button', { name: '导出网页' }).click()
   await exportRequest
 })

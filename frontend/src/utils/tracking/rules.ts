@@ -68,12 +68,12 @@ export function trackingStatusText(value?: TrackingOrder['trackingStatus']) {
 /**
  * 跟单状态筛选下拉与 chip 用的展示文案：
  * 含后端真实状态（pending/in_progress/completed/stopped）和筛选入参 'closed'（人工结案）、
- * 前端伪值 'open'（跟单进行中 = pending+in_progress）。closed 在状态字段上不会出现，
+ * 前端伪值 'open'（未结束跟单 = pending+in_progress）。closed 在状态字段上不会出现，
  * 仅作为筛选参数；带 closedAt 的行 trackingStatus 字段为 'completed'。
  */
 export const TRACKING_STATUS_FILTER_LABEL: Record<string, string> = {
   pending: '待跟单', in_progress: '跟单中', completed: '跟单已完成',
-  closed: '已结案（人工确认）', stopped: '停止生产跟单', open: '跟单进行中'
+  closed: '人工结案', stopped: '停止生产跟单', open: '未结束跟单'
 }
 export function trackingStatusTone(value?: TrackingOrder['trackingStatus']): 'success' | 'warning' | 'info' {
   return value === 'completed' ? 'success' : value === 'in_progress' ? 'warning' : 'info'
@@ -218,15 +218,15 @@ export function reportCompareText(row: TrackingOrder) {
   const days = daysBetween(row.expectedFinishDate, row.actualFinishDate)
   return days == null ? '' : days < 0 ? `比车间预计早 ${-days} 天（报工仅供对照）` : days === 0 ? '与车间预计同日（报工仅供对照）' : `比车间预计晚 ${days} 天（报工仅供对照）`
 }
-/** 首次入库/跟单确认的交期对照；可能只是部分入库，不代表整单完工。 */
+/** 首次入库/跟单确认的交期对照；可能只是部分入库，不代表整单完工（10-19 LQ 定名：统一叫「交付」，不叫「入库」）。 */
 export function deliveryOutcomeText(row: TrackingOrder) {
   if (row.stoppedAt) return '已停止跟单'
-  if (row.deliveryOutcome === 'OVERDUE') return `见入库逾期 ${row.deliveryOverdueDays ?? 0} 天`
-  if (row.deliveryOutcome === 'ON_TIME') return '按期见入库'
-  if (row.deliveryOutcome === 'NO_BASELINE') return '已见入库（无基准）'
-  return '未见入库'
+  if (row.deliveryOutcome === 'OVERDUE') return `逾期交付 ${row.deliveryOverdueDays ?? 0} 天`
+  if (row.deliveryOutcome === 'ON_TIME') return '按期交付'
+  if (row.deliveryOutcome === 'NO_BASELINE') return '已交付（无基准）'
+  return '未交付'
 }
-/** 入库记录交期的语义色：口径与列表 el-tag 的 type 完全一致（网页导出用它上色）。 */
+/** 生产交付结果的语义色：口径与列表 el-tag 的 type 完全一致（网页导出用它上色）。 */
 export function deliveryOutcomeTone(row: TrackingOrder): Tone | '' {
   if (row.stoppedAt) return 'info'
   if (row.deliveryOutcome === 'OVERDUE') return 'danger'

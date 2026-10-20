@@ -41,7 +41,64 @@ public class ManufacturingTaskConfigController {
 
     @GetMapping("/task-configs")
     public List<Map<String,Object>> list() {
-        return jdbc.queryForList("SELECT c.id,c.workshop_id workshopId,c.config_code configCode,c.product_type productType,c.option_group_code optionGroupCode,c.config_name AS configName,c.workshop_name AS workshopName,c.config_type AS configType,c.active,c.process_template_id AS processTemplateId,t.template_name AS processTemplateName FROM manufacturing_task_config_items c LEFT JOIN manufacturing_process_templates t ON t.id=c.process_template_id ORDER BY c.workshop_name,c.config_type,c.id");
+        return jdbc.queryForList("SELECT c.id,c.workshop_id workshopId,c.config_code configCode,c.product_type productType,c.option_group_code optionGroupCode,c.config_name AS configName,c.workshop_name AS workshopName,c.config_type AS configType,c.active,c.process_template_id AS processTemplateId,t.template_name AS processTemplateName,c.duration_group_id AS durationGroupId,"
+                +"CASE WHEN c.config_type='PRODUCT_NAME' THEN (SELECT COUNT(*) FROM production_orders p WHERE p.product_name=c.config_name AND p.production_line=c.workshop_name) ELSE NULL END AS historicalTaskCount "
+                +"FROM manufacturing_task_config_items c LEFT JOIN manufacturing_process_templates t ON t.id=c.process_template_id ORDER BY c.workshop_name,c.config_type,c.id");
+    }
+
+    /** 产品工期分组只影响本地跟单参考日期，不改变氚云产品和制程定义。 */
+    @GetMapping("/duration-groups")
+    public List<Map<String,Object>> durationGroups() {
+        return jdbc.queryForList("SELECT id,group_name AS groupName,workshop_kind AS workshopKind,active FROM production_tracking_duration_groups ORDER BY group_name");
+    }
+
+    @GetMapping("/duration-coverage")
+    public Map<String,Object> durationCoverage() {
+        return jdbc.queryForMap("SELECT COUNT(*) AS total,"
+                +"SUM(EXISTS(SELECT 1 FROM manufacturing_task_config_items c WHERE c.config_type='PRODUCT_NAME' "
+                +"AND c.active=1 AND c.config_name=p.product_name AND c.workshop_name=p.production_line)) AS productMatched,"
+                +"SUM((SELECT COUNT(DISTINCT c.duration_group_id) FROM manufacturing_task_config_items c "
+                +"WHERE c.config_type='PRODUCT_NAME' AND c.active=1 AND c.config_name=p.product_name "
+                +"AND c.workshop_name=p.production_line)=1) AS groupAssigned FROM production_orders p");
+    }
+
+    public record DurationGroupCreate(String groupName,String workshopKind) {}
+
+    @PostMapping("/duration-groups")
+    @Transactional
+    public long createDurationGroup(@RequestBody DurationGroupCreate request) {
+        String name=requiredName(request.groupName(),"工期分组名称");
+        if(name.length()>100||!Set.of("SEALER","MACHINE").contains(request.workshopKind()))
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"请填写有效的工期分组名称和车间类别");
+        if(jdbc.queryForObject("SELECT COUNT(*) FROM production_tracking_duration_groups WHERE group_name=?",Integer.class,name)>0)
+            throw new ResponseStatusException(HttpStatus.CONFLICT,"工期分组名称已存在");
+        jdbc.update("INSERT INTO production_tracking_duration_groups(group_name,workshop_kind) VALUES(?,?)",name,request.workshopKind());
+        long id=jdbc.queryForObject("SELECT id FROM production_tracking_duration_groups WHERE group_name=?",Long.class,name);
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.production_tracking_duration_groups",id,"INSERT",
+                ErpChangeLogWriter.changes("groupName",name,"workshopKind",request.workshopKind()),null,"新增产品工期分组",null,null));
+        return id;
+    }
+
+    public record DurationGroupAssignment(Long durationGroupId) {}
+
+    @PutMapping("/task-configs/{id}/duration-group")
+    @Transactional
+    public void assignDurationGroup(@PathVariable long id,@RequestBody DurationGroupAssignment request) {
+        var rows=jdbc.queryForList("SELECT config_type,workshop_name,duration_group_id FROM manufacturing_task_config_items WHERE id=? FOR UPDATE",id);
+        if(rows.isEmpty())throw new ResponseStatusException(HttpStatus.NOT_FOUND,"产品不存在");
+        var row=rows.getFirst();
+        if(!"PRODUCT_NAME".equals(row.get("config_type")))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"只有产品名称可以设置工期分组");
+        if(request.durationGroupId()!=null){
+            if(row.get("workshop_name")==null||String.valueOf(row.get("workshop_name")).isBlank())
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"产品缺少车间，暂不能关联工期分组");
+            var groups=jdbc.queryForList("SELECT workshop_kind FROM production_tracking_duration_groups WHERE id=? AND active=1",request.durationGroupId());
+            if(groups.isEmpty())throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"工期分组不存在或已停用");
+            String expected=String.valueOf(row.get("workshop_name")).contains("封口")?"SEALER":"MACHINE";
+            if(!expected.equals(groups.getFirst().get("workshop_kind")))throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"产品车间与工期分组类别不一致");
+        }
+        jdbc.update("UPDATE manufacturing_task_config_items SET duration_group_id=? WHERE id=?",request.durationGroupId(),id);
+        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_task_config_items",id,"UPDATE",
+                ErpChangeLogWriter.changes("durationGroupId",request.durationGroupId(),"before",row.get("duration_group_id")),null,"关联产品工期分组",null,null));
     }
 
     public record Update(String configName, Boolean active, Long processTemplateId) {}

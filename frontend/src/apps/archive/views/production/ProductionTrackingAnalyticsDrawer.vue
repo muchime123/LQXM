@@ -34,7 +34,7 @@
     <template v-if="data">
       <section class="analysis-cards" aria-label="核心指标">
         <div><span>应完成任务 <el-tooltip content="当前有效预计日期落在范围内，且未确认取消；停止本地跟单仍计入。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('dueTasks','应完成任务')">{{ data.totals.dueTasks }} 单 ↗</button><small>其中已到期 {{ data.totals.matured }} 单</small></div>
-        <div><span>已完工 <el-tooltip content="跟单员确认入库节点优先；尚未确认时，仅同任务编号下入库品名和单位均唯一、累计数量达到计划数，才自动推定整单完工。混合品名或单位需核实。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('completed','已完工')">{{ data.totals.delivered }} 单 ↗</button><small>完工率 {{ percent(data.totals.completionRate) }}</small></div>
+        <div><span>已完工 <el-tooltip content="跟单员确认入库节点优先；尚未确认时，仅同任务编号下入库品名和单位均唯一、累计数量达到计划数，才自动推定整单完工。混合品名或单位需核实。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('delivered','已完工')">{{ data.totals.delivered }} 单 ↗</button><small>完工率 {{ percent(data.totals.completionRate) }}</small></div>
         <div><span>未完工 <el-tooltip content="尚无整单完工依据；首次或部分采购入库不算整单完工。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('open','未完工')">{{ data.totals.open }} 单 ↗</button><small>其中已超预计日期 {{ data.totals.openOverdue }} 单</small></div>
         <div><span>按期完工 <el-tooltip content="整单完工日期不晚于当前有效预计日期。按期达成率＝按期完工 ÷ 应完成任务。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('onTime','按期完工')">{{ data.totals.onTime }} 单 ↗</button><small>按期达成率 {{ percent(data.totals.onTimeAchievementRate) }}</small></div>
         <div class="warning"><span>逾期完工 <el-tooltip content="整单完工日期晚于当前有效预计日期；未完工不会计入。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('overdue','逾期完工')">{{ data.totals.overdue }} 单 ↗</button><small>仅计已经完工的任务</small></div>
@@ -82,7 +82,7 @@
         <section class="analysis-section">
           <div class="section-head">
             <h2>协商改期<el-tooltip placement="top" content="与源任务的原车间预计日期比较；没有原车间预计日期时暂不判定改期。"><span class="note-icon" tabindex="0">ⓘ</span></el-tooltip></h2>
-            <div class="analysis-facts"><button v-for="fact in extensionFacts" :key="fact.bucket" @click="openDrilldown(fact.bucket,fact.label)">{{ fact.label }} {{ fact.count }} {{ fact.unit }} ↗</button></div>
+            <div class="analysis-facts"><button v-for="fact in extensionFacts" :key="fact.bucket" @click="openDrilldown(fact.bucket,fact.label)">{{ fact.label }} {{ fact.count }} {{ fact.unit }} ↗<small v-if="fact.note">（{{ fact.note }}）</small></button></div>
           </div>
           <h3>记录的延后原因</h3><ReasonList :items="data.extensionReasons" @select="reason => openDrilldown('extensionReason',`延后原因：${reason}`,{reason})" /><h3>风险类别</h3><ReasonList :items="riskItems(data.riskCategories)" @select="reason => openDrilldown('riskCategory',`风险类别：${riskNames[reason] || reason}`,{reason})" />
         </section>
@@ -134,9 +134,13 @@ const coverageFacts=computed(()=>{const t=data.value?.totals;return t?[
   {bucket:'cancelled',label:'已确认取消',count:t.cancelled},
   {bucket:'stopped',label:'停止本地跟单',count:t.stopped}
 ]:[]})
+/**
+ * 「累计延后 N 天」原先是**独立卡片**，但它显示的是天数（`extensionDays`），
+ * 点进去下钻出来的却是延后过的单数（`extended`）—— 量纲本就不同，卡片与下钻必然对不上。
+ * 现改为同一张卡的**附注行**：主数字＝延后单数＝下钻条数，天数只作展示、不可点。
+ */
 const extensionFacts=computed(()=>{const t=data.value?.totals;return t?[
-  {bucket:'extended',label:'协商延后',count:t.extended,unit:'单'},
-  {bucket:'extended',label:'累计延后',count:t.extensionDays,unit:'天'},
+  {bucket:'extended',label:'协商延后',count:t.extended,unit:'单',note:`累计延后 ${t.extensionDays} 天`},
   {bucket:'advanced',label:'提前',count:t.advanced,unit:'单'},
   {bucket:'extensionReasonMissing',label:'延后原因未记',count:t.extensionReasonMissing,unit:'单'}
 ]:[]})

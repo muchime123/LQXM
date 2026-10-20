@@ -31,6 +31,7 @@
 
     <!-- ==================== 右：选中车间的产品与配置 ==================== -->
     <section v-if="current" class="detail">
+      <el-alert v-if="coverage" type="info" :closable="false" :title="`历史任务产品匹配 ${coverage.productMatched}/${coverage.total}，已归入工期组 ${coverage.groupAssigned}/${coverage.total}`" description="按车间和产品名称精确匹配；未匹配或未分组的任务继续沿用车间参考基准。" />
       <header class="detail-head">
         <div class="detail-title">
           <h2>{{ current.workshopName }}</h2>
@@ -71,6 +72,15 @@
                 </el-select>
               </template>
             </el-table-column>
+            <el-table-column label="跟单工期分组" min-width="155">
+              <template #header>跟单工期分组 <el-button link type="primary" size="small" @click="createDurationGroup">新增</el-button></template>
+              <template #default="{ row }">
+                <el-select v-model="row.durationGroupId" clearable filterable size="small" class="full" placeholder="沿用车间基准">
+                  <el-option v-for="group in availableDurationGroups" :key="group.id" :value="group.id" :label="group.groupName" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column prop="historicalTaskCount" label="历史工单" width="92" />
             <el-table-column label="启用" width="72">
               <template #default="{ row }"><el-switch v-model="row.active" size="small" /></template>
             </el-table-column>
@@ -146,18 +156,22 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { http } from '@/api/http'
 import ProductConfigurationRuleDialog from './ProductConfigurationRuleDialog.vue'
 const ruleEditor = ref<InstanceType<typeof ProductConfigurationRuleDialog>>()
 
-interface Config { id: number; workshopId: number; configCode: string; configName: string; workshopName: string; configType: string; active: boolean; processTemplateId: number | null }
+interface Config { id: number; workshopId: number; configCode: string; configName: string; workshopName: string; configType: string; active: boolean; processTemplateId: number | null; durationGroupId: number | null; historicalTaskCount: number }
 interface Workshop { id: number; workshopName: string; enabled: boolean; defaultProcessTemplateId: number | null }
 interface Template { id: number; templateName: string; active: boolean }
+interface DurationGroup { id: number; groupName: string; workshopKind: 'SEALER' | 'MACHINE'; active: boolean }
+interface Coverage { total: number; productMatched: number; groupAssigned: number }
 
 const configs = ref<Config[]>([])
 const workshops = ref<Workshop[]>([])
 const templates = ref<Template[]>([])
+const durationGroups = ref<DurationGroup[]>([])
+const coverage = ref<Coverage | null>(null)
 const selectedId = ref<number | null>(null)
 const configKeyword = ref('')
 const saving = ref<number | null>(null)
@@ -178,6 +192,8 @@ const workshopCards = computed(() => workshops.value.map(w => {
 }))
 
 const current = computed(() => workshopCards.value.find(w => w.id === selectedId.value) ?? null)
+const availableDurationGroups = computed(() => durationGroups.value.filter(group => group.active &&
+  group.workshopKind === (current.value?.workshopName.includes('封口') ? 'SEALER' : 'MACHINE')))
 
 const filteredConfigs = computed(() => {
   const list = current.value?.configs ?? []
@@ -186,14 +202,18 @@ const filteredConfigs = computed(() => {
 })
 
 async function load() {
-  const [cfg, ws, tpl] = await Promise.all([
+  const [cfg, ws, tpl, groups, match] = await Promise.all([
     http.get<Config[]>('/manufacturing/master/task-configs'),
     http.get<Workshop[]>('/manufacturing/master/workshops'),
-    http.get<Template[]>('/manufacturing/master/templates')
+    http.get<Template[]>('/manufacturing/master/templates'),
+    http.get<DurationGroup[]>('/manufacturing/master/duration-groups'),
+    http.get<Coverage>('/manufacturing/master/duration-coverage')
   ])
   configs.value = cfg.data.map(r => ({ ...r, active: Boolean(r.active) }))
   workshops.value = ws.data
   templates.value = tpl.data.filter(t => t.active)
+  durationGroups.value = groups.data
+  coverage.value = match.data
   // 默认落到第一条启用产线，避免首屏空白
   if (selectedId.value == null || !workshops.value.some(w => w.id === selectedId.value)) {
     selectedId.value = (workshops.value.find(w => w.enabled) ?? workshops.value[0])?.id ?? null
@@ -241,8 +261,24 @@ async function save(row: Config) {
       active: row.active,
       processTemplateId: row.processTemplateId || null
     })
-    ElMessage.success(`已保存「${row.configName}」，仅影响后续新建的任务`)
+    await http.put(`/manufacturing/master/task-configs/${row.id}/duration-group`, { durationGroupId: row.durationGroupId })
+    ElMessage.success(`已保存「${row.configName}」；跟单参考基准按当前产品分组计算`)
   } finally { saving.value = null }
+}
+
+async function createDurationGroup() {
+  if (!current.value) return
+  try {
+    const { value } = await ElMessageBox.prompt('同系列产品可共用一个工期分组；此处只创建分组，不会更改跟单节点。',
+      '新增跟单工期分组', { inputPlaceholder: '例如：气动卷膜', inputValidator: text => !!text.trim() || '请填写分组名称' })
+    await http.post('/manufacturing/master/duration-groups', {
+      groupName: value.trim(), workshopKind: current.value.workshopName.includes('封口') ? 'SEALER' : 'MACHINE'
+    })
+    await load()
+    ElMessage.success('分组已创建，可在产品行关联')
+  } catch (error) {
+    if (error !== 'cancel' && error !== 'close') ElMessage.error(error instanceof Error ? error.message : '创建分组失败')
+  }
 }
 </script>
 

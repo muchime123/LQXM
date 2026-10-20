@@ -156,7 +156,7 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
   { key: 'inboundCount', label: '关联采购入库单数', source: 'derived', value: row => row.inboundCount ?? 0 },
   // 实际交付 = min(跟单入库节点, 采购首次入库)，交付结果/逾期天数都由它推 → 系统计算。
   { key: 'deliveredDate', label: '实际生产交付日期', source: 'derived', value: row => row.deliveredDate || '', htmlValue: row => shortDate(row.deliveredDate) },
-  { key: 'delivery', label: '入库记录交期', source: 'derived', value: row => deliveryOutcomeText(row), tone: row => deliveryOutcomeTone(row) },
+  { key: 'delivery', label: '生产交付结果', source: 'derived', value: row => deliveryOutcomeText(row), tone: row => deliveryOutcomeTone(row) },
   { key: 'deliveryOverdueDays', label: '逾期天数', source: 'derived', value: row => row.deliveryOverdueDays ?? '', tone: row => ((row.deliveryOverdueDays ?? 0) > 0 ? 'danger' : '') },
   // 延期原因：既是要看的列，也是**导回可写的四类列之一**（与后端 ProductionTrackingRoundTripService 的表头常量对齐）。
   { key: 'delayReason', label: '延期原因', source: 'manual', value: row => row.delayReason || '' },

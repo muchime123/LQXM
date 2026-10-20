@@ -21,17 +21,23 @@ import { shortWorkshop, TRACKING_STATUS_FILTER_LABEL, trackingStatusText } from 
 
 export type TrackingDateFilter = { from: string; to: string }
 export type FilterChip = { key: string; label: string }
-export type QuickFilterKey = 'pending' | 'in_progress' | 'today' | 'overdue' | 'time_attention' | 'stopped' | 'oxidation'
+export type QuickFilterKey = 'open' | 'pending' | 'in_progress' | 'today' | 'overdue' | 'time_attention' | 'stopped' | 'oxidation'
 
 const emptyTrackingDateFilter = (): TrackingDateFilter => ({ from: '', to: '' })
 
 /**
- * 「入库记录交期」常用区多选筛选：取值是后端固定的四态枚举（见 Service.DELIVERY_OUTCOME），
+ * 工作台的跟单状态默认口径（只查待处理）；「更多筛选」角标与重置判定都以此为基准，
+ * 否则首次进入就会因为「未结束跟单」这个默认值而多出一个角标。
+ */
+const DEFAULT_TRACKING_STATUS = 'open'
+
+/**
+ * 「生产交付结果」常用区多选筛选：取值是后端固定的四态枚举（见 Service.DELIVERY_OUTCOME），
  * 与列表徽标一一对应，故这里是常量而非从数据里取。
  */
 const DELIVERY_FILTER_OPTIONS = [
-  { value: 'OVERDUE', label: '见入库逾期' }, { value: 'ON_TIME', label: '按期见入库' },
-  { value: 'NO_BASELINE', label: '已见入库（无基准）' }, { value: 'PENDING', label: '未见入库' }
+  { value: 'OVERDUE', label: '逾期交付' }, { value: 'ON_TIME', label: '按期交付' },
+  { value: 'NO_BASELINE', label: '已交付（无基准）' }, { value: 'PENDING', label: '未交付' }
 ]
 const COUNTDOWN_FILTER_OPTIONS = [
   { value: 'overdue', label: '已超期' }, { value: 'today', label: '今日到期' },
@@ -49,20 +55,29 @@ const OPTIONAL_STAGE_OPTIONS = [
 ]
 
 export function useTrackingFilters(options: { onChange: () => void }) {
+  /** 搜索框唯一关键词（10-19 LQ：任务号 / 产品 / 客户 / 规格共用一个框，后端同一段谓词匹配）。 */
   const keyword = ref('')
-  const specification = ref('')
   const advancedFiltersVisible = ref(false)
-  const dateFilters = ref<{ created: TrackingDateFilter }>({ created: emptyTrackingDateFilter() })
+  /**
+   * 常用区的两段日期筛选（都在搜索行里，不必展开「更多筛选」）：
+   * - created＝生产任务单提交时间（→ createdFrom/createdTo）；
+   * - expected＝预计完成时间（→ expectedFrom/expectedTo），后端口径＝车间预计完成日，
+   *   车间未填时回落有效的业务员要求日（见 ProductionTrackingService 的 DEADLINE）。
+   */
+  const dateFilters = ref<{ created: TrackingDateFilter; expected: TrackingDateFilter }>({
+    created: emptyTrackingDateFilter(), expected: emptyTrackingDateFilter()
+  })
   const countdownFilter = ref<string[]>([])
   const deliveryFilter = ref<string[]>([])
   const optionalStageFilter = ref('')
-  /** 「业务员」常用区多选筛选：取值来自数据（后端 filter-options 的 salespersons），故用可选值清单。 */
+  /** 「业务员」筛选：取值来自数据（后端 filter-options 的 salespersons），故用可选值清单；位置在「更多筛选」区。 */
   const salespersonFilter = ref<string[]>([])
   const workshop = ref('')
   const sourceStatus = ref('')
   /** 跟单员筛选：''＝全部 / 员工 id 字符串。 */
   const assignee = ref('')
-  const trackingStatus = ref('all')
+  /** 跟单状态筛选；位置在「更多筛选」区，初始值 open＝工作台默认只查待处理。 */
+  const trackingStatus = ref(DEFAULT_TRACKING_STATUS)
   const timeFilter = ref('all')
   /** 跟单待办筛选：all＝不限 / any＝只要有提醒 / 具体代码见 TRACKING_ACTION_CODES。 */
   const actionFilter = ref('all')
@@ -73,15 +88,17 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   let filterOptionsLoaded = false
 
   const quickFilterPresets: { key: QuickFilterKey; label: string }[] = [
+    { key: 'open', label: '需要处理' },
     { key: 'pending', label: '待跟单' }, { key: 'in_progress', label: '跟单中' },
     { key: 'today', label: '今日到期' }, { key: 'overdue', label: '已超期' },
-    { key: 'time_attention', label: '时间待核实' }, { key: 'stopped', label: '停止跟单' },
+    { key: 'time_attention', label: '待核实问题' }, { key: 'stopped', label: '停止跟单' },
     { key: 'oxidation', label: '需要氧化/喷特氟龙' },
   ]
   const timeFilterLabels: Record<string, string> = {
-    time_attention: '时间待核实', time_application: '申请日期问题', time_required: '业务员要求日期问题',
+    time_attention: '待核实问题', time_source: '日期异常（含已核实）', time_production: '生产时间异常',
+    time_application: '申请日期异常', time_required: '业务员要求日期异常',
     time_acceptance: '接单时间待核', time_commitment: '车间交期待核', time_reporting: '报工时间待核',
-    time_inbound_reporting: '入库与报工待核', time_overdue: '逾期待记录原因', time_due: '核实事项应跟进',
+    time_inbound_reporting: '入库与报工待核', time_overdue: '逾期原因待记录', time_due: '核实事项应跟进',
   }
 
   /**
@@ -98,8 +115,11 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   function optionalStageLabel(value: string) {
     return OPTIONAL_STAGE_OPTIONS.find(option => option.value === value)?.label || value
   }
-  const activeAdvancedFilterCount = computed(() => [Boolean(workshop.value), Boolean(sourceStatus.value), Boolean(assignee.value), trackingStatus.value !== 'all', mine.value,
-    actionFilter.value !== 'all', timeFilter.value !== 'all', Boolean(optionalStageFilter.value)]
+  const activeAdvancedFilterCount = computed(() => [Boolean(workshop.value), Boolean(sourceStatus.value), Boolean(assignee.value), mine.value,
+    timeFilter.value !== 'all', Boolean(optionalStageFilter.value),
+    // 「业务员」「跟单状态」已移入「更多筛选」区，故计入角标；跟单状态要排除工作台默认值，否则一进页面就多一个角标。
+    salespersonFilter.value.length > 0,
+    trackingStatus.value !== 'all' && trackingStatus.value !== DEFAULT_TRACKING_STATUS]
     .filter(Boolean).length)
   const activeFilterChips = computed<FilterChip[]>(() => {
     const chips: FilterChip[] = []
@@ -109,27 +129,28 @@ export function useTrackingFilters(options: { onChange: () => void }) {
     if (assignee.value) chips.push({ key: 'assignee', label: `跟单员：${filterOptions.value.assignees.find(person => String(person.id) === assignee.value)?.name || assignee.value}` })
     if (mine.value) chips.push({ key: 'mine', label: '我的跟单' })
     if (trackingStatus.value !== 'all') chips.push({ key: 'trackingStatus', label: `跟单状态：${TRACKING_STATUS_FILTER_LABEL[trackingStatus.value] || trackingStatusText(trackingStatus.value as TrackingOrder['trackingStatus'])}` })
-    if (specification.value.trim()) chips.push({ key: 'specification', label: `规格：${specification.value.trim()}` })
     if (actionFilter.value !== 'all') chips.push({ key: 'action', label: `跟单待办：${actionFilter.value === 'any' ? '有提醒' : actionLabel(actionFilter.value as TrackingActionCode)}` })
     if (timeFilter.value !== 'all') chips.push({ key: 'time', label: `时间核实：${timeFilterLabels[timeFilter.value] || timeFilter.value}` })
     if (optionalStageFilter.value) chips.push({ key: 'optionalStage', label: `按需工序：${optionalStageLabel(optionalStageFilter.value)}` })
     if (urgentOnly.value) chips.push({ key: 'urgent', label: '仅看加急' })
     if (salespersonFilter.value.length) chips.push({ key: 'salesperson', label: `业务员：${salespersonFilter.value.join('、')}` })
     if (countdownFilter.value.length) chips.push({ key: 'countdown', label: `生产倒计时：${countdownFilter.value.map(value => COUNTDOWN_FILTER_OPTIONS.find(option => option.value === value)?.label || value).join('、')}` })
-    if (deliveryFilter.value.length) chips.push({ key: 'delivery', label: `入库记录交期：${deliveryFilter.value.map(value => DELIVERY_FILTER_OPTIONS.find(option => option.value === value)?.label || value).join('、')}` })
+    if (deliveryFilter.value.length) chips.push({ key: 'delivery', label: `生产交付结果：${deliveryFilter.value.map(value => DELIVERY_FILTER_OPTIONS.find(option => option.value === value)?.label || value).join('、')}` })
     const created = dateFilters.value.created
     if (created.from || created.to) chips.push({ key: 'createdDate', label: `生产任务单提交时间：${created.from || '不限'}～${created.to || '不限'}` })
+    const expected = dateFilters.value.expected
+    if (expected.from || expected.to) chips.push({ key: 'expectedDate', label: `预计完成时间：${expected.from || '不限'}～${expected.to || '不限'}` })
     return chips
   })
 
   function quickFilterActive(key: QuickFilterKey) {
-    if (key === 'pending' || key === 'in_progress' || key === 'stopped') return trackingStatus.value === key
+    if (key === 'open' || key === 'pending' || key === 'in_progress' || key === 'stopped') return trackingStatus.value === key
     if (key === 'time_attention') return timeFilter.value === key
     if (key === 'oxidation') return optionalStageFilter.value === 'OXIDATION'
     return countdownFilter.value.includes(key)
   }
   function applyQuickFilter(key: QuickFilterKey) {
-    if (key === 'pending' || key === 'in_progress' || key === 'stopped') trackingStatus.value = trackingStatus.value === key ? 'all' : key
+    if (key === 'open' || key === 'pending' || key === 'in_progress' || key === 'stopped') trackingStatus.value = trackingStatus.value === key ? 'all' : key
     else if (key === 'time_attention') timeFilter.value = timeFilter.value === key ? 'all' : key
     else if (key === 'oxidation') optionalStageFilter.value = optionalStageFilter.value === 'OXIDATION' ? '' : 'OXIDATION'
     else countdownFilter.value = countdownFilter.value.includes(key) ? countdownFilter.value.filter(value => value !== key) : [...countdownFilter.value, key]
@@ -138,13 +159,13 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   function clearFilterChip(key: string) {
     switch (key) {
       case 'createdDate': dateFilters.value.created = emptyTrackingDateFilter(); break
+      case 'expectedDate': dateFilters.value.expected = emptyTrackingDateFilter(); break
       case 'keyword': keyword.value = ''; break
       case 'workshop': workshop.value = ''; break
       case 'sourceStatus': sourceStatus.value = ''; break
       case 'assignee': assignee.value = ''; break
       case 'mine': mine.value = false; break
       case 'trackingStatus': trackingStatus.value = 'all'; break
-      case 'specification': specification.value = ''; break
       case 'action': actionFilter.value = 'all'; break
       case 'time': timeFilter.value = 'all'; break
       case 'optionalStage': optionalStageFilter.value = ''; break
@@ -156,27 +177,33 @@ export function useTrackingFilters(options: { onChange: () => void }) {
     options.onChange()
   }
   function resetFilters() {
-    keyword.value = ''; specification.value = ''; workshop.value = ''; sourceStatus.value = ''; assignee.value = ''
+    keyword.value = ''; workshop.value = ''; sourceStatus.value = ''; assignee.value = ''
     mine.value = false; urgentOnly.value = false; trackingStatus.value = 'all'; actionFilter.value = 'all'; timeFilter.value = 'all'
     salespersonFilter.value = []; countdownFilter.value = []; deliveryFilter.value = []; optionalStageFilter.value = ''
-    dateFilters.value = { created: emptyTrackingDateFilter() }
+    dateFilters.value = { created: emptyTrackingDateFilter(), expected: emptyTrackingDateFilter() }
   }
   function resetTrackingFilters() { resetFilters(); options.onChange() }
-  function onCreatedDateChange(changed: 'from' | 'to') {
-    const value = dateFilters.value.created
+  /**
+   * 起止写反时清掉另一端并刷新（两段日期筛选共用，避免复制两份同构代码）。
+   * @param label 提示语里的条件名，用于让用户知道清的是哪一段日期。
+   */
+  function onDateChange(target: () => TrackingDateFilter, changed: 'from' | 'to', label: string) {
+    const value = target()
     if (value.from && value.to && value.from > value.to) {
       value[changed === 'from' ? 'to' : 'from'] = ''
-      ElMessage.warning('起始日期不能晚于截止日期，已清除另一端日期')
+      ElMessage.warning(`${label}的起始日期不能晚于截止日期，已清除另一端日期`)
     }
     options.onChange()
   }
+  function onCreatedDateChange(changed: 'from' | 'to') { onDateChange(() => dateFilters.value.created, changed, '生产任务单提交时间') }
+  function onExpectedDateChange(changed: 'from' | 'to') { onDateChange(() => dateFilters.value.expected, changed, '预计完成时间') }
   /**
    * 列表与导出的筛选入参**唯一来源**：两处必须完全一致，
    * 否则「导出的行」和「页面上看到的行」会对不上，而这不会有任何报错。
    */
   function trackingFilters() {
     return {
-      keyword: keyword.value, specification: specification.value, workshop: workshop.value, sourceStatus: sourceStatus.value, trackingStatus: trackingStatus.value,
+      keyword: keyword.value, workshop: workshop.value, sourceStatus: sourceStatus.value, trackingStatus: trackingStatus.value,
       reminder: timeFilter.value,
       action: actionFilter.value,
       urgent: urgentOnly.value,
@@ -185,6 +212,7 @@ export function useTrackingFilters(options: { onChange: () => void }) {
       deliveryResult: deliveryFilter.value.join(','),
       optionalStage: optionalStageFilter.value,
       createdFrom: dateFilters.value.created.from || '', createdTo: dateFilters.value.created.to || '',
+      expectedFrom: dateFilters.value.expected.from || '', expectedTo: dateFilters.value.expected.to || '',
       month: '',
       mine: mine.value, assignee: assignee.value
     }
@@ -197,10 +225,11 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   }
 
   return {
-    keyword, specification, advancedFiltersVisible, dateFilters, countdownFilter, deliveryFilter, optionalStageFilter,
+    keyword, advancedFiltersVisible, dateFilters, countdownFilter, deliveryFilter, optionalStageFilter,
     salespersonFilter, workshop, sourceStatus, assignee, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
     filterOptions, COUNTDOWN_FILTER_OPTIONS, DELIVERY_FILTER_OPTIONS, optionalStageOptions, optionalStageLabel,
     quickFilterPresets, timeFilterLabels, quickFilterActive, applyQuickFilter, activeAdvancedFilterCount,
-    activeFilterChips, clearFilterChip, resetTrackingFilters, onCreatedDateChange, trackingFilters, loadOptions
+    activeFilterChips, clearFilterChip, resetTrackingFilters, onCreatedDateChange, onExpectedDateChange,
+    trackingFilters, loadOptions
   }
 }

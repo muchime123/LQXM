@@ -70,15 +70,19 @@ public class ProductionTrackingAnalyticsService {
     }
 
     public Map<String,Object> orders(String fromDate,String toDate,String workshop,String dateBasis,String month,
-                                     String bucket,String reason,int page,int size){
+                                     String bucket,String reason,String reasonCategory,int page,int size){
         if(page<1||size<1||size>100)throw new IllegalArgumentException("分页范围无效");
         if(!BUCKETS.contains(bucket))throw new IllegalArgumentException("分析指标无效");
         if(month!=null&&!month.isBlank()&&!month.matches("\\d{4}-(0[1-9]|1[0-2])|未填写"))
             throw new IllegalArgumentException("预计完成月份无效");
+        // 类别下钻：类别是词典里的固定取值，白名单校验后才用于比较，避免把任意文本当作原因原文匹配。
+        if(reasonCategory!=null&&!reasonCategory.isBlank()
+                &&!ProductionTrackingReasonTaxonomy.keys().contains(reasonCategory))
+            throw new IllegalArgumentException("原因类别无效");
         LocalDate today=LocalDate.now();
         var selected=loadRows(fromDate,toDate,workshop,dateBasis,"missingExpected".equals(bucket)).stream()
                 .filter(item->month==null||month.isBlank()||month.equals(item.row().baseline()==null?"未填写":item.row().baseline().toString().substring(0,7)))
-                .filter(item->matches(item.row(),bucket,reason,today)).toList();
+                .filter(item->matches(item.row(),bucket,reason,reasonCategory,today)).toList();
         long offset=(long)(page-1)*size;
         var result=new ArrayList<Map<String,Object>>();
         for(long i=offset;i<Math.min(offset+size,selected.size());i++){
@@ -97,14 +101,22 @@ public class ProductionTrackingAnalyticsService {
         return Map.of("items",result,"total",selected.size(),"page",page,"size",size);
     }
 
-    private static final java.util.Set<String> BUCKETS=java.util.Set.of(
-            "total","dueTasks","cancelled","missingExpected","stopped","completed","matured","openNotDue","openDueToday",
+    /** 包可见，供一致性测试穷尽遍历（新增 bucket 时测试自动覆盖，不必另抄一份名单）。 */
+    static final java.util.Set<String> BUCKETS=java.util.Set.of(
+            "total","dueTasks","cancelled","missingExpected","stopped","matured","openNotDue","openDueToday",
             "delivered","comparable","onTime","overdue","deliveredNoBaseline",
             "open","openOverdue","openDueSoon","openNoBaseline","requestedComparable","requestedOnTime",
             "extended","advanced","extensionReasonMissing","overdueReasonMissing","overdue1to3","overdue4to7",
-            "overdue8plus","receiptOnly","manualOnly","bothSources","extensionReason","overdueReason","riskCategory");
+            "overdue8plus","receiptOnly","manualOnly","bothSources","extensionReason","overdueReason","riskCategory",
+            // 周复盘看板用：按「原因类别」下钻（六类原因见 ProductionTrackingReasonTaxonomy）
+            "overdueReasonCategory","extensionReasonCategory");
 
+    /** 不带原因类别的下钻走这里（卡片类 bucket 与一致性测试）。 */
     static boolean matches(OrderRow row,String bucket,String reason,LocalDate today){
+        return matches(row,bucket,reason,null,today);
+    }
+
+    static boolean matches(OrderRow row,String bucket,String reason,String reasonCategory,LocalDate today){
         if("total".equals(bucket))return true;
         if("cancelled".equals(bucket))return row.cancelled();
         if("missingExpected".equals(bucket))return !row.cancelled()&&row.baseline()==null;
@@ -117,7 +129,7 @@ public class ProductionTrackingAnalyticsService {
         long days=overdue?ChronoUnit.DAYS.between(row.baseline(),row.delivered()):0;
         return switch(bucket){
             case "dueTasks" -> true;
-            case "completed" -> delivered;
+            // completed 已从名单移除：它与 delivered 完全同义，留着只会让人以为是两个指标
             case "matured" -> baseline&&!row.baseline().isAfter(today);
             case "openNotDue" -> !delivered&&baseline&&row.baseline().isAfter(today);
             case "openDueToday" -> !delivered&&baseline&&row.baseline().equals(today);
@@ -146,6 +158,11 @@ public class ProductionTrackingAnalyticsService {
             case "extensionReason" -> extended&&firstText(row.delayReason(),row.commitmentReason()).equals(reason);
             case "overdueReason" -> overdue&&firstText(row.overdueReason()).equals(reason);
             case "riskCategory" -> extended&&firstText(row.riskCategory()).equals(reason);
+            // 类别下钻：对原文先归类再比较，原文本身仍保留（见 ProductionTrackingReasonTaxonomy）
+            case "extensionReasonCategory" -> extended&&ProductionTrackingReasonTaxonomy
+                    .classify(firstText(row.delayReason(),row.commitmentReason())).equals(reasonCategory);
+            case "overdueReasonCategory" -> overdue
+                    &&ProductionTrackingReasonTaxonomy.classify(firstText(row.overdueReason())).equals(reasonCategory);
             default -> false;
         };
     }
@@ -156,6 +173,21 @@ public class ProductionTrackingAnalyticsService {
         if(row.baseline()==null)return "MISSING_EXPECTED";
         if(row.delivered()==null)return "UNFINISHED";
         return row.delivered().isAfter(row.baseline())?"LATE":"ON_TIME";
+    }
+
+    /**
+     * 周复盘专用：与 {@link #analyze} 同一批行、同一套口径，但两个原因榜**都不截断**。
+     *
+     * <p>【为什么单独一个入口】周复盘要把原因原文归并成类别（见 {@link ProductionTrackingReasonTaxonomy}），
+     * 归并丢一条原文，类别之和就对不上总数，看板上就是「合计 10、分项加起来 7」。
+     * 而抽屉展示用的是截断后的榜（延后原因截 12 条），那是给**人看**的，不能拿它当归并输入。
+     */
+    Map<String,Object> analyzeUncut(String fromDate,String toDate,String workshop){
+        var rows=loadRows(fromDate,toDate,workshop,"baseline").stream().map(AnalysisItem::row).toList();
+        var result=new LinkedHashMap<String,Object>(summarize(rows,LocalDate.now()));
+        result.put("extensionReasons",rankAll(extensionReasonCounts(rows)));
+        result.put("missingExpected",missingExpected(workshop));
+        return result;
     }
 
     private List<AnalysisItem> loadRows(String fromDate,String toDate,String workshop,String dateBasis){
@@ -222,30 +254,53 @@ public class ProductionTrackingAnalyticsService {
         var workshops=new TreeMap<String,Bucket>();
         var months=new TreeMap<String,Bucket>();
         var riskReasons=new TreeMap<String,Integer>();
-        var extensionReasons=new TreeMap<String,Integer>();
-        var overdueReasons=new TreeMap<String,Integer>();
         for(var row:rows){
             totals.add(row,today);
             workshops.computeIfAbsent(row.workshop(),unused->new Bucket()).add(row,today);
             months.computeIfAbsent(row.baseline()==null?"未填写":row.baseline().toString().substring(0,7),unused->new Bucket()).add(row,today);
             if(row.cancelled())continue;
-            if(row.baseline()!=null && row.originalBaseline()!=null && row.revisedBaseline()!=null
-                    && row.revisedBaseline().isAfter(row.originalBaseline())){
-                count(extensionReasons,firstText(row.delayReason(),row.commitmentReason()));
-                count(riskReasons,firstText(row.riskCategory()));
-            }
-            if(row.delivered()!=null && row.baseline()!=null && row.delivered().isAfter(row.baseline()))
-                count(overdueReasons,firstText(row.overdueReason()));
+            if(isExtended(row))count(riskReasons,firstText(row.riskCategory()));
         }
         var byWorkshop=new ArrayList<Map<String,Object>>();
         workshops.forEach((name,bucket)->{var data=new LinkedHashMap<String,Object>(bucket.asMap());data.put("name",name);byWorkshop.add(data);});
         var byMonth=new ArrayList<Map<String,Object>>();
         months.forEach((name,bucket)->{var data=new LinkedHashMap<String,Object>(bucket.asMap());data.put("name",name);byMonth.add(data);});
         return Map.of("totals",totals.asMap(),"workshops",byWorkshop,"months",byMonth,
-                "riskCategories",rank(riskReasons,20),"extensionReasons",rank(extensionReasons,12),
+                "riskCategories",rank(riskReasons,20),
+                // 延后原因榜截 12 条：这是给「人看」的榜；周复盘要拿它归并成类别，
+                // 归并丢一条原文就会少一单，故那边另走 analyzeUncut 取全量（见该方法注释）。
+                "extensionReasons",rank(extensionReasonCounts(rows),12),
                 // ⚠️ 不截断：逾期原因目前是跟单员自由填写的原文，截断会让「分桶逾期数 ≠ 原因之和」，
                 // 也看不到长尾写法——正是要拿全量原样本来归纳出后续更精确的原因选项，故全量返回。
-                "overdueReasons",rankAll(overdueReasons),"asOf",today.toString());
+                "overdueReasons",rankAll(overdueReasonCounts(rows)),"asOf",today.toString());
+    }
+
+    /**
+     * 协商延后的唯一判据：跟单员确认后的车间预计晚于源任务的原车间预计。
+     * 卡片（Bucket.extended）、原因榜、下钻三处共用这一份，避免各写一套。
+     */
+    private static boolean isExtended(OrderRow row){
+        return row.baseline()!=null&&row.originalBaseline()!=null&&row.revisedBaseline()!=null
+                &&row.revisedBaseline().isAfter(row.originalBaseline());
+    }
+    /** 延期原因原文榜的输入：原文优先取状态行的 delay_reason，为空时取 COMMITMENT 核实记录。包可见供测试对拍。 */
+    static Map<String,Integer> extensionReasonCounts(List<OrderRow> rows){
+        var counts=new TreeMap<String,Integer>();
+        for(var row:rows){
+            if(row.cancelled())continue;
+            if(isExtended(row))count(counts,firstText(row.delayReason(),row.commitmentReason()));
+        }
+        return counts;
+    }
+    /** 逾期原因原文榜的输入：只认整单完工晚于基准、且快照仍与当前一致的那条 OVERDUE 核实记录。包可见供测试对拍。 */
+    static Map<String,Integer> overdueReasonCounts(List<OrderRow> rows){
+        var counts=new TreeMap<String,Integer>();
+        for(var row:rows){
+            if(row.cancelled())continue;
+            if(row.delivered()!=null&&row.baseline()!=null&&row.delivered().isAfter(row.baseline()))
+                count(counts,firstText(row.overdueReason()));
+        }
+        return counts;
     }
 
     private static void count(Map<String,Integer> counts,String reason){counts.merge(reason,1,Integer::sum);}

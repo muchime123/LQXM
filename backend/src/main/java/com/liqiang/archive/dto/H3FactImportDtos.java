@@ -25,6 +25,31 @@ public final class H3FactImportDtos {
     public record Result(Long batchId, String dataType, int totalCount,
                          int createdCount, int updatedCount, int unchangedCount,
                          int childCount) {}
+    /**
+     * 批次告警明细（业务事实域专用，2026-10-20 新增）。
+     *
+     * <p>来源：基于 {@code h3_import_rows.raw_data} 重新解析每行原始单据，
+     * 复用 {@link com.liqiang.archive.service.H3FactImportService} 中各类型的
+     * {@code *Warnings(Group, false)} 现有方法重算告警（不写库、历史批次同样可用）。
+     * 仅返回含告警的行（warnings IS NOT NULL），按业务编号升序。</p>
+     *
+     * <p>{@code total} = 批次全量行数；{@code totalWarningRows} = 含告警行数；
+     * {@code items} = 当前页（默认 50/页）。</p>
+     */
+    public record BatchWarningsPage(Long batchId, String dataType,
+                                    long total, long totalWarningRows,
+                                    int page, int size,
+                                    List<BatchWarningRow> items) {}
+    /**
+     * 批次告警单行（业务事实域）：来自 {@code h3_import_rows} 反序列化后重算。
+     * businessId = 落库后的事实行 id（销售出库/采购入库/收款等主表 id），便于台账深链。
+     * title = 预览同款（{@code H3FactImportService#title}）的人类可读标题。
+     * action = CREATE / UPDATE / UNCHANGED，与导入结果一致。
+     * warnings = 中文告警多条以「；」连接，与预览行同口径。
+     * warningCodes = 告警前缀枚举（用于在 UI 上分类统计/筛选；无分类时为 null）。
+     */
+    public record BatchWarningRow(Long rowId, Long businessId, String externalId, String title,
+                                  String action, String warnings, List<String> warningCodes) {}
     public record MatchResult(int linkedExplicitly, int linkedStrictly,
                               int createdProductionBusinesses,
                               int createdOutboundBusinesses, int refreshedBusinesses) {}

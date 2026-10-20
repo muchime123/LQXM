@@ -20,7 +20,7 @@ export const TRACKING_ACTION_LABELS: Record<TrackingActionCode, string> = {
   INBOUND_PENDING: '已入库待跟单',
   SCHEDULED_PENDING: '已排产待跟单',
   INBOUND_UNLOGGED: '已入库待登记',
-  STALE_FOLLOWUP: '超期未更新'
+  STALE_FOLLOWUP: '7 天未更新'
 }
 
 /** 提醒说得出依据的最少字段（TrackingOrder 直接满足）。 */

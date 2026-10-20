@@ -19,6 +19,12 @@ import static org.mockito.Mockito.*;
 
 class ProductionTrackingServiceTest {
     @Test
+    void productDurationCandidatePercentilesDoNotAssumeAllOrdersAreValid() {
+        assertEquals(new BigDecimal("2.5"),ProductionTrackingService.percentile(List.of(1L,2L,3L,10L),0.5));
+        assertEquals(new BigDecimal("4.8"),ProductionTrackingService.percentile(List.of(1L,2L,3L,10L),0.75));
+        assertNull(ProductionTrackingService.percentile(List.of(),0.5));
+    }
+    @Test
     void exportSourceIncludesTrackingRemarkAndProductionOrderFields() {
         String columns=ProductionTrackingService.LIST_COLUMNS;
         assertTrue(columns.contains("t.remark"),"导出可选的跟单备注必须随列表和导出查询返回");
@@ -190,12 +196,17 @@ class ProductionTrackingServiceTest {
         assertTrue(pageSql.getValue().contains(ProductionTrackingService.TIME_ATTENTION));
         assertTrue(countSql.getValue().contains(ProductionTrackingService.CREATED_MONTH_DATE));
         assertTrue(ProductionTrackingService.TIME_ATTENTION.contains("p.application_date<DATE(p.source_created_at)"));
+        assertTrue(ProductionTrackingService.TIME_ATTENTION.contains("n.kind='SOURCE_DATE'"),
+                "待核实汇总应排除源日期快照已核实且未变化的任务");
+        assertTrue(ProductionTrackingService.TIME_ATTENTION.contains("n.source_created_at<=>p.source_created_at"));
         assertTrue(ProductionTrackingService.TIME_ATTENTION.contains(ProductionTrackingService.TIME_REVIEW_DUE));
     }
 
     @Test
     void everyTimeCategoryHasItsOwnServerSidePredicate() {
         var predicates=Map.of(
+                "time_source",ProductionTrackingService.TIME_SOURCE,
+                "time_production",ProductionTrackingService.TIME_PRODUCTION,
                 "time_application",ProductionTrackingService.TIME_SOURCE_APPLICATION,
                 "time_required",ProductionTrackingService.TIME_SOURCE_REQUIRED,
                 "time_acceptance",ProductionTrackingService.TIME_ACCEPTANCE,
@@ -500,8 +511,10 @@ class ProductionTrackingServiceTest {
         assertEquals(Boolean.TRUE,byKey.get("salesTrace").get("configured"));
         assertEquals(Boolean.FALSE,byKey.get("trackingStatus").get("visible"),"没配过：回落代码兜底（该列隐藏）");
         assertEquals(Boolean.FALSE,byKey.get("trackingStatus").get("configured"));
-        assertEquals(Boolean.TRUE,byKey.get("quantity").get("visible"),"没配过且不在兜底隐藏名单：可见");
-        assertEquals(Boolean.FALSE,byKey.get("quantity").get("configured"));
+        // ⚠️ 必须是白名单里真实存在的列 key。曾误写列表里没有的 quantity，
+        // HashMap.get 返回 null ⇒ 下一行 NPE；编译期与类型检查都看不出来，只有跑到这条断言才暴露。
+        assertEquals(Boolean.TRUE,byKey.get("salesperson").get("visible"),"没配过且不在兜底隐藏名单：可见");
+        assertEquals(Boolean.FALSE,byKey.get("salesperson").get("configured"));
     }
 
     /** 保存校验：列标识非法 / 重复 / 缺显示状态必须在写库前拦下。 */
@@ -563,12 +576,16 @@ class ProductionTrackingServiceTest {
         verify(audit,times(2)).write(any(com.liqiang.archive.erp.ErpChangeLogWriter.Entry.class));
     }
 
-    /** 白名单是前后端的契约：19 列、不重复、覆盖兜底隐藏名单（前端契约测试同时比对两侧清单）。 */
+    /**
+     * 白名单是前后端的契约：18 列、不重复、覆盖兜底隐藏名单（前端契约测试同时比对两侧清单）。
+     * <p>⚠️ 数量写死是刻意的：列清单增删时这里必须跟着改，等于给「悄悄加了一列」上一道闸。
+     * 跨端是否同集合由前端 {@code trackingListColumns.test.ts} 直读这两个常量比对。
+     */
     @Test
     void listColumnKeysAreDistinctAndCoverFallbackHidden() {
         var keys=ProductionTrackingService.LIST_COLUMN_KEYS;
-        assertEquals(19,keys.size());
-        assertEquals(19,new java.util.HashSet<>(keys).size(),"不得有重复列");
+        assertEquals(18,keys.size(),"改动列清单后同步本数字："+keys);
+        assertEquals(keys.size(),new java.util.HashSet<>(keys).size(),"不得有重复列");
         assertEquals(6,ProductionTrackingService.LIST_COLUMN_FALLBACK_HIDDEN.size());
         assertTrue(keys.containsAll(ProductionTrackingService.LIST_COLUMN_FALLBACK_HIDDEN),
                 "兜底隐藏的列必须是合法列："+ProductionTrackingService.LIST_COLUMN_FALLBACK_HIDDEN);
@@ -843,9 +860,11 @@ class ProductionTrackingServiceTest {
 
         // 未跟单＝一个跟单节点记录都没有（见 NEVER_TRACKED）；不能用 version=0 代替——
         // 进度表导入时若该行没填任何节点完成日期，只落状态行、version 却已经是 1。
-        assertTrue(action.startsWith("CASE WHEN t.stopped_at IS NOT NULL THEN NULL WHEN "+ProductionTrackingService.NEVER_TRACKED
+        // 两条前置排除必须排在判定之前：停止跟单、已结案的单都不再给提醒（顺序变了就等于放开提醒）。
+        assertTrue(action.startsWith("CASE WHEN t.stopped_at IS NOT NULL THEN NULL "
+                        +"WHEN t.closed_at IS NOT NULL THEN NULL WHEN "+ProductionTrackingService.NEVER_TRACKED
                         +" AND p.actual_completion_date IS NOT NULL THEN 'FINISHED_PENDING'"),
-                "最严重的一条是「氚云已报工完工但一个节点都没登记」："+action);
+                "最严重的一条是「氚云已报工完工但一个节点都没登记」（停止跟单与已结案先排除）："+action);
         assertTrue(action.contains(ProductionTrackingService.NEVER_TRACKED+" AND ib.first_in IS NOT NULL THEN 'INBOUND_PENDING'"),
                 "第二条是「采购已入库但跟单还没开始」："+action);
         assertTrue(action.contains(ProductionTrackingService.NEVER_TRACKED+" AND p.schedule_time IS NOT NULL THEN 'SCHEDULED_PENDING'"),
@@ -941,9 +960,9 @@ class ProductionTrackingServiceTest {
         var empty=new ProductionTrackingService.DateRangeFilter("","",false);
 
         service.list("","","all","all","",false,"","","all","","","",empty,empty,empty,
-                false,"","",created,1,30);
+                false,"",created,1,30);
         service.exportRows("","","all","all","",false,"","","all","","","",empty,empty,empty,
-                false,"","",created);
+                false,"",created);
 
         assertEquals(2,sql.getAllValues().size());
         assertTrue(sql.getAllValues().get(0).contains("DATE(p.source_created_at)>=? AND DATE(p.source_created_at)<=?"));
@@ -952,6 +971,32 @@ class ProductionTrackingServiceTest {
         assertEquals(java.time.LocalDate.parse("2026-09-30"),args.getAllValues().get(0)[1]);
         assertEquals(args.getAllValues().get(0)[0],args.getAllValues().get(1)[0]);
         assertEquals(args.getAllValues().get(0)[1],args.getAllValues().get(1)[1]);
+    }
+
+    /**
+     * 搜索框唯一入口（10-19 LQ：「搜索规格」并入任务号 / 产品 / 客户同一个框）。
+     * 关键词必须命中四个字段，且规格走与列表列 specification_snapshot 完全相同的拼接口径 ——
+     * 两处拼接方式一旦分叉，就会出现「搜出来的行，规格列里却看不到搜的那个词」。
+     */
+    @Test
+    void keywordSearchAlsoCoversSpecification() {
+        var jdbc=mock(JdbcTemplate.class);
+        var countArgs=org.mockito.ArgumentCaptor.forClass(Object[].class);
+        when(jdbc.queryForObject(anyString(),eq(Long.class),countArgs.capture())).thenReturn(0L);
+        var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
+        when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
+        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+
+        service.list("120×80","","all","all","",false,"","","all","",1,30);
+
+        String sql=rowSql.getValue();
+        for(String column:List.of("p.work_order_no","p.product_name","p.customer_name"))
+            assertTrue(sql.contains(column+" LIKE ?"),"关键词必须命中 "+column+"："+sql);
+        assertTrue(sql.contains("CONCAT_WS(' / ',p.box_size,p.box_shape,p.box_material) LIKE ?"),
+                "规格必须按列表列同一拼接口径匹配："+sql);
+        var args=countArgs.getValue();
+        assertEquals(4,args.length,"4 个占位符必须配 4 个参数（少一个＝绑定错位直接 500）："+sql);
+        for(Object arg:args)assertEquals("%120×80%",arg,"每个字段都要用同一个关键词模式："+sql);
     }
 
     /** 业务员下拉清单必须与列表同一可见性口径，否则下拉里出现的人可能一个都筛不到。 */
@@ -1073,9 +1118,9 @@ class ProductionTrackingServiceTest {
         var created=new ProductionTrackingService.DateRangeFilter("","",false);
 
         service.list("","","all","all","",false,"","","all","","","",created,created,created,
-                false,"","",created,"OXIDATION",1,30);
+                false,"",created,"OXIDATION",1,30);
         service.exportRows("","","all","all","",false,"","","all","","","",created,created,created,
-                false,"","",created,"OXIDATION","");
+                false,"",created,"OXIDATION","");
 
         String predicate=ProductionTrackingService.needsOptionalStage("OXIDATION");
         assertTrue(predicate.contains("ms.oxidation_count"),"要看该单有没有这道工序的节点记录："+predicate);
@@ -1088,7 +1133,7 @@ class ProductionTrackingServiceTest {
 
         assertThrows(IllegalArgumentException.class,
                 ()->service.list("","","all","all","",false,"","","all","","","",created,created,created,
-                        false,"","",created,"NOPE",1,30),
+                        false,"",created,"NOPE",1,30),
                 "工序码必须走白名单，非法值不得静默不筛");
     }
 

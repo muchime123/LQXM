@@ -222,9 +222,11 @@ describe('trackingDateGuard · 导出与页面接线', () => {
     expect(viewSource).toContain('leadDaysKindText(row)')
     expect(viewSource).toContain('otherLeadDaysText(row)')
     expect(viewSource).toContain('leadDaysBreakdown(row)')
-    expect(viewSource).toContain('leadBreakdownText(detail.order)')
+    // 详情卡：10-15 起「工期构成」从一段纯文本改成悬停明细（leadDaysTooltipHtml），
+    // 原来那句 leadBreakdownText(detail.order) 已随重构下线，契约改钉现行入口。
+    expect(viewSource).toContain('leadDaysTooltipHtml(detail.order)')
     expect(viewSource).toContain('leadDaysAlarm(detail.order)')
     expect(viewSource).toContain('negativeLeadReason(detail.order)')
-    expect(viewSource).toContain('effectiveLeadDaysBasisText(detail.order)')
+    expect(viewSource).toContain('leadDaysDeltaText(detail.order)')
   })
 })
