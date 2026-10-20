@@ -16,7 +16,7 @@ import java.util.List;
 public interface CertificateRepository extends JpaRepository<Certificate, Long> {
 
     /**
-     * 多条件分页搜索：资产状态、资产类别、专利类型、关键词（名称/专利号/申请号）
+     * 多条件分页搜索：资产状态、资产类别、专利类型、关键词（名称/专利号/申请号/纯数字查询号）
      */
     @Query("""
             SELECT c FROM Certificate c
@@ -28,6 +28,7 @@ public interface CertificateRepository extends JpaRepository<Certificate, Long> 
                  c.name LIKE CONCAT('%', :keyword, '%') OR
                  c.patentNo LIKE CONCAT('%', :keyword, '%') OR
                  c.applicationNo LIKE CONCAT('%', :keyword, '%') OR
+                 c.queryNo LIKE CONCAT('%', :keyword, '%') OR
                  c.publicationNo LIKE CONCAT('%', :keyword, '%') OR
                  c.inventors LIKE CONCAT('%', :keyword, '%') OR
                  c.applicant LIKE CONCAT('%', :keyword, '%'))

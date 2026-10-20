@@ -101,6 +101,8 @@ export interface DueSoonItem {
   number: string
   dueDate: string
   daysRemaining: number
+  /** 纯数字查询号（官方检索用），资质到期来源无此字段 */
+  queryNo?: string
 }
 
 export interface FilterOptions {

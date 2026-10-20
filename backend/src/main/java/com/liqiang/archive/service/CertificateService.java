@@ -122,6 +122,7 @@ public class CertificateService {
     public CertificateSummary create(CertificatePayload payload) {
         Certificate c = new Certificate();
         applyPayloadToEntity(c, payload);
+        c.setQueryNo(resolveQueryNo(c, payload));
         // 自动计算到期日
         if (c.getApplyDate() != null && c.getLegalYears() != null && c.getExpireDate() == null) {
             c.setExpireDate(c.getApplyDate().plusYears(c.getLegalYears()));
@@ -136,6 +137,8 @@ public class CertificateService {
         Certificate c = certificateRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("证书不存在: " + id));
         applyPayloadToEntity(c, payload);
+        // 号码变更后同步纯数字查询号（前端未显式填写时按申请号→专利号重新提取）
+        c.setQueryNo(resolveQueryNo(c, payload));
         // 如果修改了申请日或法定年限，重新计算到期日
         if (c.getApplyDate() != null && c.getLegalYears() != null) {
             c.setExpireDate(c.getApplyDate().plusYears(c.getLegalYears()));
@@ -275,7 +278,8 @@ public class CertificateService {
             long days = ChronoUnit.DAYS.between(today, c.getFeeDueDate());
             dueSoonItems.add(new DueSoonItem(
                     c.getId(), "FEE_DUE", c.getName(),
-                    c.getPatentNo(), c.getFeeDueDate(), days));
+                    c.getPatentNo(), c.getFeeDueDate(), days,
+                    resolveQueryNo(c, null)));
         }
 
         // 2. 专利/软著保护期到期
@@ -285,7 +289,8 @@ public class CertificateService {
             long days = ChronoUnit.DAYS.between(today, c.getExpireDate());
             dueSoonItems.add(new DueSoonItem(
                     c.getId(), "EXPIRY", c.getName(),
-                    c.getPatentNo(), c.getExpireDate(), days));
+                    c.getPatentNo(), c.getExpireDate(), days,
+                    resolveQueryNo(c, null)));
         }
 
         // 3. 企业资质到期
@@ -294,7 +299,7 @@ public class CertificateService {
             long days = ChronoUnit.DAYS.between(today, c.getExpiryDate());
             dueSoonItems.add(new DueSoonItem(
                     c.getId(), "CERT_EXPIRY", c.getName(),
-                    c.getCertNumber(), c.getExpiryDate(), days));
+                    c.getCertNumber(), c.getExpiryDate(), days, null));
         }
 
         // 按剩余天数升序（已逾期排最前）
@@ -581,6 +586,29 @@ public class CertificateService {
         if (payload.websiteSortOrder() != null)
             c.setWebsiteSortOrder(payload.websiteSortOrder());
         normalizeWebsitePublishing(c);
+    }
+
+    /**
+     * 解析「查询号」：官方检索站（专利局/年费缴费）用的是纯数字申请号，
+     * 例如 ZL202411238193.4、CN202411238193.4 都对应 2024112381934。
+     * 前端显式填写时以其数字部分为准；否则按「申请号 → 专利号」自动提取，保证搜索栏可直接搜纯数字。
+     */
+    private static String resolveQueryNo(Certificate c, CertificatePayload payload) {
+        String provided = payload == null ? null : StringUtils.blankToNull(payload.queryNo());
+        if (provided != null) {
+            return StringUtils.blankToNull(digitsOnly(provided));
+        }
+        String derived = digitsOnly(c.getApplicationNo());
+        if (derived.isEmpty()) {
+            derived = digitsOnly(c.getPatentNo());
+        }
+        return derived.isEmpty() ? null : derived;
+    }
+
+    /** 提取字符串中的数字部分（去除 ZL/CN/点号/空格等非数字字符） */
+    private static String digitsOnly(String value) {
+        if (value == null) return "";
+        return value.replaceAll("\\D", "");
     }
 
     /** 保持官网发布状态一致：精选必然公开，下线同时取消精选。 */

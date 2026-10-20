@@ -284,7 +284,9 @@ public class CertificateDtos {
             String name,
             String number,
             LocalDate dueDate,
-            long daysRemaining
+            long daysRemaining,
+            /** 纯数字查询号（专利局/年费网站检索用），非专利来源为 null */
+            String queryNo
     ) {
     }
 

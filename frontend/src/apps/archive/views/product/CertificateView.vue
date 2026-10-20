@@ -25,7 +25,7 @@
                 class="due-copy-btn"
                 title="复制纯数字编号"
                 aria-label="复制纯数字编号"
-                @click="copyDuePatentNo(item.number)"
+                @click="copyDuePatentNo(item)"
               >
                 复制
               </button>
@@ -526,8 +526,11 @@ function handleResetFilters() {
 
 // === 证书管理 ===
 
-function copyDuePatentNo(patentNo: string) {
-  copyText(digitsOnly(patentNo), '纯数字专利号')
+function copyDuePatentNo(item: { number?: string; queryNo?: string }) {
+  // 优先使用后端写好的纯数字查询号（与官方检索框口径一致），缺失时按号码去非数字
+  const value = item.queryNo || digitsOnly(item.number)
+  if (!value) return
+  copyText(value, '纯数字专利号')
 }
 
 function sourceLabel(sourceType: string): string {

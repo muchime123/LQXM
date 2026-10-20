@@ -78,6 +78,14 @@
               <label>公开号</label>
               <el-input v-model="modalForm.publicationNo" />
             </div>
+            <div class="cert-field">
+              <label>查询号（纯数字）</label>
+              <el-input
+                v-model="modalForm.queryNo"
+                placeholder="留空则按申请号/专利号自动提取"
+                @blur="onQueryNoBlur"
+              />
+            </div>
           </div>
         </FormSection>
 
@@ -449,6 +457,7 @@ import { useLocalDropUpload } from '../../composables'
 import { findFileAssetHandle, fileAssetPreviewUrlByOptions } from '../../utils/ui/fileAssetUrls'
 import { FILE_OWNER_TYPE_KEYS } from '../../types/fileAsset'
 import { fmtDate, todayIso } from '../../utils/common/dateUtils'
+import { digitsOnly } from '../../utils/common/textUtils'
 import { isImageFile } from '../../utils/ui/fileUtils'
 import { certificateFileAssetId, type CertificateFileField } from '../../utils/certificate/certificateFileAsset'
 
@@ -600,7 +609,7 @@ const detailGroups = computed<DescGroup[]>(() => {
         { label: '专利号/证书号', value: d.patentNo, mono: true, highlight: true, copyable: 'digits', slot: 'patentNo' },
         { label: '申请号', value: d.applicationNo, mono: true, copyable: true },
         { label: '公开号', value: d.publicationNo, mono: true, copyable: true },
-        ...(d.queryNo ? [{ label: '查询号', value: d.queryNo, mono: true, copyable: true }] : [])
+        { label: '查询号', value: d.queryNo || digitsOnly(d.applicationNo) || digitsOnly(d.patentNo), mono: true, copyable: true }
       ]
     },
     {
@@ -790,6 +799,20 @@ function modalEmitPreview(field: CertificateFileField) {
     assetId: handle?.assetId || (props.data?.id ? certificateFileAssetId(props.data.id, field) : null),
     category: 'certificate'
   })
+}
+
+/** 查询号留空时按申请号/专利号自动提取纯数字部分，方便直接复制到官方检索框 */
+function onQueryNoBlur() {
+  const current = String(modalForm.queryNo ?? '').trim()
+  if (current) {
+    modalForm.queryNo = digitsOnly(current)
+    return
+  }
+  const derived = digitsOnly(modalForm.applicationNo) || digitsOnly(modalForm.patentNo)
+  if (derived) {
+    modalForm.queryNo = derived
+    setDirty()
+  }
 }
 
 async function modalDoSave() {
