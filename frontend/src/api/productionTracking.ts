@@ -178,7 +178,7 @@ export interface TrackingMilestone {
   /** 该工序一般耗时（天）＝基准表里上游完成→本节点完成的中位间隔；无基准（如机器车间暂无数据）为 null。 */
   typicalDays?: number | null
   /**
-   * 参考完成日期（派生，不落库）：锚点=计划开工（回退申请日），上游已实际完成用实际完成日接力、
+   * 参考完成日期（派生，不落库）：锚点=排产日（本地计划开工 → 氚云排产时间，回退申请日），上游已实际完成用实际完成日接力、
    * 未完成用参考值接力；无锚点或无基准时为 null。供跟单员判断「这道工序一般该何时完成」。
    */
   referenceDate?: string | null
@@ -553,6 +553,20 @@ export const addTrackingTimeReview = async (id: number, review: {
 }) => (await http.post<{ id: number }>(`/manufacturing/followups/${id}/time-reviews`, review,
   { headers: { 'X-Request-Key': createRequestKey() } })).data
 
+/**
+ * 修改某类时间核实的**最新一条**记录（写错原因/补漏细节）。
+ * 不追加历史：列表 badge、详情「已记录原因」、导出「逾期原因」都读最新一条，改这条才改得动它们。
+ */
+export const updateTrackingTimeReview = async (id: number, noteId: number, review: {
+  kind: TrackingTimeReviewKind
+  status: TrackingTimeReviewStatus
+  reason: string
+  contactName: string | null
+  agreedDate: string | null
+  nextFollowupDate: string | null
+}) => (await http.put<{ id: number }>(`/manufacturing/followups/${id}/time-reviews/${noteId}`, review,
+  { headers: { 'X-Request-Key': createRequestKey() } })).data
+
 export interface TrackingPurchaseReceipt {
   id: number
   sourceNo?: string | null
@@ -753,7 +767,7 @@ export const changeTrackingClosure = async (id: number, version: number, closed:
 export interface TrackingBenchmarkStage {
   stageCode: string
   stageLabel: string
-  /** 这一段的起止：首段锚点是「计划开工」，其余取上一节点。 */
+  /** 这一段的起止：首段锚点是「排产日」，其余取上一节点。 */
   intervalLabel: string
   /** 按需工序（封口机的氧化/喷特氟龙）：配了也不占链，不影响后续节点的参考日期。 */
   optionalStage: boolean
@@ -783,6 +797,92 @@ export const fetchTrackingNodeBenchmarks = async () =>
 export const saveTrackingNodeBenchmarks = async (
   rows: { workshopKind: string; stageCode: string; typicalDays: number | null }[]
 ) => (await http.put<{ changed: number }>('/manufacturing/followups/node-benchmarks', rows)).data
+
+/**
+ * 产品级节点参考间隔：每个产品（任务单产品名称配置行）用自己的历史工单统计候选，
+ * 候选值与人工发布值并存，只有 typicalDays 参与参考日期计算。
+ * 产品未计算过候选时，该产品在矩阵里只有一行 stageCode 为 null 的产品信息。
+ */
+export interface TrackingProductBenchmarkRow {
+  taskConfigId: number
+  workshopName: string | null
+  configName: string | null
+  stageCode: string | null
+  /** 人工审核发布值；null＝沿用车间基准。 */
+  typicalDays: number | null
+  /** 发布来源：MANUAL 人工审核 / P50 按历史样本批量填充 / COPY 从同车间产品复制；null＝未发布（含已撤销）。 */
+  publishedSource: 'MANUAL' | 'P50' | 'COPY' | null
+  /** 最近一次发布时间。 */
+  publishedAt: string | null
+  sampleCount: number | null
+  p50Days: number | null
+  p75Days: number | null
+  excludedCount: number | null
+  plannedAnchorCount: number | null
+  applicationAnchorCount: number | null
+  applicationP50Days: number | null
+  applicationP75Days: number | null
+  zeroDayCount: number | null
+  baselineNote: string | null
+  computedAt: string | null
+}
+
+export const fetchTrackingProductBenchmarks = async () =>
+  (await http.get<TrackingProductBenchmarkRow[]>('/manufacturing/followups/product-node-benchmarks')).data
+
+export const saveTrackingProductBenchmark = async (row: { taskConfigId: number; stageCode: string; typicalDays: number | null }) =>
+  http.put('/manufacturing/followups/product-node-benchmarks', row)
+
+/** 只重算该产品的候选分位数，不改动已发布的参考值。 */
+export const refreshTrackingProductBenchmarkCandidates = async (taskConfigId: number) =>
+  (await http.post<TrackingProductBenchmarkRow[]>(`/manufacturing/followups/product-node-benchmarks/${taskConfigId}/refresh-candidates`, {})).data
+
+/** 把候选 P50 批量写成发布值（仅补未发布且样本量达标的节点），返回受影响节点。 */
+export const applyTrackingProductBenchmarkP50 = async (taskConfigId: number) =>
+  (await http.post<Array<{ stageCode: string; p50Days: number; sampleCount: number }>>(
+    `/manufacturing/followups/product-node-benchmarks/${taskConfigId}/apply-p50`, {})).data
+
+/** 样本明细里的一段：相邻两个节点（或锚点→首个节点）之间的自然日间隔。 */
+export interface ProductBenchmarkSampleStage {
+  stageCode: string
+  days: number | null
+  /** 是否计入候选统计；false 时 reason 说明为什么被排除。 */
+  used: boolean
+  reason: string | null
+  /** 间隔为 0：多数是批量补录，发布前要抽查（见 reasonsForAnchor）。 */
+  zeroDay?: boolean
+}
+export interface ProductBenchmarkSampleOrder {
+  orderId: number
+  orderNo: string | null
+  submittedAt: string | null
+  /** PLANNED＝以排产日为锚点（本地计划开工或氚云排产时间）；APPLICATION＝退到申请日；NONE＝无锚点，该单不计入样本。 */
+  anchorKind: 'PLANNED' | 'APPLICATION' | 'NONE'
+  stages: ProductBenchmarkSampleStage[]
+}
+export interface ProductBenchmarkSamples {
+  workshop: string
+  product: string
+  stageCodes: string[]
+  summary: {
+    matchedOrders: number
+    plannedAnchorCount: number
+    applicationAnchorCount: number
+    noAnchorCount: number
+    spanFrom: string | null
+    spanTo: string | null
+  }
+  orders: ProductBenchmarkSampleOrder[]
+}
+
+/** 从同车间另一产品复制已发布间隔：只补目标产品尚未发布的节点，已发布的人工值不覆盖。 */
+export const copyTrackingProductBenchmarks = async (taskConfigId: number, sourceTaskConfigId: number) =>
+  (await http.post<{ copied: string[]; sourcePublished: number; skipped: number }>(
+    `/manufacturing/followups/product-node-benchmarks/${taskConfigId}/copy-from/${sourceTaskConfigId}`, {})).data
+
+/** 样本明细（只读）：候选是怎么算出来的，用于发布前抽查。需要 manufacturing.baseline.manage。 */
+export const fetchProductBenchmarkSamples = async (taskConfigId: number) =>
+  (await http.get<ProductBenchmarkSamples>(`/manufacturing/followups/product-benchmark-samples/${taskConfigId}`)).data
 
 export interface TrackingColumnDefault {
   columnKey: string

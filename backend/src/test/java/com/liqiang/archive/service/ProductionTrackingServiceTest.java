@@ -974,6 +974,37 @@ class ProductionTrackingServiceTest {
     }
 
     /**
+     * 「预计完成」筛选必须认延期至（2026-10-21 LQ 报：周复盘 65 单、列表 71 单）。
+     *
+     * <p>列表该列显示的是 {@code currentCompletionDate}（延期至优先），筛选若用 {@link ProductionTrackingService#DEADLINE}
+     * （不含延期至），就会出现两种错位：车间改期到 10-22 的单，筛 10-12~10-18 仍然出现；车间把 9-29 改到 10-13 的单，
+     * 筛 10-12~10-18 反而筛不到。两者必须同源，都用 {@link ProductionTrackingService#DELIVERY_BASELINE}。
+     */
+    @Test
+    void expectedCompletionFilterUsesTheSameCaliberAsTheListColumn() {
+        var jdbc=mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
+        var sql=org.mockito.ArgumentCaptor.forClass(String.class);
+        var args=org.mockito.ArgumentCaptor.forClass(Object[].class);
+        when(jdbc.query(sql.capture(),any(RowMapper.class),args.capture())).thenReturn(List.of());
+        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var empty=new ProductionTrackingService.DateRangeFilter("","",false);
+        var expected=new ProductionTrackingService.DateRangeFilter("2026-10-12","2026-10-18",false);
+
+        service.list("","","all","all","",false,"","","all","","","",empty,empty,expected,
+                false,"",empty,1,30);
+
+        String sameCaliber=ProductionTrackingService.DELIVERY_BASELINE+">=? AND "
+                +ProductionTrackingService.DELIVERY_BASELINE+"<=?";
+        assertTrue(sql.getValue().contains(sameCaliber),
+                "预计完成筛选必须与列表列同源（含延期至）："+sql.getValue());
+        assertFalse(sql.getValue().contains(ProductionTrackingService.DEADLINE+">=?"),
+                "预计完成筛选不得退回 DEADLINE（不算延期至）："+sql.getValue());
+        assertEquals(java.time.LocalDate.parse("2026-10-12"),args.getValue()[0]);
+        assertEquals(java.time.LocalDate.parse("2026-10-18"),args.getValue()[1]);
+    }
+
+    /**
      * 搜索框唯一入口（10-19 LQ：「搜索规格」并入任务号 / 产品 / 客户同一个框）。
      * 关键词必须命中四个字段，且规格走与列表列 specification_snapshot 完全相同的拼接口径 ——
      * 两处拼接方式一旦分叉，就会出现「搜出来的行，规格列里却看不到搜的那个词」。
@@ -999,22 +1030,29 @@ class ProductionTrackingServiceTest {
         for(Object arg:args)assertEquals("%120×80%",arg,"每个字段都要用同一个关键词模式："+sql);
     }
 
-    /** 业务员下拉清单必须与列表同一可见性口径，否则下拉里出现的人可能一个都筛不到。 */
+    /**
+     * 业务员下拉清单必须与列表同一可见性口径，否则下拉里出现的人可能一个都筛不到。
+     *
+     * <p>⚠️ 2026-10-20：filter-options 改单遍扫描后，业务员不再是独立的一条
+     * {@code SELECT DISTINCT p.salesperson_name}，而是并进主扫描的
+     * {@code GROUP_CONCAT(DISTINCT CASE WHEN p.salesperson_name IS NOT NULL AND p.salesperson_name&lt;&gt;'' ...)}。
+     * 断言随之改为「主扫描 SQL 里含这组去重取值 + 同一段可见范围」——口径没变，
+     * 变的只是取数方式（8 条串行 → 1 次扫描）。
+     */
     @Test
     void filterOptionsExposesSalespersonsWithSameVisibility() {
         var jdbc=mock(JdbcTemplate.class);
-        when(jdbc.queryForList(anyString(),eq(String.class),any(Object[].class))).thenReturn(List.of());
+        var scanSql=org.mockito.ArgumentCaptor.forClass(String.class);
+        when(jdbc.queryForList(scanSql.capture(),any(Object[].class))).thenReturn(List.of());
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
         var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
 
         var options=service.filterOptions();
 
         assertTrue(options.containsKey("salespersons"),"下拉必须返回业务员清单："+options.keySet());
-        var querySql=org.mockito.ArgumentCaptor.forClass(String.class);
-        verify(jdbc,atLeastOnce()).queryForList(querySql.capture(),eq(String.class),any(Object[].class));
-        String names=querySql.getAllValues().stream()
-                .filter(sql->sql.contains("DISTINCT p.salesperson_name")).findFirst()
-                .orElseThrow(()->new AssertionError("filter-options 必须查业务员去重清单："+querySql.getAllValues()));
+        String names=scanSql.getAllValues().stream()
+                .filter(sql->sql.contains("GROUP_CONCAT(DISTINCT CASE WHEN p.salesperson_name")).findFirst()
+                .orElseThrow(()->new AssertionError("filter-options 必须查业务员去重清单："+scanSql.getAllValues()));
         assertTrue(names.contains("p.salesperson_name IS NOT NULL")&&names.contains("<>''"),
                 "业务员清单要排除空值，否则会多出一个空选项："+names);
         assertTrue(names.contains("p.external_source='H3YUN'"),
@@ -1103,6 +1141,92 @@ class ProductionTrackingServiceTest {
     }
 
     /**
+     * COUNT 只在筛选真的引用 {@code ib} 时才挂 {@code INBOUND_JOIN}。
+     *
+     * <p>背景（2026-10-20 实测）：该派生表把 6.5 万行采购明细按工单号全量聚合成 5834 组，
+     * 挂上去「不改变行数」（1:1），但默认打开时让 COUNT 从 49ms 涨到 72ms。
+     * 反过来更危险：一旦某个谓词引用了 {@code ib.*} 却没挂 JOIN，SQL 直接报 Unknown column（列不存在），
+     * 整个列表 500。所以两头都要钉死：
+     * <ul>
+     *   <li>默认（无交付结果 / 无倒计时）→ COUNT SQL <b>不得</b>含 INBOUND_JOIN；</li>
+     *   <li>「生产交付结果」筛选 → COUNT SQL <b>必须</b>含 INBOUND_JOIN（DELIVERY_OUTCOME 用它算交付日）；</li>
+     *   <li>「倒计时」筛选 → COUNT SQL <b>必须</b>含（DELIVERED_IN_DATE 用它判已交付/未交付）；</li>
+     *   <li>明细查询永远含（LIST_COLUMNS 里有 INBOUND_COLUMNS，与标记无关）。</li>
+     * </ul>
+     */
+    @Test
+    void countOnlyJoinsInboundWhenAFilterActuallyNeedsIt() {
+        var created=new ProductionTrackingService.DateRangeFilter("","",false);
+
+        // ① 默认打开：COUNT 不挂，明细照挂
+        {
+            var jdbc=mock(JdbcTemplate.class);
+            var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
+            when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
+            var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
+            when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
+            var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+
+            service.list("","","all","all","",false,"","",/*action*/"all",/*countdown*/"",
+                    /*salesperson*/"",/*deliveryResult*/"",created,created,created,
+                    false,"",created,"",1,30);
+
+            assertFalse(countSql.getValue().contains(ProductionTrackingService.INBOUND_JOIN),
+                    "默认打开时 COUNT 不该白跑采购入库聚合："+countSql.getValue());
+            assertTrue(rowSql.getValue().contains(ProductionTrackingService.INBOUND_JOIN),
+                    "明细要出入库日期/单数/交付结果，永远得挂："+rowSql.getValue());
+        }
+
+        // ② 交付结果筛选：COUNT 必须挂
+        {
+            var jdbc=mock(JdbcTemplate.class);
+            var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
+            when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
+            when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
+            var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+
+            service.list("","","all","all","",false,"","",/*action*/"all",/*countdown*/"",
+                    /*salesperson*/"",/*deliveryResult*/"OVERDUE",created,created,created,
+                    false,"",created,"",1,30);
+
+            assertTrue(countSql.getValue().contains(ProductionTrackingService.INBOUND_JOIN),
+                    "交付结果筛选引用了 ib.first_in，COUNT 必须挂："+countSql.getValue());
+            assertTrue(countSql.getValue().contains("delivery")||countSql.getValue().contains("ib.first_in"),
+                    "交付结果谓词要真的进 where："+countSql.getValue());
+        }
+
+        // ③ 倒计时筛选：COUNT 必须挂
+        {
+            var jdbc=mock(JdbcTemplate.class);
+            var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
+            when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
+            when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
+            var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+
+            service.list("","","all","all","",false,"","",/*action*/"all",/*countdown*/"delivered",
+                    /*salesperson*/"",/*deliveryResult*/"",created,created,created,
+                    false,"",created,"",1,30);
+
+            assertTrue(countSql.getValue().contains(ProductionTrackingService.INBOUND_JOIN),
+                    "倒计时引用了交付日，COUNT 必须挂："+countSql.getValue());
+        }
+
+        // ④ 导出 COUNT 同一口径：默认也不挂
+        {
+            var jdbc=mock(JdbcTemplate.class);
+            var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
+            when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
+            when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
+            var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+
+            service.exportRows("","","all","all","",false,"","",/*action*/"all");
+
+            assertFalse(countSql.getValue().contains(ProductionTrackingService.INBOUND_JOIN),
+                    "导出的 total 与列表同口径，默认也不必挂："+countSql.getValue());
+        }
+    }
+
+    /**
      * 「按需工序」筛选（氧化/喷特氟龙、木箱）：谓词必须**同时**出现在 COUNT 与明细上
      * （依赖 TRACKING_FROM 的 ms 派生表，两处都挂了同一份 FROM），且口径＝「配置要求 或 已登记该节点」——
      * 只看节点会漏掉还没开始跟单的新单，只看配置会漏掉跟单员实际登记过节点的单。
@@ -1137,15 +1261,34 @@ class ProductionTrackingServiceTest {
                 "工序码必须走白名单，非法值不得静默不筛");
     }
 
-    /** 工序条数下拉必须与列表同一份 FROM 与同一段可见范围，且空集时要 COALESCE 兜 0（SUM 会给 NULL）。 */
+    /**
+     * 工序条数下拉必须与列表同一份 FROM 与同一段可见范围，且空集时要 COALESCE 兜 0（SUM 会给 NULL）。
+     *
+     * <p>⚠️ 2026-10-20 改：filter-options 由「8 条串行 SQL」改为「1 条单遍扫描 + 3 条并行」，
+     * 本方法随之调整两处：
+     * <ul>
+     *   <li>取数改走 {@code queryForList(sql, params)}（不带 Class 的重载），原来的
+     *       {@code queryForList(anyString(), eq(String.class), ...)} 桩不再命中，会静默回落空结果；</li>
+     *   <li>断言从「SQL 字面量里出现 {@code COALESCE(SUM(}」改为**直接喂一行 NULL 计数**，
+     *       验的是「空集时下拉数字是 0 而不是 null」这个行为本身。字面量断言在表达式被重排
+     *       （如把谓词套进 SUM 里）时就会假红，而真正的风险是 null 泄漏到前端。</li>
+     * </ul>
+     *
+     * <p>⚠️ 2026-10-20：filter-options 改单遍扫描后，工序条数放在**并行任务**里（虚拟线程），
+     * 那些任务里的取数用的是 {@code queryForList(sql, params)}；主扫描也是这个重载。
+     * 故桩必须打在这个重载上；{@code jdbc.execute(SET SESSION ...)} 用 mock 默认实现（返回 null 即可）。
+     */
     @Test
     void optionalStageCountsShareTheListFromAndNeverReturnNull() {
         var jdbc=mock(JdbcTemplate.class);
-        when(jdbc.queryForList(anyString(),eq(String.class),any(Object[].class))).thenReturn(List.of());
-        var querySql=org.mockito.ArgumentCaptor.forClass(String.class);
-        when(jdbc.query(querySql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
         var listSql=org.mockito.ArgumentCaptor.forClass(String.class);
-        when(jdbc.queryForList(listSql.capture(),any(Object[].class))).thenReturn(List.of());
+        // 模拟真库「空集」：SUM 在无匹配行时返回 NULL（两个聚合列都是 null）。
+        var nullRow=new java.util.HashMap<String,Object>();
+        nullRow.put("oxidation",null);
+        nullRow.put("wooden_crate",null);
+        when(jdbc.queryForList(listSql.capture(),any(Object[].class)))
+                .thenReturn(List.<Map<String,Object>>of(nullRow));
+        when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
         var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
 
         var options=service.filterOptions();
@@ -1153,9 +1296,14 @@ class ProductionTrackingServiceTest {
         assertTrue(options.containsKey("optionalStageCounts"),"下拉要给出各道按需工序的条数："+options.keySet());
         var counts=(List<?>)options.get("optionalStageCounts");
         assertEquals(2,counts.size(),"氧化与木箱各一条："+counts);
-        String sql=listSql.getAllValues().stream().filter(item->item.contains("oxidation"))
+        for(Object item:counts){
+            var row=(Map<?,?>)item;
+            assertNotNull(row.get("count"),"SUM 在空集返回 NULL，下拉不得把 null 透给前端："+row);
+            assertEquals(0L,((Number)row.get("count")).longValue(),"空集时条数必须是 0："+row);
+        }
+        // 按需工序计数那条：唯一锚点是 `COALESCE(SUM(`（主扫描用的是 COALESCE(ms.xxx)；ms 派生表自带 oxidation/wooden_crate 字样，故不能用它们定位）。
+        String sql=listSql.getAllValues().stream().filter(item->item.contains("COALESCE(SUM("))
                 .findFirst().orElseThrow(()->new AssertionError("filter-options 必须查按需工序条数："+listSql.getAllValues()));
-        assertTrue(sql.contains("COALESCE(SUM("),"空集时 SUM 返回 NULL，必须兜 0："+sql);
         assertTrue(sql.contains("p.external_source='H3YUN'")&&sql.contains("production_tracking_workbook_rows"),
                 "条数必须与列表同一段可见范围："+sql);
     }

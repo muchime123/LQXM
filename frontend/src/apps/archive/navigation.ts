@@ -77,7 +77,7 @@ export const archiveNavItems: NavItem[] = [
         to: '/manufacturing-task-configs',
         permission: 'manufacturing.template.manage',
         label: '任务单产品与配置',
-        description: '维护各产线可下单的产品名称与可选配置，是新建任务单的联动数据源与产品身份锚点。',
+        description: '维护各产线可下单的产品名称与可选配置，并在同一页按产品逐个维护跟单节点参考间隔（未发布时沿用车间基准）。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="15" width="18" height="5" rx="1.5"/><circle cx="8" cy="7.5" r="1.2"/></svg>',
         group: 'h3'
       },

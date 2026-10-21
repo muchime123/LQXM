@@ -253,6 +253,15 @@ public class ProductionTrackingController {
         return Map.of("id",service.addTimeReview(id,body,key));
     }
 
+    /** 修改某类时间核实的最新一条记录（写错原因/补漏细节）；不新增历史，审计留改动前后原文。 */
+    @PutMapping("/{id}/time-reviews/{noteId}")
+    @RequirePermission("manufacturing.followup")
+    public Map<String,Long> updateTimeReview(@PathVariable long id,@PathVariable long noteId,
+            @RequestBody ProductionTrackingService.TimeReviewRequest body,
+            @RequestHeader("X-Request-Key") String key){
+        return Map.of("id",service.updateTimeReview(id,noteId,body,key));
+    }
+
     @GetMapping("/candidates")
     @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public List<Map<String,Object>> candidates(@RequestParam(defaultValue="") String keyword,
@@ -422,10 +431,31 @@ public class ProductionTrackingController {
         service.saveProductBenchmark(row);
     }
 
-    @PostMapping("/product-node-benchmarks/{groupId}/refresh-candidates")
+    @PostMapping("/product-node-benchmarks/{taskConfigId}/refresh-candidates")
     @RequirePermission("manufacturing.baseline.manage")
-    public List<Map<String,Object>> refreshProductBenchmarkCandidates(@PathVariable long groupId){
-        return service.refreshProductBenchmarkCandidates(groupId);
+    public List<Map<String,Object>> refreshProductBenchmarkCandidates(@PathVariable long taskConfigId){
+        return service.refreshProductBenchmarkCandidates(taskConfigId);
+    }
+
+    /** 候选 P50 批量转发布值（界面确认后触发；已发布节点不动）。 */
+    @PostMapping("/product-node-benchmarks/{taskConfigId}/apply-p50")
+    @RequirePermission("manufacturing.baseline.manage")
+    public List<Map<String,Object>> applyProductBenchmarkP50(@PathVariable long taskConfigId){
+        return service.applyProductBenchmarkP50(taskConfigId);
+    }
+
+    /** 样本明细（只读）：候选是怎么算出来的，用于发布前抽查。 */
+    @GetMapping("/product-benchmark-samples/{taskConfigId}")
+    @RequirePermission("manufacturing.baseline.manage")
+    public Map<String,Object> productBenchmarkSamples(@PathVariable long taskConfigId){
+        return service.productBenchmarkSamples(taskConfigId);
+    }
+
+    /** 从同车间另一产品复制已发布间隔（只补未发布节点）。 */
+    @PostMapping("/product-node-benchmarks/{taskConfigId}/copy-from/{sourceTaskConfigId}")
+    @RequirePermission("manufacturing.baseline.manage")
+    public Map<String,Object> copyProductBenchmarks(@PathVariable long taskConfigId,@PathVariable long sourceTaskConfigId){
+        return service.copyProductBenchmarks(taskConfigId,sourceTaskConfigId);
     }
 
     /**
