@@ -14,7 +14,7 @@
     </header>
     <p class="hint">
       候选来自本产品自身的跟单记录（P50 / P75 仅供审核）；点击单行保存、或用「按 P50 填充」批量发布后才参与跟单参考日期。
-      <template v-if="!fillableCount">当前没有可批量填充的节点（需候选样本 ≥ 3 段且尚未发布）。</template>
+      <template v-if="!fillableCount">当前没有可批量填充的节点（需候选样本 ≥ 8 段、零天占比不过半、且尚未发布；零天多的节点请人工看样本后单行发布）。</template>
     </p>
     <el-table v-if="stageRows.length" :data="stageRows" stripe size="small">
       <el-table-column label="跟单节点" min-width="110">
@@ -145,9 +145,10 @@ const stageLabels = computed<Record<string, string>>(() => {
   return map
 })
 
-/** 可批量填充＝尚未发布且候选样本达标（后端同口径：样本 ≥ 3 段）。 */
+/** 可批量填充＝尚未发布且候选样本达标（后端同口径：样本 ≥ 8 段、零天占比 < 50%，2026-10-21 收紧）。 */
 const fillableCount = computed(() => stageRows.value.filter(row =>
-  row.typicalDays == null && row.p50Days != null && row.sampleCount >= 3).length)
+  row.typicalDays == null && row.p50Days != null && row.sampleCount >= 8
+  && row.zeroDayCount * 2 < row.sampleCount).length)
 
 async function save(row: StageRow) {
   saving.value = row.stageCode

@@ -64,10 +64,11 @@
                 <span :class="{ none: publishedCount(row) === 0 }">{{ stageTotal ? `${publishedCount(row)} / ${stageTotal}` : '—' }}</span>
               </template>
             </el-table-column>
-            <!-- 产品没有启用/禁用：能不能下单由氚云决定。这里只留「删掉补录错的行」这一条纠正路径（后端有两条硬保护）。 -->
+            <!-- 产品没有启用/禁用：能不能下单由氚云决定。删除只对本地补录行开放——
+                 氚云字典镜像行（H3YUN）没被用过也不许删（可能是氚云新增还没下单的项，2026-10-21 复查 P0）。 -->
             <el-table-column label="操作" width="72" fixed="right">
               <template #default="{ row }">
-                <el-tooltip content="删除本地补录错的产品行。已匹配历史任务、或已有参考间隔的产品会被后端拒绝。" placement="top">
+                <el-tooltip v-if="row.externalSource === 'MANUAL'" content="删除本地补录错的产品行。已匹配历史任务、或已有参考间隔的产品会被后端拒绝。" placement="top">
                   <el-button link type="danger" @click.stop="removeConfig(row)">删除</el-button>
                 </el-tooltip>
               </template>
@@ -101,10 +102,10 @@
                   </div>
                 </template>
               </el-table-column>
-              <!-- 可选配置也没有启用/禁用：能不能选由氚云决定。只留「删掉补录错的行」这一条纠正路径。 -->
+              <!-- 同上：删除只对本地补录行开放，氚云字典镜像行不可删。 -->
               <el-table-column label="操作" width="90" fixed="right">
                 <template #default="{ row }">
-                  <el-tooltip content="删除本地补录错的配置行。已被历史任务用过的会被后端拒绝。" placement="top">
+                  <el-tooltip v-if="row.externalSource === 'MANUAL'" content="删除本地补录错的配置行。已被历史任务用过的会被后端拒绝。" placement="top">
                     <el-button link type="danger" @click.stop="removeConfig(row)">删除</el-button>
                   </el-tooltip>
                 </template>
@@ -237,7 +238,7 @@ async function createConfig() {
 }
 
 /** 删除本地补录错的配置行。名称只读，所以这是唯一的纠正路径；硬保护在后端
- *  （产品：有历史任务 / 有参考间隔；可选配置：历史任务用过 → 409）。 */
+ *  （来源＝H3YUN 字典镜像行一律拒绝；产品：有历史任务 / 有参考间隔；可选配置：历史任务用过 → 409）。 */
 async function removeConfig(row: ConfigRow) {
   const what = row.configType === 'PRODUCT_NAME' ? '任务单产品' : '可选配置'
   try {

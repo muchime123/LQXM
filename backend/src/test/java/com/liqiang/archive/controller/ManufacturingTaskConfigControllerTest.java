@@ -34,7 +34,8 @@ import static org.mockito.Mockito.*;
  *   <li>列表查询不许再 select {@code active}（V400 已删列，留着会在运行期报 Unknown column）；</li>
  *   <li>不存在改名端点：名称是源字典的镜像，本地改名只断自己的匹配；纠错路径只有「删除后重录」；</li>
  *   <li>新增只写身份列（名称 / 车间 / 类型），不再写 {@code active}；</li>
- *   <li>删除对两类都开放，但硬保护必须生效：产品看基准行 + 历史任务；可选配置看历史任务文本。</li>
+ *   <li>删除只对本地补录（{@code MANUAL}）行开放：氚云字典镜像行（{@code H3YUN}）没被用过也不许删；
+ *       MANUAL 行再受使用证据硬保护：产品看基准行 + 历史任务，可选配置看历史任务文本。</li>
  * </ol>
  */
 class ManufacturingTaskConfigControllerTest {
@@ -66,6 +67,13 @@ class ManufacturingTaskConfigControllerTest {
                 "覆盖率必须仍然返回两个命中数："+value);
         assertFalse(value.matches("(?s).*\\bc\\s*\\.\\s*active.*"),
                 "覆盖率匹配产品时不许再判 active —— 停用开关会让本地跟单匹配凭空失效："+value);
+        // 唯一匹配（2026-10-21 复查 P1）：覆盖率必须与 benchmarksForOrder 的 items.size()==1 同判据，
+        // 重名歧义行不算已匹配，否则「统计说匹配、详情用车间基准」两处口径漂移。
+        assertTrue(value.contains("=1) AS productMatched"),
+                "productMatched 必须用「恰好一行配置」的唯一匹配判据："+value);
+        assertTrue(value.contains("=1 "
+                        +"AND EXISTS(SELECT 1 FROM manufacturing_task_config_items"),
+                "benchmarkMatched 必须先唯一匹配、再要求该产品已发布间隔："+value);
     }
 
     /** 跟单侧：产品级参考工期与基准矩阵都按「车间 + 产品名」精确匹配，不看启用状态。 */
@@ -130,7 +138,7 @@ class ManufacturingTaskConfigControllerTest {
     @Test
     void deleteRejectsProductWithBenchmarkRows() {
         when(jdbc.queryForList(contains("FROM manufacturing_task_config_items WHERE id=? FOR UPDATE"),any(Object[].class)))
-                .thenReturn(List.of(row("config_name","气动卷膜","config_type","PRODUCT_NAME","workshop_id",2L)));
+                .thenReturn(List.of(row("config_name","气动卷膜","config_type","PRODUCT_NAME","workshop_id",2L,"external_source","MANUAL")));
         when(jdbc.queryForObject(contains("FROM production_tracking_product_benchmarks"),eq(Integer.class),any(Object[].class)))
                 .thenReturn(3);
 
@@ -144,7 +152,7 @@ class ManufacturingTaskConfigControllerTest {
     @Test
     void deleteRejectsProductMatchedByHistoryOrders() {
         when(jdbc.queryForList(contains("FROM manufacturing_task_config_items WHERE id=? FOR UPDATE"),any(Object[].class)))
-                .thenReturn(List.of(row("config_name","气动卷膜","config_type","PRODUCT_NAME","workshop_id",2L)));
+                .thenReturn(List.of(row("config_name","气动卷膜","config_type","PRODUCT_NAME","workshop_id",2L,"external_source","MANUAL")));
         when(jdbc.queryForObject(contains("FROM production_tracking_product_benchmarks"),eq(Integer.class),any(Object[].class)))
                 .thenReturn(0);
         when(jdbc.queryForObject(contains("FROM production_orders p JOIN manufacturing_workshops w"),eq(Integer.class),any(Object[].class)))
@@ -156,11 +164,11 @@ class ManufacturingTaskConfigControllerTest {
                 "拒绝理由要带上匹配到的历史任务张数："+ex.getReason());
     }
 
-    /** 产品两条保护都不占 → 必然是补录错了的行，放行。 */
+    /** 产品两条使用证据都不占 → 必然是补录错了的行，放行。 */
     @Test
     void deleteRemovesOnlyOrphanProductRow() {
         when(jdbc.queryForList(contains("FROM manufacturing_task_config_items WHERE id=? FOR UPDATE"),any(Object[].class)))
-                .thenReturn(List.of(row("config_name","敲错的名字","config_type","PRODUCT_NAME","workshop_id",2L)));
+                .thenReturn(List.of(row("config_name","敲错的名字","config_type","PRODUCT_NAME","workshop_id",2L,"external_source","MANUAL")));
         when(jdbc.queryForObject(anyString(),eq(Integer.class),any(Object[].class))).thenReturn(0);
 
         assertDoesNotThrow(()->controller.deleteConfig(9L));
@@ -173,7 +181,7 @@ class ManufacturingTaskConfigControllerTest {
     @Test
     void deleteRejectsOptionalConfigUsedByHistoryOrders() {
         when(jdbc.queryForList(contains("FROM manufacturing_task_config_items WHERE id=? FOR UPDATE"),any(Object[].class)))
-                .thenReturn(List.of(row("config_name","出口木箱","config_type","OPTIONAL_CONFIG","workshop_id",2L)));
+                .thenReturn(List.of(row("config_name","出口木箱","config_type","OPTIONAL_CONFIG","workshop_id",2L,"external_source","MANUAL")));
         when(jdbc.queryForObject(contains("LOCATE"),eq(Integer.class),any(Object[].class))).thenReturn(96);
 
         var ex=assertThrows(ResponseStatusException.class,()->controller.deleteConfig(9L));
@@ -186,11 +194,39 @@ class ManufacturingTaskConfigControllerTest {
     @Test
     void deleteAllowsOptionalConfigNeverUsed() {
         when(jdbc.queryForList(contains("FROM manufacturing_task_config_items WHERE id=? FOR UPDATE"),any(Object[].class)))
-                .thenReturn(List.of(row("config_name","敲错的选项","config_type","OPTIONAL_CONFIG","workshop_id",2L)));
+                .thenReturn(List.of(row("config_name","敲错的选项","config_type","OPTIONAL_CONFIG","workshop_id",2L,"external_source","MANUAL")));
         when(jdbc.queryForObject(contains("LOCATE"),eq(Integer.class),any(Object[].class))).thenReturn(0);
 
         assertDoesNotThrow(()->controller.deleteConfig(9L));
         verify(jdbc).update(contains("DELETE FROM manufacturing_task_config_items WHERE id=?"),eq(9L));
+    }
+
+    /**
+    /**
+     * 来源闸（2026-10-21 复查 P0）：H3YUN 字典镜像行即使「没有历史任务、没有基准、没被用过」也不许删
+     * ——没被用过 ≠ 氚云侧不存在，可能是新增还没人下单的项；氚云移除后随导入同步消失，本地不替氚云做主。
+     */
+    @Test
+    void deleteRejectsH3yunDictionaryRowsEvenWithoutAnyUsage() {
+        when(jdbc.queryForList(contains("FROM manufacturing_task_config_items WHERE id=? FOR UPDATE"),any(Object[].class)))
+                .thenReturn(List.of(row("config_name","全新产品还没下过单","config_type","PRODUCT_NAME","workshop_id",2L,"external_source","H3YUN")));
+
+        var ex=assertThrows(ResponseStatusException.class,()->controller.deleteConfig(9L));
+        assertEquals(HttpStatus.CONFLICT,ex.getStatusCode());
+        assertTrue(String.valueOf(ex.getReason()).contains("氚云"),
+                "拒绝理由必须点明来源是氚云字典镜像："+ex.getReason());
+        verify(jdbc,never()).update(contains("DELETE FROM manufacturing_task_config_items"),any(Object[].class));
+        verify(changeLog,never()).write(any());
+    }
+
+    @Test
+    void deleteRejectsH3yunOptionalConfigRowToo() {
+        when(jdbc.queryForList(contains("FROM manufacturing_task_config_items WHERE id=? FOR UPDATE"),any(Object[].class)))
+                .thenReturn(List.of(row("config_name","新选项","config_type","OPTIONAL_CONFIG","workshop_id",2L,"external_source","H3YUN")));
+
+        var ex=assertThrows(ResponseStatusException.class,()->controller.deleteConfig(9L));
+        assertEquals(HttpStatus.CONFLICT,ex.getStatusCode());
+        verify(jdbc,never()).update(contains("DELETE FROM manufacturing_task_config_items"),any(Object[].class));
     }
 
     /**
@@ -201,7 +237,7 @@ class ManufacturingTaskConfigControllerTest {
     @Test
     void optionalConfigUsageIsMatchedAsWholeToken() {
         when(jdbc.queryForList(contains("FROM manufacturing_task_config_items WHERE id=? FOR UPDATE"),any(Object[].class)))
-                .thenReturn(List.of(row("config_name","灌装(量杯式)","config_type","OPTIONAL_CONFIG","workshop_id",2L)));
+                .thenReturn(List.of(row("config_name","灌装(量杯式)","config_type","OPTIONAL_CONFIG","workshop_id",2L,"external_source","MANUAL")));
         when(jdbc.queryForObject(anyString(),eq(Integer.class),any(Object[].class))).thenReturn(0);
 
         controller.deleteConfig(9L);

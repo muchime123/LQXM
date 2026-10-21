@@ -67,7 +67,7 @@
         <template v-else>
           <header class="duration-head"><h2>节点参考间隔</h2></header>
           <el-alert v-if="!canManageBaseline" type="info" :closable="false" title="无节点参考间隔权限"
-            description="维护间隔需要 manufacturing.baseline.manage 权限；产品与可选配置字典仍可查看、补录与删除，未发布的节点沿用车间基准。" />
+            description="维护间隔需要 manufacturing.baseline.manage 权限；产品与可选配置字典仍可查看与补录，删除仅限本地补录行（氚云字典镜像不可删），未发布的节点沿用车间基准。" />
           <el-empty :image-size="80" description="选择中间「任务单产品」表里的产品行，右侧会显示该产品的历史任务、有效样本与节点参考间隔" />
         </template>
       </section>

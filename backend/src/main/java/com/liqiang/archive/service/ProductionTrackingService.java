@@ -2029,8 +2029,13 @@ public class ProductionTrackingService {
                         "typicalDays",row.typicalDays()),"FOLLOW_UP","发布产品节点参考间隔",null,null));
     }
 
-    /** 批量发布的最低样本量：低于 3 段不自动采用 P50，避免一两条补录记录定下参考值。 */
-    private static final int AUTO_PUBLISH_MIN_SAMPLES=3;
+    /**
+     * 批量发布的最低样本量：低于 8 段不自动采用 P50（2026-10-21 外部复查 P1，原值 3）。
+     * 实测依据：3 段门槛下 38 个产品组合里 124 个节点对可发布，一条补录记录就能定参考值；
+     * 提到 8 段覆盖 58 个节点对 / 15 个主力产品。**只约束批量填充**——管理员看过样本明细后
+     * 的单行手工发布不受此限。
+     */
+    private static final int AUTO_PUBLISH_MIN_SAMPLES=8;
 
     /**
      * 从同车间另一产品复制已发布间隔：只补目标产品**尚未发布**的节点，已发布的人工值不被覆盖
@@ -2078,14 +2083,17 @@ public class ProductionTrackingService {
     }
 
     /**
-     * 把候选 P50 批量写成发布值：只填「尚未发布 + 样本量达标」的节点，已经发布的节点不动。
+     * 把候选 P50 批量写成发布值：只填「尚未发布 + 样本量达标 + 零天占比不过半」的节点，已经发布的节点不动。
+     * 零天占比 ≥50% 的节点多为批量补录（封口机备料 73%、入库 90% 都是零天），自动发布等于宣布
+     * 「上一节点完成当天必须完成本节点」，没有缓冲——这类节点人工看过样本明细再定（2026-10-21 外部复查 P1）。
      * 由界面确认后触发，返回受影响节点供提示。
      */
     @Transactional
     public List<Map<String,Object>> applyProductBenchmarkP50(long taskConfigId) {
         var rows=jdbc.queryForList("SELECT stage_code AS stageCode,p50_days AS p50Days,sample_count AS sampleCount "
                 +"FROM production_tracking_product_benchmarks WHERE task_config_id=? AND typical_days IS NULL "
-                +"AND p50_days IS NOT NULL AND sample_count>=? ORDER BY id",taskConfigId,AUTO_PUBLISH_MIN_SAMPLES);
+                +"AND p50_days IS NOT NULL AND sample_count>=? "
+                +"AND COALESCE(zero_day_count,0)*2<sample_count ORDER BY id",taskConfigId,AUTO_PUBLISH_MIN_SAMPLES);
         for(var row:rows)
             jdbc.update("UPDATE production_tracking_product_benchmarks SET typical_days=?,"
                     +"published_source='P50',published_at=NOW(),"

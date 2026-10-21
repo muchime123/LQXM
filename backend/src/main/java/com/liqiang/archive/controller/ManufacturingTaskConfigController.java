@@ -65,23 +65,30 @@ public class ManufacturingTaskConfigController {
     }
 
     /**
-     * 覆盖率：历史任务中匹配到产品配置的张数，以及命中「该产品已发布节点间隔」的张数（后者之外的仍用车间基准）。
+     * 覆盖率：历史任务中「唯一匹配」到产品配置的张数，以及命中「该产品已发布节点间隔」的张数（后者之外的仍用车间基准）。
      *
-     * <p><b>2026-10-21 起不再判 {@code active}</b>：任务单产品是氚云生产任务单产品下拉字典的镜像，
-     * 产品能否下单由氚云决定，LQXM 的本地开关既不影响氚云、也不该让本地跟单匹配凭空失效
-     * （否则「氚云正常在用 + 本地被停用」= 产品级参考工期静默退回车间基准）。全库 50 个产品实测全为启用，
-     * 去掉判据后覆盖率数字不变。
+     * <p><b>唯一匹配</b>（2026-10-21 外部复查 P1）：匹配判据必须与跟单侧 {@code benchmarksForOrder()}
+     * 完全一致——后者要求同车间同类型同名恰好一行（{@code items.size()==1}），存在重名歧义时回退车间基准。
+     * 覆盖率若只判「存在即匹配」，重名行会被算成已匹配，数字就和跟单实际用的参考来源对不上
+     * （统计说匹配了、详情却用车间基准）。重名本身是数据问题，由列表页的「重名 ×N」警告暴露，不在这里猜。
+     *
+     * <p><b>不判 {@code active}</b>（2026-10-21）：active 列已随 V400 删除，产品没有启用概念。
      */
     @GetMapping("/duration-coverage")
     public Map<String,Object> durationCoverage() {
         return jdbc.queryForMap("SELECT COUNT(*) AS total,"
                 // trackedTotal＝已建跟单记录的任务数：参考间隔的真实样本基数（2026-10-21：593 / 6038）。
                 +"SUM(EXISTS(SELECT 1 FROM production_tracking_state ts WHERE ts.production_order_id=p.id)) AS trackedTotal,"
-                +"SUM(EXISTS(SELECT 1 FROM manufacturing_task_config_items c "
+                // 唯一匹配＝「车间+产品名」恰好一行配置（COUNT(*)=1）；NULL 产品名匹配不到任何行，自然不算。
+                +"SUM((SELECT COUNT(*) FROM manufacturing_task_config_items c "
                 +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
                 +"WHERE c.config_type='PRODUCT_NAME' "
-                +"AND c.config_name=p.product_name AND w.workshop_name=p.production_line)) AS productMatched,"
-                +"SUM(EXISTS(SELECT 1 FROM manufacturing_task_config_items c "
+                +"AND c.config_name=p.product_name AND w.workshop_name=p.production_line)=1) AS productMatched,"
+                +"SUM((SELECT COUNT(*) FROM manufacturing_task_config_items c "
+                +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
+                +"WHERE c.config_type='PRODUCT_NAME' "
+                +"AND c.config_name=p.product_name AND w.workshop_name=p.production_line)=1 "
+                +"AND EXISTS(SELECT 1 FROM manufacturing_task_config_items c "
                 +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
                 +"JOIN production_tracking_product_benchmarks b ON b.task_config_id=c.id AND b.typical_days IS NOT NULL "
                 +"WHERE c.config_type='PRODUCT_NAME' AND c.config_name=p.product_name "
@@ -195,13 +202,14 @@ public class ManufacturingTaskConfigController {
 
 
     /**
-     * 删除本地补录的配置行（任务单产品 / 可选配置都走这里）。
+     * 删除配置行（任务单产品 / 可选配置都走这里）。
      *
-     * <p><b>为什么必须有它</b>：名称只读之后只剩「补录」一条写入路径，而「启用/停用」取消后
-     * 也没有「停用即隐藏」的遮蔽手段——名字敲错的行如果既不能改也不能删，就会永久留在字典里，
-     * 一边污染下拉清单、一边参与文本匹配（产品→参考间隔；可选配置→按需工序判定）。纠正路径只能是删除。
+     * <p><b>第一道闸：来源。</b>{@code external_source='H3YUN'} 的行是氚云生产任务单下拉字典的镜像
+     * ——**没被用过 ≠ 不是真实产品**：氚云侧新增一个下拉项、本地已导入但还没人下过单，它依然是
+     * 准确有效的字典项，删掉之后下次对账就少一行、覆盖率数字也会跟着失真（2026-10-21 外部复查 P0）。
+     * 氚云侧真正移除后由导入同步消失，本地不替氚云做主。只有本地补录（{@code MANUAL}）的行才走删除。
      *
-     * <p><b>硬保护</b>（宁可拒绝，也不静默丢数据）：
+     * <p><b>第二道闸：使用证据</b>（只对 MANUAL 行生效，「宁可拒绝，也不静默丢数据」）：
      * <ul>
      *   <li>产品：已有 {@code production_tracking_product_benchmarks} 行（含只有候选统计、尚未发布的）→ 拒绝，
      *       删掉会连同已发布的参考间隔一起永久消失，而「撤销发布」是单独动作、要留审计；</li>
@@ -209,16 +217,20 @@ public class ManufacturingTaskConfigController {
      *   <li>可选配置：作为独立一项出现在该车间历史任务的 {@code optional_configuration} 文本里 → 拒绝，
      *       同理（2026-10-21 实测 70 条里 67 条真被用过）。</li>
      * </ul>
-     * 都不占的行必然是补录错了的，删掉零损失。
+     * 名称只读之后只剩「补录 + 删除」两条写入路径：MANUAL 行两条闸都不占，必然是补录错了的，删掉零损失。
      */
     @DeleteMapping("/task-configs/{id}")
     @Transactional
     public void deleteConfig(@PathVariable long id) {
-        var rows=jdbc.queryForList("SELECT config_name,config_type,workshop_id FROM manufacturing_task_config_items WHERE id=? FOR UPDATE",id);
+        var rows=jdbc.queryForList("SELECT config_name,config_type,workshop_id,external_source FROM manufacturing_task_config_items WHERE id=? FOR UPDATE",id);
         if(rows.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND,"配置不存在");
         var row=rows.getFirst();
         String name=String.valueOf(row.get("config_name"));
         Object workshopId=row.get("workshop_id");
+        if(!"MANUAL".equals(row.get("external_source")))
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "该行来自氚云任务单字典镜像，不能在本地删除——没被用过也不代表氚云侧不存在（可能是新增还没下单的项）。"
+                    +"氚云侧移除后会随导入同步消失；只有本地补录的行才可删除");
         if("PRODUCT_NAME".equals(row.get("config_type"))){
             Integer benchmarks=jdbc.queryForObject("SELECT COUNT(*) FROM production_tracking_product_benchmarks WHERE task_config_id=?",Integer.class,id);
             if(benchmarks!=null&&benchmarks>0)
