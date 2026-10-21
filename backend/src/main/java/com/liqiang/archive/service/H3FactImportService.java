@@ -20,6 +20,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.scheduling.annotation.Async;
 import org.apache.poi.openxml4j.util.ZipSecureFile;
 import org.apache.poi.openxml4j.opc.OPCPackage;
+import org.apache.poi.openxml4j.opc.PackageAccess;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.util.IOUtils;
 import org.apache.poi.util.XMLHelper;
@@ -209,7 +210,16 @@ private List<Group> parseXlsxStreaming(FactType type, MultipartFile file) throws
     Path temp = Files.createTempFile("h3-fact-import-", ".xlsx");
     try {
         file.transferTo(temp);
-        try (OPCPackage pkg = OPCPackage.open(temp.toFile())) {
+        // ⚠️ 必须显式 PackageAccess.READ。open(File) 默认 READ_WRITE，close() 会把整个包
+        // 重新序列化到 %TEMP%\poifiles\OpenXML4J*.tmp 再回拷覆盖原文件（poi-ooxml 5.3.0
+        // ZipPackage#closeImpl，javap 反汇编确认）。两个后果：
+        //   ① poifiles 目录一旦被 Windows 磁盘清理/存储感知/杀软件清掉，createTempFile 直接抛
+        //      NoSuchFileException，message 就是完整 tmp 路径 —— 即「无法流式解析 Excel 文件
+        //      [NoSuchFileException]：...poifiles\OpenXML4J*.tmp」的真实根因（探针
+        //      tools/_probe_poi_close.java 场景 A2 一字不差复现）；
+        //   ② 对氚云全字段导出（解压后超 1GB）每次解析多一次全量重写，纯浪费。
+        // READ 模式 close() 走 revert()，完全不碰 poifiles（探针场景 B2 验证）。
+        try (OPCPackage pkg = OPCPackage.open(temp.toFile(), PackageAccess.READ)) {
             XSSFReader reader = new XSSFReader(pkg);
             StylesTable styles = reader.getStylesTable();
             ReadOnlySharedStringsTable strings = new ReadOnlySharedStringsTable(pkg);
