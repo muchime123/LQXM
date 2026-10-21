@@ -722,7 +722,7 @@ public class WebsiteController {
      * 官网公开专利/知识产权视图。脱敏字段：
      * - 保留：id/hasImage/name/assetCategory/patentType/patentNo/publicationNo/applicant/inventors/
      *         applyDate/grantDate/legalYears/expireDate/legalStatus/remark
-     * - 剔除：applicationNo/queryNo/examiner/agency/agencyContact/feeStatus/feeDueDate/feeQueryDate/
+     * - 剔除：applicationNo/queryNo/agency/agencyContact/feeStatus/feeDueDate/feeQueryDate/
      *         lastFeeAmount/feeDetail/invoiceStatus/processStage/reviewProgress 等内部敏感字段
      */
     public record PublicPatentView(Long id, boolean hasImage, String name, String assetCategory, String patentType,

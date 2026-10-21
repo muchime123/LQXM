@@ -16,7 +16,7 @@ import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   addTrackingEntry, addTrackingStageEntry, addTrackingTimeReview, changeTrackingClosure,
-  changeTrackingDisposition,
+  changeTrackingDisposition, updateTrackingTimeReview,
   fetchTrackingDetail, fetchTrackingPurchaseReceiptDetail, fetchTrackingPurchaseReceipts
 } from '@/api/productionTracking'
 import type {
@@ -159,16 +159,26 @@ export function useTrackingDetail(options: {
 
   const timeReviewVisible = ref(false)
   const timeReviewSaving = ref(false)
+  /** 正在改的那条记录的 id：null＝新增一条，有值＝改这条（只许改最新一条，见后端 updateTimeReview 说明）。 */
+  const timeReviewEditingId = ref<number | null>(null)
   const timeReviewForm = ref<{ kind: TrackingTimeReviewKind; status: TrackingTimeReviewStatus; reason: string; contactName: string; agreedDate: string | null; nextFollowupDate: string | null }>({ kind: 'ACCEPTANCE', status: 'OPEN', reason: '', contactName: '', agreedDate: null, nextFollowupDate: null })
-  function openTimeReview(kind: TrackingTimeReviewKind) {
-    const previous = detail.value?.timeReviews.find(review => review.kind === kind)
+  /**
+   * @param previous 传入则在**编辑模式**下打开：表单预填这条记录的原文与状态，保存走 update。
+   *
+   * 过去这里一律把 reason 清空 ⇒ 用户想改一个错字也只能再录一遍，历史里堆出「入库延迟」+「入库延迟7天」这类
+   * 同义记录（10-20 真库有 7 单是这种形态），而统计与导出只认最新一条，旧写法照样污染原文榜。
+   */
+  function openTimeReview(kind: TrackingTimeReviewKind, previous?: TrackingTimeReview) {
     const order = detail.value?.order
     const negotiated = kind === 'COMMITMENT' && ((daysBetween(order?.dueDate, order?.expectedFinishDate) ?? 0) > 0)
+    timeReviewEditingId.value = previous?.id ?? null
     timeReviewForm.value = {
       kind,
-      status: kind === 'COMMITMENT' ? (previous?.status === 'NEGOTIATED' || negotiated ? 'NEGOTIATED' : 'ON_TIME') : 'OPEN',
-      reason: '', contactName: previous?.contactName || '',
-      agreedDate: previous?.agreedDate || (negotiated ? order?.expectedFinishDate || null : null), nextFollowupDate: previous?.nextFollowupDate || null
+      status: previous?.status ?? (kind === 'COMMITMENT' ? (negotiated ? 'NEGOTIATED' : 'ON_TIME') : 'OPEN'),
+      reason: previous?.reason || '',
+      contactName: previous?.contactName || '',
+      agreedDate: previous?.agreedDate || (negotiated ? order?.expectedFinishDate || null : null),
+      nextFollowupDate: previous?.nextFollowupDate || null
     }
     timeReviewVisible.value = true
   }
@@ -178,10 +188,13 @@ export function useTrackingDetail(options: {
     if (!form.reason.trim()) { ElMessage.warning('请填写原因或核实结果'); return }
     if (form.status === 'NEGOTIATED' && !form.agreedDate) { ElMessage.warning('请填写协商后的交期'); return }
     timeReviewSaving.value = true
+    const payload = { ...form, reason: form.reason.trim(), contactName: form.contactName.trim() || null, agreedDate: form.status === 'NEGOTIATED' ? form.agreedDate : null }
     try {
-      await addTrackingTimeReview(detail.value.order.id, { ...form, reason: form.reason.trim(), contactName: form.contactName.trim() || null, agreedDate: form.status === 'NEGOTIATED' ? form.agreedDate : null })
+      if (timeReviewEditingId.value) await updateTrackingTimeReview(detail.value.order.id, timeReviewEditingId.value, payload)
+      else await addTrackingTimeReview(detail.value.order.id, payload)
       timeReviewVisible.value = false
-      ElMessage.success('时间核实记录已保存')
+      ElMessage.success(timeReviewEditingId.value ? '核实记录已更新' : '时间核实记录已保存')
+      timeReviewEditingId.value = null
       await openDetail(detail.value.order)
       await options.reload()
     } catch (error) { ElMessage.error(error instanceof Error ? error.message : '保存时间核实记录失败') }
@@ -563,7 +576,7 @@ export function useTrackingDetail(options: {
     purchaseDetailLoading, purchaseDetailData, purchaseDetailError, purchaseDetailId,
     detail, milestones, previousStageStatuses, requiredTotal, doneStages, showSalesTrace, gapStages, stageGapLabels,
     submittableStages, stagePercent, currentStageIndex, currentStage, referencePanels, expandedEntries,
-    timeReviewVisible, timeReviewSaving, timeReviewForm, deadlineDate, opDone, saving,
+    timeReviewVisible, timeReviewSaving, timeReviewForm, timeReviewEditingId, deadlineDate, opDone, saving,
     dispositionVisible, dispositionStopped, dispositionReason, dispositionSaving,
     closureVisible, closureClosing, closureNote, closureSaving,
     originalStages, delayDialog, delaySaving, delayDraftDate, delayDraftReason, unsavedStageCount,

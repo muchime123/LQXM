@@ -36,7 +36,7 @@ class ProductionTaskImportControllerTest {
         var file=new MockMultipartFile("file","生产任务单.xlsx",
                 "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",new byte[]{1,2,3});
         when(imports.createBatchRecord(eq("production"),eq("生产任务单.xlsx"),eq(3L),anyString()))
-                .thenReturn(new StageAccepted(11L,"PRODUCTION","生产任务单.xlsx",false,"UPLOADED","ok"));
+                .thenReturn(new StageAccepted(11L,"PRODUCTION","生产任务单.xlsx",false,"UPLOADED","ok",null));
 
         var accepted=controller().stage(file);
 
@@ -53,7 +53,7 @@ class ProductionTaskImportControllerTest {
     void stageSkipsParseWhenSameFileAlreadyStaged() throws Exception {
         var file=new MockMultipartFile("file","生产任务单.xlsx","application/octet-stream",new byte[]{9});
         when(imports.createBatchRecord(anyString(),anyString(),anyLong(),anyString()))
-                .thenReturn(new StageAccepted(12L,"PRODUCTION","生产任务单.xlsx",true,"PREVIEW_READY","命中"));
+                .thenReturn(new StageAccepted(12L,"PRODUCTION","生产任务单.xlsx",true,"PREVIEW_READY","命中",null));
 
         var accepted=controller().stage(file);
 

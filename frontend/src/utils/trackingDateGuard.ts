@@ -5,23 +5,37 @@
  * 这四处任一另写一份判断，就会出现「列表显示 6 天、导出显示日期待核实」这类
  * 只在导出件上才被发现的静默分叉。
  *
- * ## 三个日期
+ * ## 四个日期
  * - 生产工单申请时间 `applicationDate` —— 业务员提申请那天（氚云 production_orders.application_date，日期）。
  * - 任务单提交时间 `sourceCreatedAt` —— 业务员把生产任务单提交给车间审批的时间（氚云建单时间，DATETIME）。
  *   界面/导出一律叫「任务单提交」，不再叫「源创建」（2026-10-15 LQ 定）。
+ * - 车间排产时间 `scheduleTime` —— 车间**开始接单排产**的时间（氚云 production_orders.schedule_time）。
+ *   提交之后车间不一定马上接单，这段等待不属于生产周期。
  * - 业务员要求完成日 `dueDate` —— 业务员提出的完工日期。
  *
- * ## 三个真身（10-15 LQ 定：起算日**各不相同**，不要想当然统一）
+ * ## 三个真身（10-15 定，10-20 改起算：**计划与实际都从排产日起算**）
  *
  * | 真身 | 起算 | 终点 | 性质 |
  * |---|---|---|---|
  * | 要求工期 | **申请时间** | 业务员要求完成日 `dueDate` | 客户的期望，从不改动 |
- * | 计划工期 | **任务单提交时间** | 车间预计完成日，认延期（`forecastFinishDate` ?? `expectedFinishDate`） | 车间的承诺，有延期时要标出来 |
- * | 实际工期 | **任务单提交时间** | 实际入库日 `deliveredDate` = 跟单员登记优先，未登记时取采购首次入库 | 既成事实 |
+ * | 计划工期 | **车间排产时间** | 车间预计完成日，认延期（`forecastFinishDate` ?? `expectedFinishDate`） | 车间的承诺，有延期时要标出来 |
+ * | 实际工期 | **车间排产时间** | 实际入库日 `deliveredDate` = 跟单员登记优先，未登记时取采购首次入库 | 既成事实 |
  *
- * 为什么起算日是两套：申请日期常被填早（先申请、后建单），用它算车间/实际的工期会把
- * 「录入滞后」算成工期；而**要求工期**本来就是业务员在申请日提出的期望，只能从申请日起算。
+ * 为什么起算日是两套：申请日期常被填早（先申请、后建单），**要求工期**本来就是业务员在申请日
+ * 提出的期望，只能从申请日起算；而计划/实际是**车间要兑现的周期**，业务员提交后车间可能压着
+ * 没接单（真库 6030 单里提交到排产平均滞后 1.5 天、最长 83 天），把这段等待算进车间工期，会让
+ * 「车间慢/快」和「业务员报得早/晚」搅在一起（2026-10-20 LQ 定：从车间开始接单排产算）。
  * 因此要求工期与另外两个真身**不可直接比大小**，界面里必须各自说清起算（见下面各 basis 文案）。
+ *
+ * ⚠️ **未排产的单只给要求工期**（`scheduleTime` 为空，真库 44 单，2026-10-20 LQ 定）：
+ * 车间还没接单排产，就没有「车间多久做完」这件事——计划工期与实际工期**连明细都不出现**，
+ * 也不回落提交日（回落等于把「车间还没接单」的等待又算进工期，正是上面要修的病根）。
+ * 主数值降级成要求工期，悬停给一句 `leadDaysAwaitingScheduleNote` 说明「等车间接单」。
+ * 例外只有一种：**已交付但从没登记排产**（真库 1 单）——排产日缺失时回落到提交日，否则既成事实
+ * 会被整条藏掉；该回落由 `leadDaysStartFallback` 标出来，界面文案写「排产日缺失，按任务单提交日」。
+ *
+ * 历史：10-15 版计划/实际从**任务单提交时间**起算，10-20 起改从排产时间起算；`sourceCreatedAt`
+ * 仍留在本模块里，只用于「申请日是否填早 / 要求日期是否可疑」的判据与排产滞后。
  *
  * 原「承诺工期」被并入计划工期（10-15 LQ 定：不想按是否延期分成两个显示），
  * 延期的信息改由**徽章 `计划·延` 与明细里的「含延期」**承载。
@@ -62,6 +76,8 @@ export function invalidRequiredDate(row: TrackingDateFields) {
 }
 
 export interface TrackingLeadFields extends TrackingDateFields {
+  /** 车间开始接单排产的时间（氚云 `schedule_time`）；未排产为空 —— 计划/实际工期都从这里起算。 */
+  scheduleTime?: string | null
   expectedFinishDate?: string | null
   forecastFinishDate?: string | null
   /** 实际入库日期（后端 `delivered_date`）优先跟单员登记的入库，缺失时取采购首次入库。 */
@@ -81,10 +97,47 @@ export function hasForecastFinish(row: TrackingLeadFields) {
   return Boolean(row.forecastFinishDate)
 }
 
+/** 该单是否还没被车间接单排产（未排产时计划/实际工期都不给，只给要求工期）。 */
+export function leadDaysStartMissingPlan(row: TrackingLeadFields) {
+  return !row.scheduleTime
+}
+
+/**
+ * 计划/实际工期的起算日＝**车间排产时间**（10-20 LQ 定）。
+ * 例外：已交付但从未登记排产（真库 1 单）回落到任务单提交时间，否则既成事实会被整条藏掉——
+ * 是否发生回落由 `leadDaysStartFallback` 告知界面，文案必须写出来，不能悄悄换起算日。
+ */
+export function leadDaysStart(row: TrackingLeadFields) {
+  return row.scheduleTime || (row.deliveredDate ? row.sourceCreatedAt || null : null)
+}
+
+/** 起算日是否用了「排产日缺失 → 任务单提交日」的兜底（只对已交付的单可能为真）。 */
+export function leadDaysStartFallback(row: TrackingLeadFields) {
+  return !row.scheduleTime && Boolean(row.deliveredDate && row.sourceCreatedAt)
+}
+
+/**
+ * 这条单该不该给计划工期。
+ * **未排产就一律不给**（10-20 LQ 定：只显示要求工期）——不管氚云里有没有车间预计完成日、
+ * 有没有登记延期，车间没接单排产就没有「车间多久做完」这件事，硬给一个数是编的。
+ * 唯一例外：已交付但排产日缺失（起算日走兜底），既成事实不能藏。
+ */
+export function leadDaysHasPlan(row: TrackingLeadFields) {
+  return Boolean(row.scheduleTime) || leadDaysStartFallback(row)
+}
+
+/**
+ * 实际工期能不能给：既要有入库日，也要有起算日。
+ * 未排产且未交付 ⇒ 不给（`leadDaysStart` 为空）；已交付未排产 ⇒ 走兜底照给。
+ */
+export function leadDaysHasActual(row: TrackingLeadFields) {
+  return Boolean(row.deliveredDate) && leadDaysStart(row) != null
+}
+
 /** 当前工期的真身：既成事实（已入库）> 车间计划 > 业务员要求。 */
 export function leadDaysKind(row: TrackingLeadFields): LeadDaysKind {
-  if (row.deliveredDate) return 'ACTUAL'
-  if (plannedFinishDate(row)) return 'PLANNED'
+  if (leadDaysHasActual(row)) return 'ACTUAL'
+  if (leadDaysHasPlan(row) && plannedFinishDate(row)) return 'PLANNED'
   return 'REQUIRED'
 }
 
@@ -93,14 +146,14 @@ export function requiredLeadDays(row: TrackingLeadFields) {
   return invalidRequiredDate(row) ? null : daysBetween(row.applicationDate, row.dueDate)
 }
 
-/** 计划工期：任务单提交时间 → 车间预计完成日（含延期至）。 */
+/** 计划工期：车间排产时间 → 车间预计完成日（含延期至）。未排产返回 null。 */
 export function plannedLeadDays(row: TrackingLeadFields) {
-  return daysBetween(row.sourceCreatedAt, plannedFinishDate(row))
+  return daysBetween(leadDaysStart(row), plannedFinishDate(row))
 }
 
-/** 实际工期：任务单提交时间 → 实际入库日。 */
+/** 实际工期：车间排产时间 → 实际入库日。未排产返回 null（已交付未排产时回落提交日）。 */
 export function actualLeadDays(row: TrackingLeadFields) {
-  return daysBetween(row.sourceCreatedAt, row.deliveredDate)
+  return daysBetween(leadDaysStart(row), row.deliveredDate)
 }
 
 /** 当前真身的天数（主数值）；起算日或终点缺失返回 null。 */
@@ -112,16 +165,35 @@ export function effectiveLeadDays(row: TrackingLeadFields) {
   }
 }
 
-/** 当前真身的终点日期（用于与业务员要求完成日比较）。 */
+/** 当前真身的终点日期（用于与业务员要求完成日比较）；未排产时只比业务员要求日。 */
 export function effectiveFinishDate(row: TrackingLeadFields) {
-  return row.deliveredDate || plannedFinishDate(row) || row.dueDate || null
+  return (leadDaysHasActual(row) ? row.deliveredDate : null)
+    || (leadDaysHasPlan(row) ? plannedFinishDate(row) : null)
+    || row.dueDate || null
 }
 
-/** 主数值文案：算不出天数时说清是哪种算不出（要求日期待核实 / 未计算），不编天数。 */
+/**
+ * 主数值文案：按真身给天数；算不出来时说清是哪种算不出（要求日期待核实 / 未计算），不编天数。
+ * 未排产的单**降级成要求工期**（只显示要求工期，见 `leadDaysHasPlan`），所以这里不再有
+ * 「未排产」这种半截文案——要么给要求工期，要么给不出就说「未计算」。
+ */
 export function effectiveLeadDaysText(row: TrackingLeadFields): string {
   if (leadDaysKind(row) === 'REQUIRED') return requestedLeadDaysText(row)
   const days = effectiveLeadDays(row)
   return days == null ? '未计算' : `${days} 天`
+}
+
+/**
+ * 计划/实际为什么没显示——**未排产**（车间还没接单）。界面据此给一句说明，不能让人以为漏算。
+ * 已交付但排产日缺失的单走兜底起算，不算在此列。
+ */
+export function leadDaysAwaitingSchedule(row: TrackingLeadFields) {
+  return leadDaysStartMissingPlan(row) && !leadDaysStartFallback(row)
+}
+
+/** 「未排产」那句说明的正文；只在 `leadDaysAwaitingSchedule` 为真时有内容。 */
+export function leadDaysAwaitingScheduleNote(row: TrackingLeadFields) {
+  return leadDaysAwaitingSchedule(row) ? '车间尚未接单排产，暂只显示业务员要求工期；排产后自动给出计划/实际工期' : ''
 }
 
 /** 业务员要求工期的展示文案（列表 / 详情 / 导出同一份）。 */
@@ -133,11 +205,12 @@ export function requestedLeadDaysText(row: TrackingDateFields): string {
 
 /** 口径说明（详情卡片副标题）：说清这个天数是从哪个起算日到哪个终点。 */
 export function effectiveLeadDaysBasisText(row: TrackingLeadFields): string {
+  const start = leadDaysStartFallback(row) ? '任务单提交日（排产日缺失）' : '车间排产日'
   switch (leadDaysKind(row)) {
-    case 'ACTUAL': return '从任务单提交日至实际入库日（跟单员登记优先，未登记时用采购入库），按自然日计算'
+    case 'ACTUAL': return `从${start}至实际入库日（跟单员登记优先，未登记时用采购入库），按自然日计算`
     case 'PLANNED': return hasForecastFinish(row)
-      ? '从任务单提交日至跟单确认的延期日（含延期），按自然日计算'
-      : '从任务单提交日至车间预计完成日，按自然日计算'
+      ? `从${start}至跟单确认的延期日（含延期），按自然日计算`
+      : `从${start}至车间预计完成日，按自然日计算`
     default: return '从生产工单申请日至业务员要求完成日，按自然日计算'
   }
 }
@@ -155,9 +228,10 @@ export function leadDaysAlarm(row: TrackingLeadFields) {
 
 /** 负数天数的一句原因（三个真身各一句）；真库 5964 单里 70 单命中，属历史补录/日期填错。 */
 export function negativeLeadReason(row: TrackingLeadFields) {
+  const start = leadDaysStartFallback(row) ? '任务单提交日' : '车间排产日'
   switch (leadDaysKind(row)) {
-    case 'ACTUAL': return '实际入库日早于任务单提交日期，疑似补录或日期填写错误'
-    case 'PLANNED': return '车间预计完成日早于任务单提交日期，疑似补录或日期填写错误'
+    case 'ACTUAL': return `实际入库日早于${start}，疑似补录或日期填写错误`
+    case 'PLANNED': return `车间预计完成日早于${start}，疑似补录或日期填写错误`
     default: return '要求完成日早于申请日期，疑似日期填写错误'
   }
 }
@@ -201,7 +275,7 @@ export interface LeadBreakdownItem {
   label: string
   /** 短标签（列表徽章 / 紧凑小字用）。 */
   short: string
-  /** 起算日 —— 三个真身并不共用，明细里必须写出来。 */
+  /** 起算日 —— 要求从申请日、计划/实际从车间排产日，明细里必须写出来。 */
   start: string | null
   /** 终点日。 */
   date: string | null
@@ -210,6 +284,8 @@ export interface LeadBreakdownItem {
   current: boolean
   /** 计划工期是否含延期至。 */
   delayed: boolean
+  /** 算不出天数的原因（未计算）；算得出时为空串，`text` 随即给天数。未排产的计划/实际不在明细里。 */
+  missing: string
   /** 天数文案；算不出时为 `—`。 */
   text: string
 }
@@ -229,10 +305,15 @@ export function leadDaysKindText(row: TrackingLeadFields) {
 /** 三真身明细，按业务时间顺序（要求 → 计划 → 实际），只列该单真的有的真身。 */
 export function leadDaysBreakdown(row: TrackingLeadFields): LeadBreakdownItem[] {
   const current = leadDaysKind(row)
+  const start = leadDaysStart(row)
+  const hasPlan = leadDaysHasPlan(row)
+  const hasActual = leadDaysHasActual(row)
   const sources: Array<{ key: LeadDaysKind; start?: string | null; date?: string | null; days: number | null; delayed: boolean }> = [
     { key: 'REQUIRED', start: row.applicationDate, date: row.dueDate, days: requiredLeadDays(row), delayed: false },
-    { key: 'PLANNED', start: row.sourceCreatedAt, date: plannedFinishDate(row), days: plannedLeadDays(row), delayed: hasForecastFinish(row) },
-    { key: 'ACTUAL', start: row.sourceCreatedAt, date: row.deliveredDate || null, days: actualLeadDays(row), delayed: false }
+    // 未排产（且未交付）⇒ 计划/实际**整条不进明细**（10-20 LQ 定：只显示要求工期），
+    // 而不是留一行 `—` 让人以为是漏算
+    { key: 'PLANNED', start, date: hasPlan ? plannedFinishDate(row) : null, days: plannedLeadDays(row), delayed: hasForecastFinish(row) },
+    { key: 'ACTUAL', start, date: hasActual ? row.deliveredDate || null : null, days: actualLeadDays(row), delayed: false }
   ]
   return sources
     .filter(item => Boolean(item.date))
@@ -244,6 +325,8 @@ export function leadDaysBreakdown(row: TrackingLeadFields): LeadBreakdownItem[] 
       days: item.days,
       current: item.key === current,
       delayed: item.delayed,
+      /** 只剩「算不出天数」一种（终点有、起算日缺，或要求日期可疑）；未排产已在上面被排除掉。 */
+      missing: item.days == null ? '未计算' : '',
       text: item.days == null ? '—' : `${item.days} 天`
     }))
 }

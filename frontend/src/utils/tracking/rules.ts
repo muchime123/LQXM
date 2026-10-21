@@ -81,7 +81,7 @@ export function trackingStatusTone(value?: TrackingOrder['trackingStatus']): 'su
 export function stageStatusText(status: TrackingMilestone['status']) {
   return ({ PENDING: '未开始', IN_PROGRESS: '进行中', DONE: '已完成' } as Record<TrackingMilestone['status'], string>)[status]
 }
-/** 超参考完成日期仍未完成：需要说明原因（后端保存时同样校验）。 */
+/** 超参考完成日期仍未完成：用于非阻断提醒。 */
 export function stageOverdue(stage: TrackingMilestone): boolean {
   return stage.status !== 'DONE' && (stage.referenceOverdueDays ?? 0) > 0
 }
@@ -103,8 +103,6 @@ export function listStages(row: Pick<TrackingOrder, 'stageProgress'>) {
 export function stageValidationError(stages: TrackingMilestone[]) {
   const missingDate = stages.find(stage => stage.status === 'DONE' && !stage.completedDate)
   if (missingDate) return `节点「${missingDate.label}」已完成时请填写完成日期`
-  const unexplained = stages.filter(stage => stageOverdue(stage) && !(stage.note || '').trim())
-  if (unexplained.length) return `节点「${unexplained.map(stage => stage.label).join('、')}」已超参考完成日期仍未完成，请在节点备注中说明原因`
   return null
 }
 /** 列表「批量完成」的目标节点：未完成序列里的第一个。 */

@@ -1051,7 +1051,9 @@ public class H3BusinessQueryService {
         Object[] args = needWhere ? new Object[]{normType} : new Object[]{};
         Long total = jdbc.queryForObject("SELECT COUNT(*) FROM h3_import_batches" + where, Long.class, args);
         Object[] listArgs = needWhere ? new Object[]{normType,size,(page-1)*size} : new Object[]{size,(page-1)*size};
-        List<Map<String,Object>> items = jdbc.query("SELECT id,file_name,CASE WHEN data_type='NORMAL' THEN 'OUTBOUND' ELSE data_type END AS data_type,status,progress_pct,progress_stage,error_message,error_detail,total_count,created_count,updated_count,unchanged_count,created_at,completed_at FROM h3_import_batches" + where + " ORDER BY id DESC LIMIT ? OFFSET ?",
+        // missing_*_count：确认导入期的校验告警计数（客户/供应商未解析、缺日期、Σ差异/缺价等），
+        // 2026-10-20 起供前端批次列表的「含告警」徽标消费（明细走 /batches/{id}/warnings）。
+        List<Map<String,Object>> items = jdbc.query("SELECT id,file_name,CASE WHEN data_type='NORMAL' THEN 'OUTBOUND' ELSE data_type END AS data_type,status,progress_pct,progress_stage,error_message,error_detail,total_count,created_count,updated_count,unchanged_count,missing_customer_count,missing_date_count,missing_quantity_count,created_at,completed_at FROM h3_import_batches" + where + " ORDER BY id DESC LIMIT ? OFFSET ?",
                 this::row, listArgs);
         return page(items,total,page,size);
     }

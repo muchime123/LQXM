@@ -57,11 +57,11 @@ describe('tracking/rules · 节点（按需工序不参与分母）', () => {
     expect(canQuickComplete(order({ stageProgress: stages, stoppedAt: '2026-09-20T10:00:00' }))).toBe(false)
   })
 
-  it('节点校验：已完成必须有完成日期；超参考未完成必须写原因', () => {
+  it('节点校验：已完成必须有完成日期；超参考未完成只作提醒', () => {
     expect(stageValidationError([stage({ code: 'A', label: '备料', status: 'DONE', completedDate: null })]))
       .toBe('节点「备料」已完成时请填写完成日期')
     expect(stageValidationError([stage({ code: 'A', label: '备料', status: 'IN_PROGRESS', referenceOverdueDays: 3 })]))
-      .toBe('节点「备料」已超参考完成日期仍未完成，请在节点备注中说明原因')
+      .toBeNull()
     expect(stageValidationError([stage({ code: 'A', label: '备料', status: 'IN_PROGRESS', referenceOverdueDays: 3, note: '等料' })]))
       .toBeNull()
   })

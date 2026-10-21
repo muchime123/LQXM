@@ -33,18 +33,27 @@ import static org.junit.jupiter.api.Assertions.*;
 class H3SalesProductAnalysisPolicyTest {
 
     /**
-     * 2026-10-07 实测基线。数据重导后需刷新这三组常量。
+     * 2026-10-20 实测基线（出库数据重导后刷新）。数据重导后需刷新这组常量。
      *
-     * <p>组合数是<b>名称优先解析后</b>的口径：按氚云录入的原编号分组是 12,611，按实体编号（名称优先、
+     * <p>组合数是<b>名称优先解析后</b>的口径：按氚云录入的原编号分组更少，按实体编号（名称优先、
      * 编号兜底）是 {@value #ALL_COMBINATIONS}。行数两种口径都是 {@value #ALL_LINE_COUNT}（归并只改
      * 归属，不增不减明细行）。
+     *
+     * <p>⚠️ 刷新记录（10-07 → 10-20）：
+     * <pre>
+     *   ALL_LINE_COUNT        171,367 → 177,893（+6,526）
+     *   Y2026_LINE_COUNT       26,472 →  32,998（+6,526）  ← 两口径增量相同=同一次重导，非口径漂移
+     *   ALL_COMBINATIONS       12,737 →  13,268（+531）
+     *   Y2026_COMBINATIONS      3,975 →   4,628（+653）
+     * </pre>
+     * 判据：两个日期口径的行数增量必须一致；若不一致，是明细口径出问题，要查代码而不是改常量。
      */
-    private static final long ALL_LINE_COUNT = 171_367L;
-    private static final int ALL_COMBINATIONS = 12_737;
+    private static final long ALL_LINE_COUNT = 177_893L;
+    private static final int ALL_COMBINATIONS = 13_268;
     /** 按原编号分组时的组合数（口径对照，仅用于断言两者确实不同）。 */
     private static final int OLD_COMBINATIONS_BY_RAW_CODE = 12_611;
-    private static final long Y2026_LINE_COUNT = 26_472L;
-    private static final int Y2026_COMBINATIONS = 3_975;
+    private static final long Y2026_LINE_COUNT = 32_998L;
+    private static final int Y2026_COMBINATIONS = 4_628;
 
     // ===== 第一层：口径单一来源（无数据库依赖，永远运行） =====
 

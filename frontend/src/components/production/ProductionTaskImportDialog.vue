@@ -39,6 +39,19 @@ function selectFile(selected: UploadFile) {
   preview.value = null
 }
 
+/** 重复导入提示的时间文案：当天「今天 HH:mm」，跨天「MM-DD HH:mm」。 */
+function hintTime(iso: string | null | undefined): string {
+  if (!iso) return '此前'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '此前'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const now = new Date()
+  const sameDay =
+    d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  return sameDay ? `今天 ${hm}` : `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`
+}
+
 async function confirm() {
   if (loading.value) return
   if (preview.value && batchId.value != null) {
@@ -59,6 +72,12 @@ async function confirm() {
     const accepted = await stageProductionTask(file.value)
     batchId.value = accepted.batchId
     if (accepted.hashHit) ElMessage.info(accepted.message || '复用已有解析结果')
+    else if (accepted.duplicateHint) {
+      // 只提示不拦截：车间改完重新导出、同一份文件再导一次都属于正常操作
+      ElMessage.warning(
+        `该文件曾于 ${hintTime(accepted.duplicateHint.completedAt)} 导入（批次 #${accepted.duplicateHint.batchId}），仍可继续导入，系统会按当前数据更新`
+      )
+    }
     const result = await waitProductionTaskImport(accepted.batchId, value => { progress.value = value })
     progress.value = result
     if (result.status === 'FAILED') { ElMessage.error(result.errorMessage || '解析失败'); return }

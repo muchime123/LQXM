@@ -3,6 +3,7 @@ package com.liqiang.archive.service;
 import com.liqiang.archive.erp.ErpActorResolver;
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -66,19 +67,29 @@ public class ProductionOutboundTraceService {
             WHERE a.production_order_id IN (%s) GROUP BY a.production_order_id
             """.formatted(VALID_ALLOCATION,VALID_ALLOCATION,marks),ids.toArray());
         String outboundCoverageThrough=outboundCoverageThrough();
+        // 先按 orderId 建索引再回填：原实现是「每个 item 都把全量结果 stream().filter() 两遍」——那是
+        // O(商品数×结果行数)，30 行列表看不出来，但导出（EXPORT_MAX_ROWS=5000）会直接暴露。
+        Map<Long,Map<String,Object>> receivedByOrder=new HashMap<>(Math.max(16,received.size()*2));
+        for(var row:received){
+            Object key=row.get("orderId");
+            if(key instanceof Number number) receivedByOrder.put(number.longValue(),row);
+        }
+        Map<Long,Map<String,Object>> allocatedByOrder=new HashMap<>(Math.max(16,allocated.size()*2));
+        for(var row:allocated){
+            Object key=row.get("orderId");
+            if(key instanceof Number number) allocatedByOrder.put(number.longValue(),row);
+        }
         for(var item:items){
             long id=((Number)item.get("id")).longValue();
-            BigDecimal qty=received.stream().filter(row->((Number)row.get("orderId")).longValue()==id)
-                    .map(row->(BigDecimal)row.get("receivedQuantity")).findFirst().orElse(BigDecimal.ZERO);
-            var allocation=allocated.stream().filter(row->((Number)row.get("orderId")).longValue()==id).findFirst();
-            BigDecimal confirmed=allocation.map(row->(BigDecimal)row.get("confirmedQuantity")).orElse(BigDecimal.ZERO);
-            boolean stale=allocation.map(row->((Number)row.get("staleCount")).longValue()>0).orElse(false);
-            boolean mixedUnits=received.stream().filter(row->((Number)row.get("orderId")).longValue()==id)
-                    .anyMatch(row->((Number)row.get("unitCount")).longValue()>1);
-            boolean beyondCoverage=received.stream().filter(row->((Number)row.get("orderId")).longValue()==id)
-                    .anyMatch(row->row.get("latestReceiptDate")!=null
-                            && (outboundCoverageThrough==null
-                                || row.get("latestReceiptDate").toString().compareTo(outboundCoverageThrough)>0));
+            var receivedRow=receivedByOrder.get(id);
+            BigDecimal qty=receivedRow==null?BigDecimal.ZERO:(BigDecimal)receivedRow.get("receivedQuantity");
+            var allocation=allocatedByOrder.get(id);
+            BigDecimal confirmed=allocation==null?BigDecimal.ZERO:(BigDecimal)allocation.get("confirmedQuantity");
+            boolean stale=allocation!=null&&((Number)allocation.get("staleCount")).longValue()>0;
+            boolean mixedUnits=receivedRow!=null&&((Number)receivedRow.get("unitCount")).longValue()>1;
+            boolean beyondCoverage=receivedRow!=null&&receivedRow.get("latestReceiptDate")!=null
+                    &&(outboundCoverageThrough==null
+                        ||receivedRow.get("latestReceiptDate").toString().compareTo(outboundCoverageThrough)>0);
             item.put("salesTraceReceivedQuantity",qty);
             item.put("salesTraceConfirmedQuantity",confirmed);
             item.put("salesTraceStale",stale);
@@ -163,13 +174,45 @@ public class ProductionOutboundTraceService {
         return result;
     }
 
+    /**
+     * 销售出库台账的「覆盖截止日」＝ {@code MAX(COALESCE(ship_date,business_date))}。
+     *
+     * <p>⚠️ 写法必须保持「两段 {@code ORDER BY ... DESC LIMIT 1}」，<b>不得</b>写成
+     * {@code SELECT MAX(COALESCE(ship_date,business_date)) ... WHERE external_source='H3YUN'}
+     * ——后者实测 277ms，是跟单列表 440ms 里最大的一笔（2026-10-21 实测）：
+     * <ul>
+     *   <li>带 {@code external_source='H3YUN'} 的 WHERE 会让优化器放弃 {@code idx_so_ship_date}
+     *       改走 {@code uk_so_external} 全量索引扫描。该条件在全表 <b>109379/109379 行上恒真</b>，
+     *       选择性为零，纯粹是白付的代价。去掉 WHERE 后 {@code MAX(ship_date)} 只要 0ms（走覆盖索引反向扫）。</li>
+     *   <li>{@code business_date} 没有索引，只能排序 10 万行 → 40~55ms（不是 {@code COALESCE} 的锅：
+     *       单独 {@code MAX(ship_date)} 带 WHERE 同样 277ms）。</li>
+     *   <li>两段合起来 47ms，且结果与原写法逐字相等（真库对拍 2026-10-13）。</li>
+     * </ul>
+     *
+     * <p>结果按表数据整体缓存：这是「整张台账的最新日期」，与任何筛选/分页无关，而每个列表请求
+     * 都会读一次（{@link #attachSummaries}）。缓存只由本类的写入路径失效——表只经氚云导入写入，
+     * 导入完成后下一轮自然刷新；TTL 是兜底，防止别的入口（重置/重导）改了表而这里不知道。
+     */
     private String outboundCoverageThrough() {
+        long now=System.nanoTime();
+        String cached=coverageCache;
+        if(cached!=null && now-coverageCachedAtNanos<COVERAGE_TTL_NANOS) return cached.isEmpty()?null:cached;
         java.sql.Date date=jdbc.queryForObject("""
-            SELECT MAX(COALESCE(ship_date,business_date)) FROM sales_outbounds
-            WHERE external_source='H3YUN'
+            SELECT GREATEST(
+              COALESCE((SELECT ship_date      FROM sales_outbounds ORDER BY ship_date      DESC LIMIT 1),'1000-01-01'),
+              COALESCE((SELECT business_date  FROM sales_outbounds ORDER BY business_date  DESC LIMIT 1),'1000-01-01'))
             """,java.sql.Date.class);
-        return date==null?null:date.toString();
+        // 用空串表示「查过但没有数据」，与「还没查过」(null) 区分开，避免空表时每次都重查。
+        String value=date==null?"":date.toString();
+        coverageCache=value;
+        coverageCachedAtNanos=now;
+        return value.isEmpty()?null:value;
     }
+
+    /** 见 {@link #outboundCoverageThrough()}。{@code null}=尚未查询，空串=查过且无数据。 */
+    private volatile String coverageCache;
+    private volatile long coverageCachedAtNanos;
+    private static final long COVERAGE_TTL_NANOS=java.util.concurrent.TimeUnit.MINUTES.toNanos(5);
 
     public List<Map<String,Object>> candidates(long orderId,long receiptItemId,String keyword) {
         var receipt=receipt(orderId,receiptItemId);
