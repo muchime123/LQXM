@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">MANUFACTURING MASTER</p>
         <h1>任务单产品与配置</h1>
-        <p>维护各产线可下单的产品名称与可选配置，并在右侧维护每个产品自己的跟单节点参考间隔。点选产品行即可看到该产品的节点间隔，未发布时沿用车间基准。</p>
+        <p>产品名称与可选配置＝氚云生产任务单对应下拉字典的镜像，<b>本地只读</b>，也不决定它们在氚云能否被选中。点选产品行，右侧显示该产品的历史任务、有效样本与各节点参考间隔；中间的「历史任务单 / 跟单记录」两个数字也可点开看明细，未发布间隔的节点沿用车间基准。</p>
       </div>
       <div class="head-actions">
         <el-button :icon="Refresh" :loading="refreshing" @click="reload">刷新</el-button>
@@ -20,7 +20,7 @@
         <span class="stat" :class="matchClass"><b>{{ coverage?.productMatched ?? '—' }}</b> 张匹配到产品配置</span>
         <span class="stat"><b>{{ coverage?.benchmarkMatched ?? '—' }}</b> 张命中产品已发布间隔</span>
       </div>
-      <p class="note">参考日期口径：按「车间 + 产品名」精确匹配到唯一产品配置，该产品该节点已发布间隔就用它，否则沿用车间基准。节点序列按车间类别（封口机 / 其他机器，按车间名是否含「封口」判定）。与氚云工序报工无关（工序不按时报工）。<b>节点间隔的样本只取「跟单记录」，不取全部历史任务单。</b></p>
+      <p class="note">参考日期口径：按「车间 + 产品名」精确匹配到唯一产品配置，该产品该节点已发布间隔就用它，否则沿用车间基准。节点序列按车间类别（封口机 / 其他机器，按车间名是否含「封口」判定）。与氚云工序报工无关（工序不按时报工）。<b>节点间隔的样本只取「跟单记录」，不取全部历史任务单。</b>产品没有启用/停用状态：氚云在用的产品这边一律参与匹配，避免本地开关让参考工期静默退回车间基准。</p>
     </section>
 
     <div class="layout">
@@ -32,47 +32,67 @@
         :matrix="matrix"
         :benchmarks="benchmarks"
         @update:selected-task-config-id="selectedTaskConfigId = $event"
+        @show-orders="orderDrawerVisible = true"
+        @show-samples="openSamplesDrawer"
         @changed="reload"
       />
       <section class="duration-panel">
-        <header class="duration-head">
-          <div v-if="selectedProduct">
-            <h2>{{ selectedProduct.configName }}<el-tag size="small" effect="plain">{{ selectedProduct.workshopName }}</el-tag></h2>
-            <p>已发布节点 {{ stageTotal ? `${publishedCount} / ${stageTotal}` : '—' }}；未发布的节点沿用车间基准。</p>
-          </div>
-          <h2 v-else>节点参考间隔</h2>
-        </header>
-        <el-alert v-if="!canManageBaseline" type="info" :closable="false" title="无节点参考间隔权限"
-          description="维护间隔需要 manufacturing.baseline.manage 权限；产品与可选配置仍可正常维护，未发布的节点沿用车间基准。" />
-        <el-alert v-else-if="benchmarkError" type="error" :closable="false" title="节点参考间隔加载失败" :description="benchmarkError" />
-        <TrackingProductBenchmarkPanel
-          v-else-if="selectedProduct"
-          :task-config-id="selectedProduct.id"
-          :product-name="selectedProduct.configName"
-          :workshop-name="selectedProduct.workshopName"
-          :matrix="matrix"
-          :rows="benchmarkRows"
-          :peers="peerProducts"
-          @changed="reload"
-        />
-        <el-empty v-else :image-size="80" description="选择中间「产品名称」表里的产品行以维护该产品的节点参考间隔" />
+        <template v-if="selectedProduct">
+          <!-- 产品画像：历史任务 / 已建跟单 / 有效样本段，三个数字都是入口（点历史任务看明细，点已建跟单看每段间隔）。 -->
+          <ProductProfileCard
+            :task-config-id="selectedProduct.id"
+            :product-name="selectedProduct.configName"
+            :workshop-name="selectedProduct.workshopName"
+            :published="publishedCount"
+            :stage-total="stageTotal"
+            :sample-enabled="canManageBaseline"
+            @show-orders="orderDrawerVisible = true"
+            @show-samples="openSamplesDrawer"
+          />
+          <el-alert v-if="!canManageBaseline" type="info" :closable="false" title="无节点参考间隔权限"
+            description="维护间隔与查看样本明细需要 manufacturing.baseline.manage 权限；历史任务明细与配置字典仍可查看，未发布的节点沿用车间基准。" />
+          <el-alert v-else-if="benchmarkError" type="error" :closable="false" title="节点参考间隔加载失败" :description="benchmarkError" />
+          <TrackingProductBenchmarkPanel
+            v-else
+            ref="benchmarkPanelRef"
+            :task-config-id="selectedProduct.id"
+            :product-name="selectedProduct.configName"
+            :workshop-name="selectedProduct.workshopName"
+            :matrix="matrix"
+            :rows="benchmarkRows"
+            :peers="peerProducts"
+            @changed="reload"
+          />
+        </template>
+        <template v-else>
+          <header class="duration-head"><h2>节点参考间隔</h2></header>
+          <el-alert v-if="!canManageBaseline" type="info" :closable="false" title="无节点参考间隔权限"
+            description="维护间隔需要 manufacturing.baseline.manage 权限；产品与可选配置字典仍可查看、补录与删除，未发布的节点沿用车间基准。" />
+          <el-empty :image-size="80" description="选择中间「任务单产品」表里的产品行，右侧会显示该产品的历史任务、有效样本与节点参考间隔" />
+        </template>
       </section>
     </div>
+
+    <ProductOrderHistoryDrawer v-model="orderDrawerVisible" :task-config-id="selectedProduct?.id ?? null"
+      :product-name="selectedProduct?.configName ?? ''" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { Refresh } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { http } from '@/api/http'
 import WorkshopSelector, { type WorkshopCard } from '@/components/production/WorkshopSelector.vue'
 import ManufacturingTaskConfigPanel from '@/components/production/ManufacturingTaskConfigPanel.vue'
 import TrackingProductBenchmarkPanel from '@/components/production/TrackingProductBenchmarkPanel.vue'
+import ProductProfileCard from '@/components/production/ProductProfileCard.vue'
+import ProductOrderHistoryDrawer from '@/components/production/ProductOrderHistoryDrawer.vue'
 import { fetchTrackingNodeBenchmarks, fetchTrackingProductBenchmarks, type TrackingBenchmarkWorkshop, type TrackingProductBenchmarkRow } from '@/api/productionTracking'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 
-/** originalName 用于判断「这次保存是不是改名」——改名会断开历史任务的文本匹配，保存前要确认。 */
-interface ConfigRow { id: number; workshopId: number; configName: string; originalName: string; workshopName: string; configType: string; active: boolean; historicalTaskCount: number; trackedTaskCount: number; sameNameCount: number }
+/** externalSource='MANUAL' 表示本地补录。没有 active：产品与可选配置都是氚云任务单下拉字典的镜像。 */
+interface ConfigRow { id: number; workshopId: number; configName: string; workshopName: string; configType: string; externalSource: string; historicalTaskCount: number; trackedTaskCount: number; sameNameCount: number }
 interface WorkshopRow { id: number; workshopName: string; enabled: boolean; defaultProcessTemplateId: number | null }
 interface TemplateRow { id: number; templateName: string; active: boolean }
 interface Coverage { total: number; trackedTotal: number; productMatched: number; benchmarkMatched: number }
@@ -83,6 +103,18 @@ const masterError = ref('')
 const benchmarkError = ref('')
 const { can } = useCurrentUser()
 const canManageBaseline = computed(() => can('manufacturing.baseline.manage'))
+
+/** 历史任务明细抽屉：中栏「历史任务单」数字与右栏画像卡打开的是同一个。 */
+const orderDrawerVisible = ref(false)
+/** 右栏基准面板内的样本抽屉：中栏「跟单记录」数字直接复用，不另写一套明细。 */
+const benchmarkPanelRef = ref<InstanceType<typeof TrackingProductBenchmarkPanel> | null>(null)
+function openSamplesDrawer() {
+  if (!canManageBaseline.value || !benchmarkPanelRef.value) {
+    ElMessage.info('查看每段样本明细需要节点参考间隔权限（manufacturing.baseline.manage）')
+    return
+  }
+  benchmarkPanelRef.value.openSamples()
+}
 
 const workshops = ref<WorkshopRow[]>([])
 const configs = ref<ConfigRow[]>([])
@@ -102,7 +134,7 @@ const workshopCards = computed<WorkshopCard[]>(() => workshops.value.map(w => {
     enabled: w.enabled,
     defaultProcessTemplateId: w.defaultProcessTemplateId,
     defaultTemplateName: templates.value.find(t => t.id === w.defaultProcessTemplateId)?.templateName ?? null,
-    productCount: mine.filter(c => c.configType === 'PRODUCT_NAME' && c.active).length,
+    productCount: mine.filter(c => c.configType === 'PRODUCT_NAME').length,
     configCount: mine.filter(c => c.configType !== 'PRODUCT_NAME').length
   }
 }))
@@ -136,10 +168,10 @@ const publishedCount = computed(() => benchmarks.value.filter(b =>
   b.taskConfigId === selectedTaskConfigId.value && b.typicalDays != null
   && b.stageCode != null && !optionalStageCodes.value.has(b.stageCode)).length)
 
-/** 「复制间隔」的来源候选：同车间其它启用产品（后端再校验两者车间类别一致）。 */
+/** 「复制间隔」的来源候选：同车间其它产品（后端再校验两者车间类别一致）。不按启用过滤——产品没有启用状态。 */
 const peerProducts = computed(() => configs.value
   .filter(c => c.workshopId === selectedWorkshopId.value && c.configType === 'PRODUCT_NAME'
-    && c.active && c.id !== selectedTaskConfigId.value)
+    && c.id !== selectedTaskConfigId.value)
   .map(c => ({ id: c.id, configName: c.configName })))
 
 /** 匹配率是治理信号：低于 100% 说明还有历史任务的产品没建档。 */
@@ -155,11 +187,11 @@ watch(workshopCards, cards => {
   }
 }, { immediate: true })
 
-/** 切产线时把高亮迁到该产线下第一个产品（启用优先，也允许落在停用产品上以便继续维护）；没产品时清空。 */
+/** 切产线时把高亮迁到该产线下第一个产品；没产品时清空。产品不分启用/停用，取第一条即可。 */
 watch(selectedWorkshopId, () => {
   const products = configs.value.filter(c => c.workshopId === selectedWorkshopId.value && c.configType === 'PRODUCT_NAME')
   if (products.some(p => p.id === selectedTaskConfigId.value)) return
-  selectedTaskConfigId.value = (products.find(p => p.active) ?? products[0])?.id ?? null
+  selectedTaskConfigId.value = products[0]?.id ?? null
 })
 
 async function reload() {
@@ -177,7 +209,7 @@ async function loadMaster() {
       http.get<TemplateRow[]>('/manufacturing/master/templates'),
       http.get<Coverage>('/manufacturing/master/duration-coverage')
     ])
-    configs.value = configRes.data.map(r => ({ ...r, active: Boolean(r.active), originalName: r.configName }))
+    configs.value = configRes.data
     workshops.value = wsRes.data
     templates.value = tplRes.data.filter(t => t.active)
     coverage.value = covRes.data

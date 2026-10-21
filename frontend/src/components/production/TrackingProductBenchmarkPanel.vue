@@ -167,6 +167,8 @@ async function save(row: StageRow) {
 function releaseFocus() { (document.activeElement as HTMLElement | null)?.blur() }
 function openSamples() { releaseFocus(); samplesVisible.value = true }
 function openCopy() { releaseFocus(); copyVisible.value = true }
+/** 供外层从「产品表 · 跟单记录」那个数字直接打开同一个样本抽屉，避免两处各写一套明细。 */
+defineExpose({ openSamples })
 
 /** 发布来源标注：让「这条是人定的还是机器填的」一眼可见。 */
 function publishText(row: StageRow) {
