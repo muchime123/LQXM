@@ -2,6 +2,7 @@ package com.liqiang.archive.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.liqiang.archive.dto.H3FactImportDtos.BatchProgress;
+import com.liqiang.archive.dto.H3FactImportDtos.DuplicateImportHint;
 import com.liqiang.archive.dto.H3FactImportDtos.LedgerImportPreview;
 import com.liqiang.archive.dto.H3FactImportDtos.Result;
 import com.liqiang.archive.dto.H3FactImportDtos.StageAccepted;
@@ -22,6 +23,8 @@ import org.apache.poi.util.IOUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
@@ -64,6 +67,8 @@ public class ProductInventoryLedgerImportService {
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
     private final BatchImportPipelineService pipeline;
+    /** 终态批次暂存行清理（B 域无 post-commit worker，故在 confirm 事务提交后回调）。 */
+    private final H3StagingCleanupService stagingCleanup;
 
     /** 自身代理引用：在本类内触发 @Async（避免 self-invocation）时经 Spring 代理调用。 */
     @Autowired @Lazy
@@ -119,8 +124,11 @@ public class ProductInventoryLedgerImportService {
         Long cached = pipeline.findPreviewReadyBatchId(kind.dbType, fileHash);
         if (cached != null) {
             return new StageAccepted(cached, kind.dbType, fileName, true, "PREVIEW_READY",
-                    "文件内容与未确认批次一致，已复用解析结果");
+                    "文件内容与未确认批次一致，已复用解析结果", null);
         }
+
+        // 已确认过的同内容文件：只提示、不拦截（台账同样每天可能要重导多次）
+        DuplicateImportHint duplicateHint = pipeline.findLastConfirmedSameFile(kind.dbType, fileHash);
 
         // 先登记批次（即使异步解析失败也留痕），随后台虚拟线程异步解析
         long batchId = pipeline.createBatch(fileName, bytes.length, fileHash, kind.dbType, null);
@@ -128,7 +136,7 @@ public class ProductInventoryLedgerImportService {
         self.asyncParseAndStage(batchId, kind, bytes, fileName);
 
         return new StageAccepted(batchId, kind.dbType, fileName, false, "UPLOADED",
-                "文件已登记，后台解析中，完成后自动进入预览");
+                "文件已登记，后台解析中，完成后自动进入预览", duplicateHint);
     }
 
     /**
@@ -243,6 +251,17 @@ public class ProductInventoryLedgerImportService {
         jdbc.update("UPDATE h3_import_batches SET status='COMPLETED', progress_stage='DONE', progress_pct=100," +
                         " total_count=?, created_count=?, updated_count=?, unchanged_count=?, completed_at=NOW() WHERE id=?",
                 rows.size(), created, updated, unchanged, batchId);
+        // 暂存行清理只能在业务事务提交之后：若确认回滚而暂存已删，这批数据就彻底无法重试。
+        // 清理自身吞异常，不影响已完成的导入结果。
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override public void afterCommit() {
+                    stagingCleanup.purgeAfterConfirm(batchId);
+                }
+            });
+        } else {
+            stagingCleanup.purgeAfterConfirm(batchId);
+        }
         return new Result(batchId, kind.dbType, rows.size(), created, updated, unchanged, 0);
     }
 

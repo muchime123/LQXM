@@ -69,8 +69,7 @@
       <div><strong>制程模板工作台</strong><span>选择模板后，在右侧编排生产工序和产品规则。</span></div>
       <el-button type="primary" @click="openTplCreate">新增制程模板</el-button>
     </section>
-    <TrackingProductBenchmarkPanel />
-        <div class="template-layout">
+    <div class="template-layout">
           <!-- 左侧：模板列表 -->
           <section class="panel template-list">
             <div class="toolbar">
@@ -291,7 +290,6 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ManufacturingWorkshopPanel from '@/components/production/ManufacturingWorkshopPanel.vue'
-import TrackingProductBenchmarkPanel from '@/components/production/TrackingProductBenchmarkPanel.vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import {

@@ -13,9 +13,10 @@ import java.util.Set;
  * <p>三个键的分工（混用就是氚云的病根 —— 把人手拼的显示名当成了唯一身份）：
  * <ul>
  *   <li><b>显示名</b> {@code displayName}：给人看，允许重复。⚠️ <b>09-28 LQ 拍板：显示名的唯一生成器是配置规则引擎
- *       （{@code ProductConfigurationNaming.namePreview}，形态 {@code 气动卷膜｜方盒200×138mm｜一出四｜220V}），
- *       不是本类</b> —— 本类的 {@link #derive} 只负责派生 {@code skuKey}，其显示名仅供存量对拍，
- *       <b>新链路不得用库存语法拼显示名</b>（决策 {@code #36}：库存名无统一标准，跟着它会一直乱）。</li>
+ *       （形态 {@code 气动卷膜｜方盒200×138mm｜一出四｜220V}），不是本类</b> —— 本类的 {@link #derive} 只负责派生
+ *       {@code skuKey}，其显示名仅供存量对拍，<b>新链路不得用库存语法拼显示名</b>（决策 {@code #36}：库存名无统一
+ *       标准，跟着它会一直乱）。⚠️ <b>10-20：配置规则引擎已随「任务单产品与配置 → 配置规则」弹窗一并下线</b>
+ *       （{@code ProductConfigurationController/Service/Naming} 全链删除），新链路的显示名来源待重新设计。</li>
  *   <li><b>身份键</b> {@code skuKey}：给系统认（库存聚合的唯一依据），唯一索引；</li>
  *   <li><b>订单产出标识</b> {@code MFG-{工单号}}：溯源用，由调用方拼，不在本类职责内。</li>
  * </ul>
@@ -68,7 +69,7 @@ public final class ProductIdentityKeys {
     /**
      * 由任务单产品配置派生身份。
      *
-     * <p>⚠️ 09-28 起：**调用方只取 {@link Identity#skuKey()}**（显示名走规则引擎，见类注释）。
+     * <p>⚠️ 09-28 起：**调用方只取 {@link Identity#skuKey()}**（显示名原走规则引擎，该引擎已于 10-20 下线，见类注释）。
      * {@link Identity#displayName()} 仅保留给存量对拍脚本，不进入新链路的任何落库列。
      *
      * @param category        制程品类（49 项配置的取值，如「气动卷膜」「LQ310T台式黑白机」）；空 → 非标
