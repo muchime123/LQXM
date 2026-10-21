@@ -291,4 +291,38 @@ class ProductionTrackingAnalyticsConsistencyTest {
         return counts.entrySet().stream()
                 .map(e->Map.<String,Object>of("name",e.getKey(),"count",e.getValue())).toList();
     }
+
+    /**
+     * 下钻里的「业务员 / 产品规格 / 模具出数」只是多三列展示，<b>不许影响任何判据</b>。
+     * 这三列来自同一个 record 的新增字段，只要它们参与了 summarize/matches，卡片与下钻就会跟着样本变。
+     * 这里把同一批行分别「带这三列的值」和「不带」，断言卡片数字与下钻条数逐项不变。
+     */
+    @Test void drilldownDisplayColumnsDoNotAffectAnyJudgement(){
+        var plain=sampleRows();
+        var annotated=plain.stream().map(row->new ProductionTrackingAnalyticsService.OrderRow(
+                row.id(),row.workshop(),row.submitted(),row.requested(),row.originalBaseline(),
+                row.revisedBaseline(),row.baseline(),row.delivered(),row.stopped(),row.cancelled(),
+                row.riskCategory(),row.delayReason(),row.overdueReason(),row.commitmentReason(),
+                row.receiptDate(),row.manualInDate(),
+                "徐永恩","120×80 / 双层 / 瓦楞","一出四")).toList();
+        assertEquals(totals(plain),totals(annotated),"新增展示列不得改变任何卡片数字");
+        for(String bucket:ProductionTrackingAnalyticsService.BUCKETS)
+            assertEquals(drilldown(plain,bucket,null),drilldown(annotated,bucket,null),
+                    "新增展示列改变了 bucket "+bucket+" 的下钻条数");
+    }
+
+    /**
+     * 兼容构造器必须把三个展示字段置 null —— 测试与其它调用点大量使用短构造器，
+     * 若哪天误把它接到「带值的重载」上，就会凭空造出一批假业务员。
+     */
+    @Test void legacyConstructorsLeaveDisplayColumnsEmpty(){
+        var shortCtor=row(40,"2026-09-01",null,null,null,null,null,false,false,null,null,null,null,null,null);
+        assertNull(shortCtor.salesperson());
+        assertNull(shortCtor.specification());
+        assertNull(shortCtor.moldLayout());
+        var stoppedCtor=new ProductionTrackingAnalyticsService.OrderRow(41,"车间A",d("2026-09-01"),null,
+                null,null,null,null,true,null,null,null,null,null,null);
+        assertNull(stoppedCtor.salesperson());
+        assertNull(stoppedCtor.moldLayout());
+    }
 }

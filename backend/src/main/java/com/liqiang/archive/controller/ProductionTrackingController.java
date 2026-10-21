@@ -60,13 +60,14 @@ public class ProductionTrackingController {
             @RequestParam(defaultValue="") String expectedTo,
             @RequestParam(defaultValue="false") boolean expectedMissing,
             @RequestParam(defaultValue="") String optionalStage,
+            @RequestParam(defaultValue="") String moldStage,
             @RequestParam(defaultValue="1") int page,
             @RequestParam(defaultValue="30") int size){
         var result=service.list(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,salesperson,deliveryResult,
                 new ProductionTrackingService.DateRangeFilter(applicationFrom,applicationTo,applicationMissing),
                 new ProductionTrackingService.DateRangeFilter(scheduleFrom,scheduleTo,scheduleMissing),
                 new ProductionTrackingService.DateRangeFilter(expectedFrom,expectedTo,expectedMissing),urgent,moldLayout,
-                new ProductionTrackingService.DateRangeFilter(createdFrom,createdTo,false),optionalStage,page,size);
+                new ProductionTrackingService.DateRangeFilter(createdFrom,createdTo,false),optionalStage,moldStage,page,size);
         @SuppressWarnings("unchecked")
         var items=(List<Map<String,Object>>)result.get("items");
         outboundTrace.attachSummaries(items);
@@ -110,12 +111,13 @@ public class ProductionTrackingController {
             @RequestParam(defaultValue="") String expectedTo,
             @RequestParam(defaultValue="false") boolean expectedMissing,
             @RequestParam(defaultValue="") String optionalStage,
+            @RequestParam(defaultValue="") String moldStage,
             @RequestParam(defaultValue="") String ids){
         return service.exportRows(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,salesperson,deliveryResult,
                 new ProductionTrackingService.DateRangeFilter(applicationFrom,applicationTo,applicationMissing),
                 new ProductionTrackingService.DateRangeFilter(scheduleFrom,scheduleTo,scheduleMissing),
                 new ProductionTrackingService.DateRangeFilter(expectedFrom,expectedTo,expectedMissing),urgent,moldLayout,
-                new ProductionTrackingService.DateRangeFilter(createdFrom,createdTo,false),optionalStage,ids);}
+                new ProductionTrackingService.DateRangeFilter(createdFrom,createdTo,false),optionalStage,moldStage,ids);}
 
     @GetMapping("/summary")
     @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
@@ -449,6 +451,20 @@ public class ProductionTrackingController {
     @RequirePermission("manufacturing.baseline.manage")
     public Map<String,Object> productBenchmarkSamples(@PathVariable long taskConfigId){
         return service.productBenchmarkSamples(taskConfigId);
+    }
+
+    /**
+     * 产品的历史生产任务明细（只读）：配置页「历史任务单 / 跟单记录」两个数字的来源。
+     *
+     * <p>权限取 any-of：维护参考间隔的人（baseline.manage）与维护任务单字典的人（template.manage）
+     * 都该看得见自己那个数字是怎么来的；只给其中一个，会出现「有数字、点不开」。
+     */
+    @GetMapping("/product-orders/{taskConfigId}")
+    @RequirePermission({"manufacturing.baseline.manage","manufacturing.template.manage"})
+    public Map<String,Object> productOrderHistory(@PathVariable long taskConfigId,
+            @RequestParam(defaultValue="") String status,
+            @RequestParam(defaultValue="200") int limit){
+        return service.productOrderHistory(taskConfigId,status,limit);
     }
 
     /** 从同车间另一产品复制已发布间隔（只补未发布节点）。 */

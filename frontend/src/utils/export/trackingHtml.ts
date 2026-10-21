@@ -255,18 +255,36 @@ export function buildTrackingHtml(options: TrackingHtmlOptions): string {
   parts.push(`<title>${esc(title)} · ${esc(at)}</title>`)
   parts.push(`<style>${STYLE}</style>`)
   parts.push('</head>')
-  parts.push('<body class="preview-on">')
+  // 10-21 LQ：导出打开**默认即编辑态**（跟单员拿到手先改字），纸张预览默认不勾选；
+  // 勾上「纸张预览」会自动退出编辑进入纸面样式，点「完成编辑」退出后可直接打印。
+  parts.push('<body class="is-editing">')
   // 工具条在纸外面：纸面上只留「会真正打印出来的东西」，这样纸面所见＝打印所得。
   parts.push('<div class="screen-bar no-print">')
-  parts.push('<div class="print-toolbar" aria-label="打印设置">'
+  // 工具条四组（10-21 梳理）：视图（表格观感）/ 纸张（打印介质）/ 编辑（改字落盘）/ 打印（主操作）。
+  // 组间竖线分隔、组名小字点题；提示语独立成第二行，不再跟控件挤在一起。
+  parts.push('<div class="print-toolbar" aria-label="打印设置">')
+  parts.push('<div class="tool-group"><span class="group-name">视图</span>'
     + '<label>表格字号 <input id="font-size" type="range" min="9" max="18" value="12"><output id="font-size-value">12 px</output></label>'
     + '<label>行间距 <input id="cell-padding" type="range" min="3" max="14" value="7"><output id="cell-padding-value">7 px</output></label>'
+    + '</div>')
+  parts.push('<div class="tool-group"><span class="group-name">纸张</span>'
     + '<label>纸张 <select id="paper-size"><option value="A4" selected>A4 横向</option><option value="A3">A3 横向</option></select></label>'
     + '<label>打印缩放 <select id="print-scale"><option value="auto">自动适配纸张</option><option value="1">100%</option><option value="0.85">85%</option><option value="0.7">70%</option></select></label>'
-    + '<label class="toggle"><input id="paper-preview" type="checkbox" checked>纸张预览</label>'
+    + '<label class="toggle"><input id="paper-preview" type="checkbox">纸张预览</label>'
     + '<button class="btn" id="reset-print" type="button">恢复默认</button>'
-    + '<button class="btn" type="button" onclick="window.print()">打印 / 另存为 PDF</button>'
-    + '<span class="print-tip">拖动表头右侧竖线调列宽；红色竖线是<b>可打印边界</b>，线右侧的内容打印时会被切掉；红色横线是分页位置。</span></div>')
+    + '</div>')
+  parts.push('<div class="tool-group"><span class="group-name">编辑</span>'
+    + '<button class="btn is-on" id="toggle-edit" type="button">完成编辑</button>'
+    + '<button class="btn" id="save-copy" type="button">保存修改副本</button>'
+    + '</div>')
+  parts.push('<div class="tool-group">'
+    + '<button class="btn primary" type="button" onclick="window.print()">打印 / 另存为 PDF</button>'
+    + '</div>')
+  parts.push('<span class="print-tip">'
+    + '<b>改字</b>：打开文件直接点格子编辑，黄底＝改过（打印不带色）；点「完成编辑」退出后即可打印，勾「纸张预览」自动退出编辑进入纸面样式。'
+    + '<b>调版</b>：拖表头右侧竖线调列宽；红竖线＝可打印边界（线右侧打印会被切掉），红横线＝分页位置。'
+    + '<b>落盘</b>：改动要点「保存修改副本」才进文件（浏览器 Ctrl+S 存不到页面上的编辑）。'
+    + '</span>')
   parts.push('</div>')
   parts.push('<div class="paper" id="paper">')
   // 边界预警层：右侧 10mm 页边距打斜线阴影 + 红色竖虚线标出「可打印边界」；
@@ -510,9 +528,17 @@ const SCRIPT = String.raw`
   document.addEventListener('pointercancel', onUp);
   [font, padding, paper, scale].forEach(function(input){ input.addEventListener('input', applyAll); });
   paper.addEventListener('change', applyAll);
-  preview.addEventListener('change', applyAll);
+  // 勾「纸张预览」＝要看打印样子了，自动退出编辑（10-21 LQ）；取消勾选不自动回到编辑，想改字再点「开启编辑」。
+  preview.addEventListener('change', function(){
+    if(preview.checked && document.body.classList.contains('is-editing')){
+      document.body.classList.remove('is-editing');
+      applyEdit();
+    }
+    applyAll();
+  });
   document.getElementById('reset-print').addEventListener('click', function(){
-    font.value = '12'; padding.value = '7'; paper.value = 'A4'; scale.value = 'auto'; preview.checked = true;
+    // 「恢复默认」回到导出打开时的样子：编辑态、不勾纸张预览（10-21 LQ）
+    font.value = '12'; padding.value = '7'; paper.value = 'A4'; scale.value = 'auto'; preview.checked = false;
     sections.forEach(function(section){
       Array.prototype.forEach.call(section.querySelectorAll('.column-control'), function(control){
         control.querySelector('input[type=checkbox]').checked = true;
@@ -520,9 +546,59 @@ const SCRIPT = String.raw`
         width.value = width.defaultValue;
       });
     });
+    document.body.classList.add('is-editing');
+    applyEdit();
     applyAll();
   });
+
+  // —— 页面内编辑（10-21 LQ）：导出件不只是看的，跟单员要能直接在上面改字 ——
+  // contenteditable 挂在 td 上：结构（徽标/副行/标签配色）不会被改坏，改的只是文本。
+  // 默认即编辑态（body 已带 is-editing），这里在装载时把各格的 contentEditable 属性同步上。
+  var editBtn = document.getElementById('toggle-edit');
+  function applyEdit(){
+    var on = document.body.classList.contains('is-editing');
+    editBtn.textContent = on ? '完成编辑' : '开启编辑';
+    editBtn.classList.toggle('is-on', on);
+    Array.prototype.forEach.call(document.querySelectorAll('tbody td'), function(td){
+      if(td.classList.contains('empty')){ td.contentEditable = 'false'; return; }
+      td.contentEditable = on ? 'true' : 'false';
+    });
+  }
+  editBtn.addEventListener('click', function(){
+    document.body.classList.toggle('is-editing');
+    applyEdit();
+  });
+  // 改过的格子挂 edited 标记：屏幕黄底 + 左侧色条，打印时自动退成白底（见样式里的 @media print）
+  document.addEventListener('input', function(event){
+    var target = event.target;
+    var td = target && target.closest ? target.closest('tbody td') : null;
+    if(td && !td.classList.contains('empty')) td.classList.add('edited');
+  });
+  // 编辑态下粘贴一律落纯文本：外部富文本（网页/Word）带进来的样式会把导出件撑花
+  document.addEventListener('paste', function(event){
+    if(!document.body.classList.contains('is-editing')) return;
+    var text = event.clipboardData ? event.clipboardData.getData('text/plain') : null;
+    if(text == null) return;
+    event.preventDefault();
+    document.execCommand('insertText', false, text);
+  });
+  // 「保存修改副本」：浏览器 Ctrl+S 存的是打开时的原始源码，页面上的编辑不会进去——
+  // 必须把当前 DOM 序列化落盘，改动才算真的保住。改过的格子先摘掉黄底标记再存。
+  document.getElementById('save-copy').addEventListener('click', function(){
+    var clone = document.documentElement.cloneNode(true);
+    Array.prototype.forEach.call(clone.querySelectorAll('td.edited'), function(td){ td.classList.remove('edited'); });
+    var blob = new Blob(['<!DOCTYPE html>\n' + clone.outerHTML], { type: 'text/html;charset=utf-8' });
+    var link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = document.title.replace(/[\\/:*?"<>|]/g, '_').replace(' · ', '_') + '.html';
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(function(){ URL.revokeObjectURL(link.href); }, 1000);
+  });
+
   window.addEventListener('beforeprint', applyAll);
+  applyEdit();
   applyAll();
 })();`
 
@@ -534,12 +610,21 @@ body{margin:0;padding:26px 30px 54px;background:#f1f3f7;color:#1f2937;
   font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei","PingFang SC","Hiragino Sans GB",sans-serif}
 .btn{border:1px solid #cbd5e1;background:#fff;color:#334155;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer}
 .btn:hover{background:#f8fafc;border-color:#94a3b8}
-.print-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px 18px;margin:0 0 16px;padding:12px 14px;background:#fff;border:1px solid #dce5e3;border-radius:9px}
+.btn:focus-visible{outline:2px solid #0f766e;outline-offset:2px}
+/* 主操作（打印 / 另存为 PDF）：teal 实底，跟次要按钮拉开层级 */
+.btn.primary{background:#0f766e;border-color:#0f766e;color:#fff;font-weight:600}
+.btn.primary:hover{background:#0c5f58;border-color:#0c5f58}
+.print-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px 0;margin:0 0 16px;padding:12px 14px;background:#fff;border:1px solid #dce5e3;border-radius:9px}
+/* 工具条四组（视图/纸张/编辑/打印）：竖线分隔 + 组名点题，提示语独立成第二行 */
+.tool-group{display:flex;align-items:center;flex-wrap:wrap;gap:10px 14px;padding:0 16px;border-left:1px solid #e8edf3}
+.tool-group:first-child{border-left:none;padding-left:0}
+.group-name{font-size:11px;font-weight:700;letter-spacing:2px;color:#98a2b3;user-select:none}
 .print-toolbar label{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#475467}
 .print-toolbar input[type=range]{width:90px;accent-color:#0f766e}
 .print-toolbar output{min-width:35px;font-weight:400}
 .print-toolbar select,.column-control input[type=number]{border:1px solid #cbd5e1;border-radius:5px;background:#fff;color:#334155;padding:4px 5px}
-.print-tip{color:#667085;font-size:12px}
+.print-tip{flex-basis:100%;margin-top:2px;padding-top:9px;border-top:1px dashed #e8edf3;color:#667085;font-size:12px;line-height:1.7}
+.print-tip b{color:#475467;font-weight:600}
 section.sheet{background:#fff;border:1px solid #e3e8ef;border-radius:10px;box-shadow:0 1px 2px rgba(16,24,40,.05);padding:14px 16px 16px;margin-bottom:18px}
 section.sheet>h2{margin:0 0 10px;font-size:16px;color:#0f172a;display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
 .count{font-size:12.5px;font-weight:400;color:#64748b;background:#f1f5f9;border-radius:999px;padding:1px 9px}
@@ -634,6 +719,11 @@ th:last-child,td:last-child{border-right:none}
 .t-success{background:#ecfdf3;color:#027a48;border-color:#abefc6}
 .t-info{background:#eff8ff;color:#175cd3;border-color:#b2ddff}
 td.empty{text-align:center;color:#98a2b3;padding:18px 10px}
+/* —— 页面内编辑：编辑态给虚线框提示「可改」；改过的格子黄底+左色条（只上屏，打印退白） —— */
+body.is-editing tbody td{outline:1px dashed #94a3b8;outline-offset:-1px;cursor:text}
+body.is-editing tbody td:focus{outline:2px solid #0f766e;outline-offset:-1px;background:#f2f7ff}
+td.edited{background:#fffaeb!important;box-shadow:inset 2px 0 0 #d08a2d}
+.btn.is-on{border-color:#0f766e;background:#ecfdf3;color:#027a48;font-weight:600}
 footer.note{margin-top:4px;color:#6b7280;font-size:12px}
 @page{size:A4 landscape;margin:10mm}
 @media print{
@@ -650,5 +740,7 @@ footer.note{margin-top:4px;color:#6b7280;font-size:12px}
   table{zoom:var(--print-zoom,1)}
   thead{display:table-header-group}
   tr{page-break-inside:avoid}
+  /* 编辑痕迹不上纸：改过的格子打印时退回白底（内容已在，颜色标记只服务屏幕核对） */
+  td.edited{background:transparent!important;box-shadow:none}
 }
 `.trim()

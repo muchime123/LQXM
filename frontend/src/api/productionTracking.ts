@@ -422,6 +422,14 @@ export interface TrackingAnalyticsOrder {
   id: number
   orderNo: string
   productName: string
+  /**
+   * 业务员 / 产品规格 / 模具出数：只服务于下钻列表的「一眼认出这单是什么」，
+   * 不参与任何指标判据。三者都可能缺（氚云未填），缺失时为 null，展示成「—」。
+   * 规格口径与生产跟单列表一致（尺寸 / 形状 / 材质，用「 / 」连接）。
+   */
+  salesperson: string | null
+  specification: string | null
+  moldLayout: string | null
   workshop: string
   submittedDate: string | null
   baseline: string | null
@@ -883,6 +891,47 @@ export const copyTrackingProductBenchmarks = async (taskConfigId: number, source
 /** 样本明细（只读）：候选是怎么算出来的，用于发布前抽查。需要 manufacturing.baseline.manage。 */
 export const fetchProductBenchmarkSamples = async (taskConfigId: number) =>
   (await http.get<ProductBenchmarkSamples>(`/manufacturing/followups/product-benchmark-samples/${taskConfigId}`)).data
+
+/** 产品的历史生产任务一行：不排除草稿/已取消，与配置页「历史任务单」计数同源。 */
+export interface ProductOrderHistoryRow {
+  orderId: number
+  orderNo: string | null
+  status: string | null
+  applicationDate: string | null
+  scheduledDate: string | null
+  requiredDate: string | null
+  expectedDate: string | null
+  quantity: number | null
+  productionProgress: string | null
+  warehousingProgress: string | null
+  createdAt: string | null
+  /** 是否已建跟单记录——历史任务里只有一部分会被跟单。 */
+  tracked: boolean
+  /** 已完成的**必经**节点数（按需工序不计，与参考间隔分母同源）。 */
+  doneStages: number
+  lastDoneDate: string | null
+}
+export interface ProductOrderHistory {
+  product: string
+  workshop: string
+  requiredStageCount: number
+  /** 全量画像，不随 status 筛选变化。 */
+  summary: {
+    total: number
+    cancelled: number | null
+    draft: number | null
+    tracked: number | null
+    firstAt: string | null
+    lastAt: string | null
+  }
+  orders: ProductOrderHistoryRow[]
+  /** 命中行数达到上限，列表被截断。 */
+  truncated: boolean
+}
+
+/** 产品历史任务明细（只读）。status 为空＝全部状态。 */
+export const fetchProductOrderHistory = async (taskConfigId: number, status = '', limit = 200) =>
+  (await http.get<ProductOrderHistory>(`/manufacturing/followups/product-orders/${taskConfigId}`, { params: { status, limit } })).data
 
 export interface TrackingColumnDefault {
   columnKey: string

@@ -68,12 +68,18 @@ export function trackingStatusText(value?: TrackingOrder['trackingStatus']) {
 /**
  * 跟单状态筛选下拉与 chip 用的展示文案：
  * 含后端真实状态（pending/in_progress/completed/stopped）和筛选入参 'closed'（人工结案）、
- * 前端伪值 'open'（未结束跟单 = pending+in_progress）。closed 在状态字段上不会出现，
- * 仅作为筛选参数；带 closedAt 的行 trackingStatus 字段为 'completed'。
+ * 前端伪值 'open'。closed 在状态字段上不会出现，仅作为筛选参数；
+ * 带 closedAt 的行 trackingStatus 字段为 'completed'。
+ *
+ * ⚠️ 'open' 的语义 2026-10-21 改过：原先是「未结束跟单」（pending+in_progress），
+ * 但跟单从 2026-09 才开始，九月那批 571 单里 508 单已交付，一过交期就全成了「已超期」，
+ * 工作台 63 条被 5119 条已交付历史单淹掉。现在 'open' ＝ **还没入库**（未停工、未结案、无入库日）。
+ * 入库口径（后端 DELIVERED_IN_DATE 唯一来源）：跟单员填写的入库里程碑优先，没填则看采购入库，
+ * 两者都没有才算未交付。文案改成「待处理（未交付）」，继续叫「未结束跟单」会让人以为已交付的也在里面。
  */
 export const TRACKING_STATUS_FILTER_LABEL: Record<string, string> = {
   pending: '待跟单', in_progress: '跟单中', completed: '跟单已完成',
-  closed: '人工结案', stopped: '停止生产跟单', open: '未结束跟单'
+  closed: '人工结案', stopped: '停止生产跟单', open: '待处理（未交付）'
 }
 export function trackingStatusTone(value?: TrackingOrder['trackingStatus']): 'success' | 'warning' | 'info' {
   return value === 'completed' ? 'success' : value === 'in_progress' ? 'warning' : 'info'

@@ -58,6 +58,28 @@ public class ProductionTrackingService {
     static final List<String> OPTIONAL_STAGE_CODES=List.of(ProductionTrackingPolicy.OXIDATION,
             ProductionTrackingPolicy.WOODEN_CRATE);
     /**
+     * 「模具生产」跟进筛选的三档（顺序＝下拉顺序；10-21 跟单员需求）。
+     *
+     * <p>跟单员要回答的问题只有一个：<b>模具到底做完没有</b>。所以判据刻意<b>不看模具之前</b>
+     * （画图/备料/钣金跟进与否都不影响），只看两件事：
+     * <ol>
+     *   <li><b>模具之后有没有动</b>（{@link #MOLD_LATER_TRACKED}）——后面任一节点已跟进，说明这张单
+     *       已经越过模具这一关，三档都不筛出；</li>
+     *   <li>模具节点自己的状态，分出未跟进 / 进行中 / 已完成三档（{@link #MOLD_NODE_STATE}）。</li>
+     * </ol>
+     * 「进行中」与「已完成」必须分开：混成一桶时，「已开工」和「已完工」在清单里长得一样，
+     * 恰好把这个功能要回答的问题重新变得看不出来。
+     *
+     * <p>⚠️ 「未跟进」包含<b>完全没有该节点记录</b>的单（新单尚未开始跟单）——跟单员要能一并看到并催。
+     */
+    static final List<String> MOLD_STAGE_CODES=List.of("MOLD_NONE","MOLD_WORKING","MOLD_DONE");
+    /** 模具节点三态：优先认已完成，其次进行中，其余（含无记录）都算未跟进。 */
+    static final String MOLD_NODE_STATE="CASE WHEN COALESCE(ms.mold_done_count,0)>0 THEN 'MOLD_DONE' "
+            +"WHEN COALESCE(ms.mold_working_count,0)>0 THEN 'MOLD_WORKING' ELSE 'MOLD_NONE' END";
+    /** 模具之后是否已有节点跟进（按车间取不同的后置节点集合）；为真即「已越过模具」，不再筛出。 */
+    static final String MOLD_LATER_TRACKED="(CASE WHEN p.production_line LIKE '%封口%' "
+            +"THEN COALESCE(ms.later_sealer_count,0) ELSE COALESCE(ms.later_machine_count,0) END)>0";
+    /**
      * 本单**是否需要**某道按需工序＝源单可选配置写明需要，<b>或</b>已有该节点的跟单记录。
      *
      * <p>与 {@link #attachStageProgress} 里 {@code applicable} 的判据同一口径（Java 侧唯一源＝
@@ -105,6 +127,16 @@ public class ProductionTrackingService {
             +"SUM(stage_code IN ('OXIDATION','WOODEN_CRATE') AND stage_status='DONE') optional_done_count,"
             +"SUM(stage_code='OXIDATION') oxidation_count,"
             +"SUM(stage_code='WOODEN_CRATE') wooden_crate_count,"
+            // 「模具生产」跟进三态与「模具之后是否已推进」——见 {@link #MOLD_NODE_STATE}。
+            // 同为同一 GROUP BY 上的聚合，不改变行使数，故统计卡/筛选项口径不受影响。
+            // ⚠️ 三态必须用条件求和判优先级，不能用 MAX(stage_status)：字典序是 DONE<IN_PROGRESS<PENDING，
+            // MAX 会把「待开始」取成最大，正好把已完成判成未开工。
+            +"SUM(stage_code='MOLD' AND stage_status='DONE') mold_done_count,"
+            +"SUM(stage_code='MOLD' AND stage_status='IN_PROGRESS') mold_working_count,"
+            // 模具之后的节点：封口机是氧化/组装/入库/木箱，机器是组装/调试/入库/木箱（钣金在模具之前）。
+            // 只要其中任一节点 status<>'PENDING'，就说明这张单已经越过模具这一关。
+            +"SUM(stage_code IN ('OXIDATION','ASSEMBLY','WAREHOUSE','WOODEN_CRATE') AND stage_status<>'PENDING') later_sealer_count,"
+            +"SUM(stage_code IN ('ASSEMBLY','TESTING','WAREHOUSE','WOODEN_CRATE') AND stage_status<>'PENDING') later_machine_count,"
             // 「跟单员登记的入库时间」＝在「入库」节点填的完成日期；节点未完成时为空。
             // 该列是同一 GROUP BY 上的聚合，不会改变行使数，故统计卡/筛选项口径不受影响。
             +"MAX(CASE WHEN stage_code='WAREHOUSE' AND stage_status='DONE' THEN completed_date END) warehouse_in_date,"
@@ -150,6 +182,24 @@ public class ProductionTrackingService {
     static final String VALID_REQUIRED_DATE="CASE WHEN (p.application_date IS NULL "
             +"OR p.required_completion_date>=p.application_date) AND (p.source_created_at IS NULL "
             +"OR p.required_completion_date>=DATE(p.source_created_at)) THEN p.required_completion_date END";
+    /**
+     * 「已交付」的唯一判据 —— 全站（列表列 / 生产分析 / 周复盘 / 工作台默认视图）都只用这一处。
+     *
+     * <p><b>口径（LQ 2026-10-21 确认）：以入库为准。</b>
+     * ① 首选跟单员在跟单里填写的入库里程碑（{@code WAREHOUSE} 节点的完成日期，ms.warehouse_in_date）——
+     *    这是人确认过的「货真的进了库」，最可信；
+     * ② 跟单员没登记入库，则回退采购入库（{@code ib.first_in}，即该工单号最早的采购入库日期）；
+     * ③ 两者都没有 ＝ 没入库 ＝ 未交付。
+     *
+     * <p>⚠️ <b>不要换成 {@code p.actual_completion_date}</b>（报工完成日）。真库里九月起 569 单中
+     * 报工 507 单、入库里程碑 472 单、采购入库 438 单，三者并不重合；其中 25 单「已报工但还没入库」——
+     * 按报工算已交付的话，这 25 单会从工作台消失，而列表的「生产交付结果」列、生产分析、周复盘
+     * 仍按入库判它们是「未交付 / 逾期」，同一个单在两个页面会给出相反的结论。
+     * 报工 ≠ 入库：车间报完工，货可能还在产线上等入库。
+     *
+     * <p>依赖 {@code TRACKING_FROM} 的 {@code ms} 与 {@link #INBOUND_JOIN} 的 {@code ib}，
+     * 调用点必须两者都挂（{@code filter()} 用 needsInbound 兜住）。
+     */
     static final String DELIVERED_IN_DATE="COALESCE(ms.warehouse_in_date,ib.first_in)";
     /**
      * 交付基准＝跟单员确认后的车间交期；车间未另填日期时，采用有效的业务员要求日期。
@@ -249,9 +299,19 @@ public class ProductionTrackingService {
     static final String CREATED_MONTH_DATE="DATE(p.source_created_at)";
     /** 跟单归属是生产工单的固有规则，未建立跟单状态行也已分配；状态行只记录跟进过程。 */
     static final String ASSIGNEE_NAME="CASE WHEN p.production_line LIKE '%封口%' THEN '陈苏平' ELSE '胡健' END";
-    /** 九月起正式跟单：申请日期或任务单提交时间任一落在范围内即可；重导不会改变提交时间。 */
+    /**
+     * 跟单范围＝**九月起**（2026-09-01，见 {@link ProductionTrackingPolicy#SCOPE_START_DATE}）。
+     *
+     * <p><b>2026-10-21 修正：{@code OR} 改 {@code AND}。</b>原先写「申请日期<b>或</b>提交时间任一落在九月后」，
+     * 于是「七、八月提交、但申请日期被填成了九月」的历史单会从侧门回到工作台——这类单在真库有几十条，
+     * 表现为「突然冒出一张我根本没跟过的旧单」。跟单起点是一个**时间点**：任务单提交时间早于九月，
+     * 就不在跟单范围内，不管它的申请日期被人填成了什么。
+     *
+     * <p>例外只有两条，都写在 {@link #visible} 里：已被进度表覆盖、或已有跟单记录的历史单——
+     * 那是「九月前就真的在跟」的那批，不能因为起点调整而让它的跟单记录失联。
+     */
     static final String SCOPE_DATE="(p.application_date>='"+ProductionTrackingPolicy.SCOPE_START_DATE
-            +"' OR p.source_created_at>='"+ProductionTrackingPolicy.SCOPE_START_DATE+"')";
+            +"' AND p.source_created_at>='"+ProductionTrackingPolicy.SCOPE_START_DATE+"')";
     /** 跟单状态只取本地节点记录，不复用氚云任务单状态：「有节点记录即跟单中」由 NEVER_TRACKED 表达。
      *  闭案优先级最高：跟单员主动确认结束后，无论节点是否齐全一律显示「已完成」，避免为了凑齐节点
      *  而补录虚假生产记录（与「停止」互斥：闭案后状态为 completed，停止后状态为 stopped）。 */
@@ -425,11 +485,20 @@ public class ProductionTrackingService {
                                     LocalDate agreedDate,LocalDate nextFollowupDate) {}
 
     StringBuilder visible(List<Object> params) {
-        // 九月起的任务自动进入工作台；更早但已有跟单或进度表覆盖的任务保留可见。
+        // 跟单范围：九月起提交的任务自动进入工作台。
+        // 另有三类**例外**必须保留可见，否则九月前就在跟的单会突然从列表里消失、跟单记录随之失联：
+        //   ① 手工加入跟单（enrollments）② 已被跟单进度表覆盖（workbook_rows）③ 已经真的产生过跟单事实。
+        // ③ 是 2026-10-21 补的：真库有 46 单（7 月 2 / 8 月 44）在九月前就在跟，它们既没走 enroll 入口、
+        // 也不一定在进度表里，只因为「提交时间是八月」就会被新口径挡掉——而它们的节点和跟进历史是真实存在的。
+        // 判据只认「真的跟过」（里程碑节点 / 跟进条目 / 版本被推进过），**不认空壳 state 行**：
+        // 建了状态行但一个节点没填、一条跟进没写，属于「还没开始跟」，不该拿它当保留理由。
         StringBuilder where=new StringBuilder(" WHERE p.external_source='H3YUN' "
                 +"AND ("+SCOPE_DATE+" "
                 +"OR EXISTS (SELECT 1 FROM production_tracking_enrollments e WHERE e.production_order_id=p.id) "
-                +"OR EXISTS (SELECT 1 FROM production_tracking_workbook_rows w WHERE w.production_order_id=p.id))");
+                +"OR EXISTS (SELECT 1 FROM production_tracking_workbook_rows w WHERE w.production_order_id=p.id) "
+                +"OR EXISTS (SELECT 1 FROM production_tracking_milestones m WHERE m.production_order_id=p.id) "
+                +"OR EXISTS (SELECT 1 FROM production_tracking_entries en WHERE en.production_order_id=p.id) "
+                +"OR EXISTS (SELECT 1 FROM production_tracking_state t2 WHERE t2.production_order_id=p.id AND t2.version>0))");
         appendVisibility(where,params);
         return where;
     }
@@ -969,10 +1038,20 @@ public class ProductionTrackingService {
             String salesperson,String deliveryResult,DateRangeFilter application,DateRangeFilter schedule,
             DateRangeFilter expected,boolean urgent,String moldLayout,
             DateRangeFilter created,String optionalStage,int page,int size) {
+        return list(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,
+                salesperson,deliveryResult,application,schedule,expected,urgent,moldLayout,created,
+                optionalStage,"",page,size);
+    }
+
+    public Map<String,Object> list(String keyword,String workshop,String trackingStatus,String reminder,
+            String sourceStatus,boolean mine,String assignee,String month,String action,String countdown,
+            String salesperson,String deliveryResult,DateRangeFilter application,DateRangeFilter schedule,
+            DateRangeFilter expected,boolean urgent,String moldLayout,
+            DateRangeFilter created,String optionalStage,String moldStage,int page,int size) {
         if(page<1 || size<1 || size>100)throw new IllegalArgumentException("分页范围无效");
         var f=filter(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,
                 salesperson,deliveryResult,application,schedule,expected,urgent,moldLayout,created,
-                optionalStage);
+                optionalStage,moldStage);
         // 计数与明细必须挂同一份 JOIN：TIME_OVERDUE 谓词引用交付日（依赖 INBOUND_JOIN 的 ib）。
         // INBOUND_JOIN 是按工单号聚合的 1:1 派生表，挂上不改变行数，COUNT(*) 仍等于工单数。
         // ⚠️ 但「不改变行数」不等于「不花钱」：该派生表要全量聚合 6.5 万行采购明细（实测 +23ms）。
@@ -1011,14 +1090,32 @@ public class ProductionTrackingService {
      */
     private record Filtered(StringBuilder where,List<Object> params,boolean needsInbound) {}
 
+    /**
+     * 只给契约测试用的窄入口：按跟单状态跑一遍 {@link #filter}，把拼出来的 where 与 needsInbound 交出去。
+     *
+     * <p>【为什么要有它】工作台默认口径（`open` ＝ 未交付）是「不报错、只筛错」的典型：SQL 拼错一个条件，
+     * 编译通过、接口 200、页面照样出数据，只是数字悄悄错了。这类判定必须在单测里钉死。
+     * 而 {@code filter} 有 21 个入参、返回私有 record，直接暴露不合算，故只开这一条窄缝。
+     * 返回值用 {@code Map} 而不是那个私有 record：私有嵌套类型的访问器在包外测试里不可见。
+     */
+    static Map<String,Object> filterForTest(ProductionTrackingService service,String trackingStatus) {
+        Filtered filtered=service.filter(null,null,trackingStatus,"all",null,false,null,null,"all","",null,null,
+                EMPTY_DATE_FILTER,EMPTY_DATE_FILTER,EMPTY_DATE_FILTER,false,null,EMPTY_DATE_FILTER,"","");
+        return Map.of("where",filtered.where().toString(),"needsInbound",filtered.needsInbound());
+    }
+
     private Filtered filter(String keyword,String workshop,String trackingStatus,String reminder,
             String sourceStatus,boolean mine,String assignee,String month,String action,String countdown,
             String salesperson,String deliveryResult,DateRangeFilter application,DateRangeFilter schedule,
             DateRangeFilter expected,boolean urgent,String moldLayout,DateRangeFilter created,
-            String optionalStage) {
+            String optionalStage,String moldStage) {
         // 引用 ib.first_in 的两组谓词：交付结果、倒计时（两侧都依赖「实际交付日」）。
+        // ⚠️ 第三处：跟单状态 `open` ＝ 未交付，同样引用 DELIVERED_IN_DATE（含 ib.first_in），
+        // 漏挂 INBOUND_JOIN 会直接 SQL 报「Unknown column 'ib.first_in'」——这不会在单测里暴露，
+        // 因为单测只断言 where 字符串。（2026-10-21 改默认口径时新增）
         boolean needsInbound=(deliveryResult!=null&&!deliveryResult.isBlank())
-                ||(countdown!=null&&!countdown.isBlank());
+                ||(countdown!=null&&!countdown.isBlank())
+                ||"open".equals(trackingStatus);
         if(!Set.of("open","all","pending","in_progress","completed","closed","stopped").contains(trackingStatus))
             throw new IllegalArgumentException("跟单状态筛选无效");
         if(!Set.of("all","overdue","due","delayed","near","none","time_due","time_attention","time_source","time_production",
@@ -1081,9 +1178,22 @@ public class ProductionTrackingService {
             where.append(" AND ").append(trackingActionPredicate(action));
             if(!"any".equals(action))params.add(action);
         }
+        // 两类「按跟单进度」的状态各自还要排除已停止/已结案的（停止态的状态值本身是 stopped，但
+        // pending 的判据「一个节点都没有」对一条已停止的空单同样成立，不排除就会把停掉的单当成待跟单）。
+        if("pending".equals(trackingStatus)||"in_progress".equals(trackingStatus))
+            where.append(" AND t.stopped_at IS NULL AND t.closed_at IS NULL");
         if("closed".equals(trackingStatus))where.append(" AND t.closed_at IS NOT NULL");
+        else if("open".equals(trackingStatus)){
+            // 【2026-10-21 修正默认口径】`open` 原先翻成 `TRACKING_STATUS_CASE IN ('pending','in_progress')`，
+            // 而 pending 的判据是「还没有任何跟单节点」——跟单真正开始于 2026-09 的 571 单里，508 单已经交付，
+            // 交期一到它们就全成了「已超期」。于是一个「今天要做什么」的工作台，
+            // 6043 条里 5119 条是已交付的历史单，点「已超期」出来 5935 条，等于没法用。
+            // 工作台口径必须是**还没交付**：未停工、未结案、实际交付日为空。
+            // 「已跟完但没交付」（节点齐了、货还在路上）仍留在工作台里——那正是要催发货的那批。
+            where.append(" AND t.stopped_at IS NULL AND t.closed_at IS NULL AND ").append(DELIVERED_IN_DATE).append(" IS NULL");
+        }
         else if(!"all".equals(trackingStatus))where.append(" AND ").append(TRACKING_STATUS_CASE)
-                .append(" IN (").append("open".equals(trackingStatus)?"'pending','in_progress'":"'"+trackingStatus+"'").append(")");
+                .append(" IN ('").append(trackingStatus).append("')");
         String timePredicate=switch(reminder){
             case "time_due"->TIME_REVIEW_DUE;
             case "time_attention"->TIME_ATTENTION;
@@ -1128,6 +1238,20 @@ public class ProductionTrackingService {
             String code=optionalStage.trim();
             if(!OPTIONAL_STAGE_CODES.contains(code))throw new IllegalArgumentException("按需工序筛选无效");
             where.append(" AND ").append(needsOptionalStage(code));
+        }
+        // 「模具生产」跟进筛选（三档可多选，取值固定枚举，白名单校验后内联）。
+        // 两个条件缺一不可：① 模具之后没有任何节点跟进（否则单已越过模具这一关）；
+        // ② 模具节点自身落在所选档位。刻意不看模具之前的节点——备料跟没跟与本功能无关。
+        if(moldStage!=null&&!moldStage.isBlank()){
+            var selected=new java.util.LinkedHashSet<>(List.of(moldStage.split(",",-1)));
+            selected.removeIf(String::isBlank);
+            if(!selected.isEmpty()){
+                if(!MOLD_STAGE_CODES.containsAll(selected))
+                    throw new IllegalArgumentException("模具跟进筛选无效");
+                where.append(" AND NOT ").append(MOLD_LATER_TRACKED)
+                        .append(" AND ").append(MOLD_NODE_STATE).append(" IN ('")
+                        .append(String.join("','",selected)).append("')");
+            }
         }
         if(mine){where.append(" AND assigned.id=?");params.add(actors.current().employeeId());}
         if(assignee!=null&&!assignee.isBlank()){
@@ -1233,9 +1357,19 @@ public class ProductionTrackingService {
             String salesperson,String deliveryResult,DateRangeFilter application,DateRangeFilter schedule,
             DateRangeFilter expected,boolean urgent,String moldLayout,DateRangeFilter created,
             String optionalStage,String ids) {
+        return exportRows(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,
+                salesperson,deliveryResult,application,schedule,expected,urgent,moldLayout,created,
+                optionalStage,"",ids);
+    }
+
+    public Map<String,Object> exportRows(String keyword,String workshop,String trackingStatus,String reminder,
+            String sourceStatus,boolean mine,String assignee,String month,String action,String countdown,
+            String salesperson,String deliveryResult,DateRangeFilter application,DateRangeFilter schedule,
+            DateRangeFilter expected,boolean urgent,String moldLayout,DateRangeFilter created,
+            String optionalStage,String moldStage,String ids) {
         var f=filter(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,
                 salesperson,deliveryResult,application,schedule,expected,urgent,moldLayout,created,
-                optionalStage);
+                optionalStage,moldStage);
         String where=f.where().toString();
         var params=new ArrayList<>(f.params());
         if(ids!=null&&!ids.isBlank()){
@@ -1444,6 +1578,11 @@ public class ProductionTrackingService {
      * <p><b>车间口径</b>：车间名称一律从 {@code manufacturing_workshops} 反查（{@code workshop_id} 外键），
      * 不再用 {@code manufacturing_task_config_items.workshop_name} —— 后者是改名时用 UPDATE 手工级联的副本，
      * 漏一处就会静默错配到别的车间。产品名仍是文本匹配（历史任务里只有文本），改名的影响见页面提示。
+     *
+     * <p><b>不判 {@code active}（2026-10-21）</b>：任务单产品是氚云生产任务单产品下拉字典的镜像，
+     * 产品能不能下单由氚云说了算。本地若保留一个「停用」开关，就会出现「氚云照常用、这边被停用 ⇒
+     * 该产品所有在制单的参考工期静默退回车间基准」，且没有任何报错提示。实测全库 50 个产品全部启用，
+     * 去掉判据后结果完全一致。
      */
     private Map<String,BigDecimal> benchmarksForOrder(Map<String,Object> order) {
         String workshop=(String)order.get("workshopType");
@@ -1453,7 +1592,7 @@ public class ProductionTrackingService {
         if(product==null||product.isBlank()||workshop==null)return values;
         var items=jdbc.query("SELECT c.id FROM manufacturing_task_config_items c "
                 +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
-                +"WHERE c.config_type='PRODUCT_NAME' AND c.active=1 AND c.config_name=? AND w.workshop_name=?",
+                +"WHERE c.config_type='PRODUCT_NAME' AND c.config_name=? AND w.workshop_name=?",
                 (r,n)->r.getLong(1),product,workshop);
         if(items.size()!=1)return values;
         jdbc.query("SELECT stage_code,typical_days FROM production_tracking_product_benchmarks "
@@ -1571,7 +1710,8 @@ public class ProductionTrackingService {
     }
 
     /** 产品级基准矩阵：每个产品名称配置行 × 已计算的节点，未算过候选的产品只有产品信息（stageCode 为 null）。
-     *  车间名走 workshops 外键反查（同 benchmarksForOrder 口径）；workshop_id 为空的产品行不参与基准。 */
+     *  车间名走 workshops 外键反查（同 benchmarksForOrder 口径）；workshop_id 为空的产品行不参与基准。
+     *  不判 {@code active}：产品没有启用概念（见 {@link #benchmarksForOrder}），停用产品也要能看到并维护间隔。 */
     public List<Map<String,Object>> productBenchmarkMatrix() {
         return jdbc.queryForList("SELECT c.id AS taskConfigId,w.workshop_name AS workshopName,c.config_name AS configName,"
                 +"b.stage_code AS stageCode,b.typical_days AS typicalDays,b.sample_count AS sampleCount,"
@@ -1584,7 +1724,7 @@ public class ProductionTrackingService {
                 +"FROM manufacturing_task_config_items c "
                 +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
                 +"LEFT JOIN production_tracking_product_benchmarks b "
-                +"ON b.task_config_id=c.id WHERE c.config_type='PRODUCT_NAME' AND c.active=1 "
+                +"ON b.task_config_id=c.id WHERE c.config_type='PRODUCT_NAME' "
                 +"ORDER BY w.workshop_name,c.config_name,b.stage_code");
     }
 
@@ -1712,6 +1852,76 @@ public class ProductionTrackingService {
         summary.put("spanFrom",from);
         summary.put("spanTo",to);
         return Map.of("workshop",workshop,"product",product,"stageCodes",codes,"summary",summary,"orders",rows);
+    }
+
+    /**
+     * 产品的历史生产任务明细（只读）：把配置页「历史任务单 / 跟单记录」两个数字摊开——
+     * 这个产品做过哪些单、哪些建了跟单、跟到第几个必经节点。
+     *
+     * <p><b>口径</b>：与配置页那两个计数同源——{@code production_orders} 按「车间 + 产品名」精确匹配，
+     * <b>不排除</b>草稿 / 已取消（它们是真实历史，剔掉会让数字与列表对不上，页面上单独标注即可）；
+     * 「完成节点 x/y」的 y 只数必经节点，与参考间隔分母同源（按需工序没做不算缺）。
+     *
+     * <p><b>为什么这个方法在跟单域</b>：节点集合的唯一定义是 {@link ProductionTrackingPolicy}（包私有），
+     * 复制一份判据到主数据 Controller 就是第二真相，迟早和跟单分母漂移。
+     */
+    public Map<String,Object> productOrderHistory(long taskConfigId,String status,int limit){
+        var items=jdbc.queryForList("SELECT c.config_name,w.workshop_name FROM manufacturing_task_config_items c "
+                +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
+                +"WHERE c.id=? AND c.config_type='PRODUCT_NAME'",taskConfigId);
+        if(items.isEmpty())throw new IllegalArgumentException("产品不存在、不是产品名称配置，或没有所属车间");
+        String product=(String)items.getFirst().get("config_name");
+        String workshop=(String)items.getFirst().get("workshop_name");
+        var required=ProductionTrackingPolicy.requiredStages(workshop);
+        int size=Math.max(1,Math.min(limit,500));
+        String stageIn=String.join(",",Collections.nCopies(required.size(),"?"));
+        var sql=new StringBuilder("SELECT p.id,p.work_order_no,p.status,p.application_date,DATE(p.schedule_time) AS scheduled_date,")
+                .append("p.required_completion_date,p.expected_completion_date,p.required_quantity,")
+                .append("p.production_progress,p.warehousing_progress,p.source_created_at,")
+                .append("(t.production_order_id IS NOT NULL) AS tracked,")
+                .append("(SELECT COUNT(*) FROM production_tracking_milestones m WHERE m.production_order_id=p.id ")
+                .append("AND m.stage_status='DONE' AND m.stage_code IN (").append(stageIn).append(")) AS done_stages,")
+                .append("(SELECT MAX(m.completed_date) FROM production_tracking_milestones m ")
+                .append("WHERE m.production_order_id=p.id AND m.stage_status='DONE') AS last_done_date ")
+                .append("FROM production_orders p LEFT JOIN production_tracking_state t ON t.production_order_id=p.id ")
+                .append("WHERE p.production_line=? AND p.product_name=? ");
+        var args=new ArrayList<Object>(required);
+        args.add(workshop);args.add(product);
+        if(status!=null&&!status.isBlank()){sql.append("AND p.status=? ");args.add(status);}
+        sql.append("ORDER BY p.source_created_at DESC,p.id DESC LIMIT ?");
+        args.add(size);
+        var rows=new ArrayList<Map<String,Object>>();
+        jdbc.query(sql.toString(),r->{
+            var row=new LinkedHashMap<String,Object>();
+            row.put("orderId",r.getLong("id"));
+            row.put("orderNo",r.getString("work_order_no"));
+            row.put("status",r.getString("status"));
+            java.sql.Date application=r.getDate("application_date");
+            row.put("applicationDate",application==null?null:application.toLocalDate());
+            row.put("scheduledDate",r.getObject("scheduled_date"));
+            java.sql.Date requiredDate=r.getDate("required_completion_date");
+            row.put("requiredDate",requiredDate==null?null:requiredDate.toLocalDate());
+            java.sql.Date expectedDate=r.getDate("expected_completion_date");
+            row.put("expectedDate",expectedDate==null?null:expectedDate.toLocalDate());
+            row.put("quantity",r.getBigDecimal("required_quantity"));
+            row.put("productionProgress",r.getString("production_progress"));
+            row.put("warehousingProgress",r.getString("warehousing_progress"));
+            row.put("createdAt",r.getObject("source_created_at"));
+            row.put("tracked",r.getBoolean("tracked"));
+            row.put("doneStages",r.getInt("done_stages"));
+            java.sql.Date lastDone=r.getDate("last_done_date");
+            row.put("lastDoneDate",lastDone==null?null:lastDone.toLocalDate());
+            rows.add(row);
+        },args.toArray());
+        // summary 不受 status 过滤影响：左边筛状态、右边画像不能跟着变，否则「总量」会随筛选跳动。
+        var summary=jdbc.queryForMap("SELECT COUNT(*) AS total,"
+                +"SUM(CASE WHEN p.status IN ('已取消','CANCELLED','CANCELED') THEN 1 ELSE 0 END) AS cancelled,"
+                +"SUM(CASE WHEN p.status='草稿' THEN 1 ELSE 0 END) AS draft,"
+                +"SUM(EXISTS(SELECT 1 FROM production_tracking_state t WHERE t.production_order_id=p.id)) AS tracked,"
+                +"MIN(p.source_created_at) AS firstAt,MAX(p.source_created_at) AS lastAt "
+                +"FROM production_orders p WHERE p.production_line=? AND p.product_name=?",workshop,product);
+        return Map.of("product",product,"workshop",workshop,"requiredStageCount",required.size(),
+                "summary",summary,"orders",rows,"truncated",rows.size()>=size);
     }
 
     /** 从该产品自己的历史跟单完成日期计算候选间隔；只更新证据，不自动改动已发布参考值。 */

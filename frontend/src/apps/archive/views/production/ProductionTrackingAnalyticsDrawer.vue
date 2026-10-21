@@ -21,6 +21,8 @@
       <el-table v-loading="drilldownLoading" :data="drilldownItems" stripe empty-text="没有符合条件的工单" @row-click="openDrilldownOrder">
         <el-table-column prop="orderNo" label="生产任务单" min-width="165"><template #default="{ row }"><button class="analysis-link" type="button" @click.stop="emit('open-order', row.id)">{{ row.orderNo }} ↗</button></template></el-table-column>
         <el-table-column prop="productName" label="产品" min-width="150" show-overflow-tooltip />
+        <el-table-column label="业务员" width="100"><template #default="{ row }"><TrackingAnalyticsSalespersonCell :salesperson="row.salesperson" /></template></el-table-column>
+        <el-table-column label="产品规格 / 模具出数" min-width="240" show-overflow-tooltip><template #default="{ row }"><TrackingAnalyticsSpecCell :specification="row.specification" :mold-layout="row.moldLayout" /></template></el-table-column>
         <el-table-column prop="workshop" label="车间" min-width="125" show-overflow-tooltip />
         <el-table-column prop="submittedDate" label="提交日期" width="115" />
         <el-table-column prop="baseline" label="当前预计" width="115" />
@@ -104,6 +106,9 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { fetchTrackingAnalytics, fetchTrackingAnalyticsOrders, type TrackingAnalytics, type TrackingAnalyticsOrder, type TrackingAnalysisDateBasis } from '@/api/productionTracking'
 import ReasonList from '@/components/production/TrackingAnalysisReasonList.vue'
+// 下钻表与「生产跟单周复盘」共用同一个接口，故「业务员」「规格/模具」两格用同一份组件，避免同源不同显。
+import TrackingAnalyticsSalespersonCell from '@/components/production/TrackingAnalyticsSalespersonCell.vue'
+import TrackingAnalyticsSpecCell from '@/components/production/TrackingAnalyticsSpecCell.vue'
 
 const props=defineProps<{ modelValue: boolean }>()
 const emit=defineEmits<{ 'update:modelValue': [value: boolean]; 'open-order': [id: number] }>()

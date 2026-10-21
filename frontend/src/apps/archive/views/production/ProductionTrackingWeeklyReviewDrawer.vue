@@ -32,6 +32,8 @@
           <template #default="{ row }"><button class="weekly-link" @click.stop="openDrilldownOrder(row)">{{ row.orderNo }} ↗</button></template>
         </el-table-column>
         <el-table-column prop="productName" label="产品" min-width="150" show-overflow-tooltip />
+        <el-table-column label="业务员" width="100"><template #default="{ row }"><TrackingAnalyticsSalespersonCell :salesperson="row.salesperson" /></template></el-table-column>
+        <el-table-column label="产品规格 / 模具出数" min-width="240" show-overflow-tooltip><template #default="{ row }"><TrackingAnalyticsSpecCell :specification="row.specification" :mold-layout="row.moldLayout" /></template></el-table-column>
         <el-table-column prop="workshop" label="车间" min-width="125" show-overflow-tooltip />
         <el-table-column prop="baseline" label="当前预计" width="115" />
         <el-table-column prop="deliveredDate" label="整单完工日" width="125" />
@@ -98,6 +100,8 @@
             <template #default="{ row }"><button class="weekly-link" @click.stop="openDrilldownOrder(row)">{{ row.orderNo }} ↗</button></template>
           </el-table-column>
           <el-table-column prop="productName" label="产品" min-width="150" show-overflow-tooltip />
+          <el-table-column label="业务员" width="100"><template #default="{ row }"><TrackingAnalyticsSalespersonCell :salesperson="row.salesperson" /></template></el-table-column>
+          <el-table-column label="产品规格 / 模具出数" min-width="240" show-overflow-tooltip><template #default="{ row }"><TrackingAnalyticsSpecCell :specification="row.specification" :mold-layout="row.moldLayout" /></template></el-table-column>
           <el-table-column prop="workshop" label="车间" min-width="125" show-overflow-tooltip />
           <el-table-column prop="baseline" label="当前预计" width="115" />
           <el-table-column label="当前超期" width="110">
@@ -124,6 +128,9 @@ import { computed, nextTick, ref, watch } from 'vue'
 import MetricCard from '@/components/common/MetricCard.vue'
 import MetricGrid from '@/components/common/MetricGrid.vue'
 import ReasonTable from '@/components/production/TrackingWeeklyReasonTable.vue'
+// 与「生产交期达成分析」共用同一份下钻列组件：两边读的是同一个接口，展示也不能分叉。
+import TrackingAnalyticsSalespersonCell from '@/components/production/TrackingAnalyticsSalespersonCell.vue'
+import TrackingAnalyticsSpecCell from '@/components/production/TrackingAnalyticsSpecCell.vue'
 import {
   fetchTrackingAnalyticsOrders, fetchTrackingWeeklyReview,
   type TrackingAnalyticsOrder, type TrackingWeeklyReview

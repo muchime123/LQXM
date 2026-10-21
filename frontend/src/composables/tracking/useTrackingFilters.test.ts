@@ -3,8 +3,8 @@ import { ElMessage } from 'element-plus'
 import { useTrackingFilters } from './useTrackingFilters'
 
 /** 关键词是任务号 / 产品 / 客户 / 规格的**唯一**搜索入口，不再有独立的「规格」标签。 */
-const CHIP_KEYS = ['keyword', 'workshop', 'sourceStatus', 'assignee', 'mine', 'trackingStatus',
-  'action', 'time', 'optionalStage', 'urgent', 'salesperson', 'countdown', 'delivery', 'createdDate', 'expectedDate']
+const CHIP_KEYS = ['keyword', 'workshop', 'mine', 'trackingStatus',
+  'action', 'time', 'optionalStage', 'moldStage', 'urgent', 'salesperson', 'countdown', 'delivery', 'createdDate', 'expectedDate']
 
 function setup() {
   const onChange = vi.fn()
@@ -15,16 +15,15 @@ function setup() {
 function enableAll(filters: ReturnType<typeof useTrackingFilters>) {
   filters.keyword.value = '封口'
   filters.workshop.value = '封口机车间'
-  filters.sourceStatus.value = '已提交'
-  filters.assignee.value = '7'
   filters.mine.value = true
   filters.trackingStatus.value = 'in_progress'
   filters.actionFilter.value = 'any'
   filters.timeFilter.value = 'time_attention'
   filters.optionalStageFilter.value = 'OXIDATION'
+  filters.moldStageFilter.value = ['MOLD_NONE']
   filters.urgentOnly.value = true
   filters.salespersonFilter.value = ['张三']
-  filters.countdownFilter.value = ['overdue']
+  filters.countdownFilter.value = ['today']
   filters.deliveryFilter.value = ['ON_TIME']
   filters.dateFilters.value.created = { from: '2026-09-01', to: '' }
   filters.dateFilters.value.expected = { from: '2026-10-01', to: '' }
@@ -35,7 +34,7 @@ describe('tracking/useTrackingFilters · 筛选清单单一来源', () => {
 
   it('每个筛选条件都会产生标签，且能被逐个清除（不留残留）', () => {
     const { onChange, filters } = setup()
-    expect(filters.activeFilterChips.value).toEqual([{ key: 'trackingStatus', label: '跟单状态：未结束跟单' }])
+    expect(filters.activeFilterChips.value).toEqual([{ key: 'trackingStatus', label: '跟单状态：待处理（未交付）' }])
 
     enableAll(filters)
     const chips = filters.activeFilterChips.value
@@ -51,9 +50,12 @@ describe('tracking/useTrackingFilters · 筛选清单单一来源', () => {
     enableAll(filters)
     filters.resetTrackingFilters()
 
+    // sourceStatus / assignee 已于 2026-10-21 从 UI 撤下（与跟单状态、车间完全重复），
+    // 但后端入参契约保留，恒为空串。
     const defaults = {
       keyword: '', workshop: '', sourceStatus: '', trackingStatus: 'all', reminder: 'all',
       action: 'all', urgent: false, countdown: '', salesperson: '', deliveryResult: '', optionalStage: '',
+      moldStage: '',
       createdFrom: '', createdTo: '', expectedFrom: '', expectedTo: '',
       month: '', mine: false, assignee: ''
     }
@@ -98,28 +100,47 @@ describe('tracking/useTrackingFilters · 筛选清单单一来源', () => {
     expect(onChange).toHaveBeenCalledTimes(1)
   })
 
-  it('快筛按钮与标签相互对应（同一状态只算一次）', () => {
+  it('快筛标签「已报工待入库」与跟单待办入参对应（再点一次＝取消）', () => {
     const { filters } = setup()
-    filters.applyQuickFilter('overdue')
-    expect(filters.quickFilterActive('overdue')).toBe(true)
-    expect(filters.activeFilterChips.value.map(chip => chip.key)).toEqual(['trackingStatus', 'countdown'])
+    filters.applyQuickFilter('inbound')
+    expect(filters.quickFilterActive('inbound')).toBe(true)
+    expect(filters.trackingFilters().action).toBe('INBOUND_PENDING')
+    expect(filters.activeFilterChips.value.map(chip => chip.key)).toEqual(['trackingStatus', 'action'])
 
     // 再点一次＝取消
-    filters.applyQuickFilter('overdue')
-    expect(filters.quickFilterActive('overdue')).toBe(false)
+    filters.applyQuickFilter('inbound')
+    expect(filters.quickFilterActive('inbound')).toBe(false)
+    expect(filters.trackingFilters().action).toBe('all')
     expect(filters.activeFilterChips.value.map(chip => chip.key)).toEqual(['trackingStatus'])
+  })
+
+  it('「需要处理」快筛与工作台默认口径对应', () => {
+    const { filters } = setup()
+    // 默认 trackingStatus=open ⇒「需要处理」一开始就是亮的
+    expect(filters.quickFilterActive('open')).toBe(true)
+    filters.applyQuickFilter('open')
+    expect(filters.trackingFilters().trackingStatus).toBe('all')
+    expect(filters.quickFilterActive('open')).toBe(false)
+  })
+
+  it('倒计时不再提供「已超期 / 待定交期」：工作台默认口径下两者恒为空', () => {
+    const { filters } = setup()
+    const values = filters.COUNTDOWN_FILTER_OPTIONS.map(option => option.value)
+    expect(values).toEqual(['today', 'soon', 'later', 'delivered'])
   })
 
   it('角标只统计「更多筛选」里的条件，常用区不计入（跟单状态的默认口径不算）', () => {
     const { filters } = setup()
     expect(filters.activeAdvancedFilterCount.value).toBe(0)
     filters.workshop.value = '封口机车间'
+    // 业务员 / 倒计时在常用区，不占角标
+    filters.salespersonFilter.value = ['张三']
     filters.countdownFilter.value = ['today']
     expect(filters.activeAdvancedFilterCount.value).toBe(1)
-    // 「跟单状态」「业务员」已收进更多筛选区，故计入角标；默认的「未结束跟单」不算
+    // 「交付结果」已收进更多筛选区，计入角标；默认的「待处理（未交付）」不算
     filters.trackingStatus.value = 'pending'
     expect(filters.activeAdvancedFilterCount.value).toBe(2)
-    filters.salespersonFilter.value = ['张三']
+    filters.deliveryFilter.value = ['ON_TIME']
     expect(filters.activeAdvancedFilterCount.value).toBe(3)
   })
 

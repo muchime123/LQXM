@@ -4,7 +4,7 @@
       <div>
         <p class="eyebrow">生产任务</p>
         <h1>生产跟单</h1>
-        <p>默认查看需要处理的生产任务；可通过筛选查看全部任务与历史记录。</p>
+        <p>默认只看<strong>还没交付</strong>的任务（未停工、未结案）；已交付的历史记录与九月前的旧单需在「更多筛选 → 跟单状态」里切到「全部跟单状态」。</p>
       </div>
       <div class="head-actions">
         <input v-if="visibility === 'ALL'" ref="workbookInput" type="file" accept=".xlsx" hidden @change="onWorkbookSelected" />
@@ -29,8 +29,10 @@
       <!-- 搜索框唯一入口（10-19 LQ）：任务号 / 产品 / 客户 / 规格共用一个框，后端同一段谓词匹配。 -->
       <el-input v-model="keyword" class="tracking-keyword" clearable placeholder="任务号、产品、客户或规格" aria-label="关键词（任务号、产品、客户、规格）" @keyup.enter="search" @clear="search" />
       <el-select v-model="countdownFilter" multiple collapse-tags clearable placeholder="生产倒计时（全部）" aria-label="生产倒计时" @change="search"><el-option v-for="option in COUNTDOWN_FILTER_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select>
-      <el-select v-model="deliveryFilter" multiple collapse-tags clearable placeholder="生产交付结果（全部）" aria-label="生产交付结果" @change="search"><el-option v-for="option in DELIVERY_FILTER_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select>
-      <el-select v-model="actionFilter" aria-label="跟单待办" @change="search"><el-option label="全部跟单待办" value="all" /><el-option label="有提醒" value="any" /><el-option v-for="code in TRACKING_ACTION_CODES" :key="code" :label="actionLabel(code)" :value="code" /></el-select>
+      <!-- 业务员：2026-10-21 从「更多筛选」上移到常用行（真库 12 人都有量，是最常按人看的一维）。 -->
+      <el-select v-model="salespersonFilter" multiple filterable collapse-tags clearable placeholder="业务员（全部）" aria-label="业务员" @change="search"><el-option v-for="name in salespersonOptions" :key="name" :label="name" :value="name" /></el-select>
+      <!-- 2026-10-21 精简：「生产交付结果」「跟单待办」撤出常用行——工作台默认口径（未交付）下交付结果恒为「未交付」，
+           待办升成快捷标签「已报工待入库」；交付结果移入更多筛选，待办靠列表徽标呈现。 -->
       <div class="tracking-common-date" aria-label="生产任务单提交时间" title="按生产任务单提交时间筛选"><div class="tracking-extra-date-inputs"><el-date-picker v-model="dateFilters.created.from" type="date" value-format="YYYY-MM-DD" placeholder="提交时间起" aria-label="生产任务单提交起始日期" @change="onCreatedDateChange('from')" /><span>至</span><el-date-picker v-model="dateFilters.created.to" type="date" value-format="YYYY-MM-DD" placeholder="提交时间止" aria-label="生产任务单提交截止日期" @change="onCreatedDateChange('to')" /></div></div>
       <!-- 预计完成时间：后端口径＝当前承诺日（延期至优先，回退车间源预计、有效业务员要求日），
            与本页「预计完成」列显示同源；导出共用同一段筛选。 -->
@@ -74,14 +76,16 @@
       <el-button v-for="preset in quickFilterPresets" :key="preset.key" size="small" :type="quickFilterActive(preset.key) ? 'primary' : 'default'" :plain="!quickFilterActive(preset.key)" @click="applyQuickFilter(preset.key)">{{ preset.label }}</el-button>
     </div>
     <div v-if="advancedFiltersVisible" class="tracking-extra-filters" aria-label="更多生产跟单筛选条件">
-      <!-- 「跟单状态」「业务员」低频，收进更多筛选（10-19 LQ），常用行留给倒计时 / 交付结果 / 待办 / 两段日期。 -->
-      <div class="tracking-extra-filter"><el-select v-model="trackingStatus" aria-label="跟单状态" @change="search"><el-option label="全部跟单状态" value="all" /><el-option label="未结束跟单" value="open" /><el-option label="待跟单" value="pending" /><el-option label="跟单中" value="in_progress" /><el-option label="跟单已完成" value="completed" /><el-option label="停止生产跟单" value="stopped" /><el-option-group label="完成方式"><el-option label="人工结案" value="closed" /></el-option-group></el-select></div>
-      <div class="tracking-extra-filter"><el-select v-model="salespersonFilter" multiple filterable collapse-tags clearable placeholder="业务员（全部）" aria-label="业务员" @change="search"><el-option v-for="name in salespersonOptions" :key="name" :label="name" :value="name" /></el-select></div>
+      <!-- 2026-10-21 精简：删除「任务单状态」（与跟单状态同一件事）与「跟单员」（与车间同一刀），
+           「交付结果」从常用行移入本区；本区只剩切历史/全部视图才用得到的条件。 -->
+      <div class="tracking-extra-filter"><el-select v-model="trackingStatus" aria-label="跟单状态" @change="search"><el-option label="全部跟单状态" value="all" /><el-option label="待处理（未交付）" value="open" title="未停工、未结案、且还没有入库的任务。入库口径：跟单员填写的入库日期优先，没填则看采购入库；两者都没有＝未入库" /><el-option label="待跟单" value="pending" /><el-option label="跟单中" value="in_progress" /><el-option label="跟单已完成" value="completed" /><el-option label="停止生产跟单" value="stopped" /><el-option-group label="完成方式"><el-option label="人工结案" value="closed" /></el-option-group></el-select></div>
+      <div class="tracking-extra-filter"><el-select v-model="deliveryFilter" multiple collapse-tags clearable placeholder="生产交付结果（全部）" aria-label="生产交付结果" @change="search"><el-option v-for="option in DELIVERY_FILTER_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select></div>
       <div class="tracking-extra-filter"><el-select v-model="workshop" clearable filterable placeholder="车间（全部）" aria-label="车间" @change="search"><el-option v-for="line in filterOptions.workshops" :key="line" :label="shortWorkshop(line)" :value="line" /></el-select></div>
-      <div class="tracking-extra-filter"><el-select v-model="sourceStatus" clearable placeholder="任务单状态（全部）" aria-label="生产任务单状态" @change="search"><el-option v-for="status in filterOptions.sourceStatuses" :key="status" :label="status" :value="status" /></el-select></div>
-      <div class="tracking-extra-filter"><el-select v-model="assignee" clearable placeholder="跟单员（全部）" aria-label="跟单员" @change="search"><el-option v-for="person in filterOptions.assignees" :key="person.id" :label="person.name" :value="String(person.id)" /></el-select></div>
       <div class="tracking-extra-filter tracking-extra-filter-check"><el-checkbox v-model="mine" @change="search">我的跟单</el-checkbox></div>
       <div class="tracking-extra-filter"><el-select v-model="optionalStageFilter" clearable placeholder="按需工序（全部）" aria-label="按需工序" @change="search"><el-option label="全部按需工序" value="" /><el-option v-for="option in optionalStageOptions" :key="option.value" :label="option.label" :value="option.value" /></el-select></div>
+      <!-- 「模具生产」跟进：三档可多选。只筛「模具之后没有任何节点跟进」的单——后面一旦动了就已越过模具这一关；
+           模具之前（画图/备料/钣金）跟没跟都不影响。可多选组合，例如只勾前两项＝模具还没完工。 -->
+      <div class="tracking-extra-filter"><el-select v-model="moldStageFilter" multiple collapse-tags clearable placeholder="模具生产（全部）" aria-label="模具生产跟进" @change="search"><el-option v-for="option in MOLD_STAGE_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select></div>
       <div class="tracking-extra-filter"><el-select v-model="timeFilter" aria-label="时间核实" @change="search">
         <el-option label="全部时间核实" value="all" />
         <el-option label="待核实问题" value="time_attention" title="仅筛出尚待处理的问题；已核实的源日期异常不在此项中" />
@@ -765,7 +769,7 @@ import ProductionTrackingAnalyticsDrawer from './ProductionTrackingAnalyticsDraw
 import ProductionTrackingWeeklyReviewDrawer from './ProductionTrackingWeeklyReviewDrawer.vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { isSourceUrgent } from '@/utils/trackingUrgency'
-import { TRACKING_ACTION_CODES, trackingActionHint as actionHint, trackingActionLabel as actionLabel, trackingActionTone as actionTone } from '@/utils/trackingAction'
+import { trackingActionHint as actionHint, trackingActionLabel as actionLabel, trackingActionTone as actionTone } from '@/utils/trackingAction'
 // 源工单日期判据与「业务员要求工期」的口径唯一来源（列表 / 详情 / 导出共用，见该模块头注释）。
 import { daysBetween, effectiveLeadDaysText, invalidApplicationDate, invalidRequiredDate, leadDaysAlarm, leadDaysAwaitingScheduleNote, leadDaysBreakdown, leadDaysDeltaText, leadDaysDeltaTone, leadDaysKindText, leadDaysStartFallback, negativeLeadDays, negativeLeadReason, otherLeadDaysText } from '@/utils/trackingDateGuard'
 // 页面的纯业务规则（节点 / 日期组合取数 / 时间核实 / 交付结果）不在这里写第二份，见该模块头注释。
@@ -786,8 +790,8 @@ import { useTrackingListCompletion } from '@/composables/tracking/useTrackingLis
  */
 const {
   keyword, advancedFiltersVisible, dateFilters, countdownFilter, deliveryFilter, optionalStageFilter,
-  salespersonFilter, workshop, sourceStatus, assignee, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
-  filterOptions, COUNTDOWN_FILTER_OPTIONS, DELIVERY_FILTER_OPTIONS, optionalStageOptions,
+  moldStageFilter, salespersonFilter, workshop, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
+  filterOptions, COUNTDOWN_FILTER_OPTIONS, DELIVERY_FILTER_OPTIONS, optionalStageOptions, MOLD_STAGE_OPTIONS,
   quickFilterPresets, quickFilterActive, applyQuickFilter, activeAdvancedFilterCount,
   activeFilterChips, clearFilterChip, resetTrackingFilters, onCreatedDateChange, onExpectedDateChange,
   trackingFilters, loadOptions: loadFilterOptions

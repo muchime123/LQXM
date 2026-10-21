@@ -21,13 +21,13 @@ import { shortWorkshop, TRACKING_STATUS_FILTER_LABEL, trackingStatusText } from 
 
 export type TrackingDateFilter = { from: string; to: string }
 export type FilterChip = { key: string; label: string }
-export type QuickFilterKey = 'open' | 'pending' | 'in_progress' | 'today' | 'overdue' | 'time_attention' | 'stopped' | 'oxidation'
+export type QuickFilterKey = 'open' | 'inbound'
 
 const emptyTrackingDateFilter = (): TrackingDateFilter => ({ from: '', to: '' })
 
 /**
- * 工作台的跟单状态默认口径（只查待处理）；「更多筛选」角标与重置判定都以此为基准，
- * 否则首次进入就会因为「未结束跟单」这个默认值而多出一个角标。
+ * 工作台的跟单状态默认口径（只查**还没交付**的任务，后端 open ＝ 未停工/未结案/无交付日）；
+ * 「更多筛选」角标与重置判定都以此为基准，否则首次进入就会因为这个默认值而多出一个角标。
  */
 const DEFAULT_TRACKING_STATUS = 'open'
 
@@ -39,10 +39,15 @@ const DELIVERY_FILTER_OPTIONS = [
   { value: 'OVERDUE', label: '逾期交付' }, { value: 'ON_TIME', label: '按期交付' },
   { value: 'NO_BASELINE', label: '已交付（无基准）' }, { value: 'PENDING', label: '未交付' }
 ]
+/**
+ * 「生产倒计时」常用区多选筛选。
+ * 2026-10-21 精简：删除「已超期」「待定交期」——工作台默认口径（open）已经排掉逾期与已交付，
+ * 这两项在默认视图里恒为空（真库实测 0 条），只有切到「全部跟单状态」才有意义，不再单列选项。
+ */
 const COUNTDOWN_FILTER_OPTIONS = [
-  { value: 'overdue', label: '已超期' }, { value: 'today', label: '今日到期' },
+  { value: 'today', label: '今日到期' },
   { value: 'soon', label: '未来 1～3 天' }, { value: 'later', label: '3 天后' },
-  { value: 'undated', label: '待定交期' }, { value: 'delivered', label: '已交付' }
+  { value: 'delivered', label: '已交付' }
 ]
 /**
  * 「按需工序」筛选（10-15 跟单员需求：筛出需要氧化/喷特氟龙这道工序的所有跟单）。
@@ -52,6 +57,16 @@ const COUNTDOWN_FILTER_OPTIONS = [
 const OPTIONAL_STAGE_OPTIONS = [
   { value: 'OXIDATION', label: '需要氧化 / 喷特氟龙' },
   { value: 'WOODEN_CRATE', label: '需要木箱' }
+]
+/**
+ * 「模具生产」跟进筛选（10-21 跟单员需求：跟进模具生产有没有完成）。
+ * 三档可多选，共同前提是**模具之后没有任何节点跟进**——后面一旦动了，说明这张单已越过模具这一关，不再筛出。
+ * 口径刻意不看模具之前的节点（备料跟没跟无关），与后端 MOLD_STAGE_CODES / MOLD_NODE_STATE 一一对应。
+ */
+const MOLD_STAGE_OPTIONS = [
+  { value: 'MOLD_NONE', label: '模具未跟进' },
+  { value: 'MOLD_WORKING', label: '模具进行中' },
+  { value: 'MOLD_DONE', label: '模具已完成·后面没推' }
 ]
 
 export function useTrackingFilters(options: { onChange: () => void }) {
@@ -70,29 +85,41 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   const countdownFilter = ref<string[]>([])
   const deliveryFilter = ref<string[]>([])
   const optionalStageFilter = ref('')
-  /** 「业务员」筛选：取值来自数据（后端 filter-options 的 salespersons），故用可选值清单；位置在「更多筛选」区。 */
+  /** 模具生产跟进筛选：三档可多选，空数组＝不筛。 */
+  const moldStageFilter = ref<string[]>([])
+  /** 「业务员」筛选：取值来自数据（后端 filter-options 的 salespersons）。2026-10-21 上移到常用行。 */
   const salespersonFilter = ref<string[]>([])
   const workshop = ref('')
-  const sourceStatus = ref('')
-  /** 跟单员筛选：''＝全部 / 员工 id 字符串。 */
-  const assignee = ref('')
+  /**
+   * 2026-10-21 精简：删除「跟单员」「任务单状态」两个下拉（真库实测与现有条件完全重复：
+   * 跟单员按车间硬分配——陈苏平≡封口机、胡健≡机器；任务单状态只是「跟单状态」的另一种写法）。
+   * 但后端入参保留（恒空串），API 契约不动。
+   */
   /** 跟单状态筛选；位置在「更多筛选」区，初始值 open＝工作台默认只查待处理。 */
   const trackingStatus = ref(DEFAULT_TRACKING_STATUS)
   const timeFilter = ref('all')
-  /** 跟单待办筛选：all＝不限 / any＝只要有提醒 / 具体代码见 TRACKING_ACTION_CODES。 */
+  /**
+   * 跟单待办筛选：all＝不限 / 具体代码见 TRACKING_ACTION_CODES。
+   * 2026-10-21 精简：下拉整体从常用行撤掉——它真正指向的「节点走完、货没入库」（INBOUND_PENDING）
+   * 升成快捷标签「已报工待入库」，其余动作码靠列表徽标即可看清，不再单独设框。
+   */
   const actionFilter = ref('all')
   const urgentOnly = ref(false)
   const mine = ref(false)
-  /** 搜索栏下拉选项（车间 / 跟单员）；加载失败时保持空，不阻断列表。 */
+  /** 搜索栏下拉选项（车间）；加载失败时保持空，不阻断列表。 */
   const filterOptions = ref<TrackingFilterOptions>({ workshops: [], sourceStatuses: [], assignees: [] })
   let filterOptionsLoaded = false
 
+  /**
+   * 快捷标签（2026-10-21 精简后只留两个）：
+   * - open＝「需要处理」，与工作台默认视图同一口径；
+   * - inbound＝「已报工待入库」，真库 23 条——节点走完、货还没入库，跟单员每天必催的那批，
+   *   原先要展开「更多筛选 → 跟单待办」才能找到，现在一键直达。
+   * 其余按钮（待跟单/跟单中/今日到期/已超期/待核实/氧化）与下拉逐字重复，已删。
+   */
   const quickFilterPresets: { key: QuickFilterKey; label: string }[] = [
     { key: 'open', label: '需要处理' },
-    { key: 'pending', label: '待跟单' }, { key: 'in_progress', label: '跟单中' },
-    { key: 'today', label: '今日到期' }, { key: 'overdue', label: '已超期' },
-    { key: 'time_attention', label: '待核实问题' }, { key: 'stopped', label: '停止跟单' },
-    { key: 'oxidation', label: '需要氧化/喷特氟龙' },
+    { key: 'inbound', label: '已报工待入库' },
   ]
   const timeFilterLabels: Record<string, string> = {
     time_attention: '待核实问题', time_source: '日期异常（含已核实）', time_production: '生产时间异常',
@@ -115,23 +142,25 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   function optionalStageLabel(value: string) {
     return OPTIONAL_STAGE_OPTIONS.find(option => option.value === value)?.label || value
   }
-  const activeAdvancedFilterCount = computed(() => [Boolean(workshop.value), Boolean(sourceStatus.value), Boolean(assignee.value), mine.value,
-    timeFilter.value !== 'all', Boolean(optionalStageFilter.value),
-    // 「业务员」「跟单状态」已移入「更多筛选」区，故计入角标；跟单状态要排除工作台默认值，否则一进页面就多一个角标。
-    salespersonFilter.value.length > 0,
+  function moldStageLabel(value: string) {
+    return MOLD_STAGE_OPTIONS.find(option => option.value === value)?.label || value
+  }
+  const activeAdvancedFilterCount = computed(() => [Boolean(workshop.value), mine.value,
+    timeFilter.value !== 'all', Boolean(optionalStageFilter.value), moldStageFilter.value.length > 0,
+    // 「交付结果」「时间核实」已收进更多筛选区，计入角标；跟单状态排除工作台默认值，否则一进页面就多一个角标。
+    deliveryFilter.value.length > 0,
     trackingStatus.value !== 'all' && trackingStatus.value !== DEFAULT_TRACKING_STATUS]
     .filter(Boolean).length)
   const activeFilterChips = computed<FilterChip[]>(() => {
     const chips: FilterChip[] = []
     if (keyword.value.trim()) chips.push({ key: 'keyword', label: `关键词：${keyword.value.trim()}` })
     if (workshop.value) chips.push({ key: 'workshop', label: `车间：${shortWorkshop(workshop.value)}` })
-    if (sourceStatus.value) chips.push({ key: 'sourceStatus', label: `任务单状态：${sourceStatus.value}` })
-    if (assignee.value) chips.push({ key: 'assignee', label: `跟单员：${filterOptions.value.assignees.find(person => String(person.id) === assignee.value)?.name || assignee.value}` })
     if (mine.value) chips.push({ key: 'mine', label: '我的跟单' })
     if (trackingStatus.value !== 'all') chips.push({ key: 'trackingStatus', label: `跟单状态：${TRACKING_STATUS_FILTER_LABEL[trackingStatus.value] || trackingStatusText(trackingStatus.value as TrackingOrder['trackingStatus'])}` })
     if (actionFilter.value !== 'all') chips.push({ key: 'action', label: `跟单待办：${actionFilter.value === 'any' ? '有提醒' : actionLabel(actionFilter.value as TrackingActionCode)}` })
     if (timeFilter.value !== 'all') chips.push({ key: 'time', label: `时间核实：${timeFilterLabels[timeFilter.value] || timeFilter.value}` })
     if (optionalStageFilter.value) chips.push({ key: 'optionalStage', label: `按需工序：${optionalStageLabel(optionalStageFilter.value)}` })
+    if (moldStageFilter.value.length) chips.push({ key: 'moldStage', label: `模具生产：${moldStageFilter.value.map(value => moldStageLabel(value)).join('、')}` })
     if (urgentOnly.value) chips.push({ key: 'urgent', label: '仅看加急' })
     if (salespersonFilter.value.length) chips.push({ key: 'salesperson', label: `业务员：${salespersonFilter.value.join('、')}` })
     if (countdownFilter.value.length) chips.push({ key: 'countdown', label: `生产倒计时：${countdownFilter.value.map(value => COUNTDOWN_FILTER_OPTIONS.find(option => option.value === value)?.label || value).join('、')}` })
@@ -144,16 +173,13 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   })
 
   function quickFilterActive(key: QuickFilterKey) {
-    if (key === 'open' || key === 'pending' || key === 'in_progress' || key === 'stopped') return trackingStatus.value === key
-    if (key === 'time_attention') return timeFilter.value === key
-    if (key === 'oxidation') return optionalStageFilter.value === 'OXIDATION'
-    return countdownFilter.value.includes(key)
+    if (key === 'open') return trackingStatus.value === 'open'
+    // inbound＝已报工待入库：节点走完、货还没入库，即跟单待办里的 INBOUND_PENDING。
+    return actionFilter.value === 'INBOUND_PENDING'
   }
   function applyQuickFilter(key: QuickFilterKey) {
-    if (key === 'open' || key === 'pending' || key === 'in_progress' || key === 'stopped') trackingStatus.value = trackingStatus.value === key ? 'all' : key
-    else if (key === 'time_attention') timeFilter.value = timeFilter.value === key ? 'all' : key
-    else if (key === 'oxidation') optionalStageFilter.value = optionalStageFilter.value === 'OXIDATION' ? '' : 'OXIDATION'
-    else countdownFilter.value = countdownFilter.value.includes(key) ? countdownFilter.value.filter(value => value !== key) : [...countdownFilter.value, key]
+    if (key === 'open') trackingStatus.value = trackingStatus.value === 'open' ? 'all' : 'open'
+    else actionFilter.value = actionFilter.value === 'INBOUND_PENDING' ? 'all' : 'INBOUND_PENDING'
     options.onChange()
   }
   function clearFilterChip(key: string) {
@@ -162,13 +188,12 @@ export function useTrackingFilters(options: { onChange: () => void }) {
       case 'expectedDate': dateFilters.value.expected = emptyTrackingDateFilter(); break
       case 'keyword': keyword.value = ''; break
       case 'workshop': workshop.value = ''; break
-      case 'sourceStatus': sourceStatus.value = ''; break
-      case 'assignee': assignee.value = ''; break
       case 'mine': mine.value = false; break
       case 'trackingStatus': trackingStatus.value = 'all'; break
       case 'action': actionFilter.value = 'all'; break
       case 'time': timeFilter.value = 'all'; break
       case 'optionalStage': optionalStageFilter.value = ''; break
+      case 'moldStage': moldStageFilter.value = []; break
       case 'urgent': urgentOnly.value = false; break
       case 'salesperson': salespersonFilter.value = []; break
       case 'countdown': countdownFilter.value = []; break
@@ -177,9 +202,10 @@ export function useTrackingFilters(options: { onChange: () => void }) {
     options.onChange()
   }
   function resetFilters() {
-    keyword.value = ''; workshop.value = ''; sourceStatus.value = ''; assignee.value = ''
+    keyword.value = ''; workshop.value = ''
     mine.value = false; urgentOnly.value = false; trackingStatus.value = 'all'; actionFilter.value = 'all'; timeFilter.value = 'all'
     salespersonFilter.value = []; countdownFilter.value = []; deliveryFilter.value = []; optionalStageFilter.value = ''
+    moldStageFilter.value = []
     dateFilters.value = { created: emptyTrackingDateFilter(), expected: emptyTrackingDateFilter() }
   }
   function resetTrackingFilters() { resetFilters(); options.onChange() }
@@ -203,7 +229,7 @@ export function useTrackingFilters(options: { onChange: () => void }) {
    */
   function trackingFilters() {
     return {
-      keyword: keyword.value, workshop: workshop.value, sourceStatus: sourceStatus.value, trackingStatus: trackingStatus.value,
+      keyword: keyword.value, workshop: workshop.value, sourceStatus: '', trackingStatus: trackingStatus.value,
       reminder: timeFilter.value,
       action: actionFilter.value,
       urgent: urgentOnly.value,
@@ -211,10 +237,11 @@ export function useTrackingFilters(options: { onChange: () => void }) {
       salesperson: salespersonFilter.value.join(','),
       deliveryResult: deliveryFilter.value.join(','),
       optionalStage: optionalStageFilter.value,
+      moldStage: moldStageFilter.value.join(','),
       createdFrom: dateFilters.value.created.from || '', createdTo: dateFilters.value.created.to || '',
       expectedFrom: dateFilters.value.expected.from || '', expectedTo: dateFilters.value.expected.to || '',
       month: '',
-      mine: mine.value, assignee: assignee.value
+      mine: mine.value, assignee: ''
     }
   }
   /** 下拉选项只在首次与「刷新」时拉取；失败时若从未成功过则回落空清单，不阻断列表。 */
@@ -226,8 +253,9 @@ export function useTrackingFilters(options: { onChange: () => void }) {
 
   return {
     keyword, advancedFiltersVisible, dateFilters, countdownFilter, deliveryFilter, optionalStageFilter,
-    salespersonFilter, workshop, sourceStatus, assignee, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
+    moldStageFilter, salespersonFilter, workshop, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
     filterOptions, COUNTDOWN_FILTER_OPTIONS, DELIVERY_FILTER_OPTIONS, optionalStageOptions, optionalStageLabel,
+    MOLD_STAGE_OPTIONS, moldStageLabel,
     quickFilterPresets, timeFilterLabels, quickFilterActive, applyQuickFilter, activeAdvancedFilterCount,
     activeFilterChips, clearFilterChip, resetTrackingFilters, onCreatedDateChange, onExpectedDateChange,
     trackingFilters, loadOptions

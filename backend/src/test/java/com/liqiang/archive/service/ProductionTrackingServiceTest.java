@@ -41,12 +41,58 @@ class ProductionTrackingServiceTest {
         String where=service.visible(params).toString();
 
         assertTrue(where.contains("p.external_source='H3YUN'"));
-        assertTrue(where.contains("p.application_date>='2026-09-01'")
-                        &&where.contains("p.source_created_at>='2026-09-01'"),
-                "申请日期或氚云创建时间在九月后都应进入跟单范围："+where);
-        assertTrue(where.contains("production_tracking_enrollments"),"历史跟单应保留可见："+where);
+        // 跟单起点是一个时间点：提交时间必须落在九月后（申请日期早/晚都不改变这一点）。
+        assertEquals(ProductionTrackingService.SCOPE_DATE,
+                "(p.application_date>='2026-09-01' AND p.source_created_at>='2026-09-01')",
+                "跟单范围必须是 AND 而不是 OR——OR 会让「八月提交、申请日期被填成九月」的历史单从侧门回来");
+        assertTrue(where.contains("production_tracking_enrollments"),"手工加入跟单的历史单应保留可见："+where);
         assertTrue(where.contains("production_tracking_workbook_rows"),"表格覆盖的历史任务应保留可见："+where);
+        // 真的跟过的历史单（节点 / 跟进条目 / 版本被推进）一个都不能丢，否则跟单记录会凭空失联。
+        assertTrue(where.contains("FROM production_tracking_milestones"),"已登记节点的历史跟单应保留可见："+where);
+        assertTrue(where.contains("FROM production_tracking_entries"),"已有跟进条目的历史跟单应保留可见："+where);
+        assertTrue(where.contains("t2.version>0"),"版本被推进过的历史跟单应保留可见："+where);
         assertEquals(List.of(),params);
+    }
+
+    /**
+     * 默认工作台口径＝**还没交付**。§ 旧实现把 `open` 翻成「跟单状态 ∈ pending/in_progress」，
+     * 结果 9 月起已交付的 508 单只要交期一过就全变成「已超期」，工作台 63 条被 5119 条历史单淹没。
+     */
+    /**
+     * 「已交付」的判据只允许一处定义，且必须是**入库优先、采购入库兜底**（LQ 2026-10-21 确认）。
+     *
+     * <p>这条测试防的是「有人图省事把它换成报工完成日」：真库九月起 569 单里，
+     * 报工 507 / 入库里程碑 472 / 采购入库 438，其中 25 单已报工但未入库。
+     * 换成 actual_completion_date 后这 25 单会从工作台消失，而列表、生产分析、周复盘
+     * 仍按入库判它们未交付 —— 同一张单在两个页面给出相反结论。
+     */
+    @Test
+    void deliveredMeansInboundFirstThenPurchaseReceipt() {
+        assertEquals("COALESCE(ms.warehouse_in_date,ib.first_in)",ProductionTrackingService.DELIVERED_IN_DATE,
+                "已交付＝跟单员填的入库里程碑优先、采购入库兜底；两者皆无才算未交付");
+        assertFalse(ProductionTrackingService.DELIVERED_IN_DATE.contains("actual_completion_date"),
+                "报工完成 ≠ 入库：车间报完工后货可能还在产线上等入库");
+    }
+
+    @Test
+    void openTrackingStatusMeansNotYetDelivered() {
+        var jdbc=mock(JdbcTemplate.class);
+        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+
+        var filtered=ProductionTrackingService.filterForTest(service,"open");
+        String openWhere=(String)filtered.get("where");
+
+        assertTrue(openWhere.contains("t.stopped_at IS NULL AND t.closed_at IS NULL AND "
+                        +ProductionTrackingService.DELIVERED_IN_DATE+" IS NULL"),
+                "`open` 必须落成「未停工、未结案、未交付」："+openWhere);
+        assertEquals(Boolean.TRUE,filtered.get("needsInbound"),
+                "`open` 引用了 DELIVERED_IN_DATE（含 ib.first_in），必须挂 INBOUND_JOIN，否则真库直接报 Unknown column");
+
+        var all=ProductionTrackingService.filterForTest(service,"all");
+        String allWhere=(String)all.get("where");
+        assertFalse(allWhere.contains("t.closed_at IS NULL AND "+ProductionTrackingService.DELIVERED_IN_DATE),
+                "`all` 不能带上工作台口径："+allWhere);
+        assertEquals(Boolean.FALSE,all.get("needsInbound"),"`all` 不引用 ib，不该白挂 INBOUND_JOIN");
     }
 
     @Test
@@ -151,8 +197,11 @@ class ProductionTrackingServiceTest {
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         verify(jdbc,atLeast(2)).queryForObject(sql.capture(),eq(Long.class),any(Object[].class));
         var counts=sql.getAllValues();
-        assertTrue(counts.get(0).contains("IN ('pending','in_progress')"),
-                "待跟单和跟单中任务必须留在进行中列表");
+        // 【2026-10-21 口径变更】「active」原先翻成跟单状态 IN ('pending','in_progress')，
+        // 现已改为**未交付**（未停工/未结案/无交付日）。旧断言等于把「已交付但没过跟单节点」的单
+        // 也算进工作台，而九月那批 571 单里 508 单已交付 —— 工作台 63 条被 5119 条历史单淹没。
+        assertTrue(counts.get(0).contains("t.closed_at IS NULL AND "+ProductionTrackingService.DELIVERED_IN_DATE+" IS NULL"),
+                "进行中列表＝还没交付的任务："+counts.get(0));
         assertTrue(counts.get(1).contains("IN ('completed')"),
                 "已完成筛选只依据跟单状态");
         assertTrue(counts.stream().allMatch(value->value.contains("stage_status='DONE'")
@@ -1005,6 +1054,63 @@ class ProductionTrackingServiceTest {
     }
 
     /**
+     * 「模具生产」跟进筛选（2026-10-21 跟单员需求：跟进模具生产有没有完成）。
+     *
+     * <p>要回答的只有一个问题：<b>模具做完没有</b>。所以判据刻意不看模具之前（画图/备料/钣金跟没跟都无关），
+     * 只看两件事：① 模具之后<b>没有任何</b>节点跟进（后面一旦动了，说明这张单已越过模具这一关，不该再出现在待办里）；
+     * ② 模具节点自身落在所选档位（未跟进 / 进行中 / 已完成）。
+     *
+     * <p>后置节点集合必须按车间区分：封口机是氧化/组装/入库/木箱，机器是组装/调试/入库/木箱。
+     * 模具自身与模具之前的钣金都<b>不得</b>出现在后置集合里——否则「刚做完备料、模具还没开工」的单会被误判成已推进。
+     */
+    @Test
+    void moldStageFilterOnlySelectsOrdersStuckBeforeLaterStages() {
+        var jdbc=mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
+        var sql=org.mockito.ArgumentCaptor.forClass(String.class);
+        when(jdbc.query(sql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
+        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var empty=new ProductionTrackingService.DateRangeFilter("","",false);
+
+        service.list("","","all","all","",false,"","","all","","","",empty,empty,empty,
+                false,"",empty,"","MOLD_NONE,MOLD_WORKING",1,30);
+
+        String where=sql.getValue();
+        assertTrue(where.contains("NOT "+ProductionTrackingService.MOLD_LATER_TRACKED),
+                "模具之后已有节点跟进的单必须排除："+where);
+        assertTrue(where.contains(ProductionTrackingService.MOLD_NODE_STATE+" IN ('MOLD_NONE','MOLD_WORKING')"),
+                "三档必须按模具节点自身状态过滤："+where);
+
+        // 后置节点集合按车间区分，且不得含模具自己或模具之前的钣金。
+        String from=ProductionTrackingService.TRACKING_FROM;
+        for(String field:List.of("later_sealer_count","later_machine_count")){
+            int at=from.indexOf(field);
+            assertTrue(at>0,"TRACKING_FROM 必须聚合 "+field+"："+from);
+            // 只取本条 SUM(...) 表达式：用 lastIndexOf("SUM(") 回退，避免把上一条聚合的 stage_code 也算进来。
+            String agg=from.substring(from.lastIndexOf("SUM(",at),at);
+            assertFalse(agg.contains("'MOLD'")||agg.contains("'SHEET_METAL'"),
+                    "模具自身与模具之前的钣金都不能算「模具之后」（"+field+"）："+agg);
+        }
+        assertTrue(from.contains("stage_code IN ('OXIDATION','ASSEMBLY','WAREHOUSE','WOODEN_CRATE')"),
+                "封口机的后置节点＝氧化/组装/入库/木箱："+from);
+        assertTrue(from.contains("stage_code IN ('ASSEMBLY','TESTING','WAREHOUSE','WOODEN_CRATE')"),
+                "机器车间的后置节点＝组装/调试/入库/木箱："+from);
+
+        // 导出必须与列表同一段谓词（否则导出的行和页面上看到的行对不上）。
+        service.exportRows("","","all","all","",false,"","","all","","","",empty,empty,empty,
+                false,"",empty,"","MOLD_DONE","");
+        assertTrue(sql.getAllValues().get(1).contains(ProductionTrackingService.MOLD_NODE_STATE+" IN ('MOLD_DONE')"),
+                "导出必须带同一段模具谓词："+sql.getAllValues().get(1));
+        assertTrue(sql.getAllValues().get(1).contains("NOT "+ProductionTrackingService.MOLD_LATER_TRACKED),
+                "导出的排除条件也必须一致："+sql.getAllValues().get(1));
+
+        assertThrows(IllegalArgumentException.class,
+                ()->service.list("","","all","all","",false,"","","all","","","",empty,empty,empty,
+                        false,"",empty,"","MOLD_NOT_A_STAGE",1,30),
+                "非白名单档位必须拒绝，不能静默变成不筛");
+    }
+
+    /**
      * 搜索框唯一入口（10-19 LQ：「搜索规格」并入任务号 / 产品 / 客户同一个框）。
      * 关键词必须命中四个字段，且规格走与列表列 specification_snapshot 完全相同的拼接口径 ——
      * 两处拼接方式一旦分叉，就会出现「搜出来的行，规格列里却看不到搜的那个词」。
@@ -1450,6 +1556,45 @@ class ProductionTrackingServiceTest {
         var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,null,new ObjectMapper(),allScope());
 
         assertThrows(IllegalArgumentException.class,()->service.archiveWorkbookRow(1L,"   ","k"));
+    }
+
+    /**
+     * 配置页「历史任务单 / 跟单记录」两个数字必须点得开，而且明细口径要和计数口径一致：
+     * ① 不自行排除草稿 / 已取消——否则明细比数字少，用户会以为丢单（页面上单独标注即可）；
+     * ② 「完成节点 x/y」的 y 只数必经节点，与参考间隔分母同源，按需工序（氧化/木箱）不进分母。
+     */
+    @Test
+    void productOrderHistoryKeepsEveryStatusAndCountsOnlyRequiredStages() {
+        for (var expected : List.of(Map.entry("封口机车间", 4), Map.entry("全自动气调机车间", 7))) {
+            String workshop = expected.getKey();
+            int required = expected.getValue();
+            var jdbc = mock(JdbcTemplate.class);
+            when(jdbc.queryForList(anyString(), any(Object[].class)))
+                    .thenReturn(List.of(Map.of("config_name", "测试产品", "workshop_name", workshop)));
+            when(jdbc.queryForMap(anyString(), any(Object[].class))).thenReturn(new java.util.LinkedHashMap<String, Object>());
+            var orderSqls = new ArrayList<String>();
+            doAnswer(inv -> { orderSqls.add(inv.getArgument(0)); return null; })
+                    .when(jdbc).query(anyString(), any(org.springframework.jdbc.core.RowCallbackHandler.class), any(Object[].class));
+
+            var service = new ProductionTrackingService(jdbc, mock(ErpActorResolver.class), null, null, new ObjectMapper(), allScope());
+            var result = service.productOrderHistory(1L, "", 50);
+
+            assertEquals(required, result.get("requiredStageCount"),
+                    workshop + " 的必经节点数必须与跟单分母同源（封口 4 / 机器 7）");
+            String sql = orderSqls.getFirst();
+            assertFalse(sql.contains("CANCELLED") || sql.contains("已取消"),
+                    "明细不能排除任何状态：数字含草稿/已取消，明细也必须含，否则两处对不上：" + sql);
+            String in = sql.substring(sql.indexOf("stage_code IN (") + "stage_code IN (".length());
+            in = in.substring(0, in.indexOf(')'));
+            assertEquals(required, in.split(",").length,
+                    "完成节点只数必经节点，按需工序不进分母：" + in);
+
+            // 画像统计（summary）与状态筛选解耦：左边筛状态时，右边的「共 N 张」不能跟着跳。
+            var summaryArgs = org.mockito.ArgumentCaptor.forClass(Object[].class);
+            verify(jdbc).queryForMap(anyString(), summaryArgs.capture());
+            assertEquals(2, summaryArgs.getValue().length,
+                    "summary 只按车间 + 产品名两个条件统计，不接受 status 参数");
+        }
     }
 
     private static Map<String,Object> candidate(long id,String orderNo,String product,String workshop,String due,int quantity) {

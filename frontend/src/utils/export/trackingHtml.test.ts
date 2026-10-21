@@ -300,9 +300,13 @@ describe('生产跟单导出：网页(HTML)组装', () => {
     expect(font.value).toBe('12')
   })
 
-  it('纸张预览：整份文档包在一张按物理尺寸的纸上（默认 A4 横向），工具条留在纸外', () => {
+  it('导出默认即编辑态：body 挂 is-editing、纸张预览不勾选，纸框与边界预警结构仍在', () => {
     const html = buildTrackingHtml({ sheets: SAMPLE })
-    expect(html).toContain('<body class="preview-on">')
+    // 默认编辑（10-21 LQ）：不是 preview-on，编辑按钮初始就是「完成编辑」亮起态
+    expect(html).toContain('<body class="is-editing">')
+    expect(html).not.toContain('<body class="preview-on">')
+    expect(html).toContain('<label class="toggle"><input id="paper-preview" type="checkbox">纸张预览</label>')
+    expect(html).toContain('<button class="btn is-on" id="toggle-edit" type="button">完成编辑</button>')
     expect(html).toContain('<div class="screen-bar no-print">')
     expect(html).toContain('<div class="paper" id="paper">')
     // 边界预警层：右边距斜线阴影 + 红色竖线标「可打印边界」+ 标签
@@ -334,10 +338,18 @@ describe('生产跟单导出：网页(HTML)组装', () => {
     expect(metrics.textContent).toContain('纸面可打印')
 
     const preview = doc.getElementById('paper-preview') as HTMLInputElement
-    expect(preview.checked).toBe(true)
+    expect(preview.checked).toBe(false)
+    expect(doc.body.classList.contains('preview-on')).toBe(false)
+    // 勾「纸张预览」自动退出编辑进入纸面样式（10-21 LQ）
+    preview.checked = true
+    preview.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(doc.body.classList.contains('preview-on')).toBe(true)
+    expect(doc.body.classList.contains('is-editing')).toBe(false)
+    // 取消勾选只回到长页面，不自动回到编辑：想改字要自己点「开启编辑」
     preview.checked = false
     preview.dispatchEvent(new Event('change', { bubbles: true }))
     expect(doc.body.classList.contains('preview-on')).toBe(false)
+    expect(doc.body.classList.contains('is-editing')).toBe(false)
   })
 
   it('宽度读数：列宽合计超纸面时报自动缩放，窄表报「刚好一页宽」', () => {
@@ -359,6 +371,10 @@ describe('生产跟单导出：网页(HTML)组装', () => {
       const html = buildTrackingHtml({ sheets: [{ name: 'A', headers, body: [headers.map(() => '1')] }] })
       const doc = new DOMParser().parseFromString(html, 'text/html')
       new Function('document', 'window', 'alert', doc.querySelector('script')!.textContent || '')(doc, window, () => {})
+      // 预警线只画在纸面预览里（长页面模式下隐藏）：勾上「纸张预览」再断言
+      const preview = doc.getElementById('paper-preview') as HTMLInputElement
+      preview.checked = true
+      preview.dispatchEvent(new Event('change', { bubbles: true }))
       return doc
     }
     // 60 列：缩到最小 30% 仍超 A4 纸面 → 边界线进入告警态
@@ -403,5 +419,62 @@ describe('生产跟单导出：网页(HTML)组装', () => {
     // 抬指后不再跟随指针
     doc.dispatchEvent(pointer('pointermove', 800))
     expect(input.value).toBe('48')
+  })
+
+  it('页面内编辑：打开即是编辑态（数据格可改、改字挂黄底、空表提示格不可编），「完成编辑」退出后可再开', () => {
+    const html = buildTrackingHtml({
+      sheets: [{ name: 'A', headers: ['任务号', '备注'], body: [['SCGD1', 'x']] }, { name: 'B', headers: ['任务号'], body: [] }]
+    })
+    const doc = new DOMParser().parseFromString(html, 'text/html')
+    new Function('document', 'window', 'alert', doc.querySelector('script')!.textContent || '')(doc, window, () => {})
+    const editBtn = doc.getElementById('toggle-edit')!
+    // 脚本装载后（不点任何按钮）就已经是编辑态：数据格全部可改，「保存修改副本」按钮也在
+    expect(doc.body.classList.contains('is-editing')).toBe(true)
+    expect(editBtn.textContent).toBe('完成编辑')
+    expect(editBtn.classList.contains('is-on')).toBe(true)
+    expect(doc.getElementById('save-copy')).toBeTruthy()
+    const cells = doc.querySelectorAll('tbody td:not(.empty)') as NodeListOf<HTMLElement>
+    for (const cell of cells) expect(cell.contentEditable).toBe('true')
+    // 空子表的「没有数据」格不进编辑
+    expect((doc.querySelector('td.empty') as HTMLElement).contentEditable).toBe('false')
+
+    // 改字 ⇒ 该格挂 edited（黄底标记的落点）
+    const first = cells[0] as HTMLElement
+    first.textContent = 'SCGD-已改'
+    first.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(first.classList.contains('edited')).toBe(true)
+
+    // 点「完成编辑」退出：恢复只读，之后即可直接打印；edited 标记保留，再开编辑仍可辨认
+    editBtn.click()
+    expect(doc.body.classList.contains('is-editing')).toBe(false)
+    expect(editBtn.textContent).toBe('开启编辑')
+    for (const cell of cells) expect(cell.contentEditable).toBe('false')
+    expect(first.classList.contains('edited')).toBe(true)
+
+    editBtn.click()
+    expect(doc.body.classList.contains('is-editing')).toBe(true)
+    expect(editBtn.textContent).toBe('完成编辑')
+    for (const cell of cells) expect(cell.contentEditable).toBe('true')
+  })
+
+  it('保存修改副本：序列化当前 DOM（含编辑内容），并摘掉 edited 标记再落盘', () => {
+    // jsdom 里拦截全局 Blob / a.click 成本高，这里钉住脚本的三个关键动作：
+    // ① 克隆整个文档再序列化（浏览器 Ctrl+S 存不到页面上的编辑，必须靠这段落盘）
+    // ② 落盘前摘掉 edited 标记（黄底不进新文件） ③ 走 a[download] 触发下载。
+    const html = buildTrackingHtml({ sheets: SAMPLE })
+    const script = html.slice(html.indexOf('<script>') + 8, html.indexOf('</script>'))
+    expect(script).toContain('cloneNode(true)')
+    expect(script).toContain("td.edited")
+    expect(script).toContain("classList.remove('edited')")
+    expect(script).toContain('outerHTML')
+    expect(script).toContain('link.download')
+    expect(script).toContain('new Blob')
+  })
+
+  it('编辑痕迹不上纸：@media print 里 edited 退回白底（内容在、颜色标记不打印）', () => {
+    const html = buildTrackingHtml({ sheets: SAMPLE })
+    const printBlock = html.slice(html.indexOf('@media print'))
+    expect(printBlock).toContain('td.edited{background:transparent!important;box-shadow:none}')
+    expect(html).toContain('td.edited{background:#fffaeb!important;box-shadow:inset 2px 0 0 #d08a2d}')
   })
 })

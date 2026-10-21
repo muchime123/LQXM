@@ -89,6 +89,10 @@ public class ProductionTrackingAnalyticsService {
             var item=selected.get((int)i);var row=item.row();
             var entry=new LinkedHashMap<String,Object>();
             entry.put("id",row.id());entry.put("orderNo",item.orderNo());entry.put("productName",item.productName());
+            // 下钻列表用：业务员 / 产品规格 / 模具出数。三者都只做展示，缺失时为 null（前端显示「—」）。
+            entry.put("salesperson",row.salesperson());
+            entry.put("specification",row.specification());
+            entry.put("moldLayout",row.moldLayout());
             entry.put("workshop",row.workshop());entry.put("submittedDate",row.submitted());
             entry.put("baseline",row.baseline());entry.put("deliveredDate",row.delivered());
             entry.put("status",status(row));
@@ -208,6 +212,13 @@ public class ProductionTrackingAnalyticsService {
         }
         // No customer, price, or outbound data crosses this endpoint. Latest review reasons remain source text.
         String sql="SELECT p.id,p.work_order_no,p.product_name,COALESCE(NULLIF(p.production_line,''),'未分车间') workshop,"
+                // 下钻列表要能一眼认出「谁的单、做什么规格」，故补业务员与产品规格/模具出数：
+                // 规格取 CONCAT_WS(' / ',box_size,box_shape,box_material)、模具取 mold_layout，
+                // 与生产跟单列表 LIST_COLUMNS 的 specification_snapshot / mold_layout **逐字同源**——
+                // 分析页看到「120×80 / 双层」而跟单页看到别的写法，就是口径分叉，必须避免。
+                +"p.salesperson_name salesperson,"
+                +"CONCAT_WS(' / ',p.box_size,p.box_shape,p.box_material) specification,"
+                +"p.mold_layout mold_layout,"
                 +"DATE(p.source_created_at) submitted_date,"
                 +ProductionTrackingService.VALID_REQUIRED_DATE+" requested_date,"
                 +"p.expected_completion_date original_baseline,"
@@ -230,9 +241,16 @@ public class ProductionTrackingAnalyticsService {
                 date(rs.getDate("baseline")),date(rs.getDate("delivered_date")),
                 rs.getTimestamp("stopped_at")!=null,rs.getBoolean("cancelled"),rs.getString("risk_category"),
                 rs.getString("delay_reason"),rs.getString("overdue_reason"),rs.getString("commitment_reason"),
-                date(rs.getDate("receipt_date")),date(rs.getDate("manual_in_date"))),
+                date(rs.getDate("receipt_date")),date(rs.getDate("manual_in_date")),
+                // CONCAT_WS 遇到全空列会返回空串而不是 null，这里统一折成 null——
+                // 下钻列表要把「没有规格」显示成「—」，而不是一个空白的格子。
+                blankToNull(rs.getString("salesperson")),blankToNull(rs.getString("specification")),
+                blankToNull(rs.getString("mold_layout"))),
                 rs.getString("work_order_no"),rs.getString("product_name")),params.toArray());
     }
+
+    /** 空串归一成 null：展示侧（前端）用 null 判「—」，避免空串与「未填写」两种假值并存。 */
+    private static String blankToNull(String value){return value==null||value.isBlank()?null:value.trim();}
 
     static void appendDateBasis(StringBuilder where,List<Object> params,LocalDate from,LocalDate to,String dateBasis){
         if(!"baseline".equals(dateBasis))throw new IllegalArgumentException("分析日期口径无效");
@@ -316,16 +334,29 @@ public class ProductionTrackingAnalyticsService {
                 .map(e->Map.<String,Object>of("name",e.getKey(),"count",e.getValue())).toList();
     }
 
+    /**
+     * 分析用的一单一行。<b>后三个字段（业务员 / 产品规格 / 模具出数）只供下钻列表展示，不参与任何判据</b>——
+     * 卡片数量、一致性校验都只看前 16 个字段，加列不会改变任何统计口径。
+     * 放在末尾是为了让测试与既有构造调用不必改动（保留下面的兼容构造器）。
+     */
     record OrderRow(long id,String workshop,LocalDate submitted,LocalDate requested,LocalDate originalBaseline,
                     LocalDate revisedBaseline,LocalDate baseline,LocalDate delivered,boolean stopped,boolean cancelled,
                     String riskCategory,String delayReason,String overdueReason,String commitmentReason,
-                    LocalDate receiptDate,LocalDate manualInDate) {
+                    LocalDate receiptDate,LocalDate manualInDate,
+                    String salesperson,String specification,String moldLayout) {
         OrderRow(long id,String workshop,LocalDate submitted,LocalDate requested,LocalDate originalBaseline,
                  LocalDate revisedBaseline,LocalDate baseline,LocalDate delivered,boolean stopped,
                  String riskCategory,String delayReason,String overdueReason,String commitmentReason,
                  LocalDate receiptDate,LocalDate manualInDate){
             this(id,workshop,submitted,requested,originalBaseline,revisedBaseline,baseline,delivered,stopped,false,
-                    riskCategory,delayReason,overdueReason,commitmentReason,receiptDate,manualInDate);
+                    riskCategory,delayReason,overdueReason,commitmentReason,receiptDate,manualInDate,null,null,null);
+        }
+        OrderRow(long id,String workshop,LocalDate submitted,LocalDate requested,LocalDate originalBaseline,
+                 LocalDate revisedBaseline,LocalDate baseline,LocalDate delivered,boolean stopped,boolean cancelled,
+                 String riskCategory,String delayReason,String overdueReason,String commitmentReason,
+                 LocalDate receiptDate,LocalDate manualInDate){
+            this(id,workshop,submitted,requested,originalBaseline,revisedBaseline,baseline,delivered,stopped,cancelled,
+                    riskCategory,delayReason,overdueReason,commitmentReason,receiptDate,manualInDate,null,null,null);
         }
     }
     private record AnalysisItem(OrderRow row,String orderNo,String productName) {}
