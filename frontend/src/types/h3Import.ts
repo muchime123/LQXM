@@ -113,6 +113,13 @@ export type H3LedgerKind =
 
 // ===== A 域 / B 域批次导入契约 =====
 export type LedgerRowAction = 'CREATE' | 'UPDATE' | 'UNCHANGED'
+/** 「这个文件以前导过」提示：仅提示，绝不拦截（氚云无法实时同步，一天多次全量重导是常态） */
+export interface DuplicateImportHint {
+  batchId: number
+  fileName: string
+  /** 该批次完成时间（本地时间 yyyy-MM-ddTHH:mm:ss），可能为空 */
+  completedAt: string | null
+}
 /** 上传登记批次（A/B 两域同形） */
 export interface StageAccepted {
   batchId: number
@@ -121,6 +128,7 @@ export interface StageAccepted {
   hashHit: boolean
   status: string
   message: string
+  duplicateHint?: DuplicateImportHint | null
 }
 /** B 域台账批次 stage 返回（与 StageAccepted 形状一致，字段可选以兼容历史实现） */
 export interface LedgerImportStageResult {
@@ -130,6 +138,7 @@ export interface LedgerImportStageResult {
   hashHit: boolean
   status?: string
   message?: string
+  duplicateHint?: DuplicateImportHint | null
 }
 /** 批次进度（两域同形；status ∈ UPLOADED/PARSING/PREVIEW_READY/CONFIRMING/COMPLETED/PARTIAL_FAILED/FAILED） */
 export interface BatchProgress {
@@ -158,8 +167,55 @@ export interface ImportBatch {
   createdCount: number
   updatedCount: number
   unchangedCount: number
+  /** 校验告警计数（确认导入时写入）：往来单位未解析单数 */
+  missingCustomerCount?: number | null
+  /** 校验告警计数：缺关键日期单数 */
+  missingDateCount?: number | null
+  /** 校验告警计数：Σ明细≠主表 / 缺价 / 仓库未匹配 等勾稽告警单数 */
+  missingQuantityCount?: number | null
   createdAt: string
   completedAt?: string
+}
+
+// ===== 批次告警明细（2026-10-20） =====
+/**
+ * 告警分类码（后端 H3FactImportService#warningCode 单一来源）。
+ * 用途：导入后按类筛选/统计；未命中映射时后端返回 OTHER，前端回落到「其他」。
+ */
+export type H3WarningCode =
+  | 'SUM_MISMATCH'
+  | 'MISSING_PRICE'
+  | 'SUPPLIER_UNRESOLVED'
+  | 'WAREHOUSE_UNMATCHED'
+  | 'INVALID_STATUS'
+  | 'INVALID_TYPE'
+  | 'BAD_FIELD'
+  | 'MISSING_FIELD'
+  | 'RED_CHAIN'
+  | 'DUPLICATE'
+  | 'OTHER'
+/** 批次告警单行：来自 h3_import_rows.raw_data 重算，与预览行 warnings 同口径 */
+export interface BatchWarningRow {
+  rowId: number
+  /** 落库后的事实行 id（销售出库/采购入库/…主表 id）；为 null 时无法跳台账详情 */
+  businessId: number | null
+  externalId: string
+  title: string
+  action: 'CREATE' | 'UPDATE' | 'UNCHANGED' | string
+  /** 中文告警，多条以「；」连接 */
+  warnings: string
+  warningCodes: H3WarningCode[]
+}
+export interface BatchWarningsPage {
+  batchId: number
+  dataType: string
+  /** 批次全量行数 */
+  total: number
+  /** 含告警行数（不受分页影响） */
+  totalWarningRows: number
+  page: number
+  size: number
+  items: BatchWarningRow[]
 }
 
 // ===== 预览 =====

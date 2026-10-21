@@ -1,5 +1,5 @@
 import { http } from '../http'
-import type { BatchProgress, H3FactType, H3LedgerKind, ImportResult, PageResult, ImportBatch, StagingPreview, LedgerPage, StageAccepted, LedgerDetailResult } from '@/types/h3Import'
+import type { BatchProgress, H3FactType, H3LedgerKind, ImportResult, PageResult, ImportBatch, StagingPreview, LedgerPage, StageAccepted, LedgerDetailResult, BatchWarningsPage } from '@/types/h3Import'
 import { waitH3ImportUntil } from '@/utils/h3Import'
 // 氚云导入共享类型单一来源在 @/types/h3Import，此处 re-export 保持调用方兼容
 export type {
@@ -15,7 +15,10 @@ export type {
   StagingPreview,
   LedgerRow,
   LedgerPage,
-  LedgerDetailResult
+  LedgerDetailResult,
+  BatchWarningRow,
+  BatchWarningsPage,
+  H3WarningCode
 } from '@/types/h3Import'
 // P0-C：预览行扩展金额/客户/业务员 3 字段，便于用户在确认前判断业务含义
 function form(file: File) { const data = new FormData(); data.append('file', file); return data }
@@ -39,6 +42,13 @@ export async function waitH3BatchUntil(batchId: number, doneStatuses: string[], 
   return waitH3ImportUntil(fetchH3BatchProgress, batchId, doneStatuses, opts)
 }
 export async function fetchImportBatches(params: Record<string, unknown>) { return (await http.get<PageResult<ImportBatch>>('/h3-imports/batches', { params })).data }
+/**
+ * 批次告警明细（GET /api/h3-imports/batches/{id}/warnings）。
+ * 后端按 h3_import_rows.raw_data 重算每行告警（只读），与预览期 warnings 同口径；历史批次同样可查。
+ */
+export async function fetchBatchWarnings(batchId: number, page = 1, size = 50) {
+  return (await http.get<BatchWarningsPage>(`/h3-imports/batches/${batchId}/warnings`, { params: { page, size } })).data
+}
 export interface H3ResetPreviewRow {
   code: string
   label: string

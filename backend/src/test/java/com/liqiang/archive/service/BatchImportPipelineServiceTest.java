@@ -68,6 +68,34 @@ class BatchImportPipelineServiceTest {
     }
 
     @Test
+    void findLastConfirmedSameFileReturnsLatestHit() {
+        // 同内容文件此前成功导入过 → 返回该批次用于「仅提示」
+        var hint = new com.liqiang.archive.dto.H3FactImportDtos.DuplicateImportHint(
+                285L, "生产任务单.xlsx", "2026-10-20T09:51:10");
+        when(jdbc.query(anyString(), any(RowMapper.class), eq("PRODUCTION"), eq("hashP")))
+                .thenReturn(Collections.singletonList(hint));
+        var got = svc.findLastConfirmedSameFile("PRODUCTION", "hashP");
+        assertEquals(285L, got.batchId());
+        assertEquals("2026-10-20T09:51:10", got.completedAt());
+    }
+
+    @Test
+    void findLastConfirmedSameFileMiss() {
+        when(jdbc.query(anyString(), any(RowMapper.class), eq("PRODUCTION"), eq("hashQ")))
+                .thenReturn(Collections.emptyList());
+        assertNull(svc.findLastConfirmedSameFile("PRODUCTION", "hashQ"));
+    }
+
+    @Test
+    void findLastConfirmedSameFileIgnoresBlankHash() {
+        // 无哈希（历史批次 file_hash 可能为 null）时不做无意义的全表扫描
+        assertNull(svc.findLastConfirmedSameFile("PRODUCTION", "   "));
+        assertNull(svc.findLastConfirmedSameFile("PRODUCTION", null));
+        verify(jdbc, org.mockito.Mockito.never())
+                .query(anyString(), any(RowMapper.class), anyString(), anyString());
+    }
+
+    @Test
     void markFailedCapsErrorMessage() {
         String longMsg = "A".repeat(2000);
         svc.markFailed(7L, "PARSING", longMsg, null);

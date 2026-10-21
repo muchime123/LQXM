@@ -1,5 +1,6 @@
 package com.liqiang.archive.controller;
 
+import com.liqiang.archive.dto.H3FactImportDtos;
 import com.liqiang.archive.dto.H3FactImportDtos.BatchProgress;
 import com.liqiang.archive.security.RequirePermission;
 import com.liqiang.archive.service.H3BusinessQueryService;
@@ -118,6 +119,26 @@ public class H3ImportBatchController {
         return isLedgerDataType(dataType)
                 ? ledgerService.previewOf(id)
                 : factService.getPreviewFromStaging(id);
+    }
+
+    /**
+     * 批次告警明细（2026-10-20）：导入确认后，预览期看到的「Σ差异 / 缺价 / 供应商未解析 …」
+     * 此前只留在当次预览里，落库后仅剩 3 个计数，用户无法回溯到具体单据。
+     * 这里按 {@code h3_import_rows.raw_data} 重算每行告警，返回含告警行的分页列表（只读、不写库）。
+     *
+     * <p>仅业务事实域（A 域）支持；台账域（产品信息/仓库明细/经销商）无行级校验告警，直接 400。</p>
+     */
+    @GetMapping("/batches/{id}/warnings")
+    @RequirePermission({"integration.h3", "product_inventory.read"})
+    public H3FactImportDtos.BatchWarningsPage batchWarnings(@PathVariable Long id,
+                                                            @RequestParam(defaultValue = "1") int page,
+                                                            @RequestParam(defaultValue = "50") int size) {
+        String dataType = queryService.importBatchDataType(id);
+        if (dataType == null) throw new NoSuchElementException("批次不存在：id=" + id);
+        if (isLedgerDataType(dataType)) {
+            throw new IllegalArgumentException("该批次为基础台账导入（" + dataType + "），无行级校验告警");
+        }
+        return factService.listBatchWarnings(id, Math.max(page, 1), size);
     }
 
     /**

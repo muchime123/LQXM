@@ -4,6 +4,9 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.liqiang.archive.dto.H3FactImportDtos.AffectedScope;
 import com.liqiang.archive.dto.H3FactImportDtos.BatchProgress;
+import com.liqiang.archive.dto.H3FactImportDtos.BatchWarningRow;
+import com.liqiang.archive.dto.H3FactImportDtos.BatchWarningsPage;
+import com.liqiang.archive.dto.H3FactImportDtos.DuplicateImportHint;
 import com.liqiang.archive.dto.H3FactImportDtos.Preview;
 import com.liqiang.archive.dto.H3FactImportDtos.Result;
 import com.liqiang.archive.dto.H3FactImportDtos.RowPreview;
@@ -345,6 +348,15 @@ private String externalIdOf(FactType type, String key, Map<String, String> main)
 private record Header(int rowIndex, Map<String, Integer> columns) {}
 
 /**
+ * 氚云表头的「(必填)」后缀。<b>它不是字段名的一部分，而是随导出人权限变化的显示装饰</b>。
+ *
+ * <p>实测（2026-10-21，同一张生产任务单表单）：管理员导出 97 列、表头作「业务员(必填)」；
+ * 跟单员导出 77 列、表头作「业务员」。见 {@link #putHeader}。
+ */
+private static final java.util.regex.Pattern BARE_FILLABLE =
+        java.util.regex.Pattern.compile("\\s*[（(]必填[)）]\\s*$");
+
+/**
  * 表头列名归一键：把「原始表头名 → 列号」写入 built。
  *
  * <p>⚠️ 库存调拨主表有两个同名「仓管员」列（选择调出仓库之后、选择调入仓库之后各一），
@@ -354,7 +366,18 @@ private record Header(int rowIndex, Map<String, Integer> columns) {}
  * <p>流式（StreamingSheetHandler#endRow）与兜底（locateHeader）两条路径共用本方法，
  * 保证 rowValues 产出的 Map 与 source_hash 完全一致（避免两路径交替导入反复判 UPDATE）。
  */
-private void putHeader(Map<String, Integer> built, FactType type, String raw, int index) {
+private void putHeader(Map<String, Integer> built, FactType type, String rawHeader, int index) {
+    // ⚠️ 氚云「必填」后缀随导出人权限变化，不是字段的一部分（2026-10-21 实测）：
+    // 同一张生产任务单表单，管理员导出表头是「业务员(必填)」「订单要求生产完成日期(必填)」，
+    // 跟单员导出的是「业务员」「订单要求生产完成日期」。而 saveProduction 等写入方法按**带后缀**的名字取，
+    // 结果：跟单员文件能解析、能预览、不报错，但那 8 个字段全部静默写成 null
+    // （业务员 / 订单要求生产完成日期 / 电压 / 选择制程 / 产线选择 / 所属部门 / 创建人 / 创建时间）。
+    // 更麻烦的是**同一份文件里后缀并不统一**：跟单员件的「拥有者(必填)」「所属部门(必填)」带后缀，
+    // 而「创建人」「修改时间」不带 ⇒ 不能靠逐字段加兜底，必须在唯一的表头归一入口统一剥掉。
+    // 只剥「(必填)」后缀，其他括号（如「产品明细.入库数量(必填)」剥后为「产品明细.入库数量」）语义不变。
+    // ⚠️ 剥完必须 trim：正则只吃「后缀前的空白」，表头若本身带前导空格（「 电压(必填) 」）
+    // 会剥出「 电压」——前导空格留着就永远匹配不到写入侧的 "电压"，静默丢值。
+    String raw = BARE_FILLABLE.matcher(rawHeader).replaceAll("").trim();
     if (type == FactType.TRANSFER && "仓管员".equals(raw) && built.containsKey(raw)) {
         built.put("仓管员(调入)", index);
     } else if (type == FactType.PRODUCTION_REPORT && "报工人".equals(raw) && built.containsKey(raw)) {
@@ -539,8 +562,8 @@ return result;
 private boolean unchanged(ExistingFact existing, Group incoming) {
     if (existing == null) return false;
     if (Objects.equals(existing.hash(), incoming.hash())) return true;
-    // 采购/生产/销售/收款主表用「修改时间(必填)」；供应商导出件表头为「修改时间」（无后缀）
-    Timestamp incomingUpdatedAt = dateTime(first(incoming.main(), "修改时间(必填)", "修改时间"));
+    // 表头后缀已在 putHeader 统一剥掉，此处只认「修改时间」一种写法（不再区分带不带后缀的导出件）。
+    Timestamp incomingUpdatedAt = dateTime(incoming.main().get("修改时间"));
     return incomingUpdatedAt != null && existing.sourceUpdatedAt() != null
             && existing.sourceUpdatedAt().toLocalDateTime().equals(incomingUpdatedAt.toLocalDateTime());
 }
@@ -638,8 +661,8 @@ jdbc.update("UPDATE " + table(type) + " SET source_hash=?,last_synced_at=NOW() W
 private Long saveProduction(Group g) {
 Map<String, String> m = g.main();
 Long customerId = customerId(first(m, "客户选择", "客户信息"));
-Long salespersonId = memberId(m.get("业务员(必填)"));
-Long employeeId = memberEmployeeId(m.get("业务员(必填)"));
+Long salespersonId = memberId(m.get("业务员"));
+Long employeeId = memberEmployeeId(m.get("业务员"));
 // 新建时先释放被其他记录占用的同号工单，避免 ON DUPLICATE KEY UPDATE 命中 uk_po_work_order 误更新
 if (existingId(FactType.PRODUCTION, g) == null) {
 clearConflicts(FactType.PRODUCTION, g);
@@ -670,16 +693,16 @@ linked_sales_order_ref=VALUES(linked_sales_order_ref),product_order_external_id=
 department_name=VALUES(department_name),source_created_by=VALUES(source_created_by),source_created_at=VALUES(source_created_at),
 source_updated_at=VALUES(source_updated_at),source_hash=VALUES(source_hash),last_synced_at=NOW()
 """, g.externalId(), g.key(), m.get("数据状态"), m.get("计划类型"), date(m.get("工单申请日期")),
-date(m.get("订单要求生产完成日期(必填)")), date(m.get("预计生产完成日期")), date(m.get("实际生产完成日期")),
+date(m.get("订单要求生产完成日期")), date(m.get("预计生产完成日期")), date(m.get("实际生产完成日期")),
 dateTime(m.get("排产时间")),
-salespersonId, employeeId, m.get("业务员(必填)"), customerId, first(m,"客户选择","客户信息"), m.get("产品名称"),
+salespersonId, employeeId, m.get("业务员"), customerId, first(m,"客户选择","客户信息"), m.get("产品名称"),
 decimal(m.get("需求数量")), decimal(m.get("生产完成数")), decimal(first(m,"入库数量_数值","入库数量")),
 first(m,"生产进度","生产进度_停用"), m.get("入库进度"), bool(m.get("是否生产完成")), bool(m.get("是否入库完成")),
 m.get("盒子尺寸"), first(m,"盒子形状","其他盒子形状"), m.get("盒子材质"), m.get("模具排列"),
-m.get("电压(必填)"), first(m,"插头","其他插头"), first(m,"品牌","自选品牌名称"), m.get("可选配置"), m.get("备注"),
-m.get("选择制程(必填)"), first(m,"产线选择(必填)","产线文本"), m.get("接单员"), m.get("入库员"),
-m.get("销售订单编号"), m.get("关联销售订单"), m.get("产品订单子OBJid"), m.get("所属部门(必填)"),
-m.get("创建人(必填)"), dateTime(m.get("创建时间(必填)")), dateTime(m.get("修改时间(必填)")), g.hash());
+m.get("电压"), first(m,"插头","其他插头"), first(m,"品牌","自选品牌名称"), m.get("可选配置"), m.get("备注"),
+m.get("选择制程"), first(m,"产线选择","产线文本"), m.get("接单员"), m.get("入库员"),
+m.get("销售订单编号"), m.get("关联销售订单"), m.get("产品订单子OBJid"), m.get("所属部门"),
+m.get("创建人"), dateTime(m.get("创建时间")), dateTime(m.get("修改时间")), g.hash());
 Long id = existingId(FactType.PRODUCTION, g);
 if (id == null) throw new IllegalStateException("生产工单写入后未能定位（external_id=" + g.externalId() + ", 单号=" + g.key() + "）");
 jdbc.update("DELETE FROM production_order_components WHERE production_order_id=?", id);
@@ -705,12 +728,12 @@ return id;
 private Long saveReceipt(Group g, boolean settlement) {
     Map<String, String> m = g.main();
     Long customerId = customerId(first(m, "选择客户", "客户名称", "选择经销商"));
-    Long salespersonId = memberId(first(m, "业务员", "归属业务员", "业务员(必填)"));
+    Long salespersonId = memberId(first(m, "业务员", "归属业务员", "业务员"));
     // 收款记录（RECEIPT）与多订单结清（SETTLEMENT）同存 receipts 表；多订单结清标为 MULTI_OUTBOUND，
     // 收款记录标为 SINGLE_OUTBOUND。仅作氚云原始数据台账，不与销售出库分配（无 receipt_allocations 写入）。
     String receiptType = settlement ? "MULTI_OUTBOUND" : "SINGLE_OUTBOUND";
     String customerName = first(m, "选择客户", "客户名称", "选择经销商");
-    String salespersonName = first(m, "业务员", "归属业务员", "业务员(必填)");
+    String salespersonName = first(m, "业务员", "归属业务员", "业务员");
     if (existingId(FactType.RECEIPT, g) == null) {
         clearConflicts(FactType.RECEIPT, g);
     }
@@ -732,8 +755,8 @@ private Long saveReceipt(Group g, boolean settlement) {
         customerId, customerName, m.get("选择经销商"), salespersonId, salespersonName,
         first(m, "支付方式", "收款方式", "收款渠道"), decimal(first(m, "本次收款金额", "收款金额")),
         decimal(first(m, "合计已收金额", "本次收款金额", "收款金额")), null, null,
-        m.get("备注"), m.get("附件"), m.get("所属部门(必填)"), m.get("创建人(必填)"),
-        dateTime(m.get("创建时间(必填)")), dateTime(m.get("修改时间(必填)")), g.hash());
+        m.get("备注"), m.get("附件"), m.get("所属部门"), m.get("创建人"),
+        dateTime(m.get("创建时间")), dateTime(m.get("修改时间")), g.hash());
     Long id = existingId(FactType.RECEIPT, g);
     if (id == null) throw new IllegalStateException("收款/结清写入后未能定位（external_id=" + g.externalId() + ", 单号=" + g.key() + "）");
     if (settlement) {
@@ -806,8 +829,8 @@ private Long saveOutbound(Group g) {
     // 这里用 resolveOutboundCustomerName 回退解析，保证 customer_id 与 customer_name 同步可用，避免下游销售出库分析找不到客户。
     String resolvedCustomerName = resolveOutboundCustomerName(m);
     Long customerId = customerId(first(m, "选择客户", resolvedCustomerName), m.get("客户详细地址"), m.get("联系方式"));
-    Long salespersonId = memberId(m.get("业务员(必填)"));
-Long employeeId = memberEmployeeId(m.get("业务员(必填)"));
+    Long salespersonId = memberId(m.get("业务员"));
+Long employeeId = memberEmployeeId(m.get("业务员"));
 Long warehouseId = h3WarehouseId(m.get("选择出库仓库"));
 // 新建（external_id 不存在）时先释放被其他记录占用的同号出库单，避免 ON DUPLICATE KEY UPDATE 命中 uk_so_no 误更新
 if (existingId(FactType.OUTBOUND, g) == null) {
@@ -837,13 +860,13 @@ invoiced_amount=VALUES(invoiced_amount),uninvoiced_amount=VALUES(uninvoiced_amou
 department_name=VALUES(department_name),source_created_by=VALUES(source_created_by),source_created_at=VALUES(source_created_at),
 source_updated_at=VALUES(source_updated_at),attachment_info=VALUES(attachment_info),source_hash=VALUES(source_hash),last_synced_at=NOW()
 """, g.externalId(), g.key(), m.get("数据状态"), SalesOutboundSettlementService.normalizeOutboundStatus(m.get("数据状态")), date(m.get("发货日期")), date(m.get("业务日期")), customerId,
-resolvedCustomerName, m.get("选择经销商"), salespersonId, employeeId, m.get("业务员(必填)"), m.get("业务归属"), m.get("地区"),
+resolvedCustomerName, m.get("选择经销商"), salespersonId, employeeId, m.get("业务员"), m.get("业务归属"), m.get("地区"),
 m.get("联系方式"), m.get("客户详细地址"), m.get("选择运输方式"), bool(m.get("是否包邮")), decimal(m.get("运杂费")),
 m.get("选择出库仓库"), warehouseId, m.get("仓管员"), m.get("客户付款状态"), m.get("订单备注"), m.get("收款备注"),
 decimal(m.get("采购金额合计")), decimal(m.get("销售金额合计")), decimal(m.get("利润金额")), decimal(m.get("已收款金额")),
 decimal(m.get("已收款金额")), decimal(m.get("未收款金额")), decimal(m.get("已开票金额")), decimal(m.get("未开票金额")), m.get("开票员"),
-m.get("数据标题"), m.get("所属部门(必填)"), m.get("创建人(必填)"), dateTime(m.get("创建时间(必填)")),
-dateTime(m.get("修改时间(必填)")), m.get("附件"), g.hash());
+m.get("数据标题"), m.get("所属部门"), m.get("创建人"), dateTime(m.get("创建时间")),
+dateTime(m.get("修改时间")), m.get("附件"), g.hash());
 Long id = existingId(FactType.OUTBOUND, g);
 if (id == null) throw new IllegalStateException("出库单写入后未能定位（external_id=" + g.externalId() + ", 单号=" + g.key() + "）");
 jdbc.update("DELETE FROM sales_outbound_items WHERE sales_outbound_id=?", id);
@@ -902,7 +925,7 @@ private Long h3WarehouseId(String sourceName) {
 
 private void syncUnchangedOutbound(Long outboundId, Group g) {
 if (outboundId == null) return;
-jdbc.update("UPDATE sales_outbounds SET employee_id=? WHERE id=? AND employee_id IS NULL", memberEmployeeId(g.main().get("业务员(必填)")), outboundId);
+jdbc.update("UPDATE sales_outbounds SET employee_id=? WHERE id=? AND employee_id IS NULL", memberEmployeeId(g.main().get("业务员")), outboundId);
 BigDecimal sourceReceived = decimal(g.main().get("已收款金额"));
 BigDecimal sourceOutstanding = decimal(g.main().get("未收款金额"));
 if (sourceReceived != null || sourceOutstanding != null) {
@@ -941,8 +964,8 @@ private void saveOutboundPaymentSnapshots(Long outboundId, Group g) {
     }
     jdbc.update("DELETE FROM sales_outbound_payment_snapshots WHERE sales_outbound_id=? AND migration_batch='LIVE_IMPORT'",outboundId);
     if (dedup.isEmpty()) return;
-    String createdBy = m.get("创建人(必填)");
-    Timestamp createdAt = dateTime(m.get("创建时间(必填)"));
+    String createdBy = m.get("创建人");
+    Timestamp createdAt = dateTime(m.get("创建时间"));
     String outboundNo = g.key();
     String sourceStatus = m.get("数据状态");
     for (Map<String, String> row : dedup.values()) {
@@ -1002,10 +1025,10 @@ private Long saveSupplier(Group g) {
             clean(m.get("对公开户名")), clean(m.get("对公银行账号")), clean(m.get("对公开户行")),
             clean(m.get("联系人")), clean(m.get("联系方式")), clean(m.get("供应商地址")), m.get("备注"),
             m.get("数据状态"), g.externalId(), m.get("数据标题"),
-            first(m, "拥有者(必填)", "拥有者"), first(m, "所属部门(必填)", "所属部门"),
-            first(m, "创建人", "创建人(必填)"),
-            dateTime(first(m, "创建时间", "创建时间(必填)")),
-            dateTime(first(m, "修改时间", "修改时间(必填)")), g.hash()};
+            m.get("拥有者"), m.get("所属部门"),
+            m.get("创建人"),
+            dateTime(m.get("创建时间")),
+            dateTime(m.get("修改时间")), g.hash()};
     if (id == null) {
         jdbc.update("""
             INSERT INTO h3_supplier_catalog(external_source,external_id,name,normalized_name,supplier_status,
@@ -1070,21 +1093,21 @@ private Long savePurchaseReceipt(Group g) {
         source_hash=VALUES(source_hash),last_synced_at=NOW()
         """,
         g.externalId(), g.key(), date(m.get("采购日期")), warehouseId, warehouseName,
-        first(m, "所属部门(必填)", "所属部门"), supplierId, supplierRef,
+        m.get("所属部门"), supplierId, supplierRef,
         clean(m.get("联系人")), clean(m.get("联系方式")), address,
         normDecimal(m.get("合计采购金额")), normDecimal(m.get("合计采购数量")),
         date(m.get("需到货日期")), clean(m.get("仓管员")),
         normDecimal(m.get("未付款金额")), normDecimal(m.get("未收票金额")), normDecimal(m.get("已付款金额")),
         m.get("付款给供应商状态"), m.get("订单备注"), m.get("付款备注"), m.get("数据状态"),
-        m.get("数据标题"), first(m, "拥有者(必填)", "拥有者"), first(m, "所属部门(必填)", "所属部门"),
-        first(m, "创建人(必填)", "创建人"), dateTime(m.get("创建时间(必填)")),
-        dateTime(first(m, "修改时间(必填)", "修改时间")), g.hash());
+        m.get("数据标题"), m.get("拥有者"), m.get("所属部门"),
+        m.get("创建人"), dateTime(m.get("创建时间")),
+        dateTime(m.get("修改时间")), g.hash());
     Long id = existingId(FactType.PURCHASE_IN, g);
     if (id == null) throw new IllegalStateException("采购入库写入后未能定位（单号=" + g.key() + "）");
     jdbc.update("DELETE FROM purchase_receipt_items WHERE purchase_receipt_id=?", id);
     for (Map<String, String> row : g.rows()) {
         if (empty(first(row, "产品明细.产品编号", "产品明细.选择产品"))
-                && empty(row.get("产品明细.入库数量(必填)"))) continue;
+                && empty(row.get("产品明细.入库数量"))) continue;
         String itemExt = clean(row.get("产品明细.数据ID(不可修改)"));
         String taskRaw = row.get("产品明细.选择生产任务单");
         // 只取首段编号（形如 SCGD20260005638    名称    规格…），关联不上记原文、不阻断
@@ -1100,7 +1123,7 @@ private Long savePurchaseReceipt(Group g) {
             VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
             """, id, itemExt, integer(row.get("产品明细.序号")), row.get("产品明细.产品编号"),
             first(row, "产品明细.选择产品"), row.get("产品明细.产品类目（隐）"), row.get("产品明细.规格型号"),
-            row.get("产品明细.单位"), normDecimal(row.get("产品明细.入库数量(必填)")),
+            row.get("产品明细.单位"), normDecimal(row.get("产品明细.入库数量")),
             normDecimal(row.get("产品明细.采购价格")), normDecimal(row.get("产品明细.采购金额小计")),
             normDecimal(row.get("产品明细.库存数量")), parseFlag(row.get("产品明细.是否为模具")),
             row.get("产品明细.是否有制程"), row.get("产品明细.任务单业务员"), taskNo, taskRaw,
@@ -1142,7 +1165,7 @@ private List<String> purchaseWarnings(Group g, boolean heal) {
     int noPrice = 0;
     for (Map<String, String> row : g.rows()) {
         java.math.BigDecimal amt = normDecimal(row.get("产品明细.采购金额小计"));
-        java.math.BigDecimal qty = normDecimal(row.get("产品明细.入库数量(必填)"));
+        java.math.BigDecimal qty = normDecimal(row.get("产品明细.入库数量"));
         if (amt != null) { sumAmount = sumAmount.add(amt); anyAmount = true; }
         if (qty != null) { sumQty = sumQty.add(qty); anyQty = true; }
         if (qty != null && qty.signum() > 0) {
@@ -1203,16 +1226,16 @@ private Long saveOtherMovement(Group g, boolean inbound) {
         warehouseId, warehouseName, clean(m.get("仓管员")), clean(m.get("业务员")),
         normDecimal(m.get("合计数量")), normDecimal(m.get("合计金额")),
         m.get("备注"), m.get("数据状态"), m.get("数据标题"),
-        first(m, "拥有者(必填)", "拥有者"), first(m, "所属部门(必填)", "所属部门"),
-        first(m, "创建人(必填)", "创建人"),
-        dateTime(first(m, "创建时间(必填)", "创建时间")),
-        dateTime(first(m, "修改时间(必填)", "修改时间")), g.hash());
+        m.get("拥有者"), m.get("所属部门"),
+        m.get("创建人"),
+        dateTime(m.get("创建时间")),
+        dateTime(m.get("修改时间")), g.hash());
     Long id = existingId(type, g);
     if (id == null) throw new IllegalStateException("其他入/出库写入后未能定位（单号=" + g.key() + "）");
     jdbc.update("DELETE FROM h3_other_stock_movement_items WHERE movement_id=?", id);
     for (Map<String, String> row : g.rows()) {
         if (empty(first(row, "其他出库明细.产品编号", "其他出库明细.选择产品"))
-                && empty(first(row, "其他出库明细.入库数量", "其他出库明细.出库数量(必填)"))) continue;
+                && empty(first(row, "其他出库明细.入库数量", "其他出库明细.出库数量"))) continue;
         jdbc.update("""
             INSERT INTO h3_other_stock_movement_items(movement_id,source_item_id,line_no,product_code,product_name,
             category,spec,unit,quantity,stock_quantity,purchase_price,amount,remark)
@@ -1222,7 +1245,7 @@ private Long saveOtherMovement(Group g, boolean inbound) {
             first(row, "其他出库明细.选择产品", "其他出库明细.产品名称（隐）"),
             first(row, "其他出库明细.类目", "其他出库明细.产品类目（隐）"),
             row.get("其他出库明细.规格"), row.get("其他出库明细.单位"),
-            normDecimal(first(row, "其他出库明细.入库数量", "其他出库明细.出库数量(必填)")),
+            normDecimal(first(row, "其他出库明细.入库数量", "其他出库明细.出库数量")),
             normDecimal(row.get("其他出库明细.库存数量")),
             normDecimal(row.get("其他出库明细.采购价格")), normDecimal(row.get("其他出库明细.采购总价")),
             row.get("其他出库明细.产品备注"));
@@ -1247,7 +1270,7 @@ private List<String> otherMovementWarnings(Group g, boolean inbound) {
     boolean anyQty = false;
     int noPrice = 0;
     for (Map<String, String> row : g.rows()) {
-        java.math.BigDecimal qty = normDecimal(first(row, "其他出库明细.入库数量", "其他出库明细.出库数量(必填)"));
+        java.math.BigDecimal qty = normDecimal(first(row, "其他出库明细.入库数量", "其他出库明细.出库数量"));
         if (qty != null) { sumQty = sumQty.add(qty); anyQty = true; }
         if (qty != null && qty.signum() > 0) {
             java.math.BigDecimal price = normDecimal(row.get("其他出库明细.采购价格"));
@@ -1299,10 +1322,10 @@ private Long saveTransfer(Group g) {
         h3WarehouseId(outName), outName, clean(m.get("仓管员")),
         h3WarehouseId(inName), inName, clean(m.get("仓管员(调入)")),
         m.get("备注"), m.get("数据状态"), m.get("数据标题"),
-        first(m, "拥有者(必填)", "拥有者"), first(m, "所属部门(必填)", "所属部门"),
-        first(m, "创建人(必填)", "创建人"),
-        dateTime(first(m, "创建时间(必填)", "创建时间")),
-        dateTime(first(m, "修改时间(必填)", "修改时间")), g.hash());
+        m.get("拥有者"), m.get("所属部门"),
+        m.get("创建人"),
+        dateTime(m.get("创建时间")),
+        dateTime(m.get("修改时间")), g.hash());
     Long id = existingId(FactType.TRANSFER, g);
     if (id == null) throw new IllegalStateException("库存调拨写入后未能定位（单号=" + g.key() + "）");
     jdbc.update("DELETE FROM h3_inventory_transfer_items WHERE transfer_id=?", id);
@@ -1406,10 +1429,10 @@ private Long saveInvoiceProfile(Group g) {
             taxNo, clean(m.get("地址")), clean(m.get("电话")),
             clean(m.get("开户行")), clean(m.get("银行账号")), customerId, m.get("数据状态"),
             g.externalId(), m.get("数据标题"),
-            first(m, "拥有者(必填)", "拥有者"), first(m, "所属部门(必填)", "所属部门"),
-            first(m, "创建人", "创建人(必填)"),
-            dateTime(first(m, "创建时间", "创建时间(必填)")),
-            dateTime(first(m, "修改时间", "修改时间(必填)")), g.hash()};
+            m.get("拥有者"), m.get("所属部门"),
+            m.get("创建人"),
+            dateTime(m.get("创建时间")),
+            dateTime(m.get("修改时间")), g.hash()};
     jdbc.update("""
         INSERT INTO h3_customer_invoice_profiles(external_source,external_id,customer_name,normalized_name,
         tax_no,address,phone,bank_name,bank_account,customer_id,data_status,source_object_id,source_title,
@@ -1485,11 +1508,11 @@ private Long saveProductionReport(Group g) {
             clean(m.get("是否自定义报工数量")),                           // is_custom_qty
             m.get("数据状态"),                                            // data_status
             m.get("数据标题"),                                            // data_title
-            first(m, "拥有者(必填)", "拥有者"),                            // owner_name
-            first(m, "所属部门(必填)", "所属部门"),                        // department_name
-            first(m, "创建人", "创建人(必填)"),                            // created_by_name
-            dateTime(first(m, "创建时间", "创建时间(必填)")),              // source_created_at
-            dateTime(first(m, "修改时间", "修改时间(必填)")),              // source_updated_at
+            m.get("拥有者"),                            // owner_name
+            m.get("所属部门"),                        // department_name
+            m.get("创建人"),                            // created_by_name
+            dateTime(m.get("创建时间")),              // source_created_at
+            dateTime(m.get("修改时间")),              // source_updated_at
             g.hash()};                                                    // source_hash
     jdbc.update("""
         INSERT INTO h3_production_reports(external_source,external_id,source_no,report_time,work_order_no,
@@ -1969,10 +1992,10 @@ private Long saveInvoiceRequest(Group g) {
             normDecimal(m.get("未收款金额")),
             m.get("选择出库单匹配开票内容、收款情况"), m.get("备注"), m.get("数据状态"),
             g.externalId(), m.get("数据标题"),
-            first(m, "拥有者(必填)", "拥有者"), first(m, "所属部门(必填)", "所属部门"),
-            first(m, "创建人", "创建人(必填)"),
-            dateTime(first(m, "创建时间", "创建时间(必填)")),
-            dateTime(first(m, "修改时间", "修改时间(必填)")), g.hash()};
+            m.get("拥有者"), m.get("所属部门"),
+            m.get("创建人"),
+            dateTime(m.get("创建时间")),
+            dateTime(m.get("修改时间")), g.hash()};
     jdbc.update("""
         INSERT INTO h3_invoice_requests(external_source,external_id,source_no,invoice_type,redflush_ref,
         request_date,salesperson,profile_external_id,profile_id,customer_name,tax_no,
@@ -2273,7 +2296,7 @@ private void enrichCustomerFromOutbound(Long customerId, Map<String,String> m) {
     if (customerId == null) return;
     String address = clean(m.get("客户详细地址"));
     String phone = clean(m.get("联系方式"));
-    String salesperson = clean(m.get("业务员(必填)"));
+    String salesperson = clean(m.get("业务员"));
     String shipDate = clean(m.get("发货日期"));
     // 地址非空优先，「地区」字段兜底：导入时即解析省/市/区县（治本，替代事后全量回填）。
     // 解析委托 ChinaAddressParser.parseLoose（区划字典文本扫描兜底），解析不出的层级留空不猜测；
@@ -2347,7 +2370,7 @@ private void enrichCustomerFromOutbound(Long customerId, Map<String,String> m) {
 
 private void enrichCustomerFromProduction(Long customerId, Map<String,String> m) {
     if (customerId == null) return;
-    String salesperson = clean(m.get("业务员(必填)"));
+    String salesperson = clean(m.get("业务员"));
     String appDate = clean(m.get("工单申请日期"));
     if (salesperson != null) ensureSalespersonRelation(customerId, salesperson, appDate);
 }
@@ -2431,11 +2454,13 @@ public StageAccepted createBatchRecord(String type, String fileName, long fileSi
     Long cached = pipeline.findPreviewReadyBatchId(factType.dbType, fileHash);
     if (cached != null) {
         return new StageAccepted(cached, factType.dbType, fileName, true, "PREVIEW_READY",
-                "文件哈希命中已有暂存结果，已跳过重复解析");
+                "文件哈希命中已有暂存结果，已跳过重复解析", null);
     }
+    // 已确认过的同内容文件：只提示、不拦截（氚云无法实时同步，一天多次全量重导是常态）
+    DuplicateImportHint duplicateHint = pipeline.findLastConfirmedSameFile(factType.dbType, fileHash);
     long batchId = pipeline.createBatch(fileName, fileSize, fileHash, factType.dbType, null);
     return new StageAccepted(batchId, factType.dbType, fileName, false, "UPLOADED",
-            "文件已登记，等待后台异步解析任务启动（由控制器触发 @Async）");
+            "文件已登记，等待后台异步解析任务启动（由控制器触发 @Async）", duplicateHint);
 }
 
 /** 异步解析：调用方通过 Spring 代理调用 public 方法使 @Async 生效。 */
@@ -2757,7 +2782,7 @@ private void collectScopeFromGroup(FactType factType, Group group,
                 INVOICE_INPUT, INVOICE_SALES, SUPPLIER_PAYABLE, CASHFLOW_JOURNAL, CASHIER_LOG -> null;
     };
     String salesperson = switch (factType) {
-        case PRODUCTION, OUTBOUND -> m.get("业务员(必填)");
+        case PRODUCTION, OUTBOUND -> m.get("业务员");
         case RECEIPT -> m.get("业务员");
         case SETTLEMENT -> m.get("归属业务员");
         case SUPPLIER, PURCHASE_IN, OTHER_IN, OTHER_OUT, TRANSFER, INVOICE_PROFILE, INVOICE_REQUEST, PRODUCTION_REPORT, SUPPLIER_PAYABLE, CASHFLOW_JOURNAL -> null;
@@ -2823,15 +2848,15 @@ case CASHIER_LOG -> first(m, "摘要", "付款人识别号");
 private String extractPreviewSalesperson(FactType factType, Map<String, String> m) {
     if (m == null) return null;
     return switch (factType) {
-        case PRODUCTION, OUTBOUND -> m.get("业务员(必填)");
+        case PRODUCTION, OUTBOUND -> m.get("业务员");
         case RECEIPT -> m.get("业务员");
         case SETTLEMENT -> m.get("归属业务员");
-        case SUPPLIER -> first(m, "拥有者(必填)", "拥有者");
+        case SUPPLIER -> m.get("拥有者");
         case PURCHASE_IN -> first(m, "仓管员");
         case OTHER_IN -> first(m, "仓管员");
         case OTHER_OUT -> first(m, "业务员", "仓管员");
         case TRANSFER -> first(m, "仓管员", "仓管员(调入)");
-case INVOICE_PROFILE -> first(m, "拥有者(必填)", "拥有者");
+case INVOICE_PROFILE -> m.get("拥有者");
 case INVOICE_REQUEST -> first(m, "业务员");
 case PRODUCTION_REPORT -> first(m, "报工人");
 case INVOICE_INPUT -> null;
@@ -2851,6 +2876,131 @@ private void insertStagingSlice(long batchId, int startSeq, List<Group> slice) {
     }
 }
 
+/**
+ * 单组（一张业务单据）的校验告警——**告警口径唯一来源**。
+ *
+ * <p>消费方三处：① 预览 {@link #buildPreviewFromGroups}；② confirm 段的 missing_* 计数；
+ * ③ 导入后告警明细 {@link #listBatchWarnings}。三者必须同口径，否则会出现
+ * 「预览提示有告警、导入后查不到」的割裂（2026-10-20 修复）。
+ *
+ * <p>⚠️ 新增 FactType 时务必补这里；所有 {@code *Warnings} 均以 {@code heal=false} 调用，
+ * 保证只读（重算历史批次时不会写供应商别名等副作用）。
+ */
+private List<String> warningsOf(FactType factType, Group g) {
+    if (factType == FactType.PURCHASE_IN) return purchaseWarnings(g, false);
+    if (factType == FactType.OTHER_IN) return otherMovementWarnings(g, true);
+    if (factType == FactType.OTHER_OUT) return otherMovementWarnings(g, false);
+    if (factType == FactType.TRANSFER) return transferWarnings(g);
+    if (factType == FactType.INVOICE_PROFILE) {
+        String pw = invoiceProfileWarning(g);
+        return pw.isEmpty() ? List.of() : List.of(pw);
+    }
+    if (factType == FactType.INVOICE_REQUEST) return invoiceRequestWarnings(g);
+    if (factType == FactType.PRODUCTION_REPORT) {
+        String pw = productionReportWarning(g);
+        return pw.isEmpty() ? List.of() : List.of(pw);
+    }
+    if (factType == FactType.INVOICE_INPUT || factType == FactType.INVOICE_SALES) return invoiceWarnings(factType, g);
+    if (factType == FactType.SUPPLIER_PAYABLE) return supplierPayableWarnings(g);
+    if (factType == FactType.CASHFLOW_JOURNAL) return cashflowJournalWarnings(g);
+    if (factType == FactType.CASHIER_LOG) return cashierLogWarnings(g);
+    return List.of();
+}
+
+/**
+ * 告警文本 → 稳定分类码（UI 分类统计/筛选用）。
+ *
+ * <p>各 {@code *Warnings} 返回的是面向人的中文串，这里只做「前缀/关键词 → 码」的
+ * 单一映射，不另起一套语义判断；未命中的统一归 OTHER。
+ */
+private static String warningCode(String w) {
+    if (w == null || w.isBlank()) return "OTHER";
+    if (w.startsWith("Σ明细金额") || w.startsWith("Σ明细数量") || w.startsWith("金额+税额")
+            || w.contains("行内容合计") || w.equals("已收款+未收款 ≠ 申请金额")) return "SUM_MISMATCH";
+    if (w.contains("缺采购价") || w.contains("缺单价")) return "MISSING_PRICE";
+    if (w.startsWith("供应商未解析")) return "SUPPLIER_UNRESOLVED";
+    if (w.contains("仓库为空") || w.contains("仓库未匹配")) return "WAREHOUSE_UNMATCHED";
+    if (w.startsWith("数据状态=")) return "INVALID_STATUS";
+    if (w.startsWith("发票类型=")) return "INVALID_TYPE";
+    if (w.contains("无法解析") || w.contains("缺付款日期") || w.contains("缺付款金额")) return "BAD_FIELD";
+    if (w.contains("已红冲") || w.contains("红冲引用")) return "RED_CHAIN";
+    if (w.contains("同键多行")) return "DUPLICATE";
+    if (w.startsWith("缺") || w.endsWith("为空") || w.contains("为空，无法")) return "MISSING_FIELD";
+    return "OTHER";
+}
+
+/**
+ * 导入后「批次告警明细」（2026-10-20）：按 {@code h3_import_rows.raw_data} 重建每一单，
+ * 用 {@link #warningsOf} 重算告警，返回含告警行的分页结果。
+ *
+ * <p>为什么不落库：告警是「原始单据 vs 当前档案字典」的派生结论，落库会随字典变化失真且需迁移；
+ * 重算保证历史批次同样可查，且只读（heal=false）不产生副作用。</p>
+ *
+ * @param page 1 起；size 上限 200
+ */
+public BatchWarningsPage listBatchWarnings(Long batchId, int page, int size) {
+    List<String> dt = jdbc.query("SELECT data_type FROM h3_import_batches WHERE id=?",
+            (rs, n) -> rs.getString(1), batchId);
+    if (dt.isEmpty()) throw new NoSuchElementException("批次不存在：id=" + batchId);
+    FactType factType = FactType.from(dt.getFirst());
+    final int pageSize = Math.min(Math.max(size, 1), 200);
+    Long totalRows = jdbc.queryForObject(
+            "SELECT COUNT(*) FROM h3_import_rows WHERE batch_id=?", Long.class, batchId);
+
+    List<BatchWarningRow> all = new ArrayList<>();
+    jdbc.query("""
+            SELECT id,external_id,action,business_id,raw_data
+              FROM h3_import_rows WHERE batch_id=? ORDER BY id
+            """, rs -> {
+        String raw = rs.getString("raw_data");
+        if (raw == null || raw.isBlank()) return;
+        Group g;
+        try {
+            g = groupFromRaw(raw, rs.getString("external_id"));
+        } catch (Exception ignored) {
+            return; // 单条快照损坏不应阻塞整批查看
+        }
+        if (g == null) return;
+        List<String> ws = warningsOf(factType, g);
+        if (ws.isEmpty()) return;
+        Long rowId = rs.getLong("id");
+        Long businessId = (Long) rs.getObject("business_id");
+        all.add(new BatchWarningRow(rowId, businessId, g.externalId(), title(factType, g.main()),
+                rs.getString("action"), String.join("；", ws),
+                ws.stream().map(H3FactImportService::warningCode).distinct().toList()));
+    }, batchId);
+
+    int from = Math.min(Math.max(page - 1, 0) * pageSize, all.size());
+    int to = Math.min(from + pageSize, all.size());
+    List<BatchWarningRow> items = new ArrayList<>(all.subList(from, to));
+    // 分类码计数：按「告警行」计，一行同码只记一次（warningCodes 已 distinct）；
+    // 统计全量 all 而非当前页，供 UI 的筛选 chips 显示总数。code 参数（当前生效筛选）暂未接
+    // 入本方法签名，恒传 null = 不筛选。
+    // TODO(并行会话)：DTO 已预留 code 筛选参数，接上时把 code 传进来并在 items 处按码过滤。
+    Map<String, Integer> codeCounts = new LinkedHashMap<>();
+    for (BatchWarningRow r : all) {
+        if (r.warningCodes() == null) continue;
+        for (String c : r.warningCodes()) codeCounts.merge(c, 1, Integer::sum);
+    }
+    return new BatchWarningsPage(batchId, factType.dbType,
+            totalRows == null ? 0 : totalRows, all.size(), Math.max(page, 1), pageSize, items,
+            codeCounts, null);
+}
+
+/** 从 {@code h3_import_rows.raw_data}（{@code {key,main,rows}}）还原 Group；无法还原返回 null。 */
+private Group groupFromRaw(String raw, String externalId) throws Exception {
+    @SuppressWarnings("unchecked")
+    Map<String, Object> payload = objectMapper.readValue(raw, Map.class);
+    if (payload == null) return null;
+    @SuppressWarnings("unchecked")
+    Map<String, String> main = (Map<String, String>) payload.get("main");
+    @SuppressWarnings("unchecked")
+    List<Map<String, String>> rows = (List<Map<String, String>>) payload.get("rows");
+    if (main == null) return null;
+    return new Group(String.valueOf(payload.getOrDefault("key", "")),
+            externalId, main, rows == null ? List.of() : rows, "");
+}
+
 private Preview buildPreviewFromGroups(FactType factType, String fileName, List<Group> groups) {
     Map<String, ExistingFact> existing = loadExistingFacts(factType);
     Map<String, Map<String, Object>> previousSnapshots =
@@ -2866,48 +3016,9 @@ private Preview buildPreviewFromGroups(FactType factType, String fileName, List<
         List<FieldChange> changes = "UPDATE".equals(action)
                 ? diffSnapshot(previousSnapshots.get(g.externalId()), g) : List.of();
         // 采购入库：Σ明细 vs 主表合计、缺价、供应商未解析 → 预览即拦（不阻断，可见即可）
-        // 其他入/出库（2026-09-17 P1）：仓库未匹配、Σ数量 vs 主表合计、缺价行 —— 同一策略
-        String warnings = null;
-        if (factType == FactType.PURCHASE_IN) {
-            List<String> groupWarnings = purchaseWarnings(g, false);
-            if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
-        } else if (factType == FactType.OTHER_IN || factType == FactType.OTHER_OUT) {
-            List<String> groupWarnings = otherMovementWarnings(g, factType == FactType.OTHER_IN);
-            if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
-        } else if (factType == FactType.TRANSFER) {
-            // 库存调拨（2026-09-17 P2）：仓库未匹配 / 调出仓=调入仓 / 超调出库存快照 / 非已生效状态
-            // ⚠️ 新增 FactType 时务必同时补此处与 confirm 段的填充点，否则预览告警静默为空（P1 踩过）
-            List<String> groupWarnings = transferWarnings(g);
-            if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
-        }
-            else if (factType == FactType.INVOICE_PROFILE) {
-                // 开票资料：户名缺失/非已生效标记（未关联 customers 不是错误，台账列表展示）
-                String pw = invoiceProfileWarning(g);
-                if (!pw.isEmpty()) warnings = pw;
-            } else if (factType == FactType.INVOICE_REQUEST) {
-                List<String> groupWarnings = invoiceRequestWarnings(g);
-                if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
-            } else if (factType == FactType.PRODUCTION_REPORT) {
-                // 生产报工（2026-09-17 第 15 类）：缺工单号/缺工序/非已生效 → 预览即标
-                String pw = productionReportWarning(g);
-                if (!pw.isEmpty()) warnings = pw;
-            } else if (factType == FactType.INVOICE_INPUT || factType == FactType.INVOICE_SALES) {
-                // 发票台账（2026-09-18 第 16 类）：勾稽/红冲链/收款子行 → 预览即标（⚠️ confirm 段同款填充点已补）
-                List<String> groupWarnings = invoiceWarnings(factType, g);
-                if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
-            } else if (factType == FactType.SUPPLIER_PAYABLE) {
-                // 供应商应付（2026-09-18 第 17 类）：付款日期/金额不成对、月份异常 → 预览即标（confirm 段同款已补）
-                List<String> groupWarnings = supplierPayableWarnings(g);
-                if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
-            } else if (factType == FactType.CASHFLOW_JOURNAL) {
-                // 流水日记账（2026-09-18 第 18 类）：日期解析失败/收支双空/账户缺失 → 预览即标（confirm 段同款已补）
-                List<String> groupWarnings = cashflowJournalWarnings(g);
-                if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
-            } else if (factType == FactType.CASHIER_LOG) {
-                // 收银通（2026-09-18 第 19 类）：缺摘要/业务员、状态非成功 → 预览即标（confirm 段同款已补）
-                List<String> groupWarnings = cashierLogWarnings(g);
-                if (!groupWarnings.isEmpty()) warnings = String.join("；", groupWarnings);
-            }
+        // 其他入/出库/调拨/开票/报工/发票/应付/流水/收银通同款策略，统一收口到 warningsOf（告警口径唯一来源）。
+        List<String> groupWarnings = warningsOf(factType, g);
+        String warnings = groupWarnings.isEmpty() ? null : String.join("；", groupWarnings);
         rows.add(new RowPreview(g.key(), g.externalId(), title(factType, g.main()), action, childCount(factType, g),
                 extractPreviewAmount(factType, g.main()),
                 extractPreviewCustomer(factType, g.main()),

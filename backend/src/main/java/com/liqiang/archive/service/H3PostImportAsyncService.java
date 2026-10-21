@@ -20,6 +20,8 @@ public class H3PostImportAsyncService {
     private final JdbcTemplate jdbc;
     private final H3ImportOrchestratorService orchestrator;
     private final CommissionCalculationService commissions;
+    private final H3StagingCleanupService stagingCleanup;
+    private final H3SnapshotCleanupService snapshotCleanup;
 
     @Async("h3ImportExecutor")
     public void run(AffectedScope scope,long batchId,boolean trackChanges) {
@@ -30,8 +32,17 @@ public class H3PostImportAsyncService {
         } catch(Exception e) {
             jdbc.update("UPDATE h3_import_batches SET status='PARTIAL_FAILED',progress_stage='DONE',progress_pct=100,error_message=?,completed_at=NOW() WHERE id=?",
                     "自动编排异常："+safe(e),batchId);
+            // 业务数据已在主事务中提交，批次已终态；暂存行对重试无意义，仍按口径清
+            stagingCleanup.purgeAfterConfirm(batchId);
+            snapshotCleanup.pruneAfterConfirm(batchId);
             return;
         }
+        // 终态写入之后才清暂存：本方法是 @Async 且无事务，两个语句各自提交，顺序天然安全。
+        // 清理内部自带失败兜底与 preview_json 守卫，不影响上面已落定的终态。
+        stagingCleanup.purgeAfterConfirm(batchId);
+        // 快照治理：只清「本批涉及的单据在更早批次里的重复快照」，每单最新一条永久保留，
+        // 因此下次导入的新旧字段对照、台账更新历史（读 preview_json）均不受影响。
+        snapshotCleanup.pruneAfterConfirm(batchId);
         if(trackChanges) {
             try {
                 int rows=commissions.trackOutboundChanges(batchId,new ArrayList<>(scope.writtenFactIds()==null?List.of():scope.writtenFactIds()),"导入后自动识别");

@@ -1,6 +1,7 @@
 package com.liqiang.archive.service;
 
 import com.liqiang.archive.dto.H3FactImportDtos.BatchProgress;
+import com.liqiang.archive.dto.H3FactImportDtos.DuplicateImportHint;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
@@ -83,6 +84,34 @@ public class BatchImportPipelineService {
                 "SELECT id FROM h3_import_batches WHERE data_type=? AND file_hash=? AND status='PREVIEW_READY' LIMIT 1",
                 (rs, rowNum) -> rs.getLong(1), dbType, fileHash);
         return ids.isEmpty() ? null : ids.getFirst();
+    }
+
+    /**
+     * 「同内容文件此前已成功导入过」提示源（<b>只提示、不拦截</b>）。
+     *
+     * <p>与 {@link #findPreviewReadyBatchId} 的区别：那个是「未确认批次复用解析结果」
+     * （省一次解析，hashHit=true）；本方法查的是<b>已经确认落库</b>的历史批次，
+     * 用于让操作员知道「这份文件上午已经导过一次」，但依然正常建新批次、正常比对写入。
+     *
+     * <p>按内容哈希而非文件名判断——氚云导出的文件名常带日期或固定不变，不可靠。
+     *
+     * @return 最近一次已确认批次；从未成功导入过则返回 null
+     */
+    public DuplicateImportHint findLastConfirmedSameFile(String dbType, String fileHash) {
+        if (!StringUtils.hasText(fileHash)) return null;
+        List<DuplicateImportHint> hits = jdbc.query("""
+                SELECT id, file_name, completed_at
+                  FROM h3_import_batches
+                 WHERE data_type=? AND file_hash=? AND status IN ('COMPLETED','PARTIAL_FAILED')
+                 ORDER BY id DESC LIMIT 1
+                """, (rs, rowNum) -> {
+                    java.sql.Timestamp ts = rs.getTimestamp("completed_at");
+                    return new DuplicateImportHint(
+                            rs.getLong("id"),
+                            rs.getString("file_name"),
+                            ts == null ? null : ts.toLocalDateTime().toString());
+                }, dbType, fileHash);
+        return hits.isEmpty() ? null : hits.getFirst();
     }
 
     /** 批次进度（轻量，只读批次表，供前端每 500ms 轮询）；批次不存在返回 null。 */

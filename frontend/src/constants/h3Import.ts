@@ -13,6 +13,7 @@ import type {
   H3ImportKindKey,
   H3ImportParticipation,
   H3LedgerKind,
+  H3WarningCode,
   LedgerImportKind
 } from '@/types/h3Import'
 
@@ -552,4 +553,43 @@ export const H3_BATCH_FALLBACK_ACTION: H3ImportNextAction = {
 export function h3DbTypeLabel(dbType?: string | null): string {
   const t = normalizeH3DbType(dbType)
   return H3_BATCH_KINDS.find(kind => kind.dbType === t)?.title || t
+}
+
+// ===== 导入告警（2026-10-20） =====
+/**
+ * 后端告警分类码 → 中文标签。码由 H3FactImportService#warningCode 单一来源产出，
+ * 此处只做展示映射；未收录的码回落「其他」，不要在各页面另行 switch。
+ */
+export const H3_WARNING_CODE_LABELS: Record<H3WarningCode, string> = {
+  SUM_MISMATCH: '明细与合计不符',
+  MISSING_PRICE: '缺价',
+  SUPPLIER_UNRESOLVED: '供应商未解析',
+  WAREHOUSE_UNMATCHED: '仓库未匹配',
+  INVALID_STATUS: '状态非已生效',
+  INVALID_TYPE: '类型非法',
+  BAD_FIELD: '字段无法解析',
+  MISSING_FIELD: '缺关键字段',
+  RED_CHAIN: '红冲链异常',
+  DUPLICATE: '同键多行',
+  OTHER: '其他'
+}
+/** 告警码 → 中文标签（未知码回落「其他」） */
+export function h3WarningCodeLabel(code?: string | null): string {
+  return H3_WARNING_CODE_LABELS[(code ?? 'OTHER') as H3WarningCode] ?? '其他'
+}
+/** 批次告警总数 = 往来单位未解析 + 缺日期 + 勾稽/缺价；null 视为 0 */
+export function h3BatchWarningCount(batch?: {
+  missingCustomerCount?: number | null
+  missingDateCount?: number | null
+  missingQuantityCount?: number | null
+} | null): number {
+  if (!batch) return 0
+  return (
+    (batch.missingCustomerCount ?? 0) + (batch.missingDateCount ?? 0) + (batch.missingQuantityCount ?? 0)
+  )
+}
+/** data_type → 该类型台账 kind（用于告警行「在台账中打开」）；无对应台账返回 null */
+export function h3LedgerKindOf(dbType?: string | null): H3LedgerKind | null {
+  const t = normalizeH3DbType(dbType)
+  return H3_BATCH_KINDS.find(k => k.dbType === t)?.next?.ledger ?? null
 }

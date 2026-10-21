@@ -9,6 +9,15 @@
     :confirm-enabled="confirmEnabled"
     @confirm="emit('confirm')"
   >
+    <el-alert
+      v-if="duplicateHint"
+      class="dup-hint"
+      type="warning"
+      :closable="false"
+      show-icon
+      :title="`该文件曾于 ${hintTime(duplicateHint.completedAt)} 导入（批次 #${duplicateHint.batchId}）`"
+      description="你仍然可以继续导入。系统会按当前数据更新业务记录：新增的插入、有变化的更新、无变化的不动。"
+    />
     <div v-if="parseProgress && !preview" class="import-progress">
       <div class="import-progress__head">
         <el-icon :class="['import-progress__icon', parseProgress.status]"><Promotion /></el-icon>
@@ -189,7 +198,7 @@ import {
   h3ProgressStageLabel as progressStageLabel,
 } from '@/constants/h3Import'
 import { amountCell, numberCell, priceCell } from '@/utils/h3ImportUi'
-import type { BatchProgress, ImportPreview, LedgerImportPreview, LedgerImportRow } from '@/types/h3Import'
+import type { BatchProgress, ImportPreview, LedgerImportPreview, LedgerImportRow, DuplicateImportHint } from '@/types/h3Import'
 
 /** 导入预览卡片结构（与 @/constants/h3Import 的卡片元数据兼容，仅取弹窗所需字段） */
 export interface PreviewKind {
@@ -208,6 +217,11 @@ const props = defineProps<{
   loading: boolean
   confirmText: string
   confirmEnabled: boolean
+  /**
+   * 「这份文件此前导过」提示。仅展示，不禁用确认——氚云无法实时同步，
+   * 同一天多次全量重导是正常操作，拦截会直接堵住业务。
+   */
+  duplicateHint?: DuplicateImportHint | null
 }>()
 const emit = defineEmits<{
   (e: 'update:modelValue', v: boolean): void
@@ -223,6 +237,19 @@ const visible = computed({
 /** 台账类导入（产品信息/仓库明细）：展示逐行 新增/更新/无变化 */
 const isLedgerImport = computed(() => !!props.kind?.ledgerKind)
 
+/** 重复导入提示的时间文案：当天显示「今天 HH:mm」，跨天显示「MM-DD HH:mm」。 */
+function hintTime(iso: string | null | undefined): string {
+  if (!iso) return '此前'
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '此前'
+  const pad = (n: number) => String(n).padStart(2, '0')
+  const hm = `${pad(d.getHours())}:${pad(d.getMinutes())}`
+  const now = new Date()
+  const sameDay =
+    d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+  return sameDay ? `今天 ${hm}` : `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${hm}`
+}
+
 function onFileChange(file: UploadFile) {
   emit('fileChange', file)
 }
@@ -232,6 +259,10 @@ function onRechoose(file: UploadFile) {
 </script>
 
 <style scoped>
+.dup-hint {
+  margin-bottom: 12px;
+}
+
 .import-file-selected {
   display: flex;
   align-items: center;

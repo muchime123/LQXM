@@ -166,6 +166,7 @@
       :loading="importLoading"
       :confirm-text="confirmBtnText"
       :confirm-enabled="!confirmBtnDisabled"
+      :duplicate-hint="duplicateHint"
       @confirm="importConfirm"
       @file-change="onDialogFileChange"
     />
@@ -363,6 +364,7 @@ import {
   h3ProgressStageLabel as progressStageLabel
 } from '@/constants/h3Import'
 import type { H3ImportKindCard, H3ImportNextAction } from '@/constants/h3Import'
+import type { DuplicateImportHint } from '@/types/h3Import'
 
 const router = useRouter()
 const route = useRoute()
@@ -689,6 +691,8 @@ const importVisible = ref(false),
   importLoading = ref(false),
   batchId = ref<number | null>(null),
   parseProgress = ref<BatchProgress | null>(null),
+  /** 「这份文件此前已导入过」提示；只展示，从不阻断上传 */
+  duplicateHint = ref<DuplicateImportHint | null>(null),
   lastImportResult = ref<ImportResult | null>(null)
 const confirmBtnText = computed(() => {
   if (parseProgress.value?.status === 'FAILED') return '重试解析'
@@ -728,6 +732,7 @@ function chooseFile(card: H3ImportKindCard, file: UploadFile) {
   preview.value = null
   batchId.value = null
   parseProgress.value = null
+  duplicateHint.value = null
   importVisible.value = true
 }
 function onDialogFileChange(file: UploadFile) {
@@ -762,6 +767,8 @@ async function importConfirm() {
     if (!selectedFile.value) return
     const accepted = await stageH3Fact(selectedImport.value!.type as H3FactType, selectedFile.value)
     batchId.value = accepted.batchId
+    // 重复导入提示：只告知，不影响本次导入（氚云无法实时同步，一天多次全量重导是常态）
+    duplicateHint.value = accepted.duplicateHint ?? null
     if (accepted.hashHit) notify.warning(accepted.message || '命中历史解析结果，跳过重复解析')
     const finalP = await waitH3BatchUntil(accepted.batchId, ['PREVIEW_READY', 'COMPLETED'], {
       onProgress(p) {
@@ -788,6 +795,7 @@ function chooseLedgerFile(card: H3ImportKindCard, file: UploadFile) {
   preview.value = null
   batchId.value = null
   parseProgress.value = null
+  duplicateHint.value = null
   importVisible.value = true
 }
 /** 台账类导入：上传登记批次 → 后台解析轮询进度 → 比对预览（新增/更新/无变化） → 确认写入台账 */
@@ -821,6 +829,8 @@ async function importLedgerConfirm() {
     if (!selectedFile.value) return
     const res = await stageLedgerImport(kind, selectedFile.value)
     batchId.value = res.batchId
+    // 重复导入提示：只告知，照常解析与写入
+    duplicateHint.value = res.duplicateHint ?? null
     // 立刻展示进度条初态，再轮询后台解析进度（PARSING → STAGING → PREVIEW_READY）
     parseProgress.value = {
       batchId: res.batchId,

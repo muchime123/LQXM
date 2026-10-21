@@ -51,6 +51,22 @@ erp:
     migrate-on-startup: ${ERP_MIGRATE_ON_STARTUP:true}
     fail-fast-on-migration-error: ${ERP_MIGRATE_FAIL_FAST:true}
 
+h3:
+  import:
+    # 氚云导入暂存行生命周期（2026-10-20）：批次确认落库后自动删除该批 staging_rows。
+    # 只清 COMPLETED/PARTIAL_FAILED 且 preview_json 非空的批次；PREVIEW_READY 等在途批次永不触碰。
+    # 排查导入问题时设为 false 可整体停用（只停清理，不影响导入本身）。
+    staging-cleanup:
+      enabled: ${H3_STAGING_CLEANUP_ENABLED:true}
+    # 氚云原始快照生命周期（2026-10-20，LQ 定 A 档）：只治理 PURCHASE_IN / PRODUCTION 两类
+    # 「同一份文件反复全量重导」的快照，删掉每张单据在更早批次里的重复副本。
+    # 两条保护缺一不可：① 每个 external_id 的最新一条永久保留（下次导入的新旧字段对照依赖它）
+    # ② 每类保留最近 keep-batches 个终态批次整批（批次告警明细依赖整批 raw_data）。
+    # 台账「更新历史」读 h3_import_batches.preview_json，不读快照，因此不受本清理影响。
+    snapshot-cleanup:
+      enabled: ${H3_SNAPSHOT_CLEANUP_ENABLED:true}
+      keep-batches: ${H3_SNAPSHOT_KEEP_BATCHES:3}
+
 app:
   dingtalk:
     # 是否启用钉钉集成。未启用时所有同步端点返回 503 + 中文提示，避免启动时误连。

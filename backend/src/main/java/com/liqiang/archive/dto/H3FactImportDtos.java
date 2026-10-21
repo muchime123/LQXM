@@ -33,13 +33,17 @@ public final class H3FactImportDtos {
      * {@code *Warnings(Group, false)} 现有方法重算告警（不写库、历史批次同样可用）。
      * 仅返回含告警的行（warnings IS NOT NULL），按业务编号升序。</p>
      *
-     * <p>{@code total} = 批次全量行数；{@code totalWarningRows} = 含告警行数；
-     * {@code items} = 当前页（默认 50/页）。</p>
+     * <p>{@code total} = 批次全量行数；{@code totalWarningRows} = 含告警行数（不受 code 筛选影响，
+     * 便于 UI 上「N/M」对照）；{@code items} = 当前页（默认 50/页）。</p>
+     *
+     * <p>{@code codeCounts} = 全量告警行按分类码计数（不受分页与 code 筛选影响），
+     * 供 UI 渲染「分类筛选 chips + 计数」；{@code code} 为当前生效的筛选码（null=不筛选）。</p>
      */
     public record BatchWarningsPage(Long batchId, String dataType,
                                     long total, long totalWarningRows,
                                     int page, int size,
-                                    List<BatchWarningRow> items) {}
+                                    List<BatchWarningRow> items,
+                                    Map<String, Integer> codeCounts, String code) {}
     /**
      * 批次告警单行（业务事实域）：来自 {@code h3_import_rows} 反序列化后重算。
      * businessId = 落库后的事实行 id（销售出库/采购入库/收款等主表 id），便于台账深链。
@@ -57,7 +61,19 @@ public final class H3FactImportDtos {
     // V160/V161 异步导入新 DTO
     /** stageUpload 返回：批次基本信息 + 是否已命中幂等缓存。 */
     public record StageAccepted(Long batchId, String dataType, String fileName,
-                                boolean hashHit, String status, String message) {}
+                                boolean hashHit, String status, String message,
+                                DuplicateImportHint duplicateHint) {}
+    /**
+     * 「这个文件以前导过」提示（<b>仅提示，绝不拦截</b>）。
+     *
+     * <p>氚云侧数据无法实时同步，只能人工导出 Excel 再导入，同一天多次全量重导是常态
+     * （上午导一次 → 车间改完 → 下午再导）。因此重复检测只用于让操作员知情，
+     * 由前端显示「该文件曾于 X 导入（批次 #N），仍可继续导入」；服务端不得据此拒绝上传，
+     * 也不得跳过业务数据的增删改校验。
+     *
+     * @param completedAt 该批次完成时间（本地时间 ISO，yyyy-MM-ddTHH:mm:ss），可为 null
+     */
+    public record DuplicateImportHint(Long batchId, String fileName, String completedAt) {}
     /** 进度查询返回：前端轮询数据。 */
     public record BatchProgress(Long batchId, String status, int progressPct,
                                 String progressStage, String errorMessage,
