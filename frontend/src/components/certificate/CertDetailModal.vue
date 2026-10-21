@@ -6,24 +6,309 @@
     size="lg"
     :close-on-click-modal="false"
     destroy-on-close
-    :mode="isEditMode || isCreateMode ? 'form' : 'detail'"
     :show-footer="true"
     :loading="modalSaving"
     @close="$emit('close')"
   >
-    <div v-if="!isEditMode && !isCreateMode" class="cert-meta">
-      <StatusTag
-        :type="certStatusTagClass(modalCurrentData.assetStatus)"
-        :label="modalCurrentData.assetStatus || '-'"
-      />
-      <span class="cert-meta__tag">{{ isTrademark ? `第${data.niceClass}类` : (modalCurrentData.patentType || modalCurrentData.assetCategory || '-') }}</span>
-    </div>
+    <!-- ==================== 详情视图 ==================== -->
+    <template v-if="!isEditMode && !isCreateMode">
+      <!-- 顶部：身份 + 到期倒计时 -->
+      <div class="cd-hero">
+        <div class="cd-hero__main">
+          <div class="cd-hero__tags">
+            <StatusTag :type="certStatusTagClass(data.assetStatus)" :label="data.assetStatus || '未知'" />
+            <span class="cd-chip">{{ heroTypeText }}</span>
+            <span v-if="data.legalStatus" class="cd-chip cd-chip--muted">{{ data.legalStatus }}</span>
+          </div>
+          <div class="cd-hero__nums">
+            <div v-if="data.patentNo" class="cd-num">
+              <span class="cd-num__label">{{ isTrademark ? '商标注册号' : '专利号' }}</span>
+              <span class="cd-num__value">
+                <code>{{ data.patentNo }}</code>
+                <button class="cd-copy" title="复制纯数字编号" @click="copyNo(data.patentNo, '编号')">复制数字</button>
+              </span>
+            </div>
+            <div v-if="queryNoText" class="cd-num">
+              <span class="cd-num__label">查询号</span>
+              <span class="cd-num__value">
+                <code>{{ queryNoText }}</code>
+                <button class="cd-copy" title="复制查询号" @click="copyNo(queryNoText, '查询号')">复制</button>
+              </span>
+            </div>
+          </div>
+        </div>
+        <div class="cd-count" :class="'cd-count--' + countdown.state">
+          <template v-if="countdown.state !== 'none'">
+            <div class="cd-count__head">
+              <span class="cd-count__value">{{ countdown.value }}</span>
+              <span v-if="countdown.unit" class="cd-count__unit">{{ countdown.unit }}</span>
+            </div>
+            <div v-if="countdown.state === 'ok' || countdown.state === 'warn' || countdown.state === 'danger'" class="cd-count__bar">
+              <i :style="{ width: countdown.pct + '%' }"></i>
+            </div>
+            <div
+              v-if="countdown.state === 'ok' || countdown.state === 'warn' || countdown.state === 'danger'"
+              class="cd-count__foot"
+            >
+              <span v-if="countdown.start">{{ countdown.start }}</span>
+              <span>{{ countdown.end }}</span>
+            </div>
+          </template>
+          <template v-else>
+            <div class="cd-count__head">
+              <span class="cd-count__value">—</span>
+              <span class="cd-count__unit">未设置到期日</span>
+            </div>
+          </template>
+        </div>
+      </div>
 
-    <template v-if="isEditMode || isCreateMode">
-      <div class="cert-form">
-        <FormSection title="基本信息" description="证书核心身份与当前法律状态" :required-count="3">
-          <div class="cert-grid">
-            <div class="cert-field">
+      <div class="cd-grid">
+        <!-- 左栏 -->
+        <div class="cd-col">
+          <section class="cd-card">
+            <h3 class="cd-card__title">号码信息</h3>
+            <dl class="cd-kv">
+              <div class="cd-kv__item">
+                <dt>{{ isTrademark ? '商标注册号' : '专利号 / 证书号' }}</dt>
+                <dd class="cd-kv__value cd-kv__value--mono" :class="{ 'cd-kv__value--empty': !data.patentNo }">
+                  {{ data.patentNo || '—' }}
+                </dd>
+              </div>
+              <div class="cd-kv__item">
+                <dt>申请号</dt>
+                <dd class="cd-kv__value cd-kv__value--mono" :class="{ 'cd-kv__value--empty': !data.applicationNo }">
+                  {{ data.applicationNo || '—' }}
+                </dd>
+              </div>
+              <div v-if="!isTrademark" class="cd-kv__item">
+                <dt>公开号</dt>
+                <dd class="cd-kv__value cd-kv__value--mono" :class="{ 'cd-kv__value--empty': !data.publicationNo }">
+                  {{ data.publicationNo || '—' }}
+                </dd>
+              </div>
+              <div class="cd-kv__item">
+                <dt>查询号（官方检索）</dt>
+                <dd class="cd-kv__value cd-kv__value--mono" :class="{ 'cd-kv__value--empty': !queryNoText }">
+                  {{ queryNoText || '—' }}
+                </dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="cd-card">
+            <h3 class="cd-card__title">权属与代理</h3>
+            <dl class="cd-kv">
+              <div class="cd-kv__item">
+                <dt>{{ isTrademark ? '注册人' : '申请人' }}</dt>
+                <dd class="cd-kv__value" :class="{ 'cd-kv__value--empty': !data.applicant }">{{ data.applicant || '—' }}</dd>
+              </div>
+              <div v-if="!isTrademark" class="cd-kv__item">
+                <dt>发明人</dt>
+                <dd class="cd-kv__value" :class="{ 'cd-kv__value--empty': !data.inventors }">{{ data.inventors || '—' }}</dd>
+              </div>
+              <div class="cd-kv__item">
+                <dt>代理机构</dt>
+                <dd class="cd-kv__value" :class="{ 'cd-kv__value--empty': !data.agency }">{{ data.agency || '—' }}</dd>
+              </div>
+              <div class="cd-kv__item">
+                <dt>代理联系人</dt>
+                <dd class="cd-kv__value" :class="{ 'cd-kv__value--empty': !data.agencyContact }">{{ data.agencyContact || '—' }}</dd>
+              </div>
+              <div v-if="isTrademark" class="cd-kv__item cd-kv__item--wide">
+                <dt>注册人地址</dt>
+                <dd class="cd-kv__value" :class="{ 'cd-kv__value--empty': !data.applicantAddress }">{{ data.applicantAddress || '—' }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="cd-card">
+            <h3 class="cd-card__title">
+              时间节点
+              <span class="cd-card__hint">到期日按「申请日 + 法定年限」自动计算</span>
+            </h3>
+            <dl class="cd-kv">
+              <div class="cd-kv__item">
+                <dt>申请日</dt>
+                <dd class="cd-kv__value cd-kv__value--mono" :class="{ 'cd-kv__value--empty': !data.applyDate }">{{ fmtDate(data.applyDate) || '—' }}</dd>
+              </div>
+              <div class="cd-kv__item">
+                <dt>{{ isTrademark ? '注册日期' : '授权日' }}</dt>
+                <dd class="cd-kv__value cd-kv__value--mono" :class="{ 'cd-kv__value--empty': !data.grantDate }">{{ fmtDate(data.grantDate) || '—' }}</dd>
+              </div>
+              <div class="cd-kv__item">
+                <dt>法定年限</dt>
+                <dd class="cd-kv__value" :class="{ 'cd-kv__value--empty': data.legalYears == null }">{{ data.legalYears != null ? `${data.legalYears} 年` : '—' }}</dd>
+              </div>
+              <div class="cd-kv__item">
+                <dt>到期日</dt>
+                <dd class="cd-kv__value cd-kv__value--mono" :class="{ 'cd-kv__value--empty': !data.expireDate }">{{ fmtDate(data.expireDate) || '—' }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section v-if="isTrademark && data.niceClassDescription" class="cd-card">
+            <h3 class="cd-card__title">商品 / 服务</h3>
+            <dl class="cd-kv cd-kv--1">
+              <div class="cd-kv__item cd-kv__item--wide">
+                <dt>核定使用商品/服务项目</dt>
+                <dd class="cd-kv__value cd-kv__value--para">{{ data.niceClassDescription }}</dd>
+              </div>
+            </dl>
+          </section>
+
+          <section class="cd-card">
+            <h3 class="cd-card__title">附件与备注</h3>
+            <dl class="cd-kv">
+              <div v-if="data.specFile" class="cd-kv__item">
+                <dt>{{ isTrademark ? '商标图样' : '说明书文件' }}</dt>
+                <dd>
+                  <span class="cd-file-link" title="点击预览" @click="modalEmitPreview('specFile')">
+                    <i class="cd-file-ico">{{ extOf(data.specFile) }}</i>
+                    <span>{{ fileNameOf(data.specFile) }}</span>
+                  </span>
+                </dd>
+              </div>
+              <div v-if="data.certFile" class="cd-kv__item">
+                <dt>{{ isTrademark ? '注册证' : '证书图片' }}</dt>
+                <dd>
+                  <span class="cd-file-link" title="点击预览" @click="modalEmitPreview('certFile')">
+                    <i class="cd-file-ico">{{ extOf(data.certFile) }}</i>
+                    <span>{{ fileNameOf(data.certFile) }}</span>
+                  </span>
+                </dd>
+              </div>
+              <div v-if="!data.specFile && !data.certFile" class="cd-kv__item cd-kv__item--wide">
+                <dd class="cd-kv__value cd-kv__value--empty">暂无附件</dd>
+              </div>
+              <div v-if="!isTrademark && data.reviewProgress" class="cd-kv__item cd-kv__item--wide">
+                <dt>审查进度</dt>
+                <dd class="cd-kv__value cd-kv__value--para">{{ data.reviewProgress }}</dd>
+              </div>
+              <div v-if="data.remark" class="cd-kv__item cd-kv__item--wide">
+                <dt>备注</dt>
+                <dd class="cd-kv__value cd-kv__value--para">{{ data.remark }}</dd>
+              </div>
+            </dl>
+          </section>
+        </div>
+
+        <!-- 右栏 -->
+        <aside class="cd-col cd-col--side">
+          <section class="cd-card">
+            <h3 class="cd-card__title">{{ isTrademark ? '商标图样' : '证书图片' }}</h3>
+            <a
+v-if="mainImageFile"
+class="cd-thumb"
+title="点击查看大图"
+@click="modalEmitPreview(mainImageField)">
+              <img :src="mainImageUrl" alt="" />
+              <span class="cd-thumb__hint">点击查看大图</span>
+            </a>
+            <div v-else class="cd-thumb--empty">暂无图片</div>
+            <div v-if="secondaryFile" class="cd-thumb__extra">
+              <span class="cd-file-link" title="点击预览" @click="modalEmitPreview(secondaryField)">
+                <i class="cd-file-ico">{{ extOf(secondaryFile) }}</i>
+                <span>{{ secondaryLabel }} · {{ fileNameOf(secondaryFile) }}</span>
+              </span>
+            </div>
+          </section>
+
+          <section v-if="!isTrademark" class="cd-card">
+            <h3 class="cd-card__title">
+              缴费概览
+              <span class="cd-card__hint">明细见下方缴费记录</span>
+            </h3>
+            <dl class="cd-kv-side">
+              <div class="cd-kv-side__row">
+                <dt>缴费状态</dt>
+                <dd>
+                  <span
+                    v-if="data.feeStatus"
+                    class="cd-fee-tag"
+                    :class="certFeeTagClass(data.feeStatus)"
+                  >{{ data.feeStatus }}</span>
+                  <span v-else class="cd-kv__value--empty">—</span>
+                </dd>
+              </div>
+              <div class="cd-kv-side__row">
+                <dt>年费截止</dt>
+                <dd :class="{ 'is-danger': feeDueOverdue }">{{ fmtDate(data.feeDueDate) || '—' }}</dd>
+              </div>
+              <div class="cd-kv-side__row">
+                <dt>上次缴费</dt>
+                <dd>{{ data.lastFeeAmount != null ? `¥${data.lastFeeAmount}` : '—' }}</dd>
+              </div>
+              <div class="cd-kv-side__row">
+                <dt>下次查询</dt>
+                <dd>{{ fmtDate(data.feeQueryDate) || '—' }}</dd>
+              </div>
+              <div v-if="data.invoiceStatus" class="cd-kv-side__row">
+                <dt>发票状态</dt>
+                <dd>{{ data.invoiceStatus }}</dd>
+              </div>
+            </dl>
+            <p v-if="data.feeDetail" class="cd-side-note">{{ data.feeDetail }}</p>
+          </section>
+
+          <section class="cd-card">
+            <h3 class="cd-card__title">官网展示</h3>
+            <div class="cd-chip-row">
+              <StatusTag :type="data.websiteEnabled ? 'success' : 'neutral'" :label="data.websiteEnabled ? '已公开' : '未公开'" />
+              <span v-if="data.websiteFeatured" class="cd-chip">重点展示</span>
+              <span class="cd-chip cd-chip--muted">排序 {{ data.websiteSortOrder ?? 0 }}</span>
+            </div>
+          </section>
+        </aside>
+      </div>
+
+      <FeeRecordsPanel v-if="data.id && !isTrademark" :certificate-id="data.id" @updated="$emit('feeUpdated')" />
+    </template>
+
+    <!-- ==================== 编辑/新增表单（缴费信息在详情页「缴费记录」中维护） ==================== -->
+    <template v-else>
+      <div class="cf">
+        <section class="cf-sec cf-sec--tint">
+          <div class="cf-sec__head">
+            <h3 class="cf-sec__title">基础信息</h3>
+            <span class="cf-sec__hint">名称、类别与当前法律状态</span>
+          </div>
+          <div class="cf-grid">
+            <div class="cf-field cf-field--full">
+              <label class="required">{{ isTrademark ? '商标名称' : '名称' }}</label>
+              <el-input v-model="modalForm.name" :placeholder="isTrademark ? '商标名称' : '专利/证书名称'" />
+            </div>
+            <div class="cf-field">
+              <label class="required">资产类别</label>
+              <el-select v-model="modalForm.assetCategory" style="width: 100%">
+                <el-option label="专利" value="专利" />
+                <el-option label="软著" value="软著" />
+                <el-option label="商标" value="商标" />
+              </el-select>
+            </div>
+            <div v-if="!isTrademark" class="cf-field">
+              <label>专利类型</label>
+              <el-select
+v-model="modalForm.patentType"
+clearable
+placeholder="--"
+style="width: 100%">
+                <el-option label="发明专利" value="发明专利" />
+                <el-option label="实用新型" value="实用新型" />
+                <el-option label="外观设计" value="外观设计" />
+                <el-option label="软著" value="软著" />
+              </el-select>
+            </div>
+            <div v-if="isTrademark" class="cf-field">
+              <label>国际分类号</label>
+              <el-input
+v-model.number="modalForm.niceClass"
+type="number"
+min="1"
+max="45"
+placeholder="1-45" />
+            </div>
+            <div class="cf-field">
               <label class="required">资产状态</label>
               <el-select v-model="modalForm.assetStatus" style="width: 100%">
                 <el-option label="有效" value="有效" />
@@ -32,205 +317,146 @@
                 <el-option label="已转让" value="已转让" />
               </el-select>
             </div>
-            <div class="cert-field">
-              <label class="required">资产类别</label>
-              <el-select v-model="modalForm.assetCategory" style="width: 100%">
-                <el-option label="专利" value="专利" />
-                <el-option label="软著" value="软著" />
-                <el-option label="商标" value="商标" />
-              </el-select>
-            </div>
-            <div v-if="!isTrademark" class="cert-field">
-              <label>专利类型</label>
-              <el-select v-model="modalForm.patentType" clearable placeholder="--" style="width: 100%">
-                <el-option label="发明专利" value="发明专利" />
-                <el-option label="实用新型" value="实用新型" />
-                <el-option label="外观设计" value="外观设计" />
-                <el-option label="软著" value="软著" />
-              </el-select>
-            </div>
-            <div v-if="isTrademark" class="cert-field">
-              <label>国际分类号</label>
-              <el-input v-model.number="modalForm.niceClass" type="number" min="1" max="45" placeholder="1-45" />
-            </div>
-            <div class="cert-field">
+            <div class="cf-field">
               <label>法律状态</label>
               <el-input v-model="modalForm.legalStatus" placeholder="如：授权有效" />
             </div>
-            <div class="cert-field cert-field--full">
-              <label class="required">{{ isTrademark ? '商标名称' : '名称' }}</label>
-              <el-input v-model="modalForm.name" :placeholder="isTrademark ? '商标名称' : '专利/证书名称'" />
-            </div>
           </div>
-        </FormSection>
+        </section>
 
-        <FormSection v-if="!isTrademark" title="号码信息" description="官方登记号码">
-          <div class="cert-grid cert-grid--3">
-            <div class="cert-field">
-              <label>专利号/证书号</label>
+        <section class="cf-sec">
+          <div class="cf-sec__head">
+            <h3 class="cf-sec__title">{{ isTrademark ? '注册信息' : '号码信息' }}</h3>
+            <span class="cf-sec__hint">查询号留空时按申请号 → 专利号自动提取纯数字</span>
+          </div>
+          <div class="cf-grid cf-grid--4">
+            <div class="cf-field">
+              <label>{{ isTrademark ? '商标注册号' : '专利号 / 证书号' }}</label>
               <el-input v-model="modalForm.patentNo" />
             </div>
-            <div class="cert-field">
+            <div class="cf-field">
               <label>申请号</label>
               <el-input v-model="modalForm.applicationNo" />
             </div>
-            <div class="cert-field">
+            <div v-if="!isTrademark" class="cf-field">
               <label>公开号</label>
               <el-input v-model="modalForm.publicationNo" />
             </div>
-            <div class="cert-field">
-              <label>查询号（纯数字）</label>
+            <div v-if="!isTrademark" class="cf-field">
+              <label>查询号</label>
               <el-input
                 v-model="modalForm.queryNo"
-                placeholder="留空则按申请号/专利号自动提取"
+                placeholder="留空自动提取"
                 @blur="onQueryNoBlur"
               />
             </div>
           </div>
-        </FormSection>
+        </section>
 
-        <FormSection v-if="isTrademark" title="注册信息" description="商标注册号与申请号">
-          <div class="cert-grid cert-grid--3">
-            <div class="cert-field">
-              <label>商标注册号</label>
-              <el-input v-model="modalForm.patentNo" />
-            </div>
-            <div class="cert-field">
-              <label>申请号</label>
-              <el-input v-model="modalForm.applicationNo" />
-            </div>
+        <section class="cf-sec">
+          <div class="cf-sec__head">
+            <h3 class="cf-sec__title">权属信息</h3>
+            <span class="cf-sec__hint">权利人、发明人与代理</span>
           </div>
-        </FormSection>
-
-        <FormSection v-if="!isTrademark" title="权属信息" description="权利人与代理信息">
-          <div class="cert-grid cert-grid--3">
-            <div class="cert-field">
-              <label>申请人</label>
+          <div class="cf-grid">
+            <div class="cf-field">
+              <label>{{ isTrademark ? '注册人' : '申请人' }}</label>
               <el-input v-model="modalForm.applicant" />
             </div>
-            <div class="cert-field">
-              <label>发明人</label>
-              <el-input v-model="modalForm.inventors" placeholder="多人用分号分隔" />
+            <div v-if="!isTrademark" class="cf-field">
+              <label>发明人 <span class="opt-note">多人用分号分隔</span></label>
+              <el-input v-model="modalForm.inventors" placeholder="张三；李四" />
             </div>
-            <div class="cert-field">
+            <div class="cf-field">
               <label>代理机构</label>
               <el-input v-model="modalForm.agency" />
             </div>
-          </div>
-        </FormSection>
-
-        <FormSection v-if="isTrademark" title="权属信息" description="注册人与代理信息">
-          <div class="cert-grid cert-grid--3">
-            <div class="cert-field">
-              <label>注册人</label>
-              <el-input v-model="modalForm.applicant" />
+            <div class="cf-field">
+              <label>代理联系人</label>
+              <el-input v-model="modalForm.agencyContact" placeholder="联系人姓名" />
             </div>
-            <div class="cert-field cert-field--full">
+            <div v-if="isTrademark" class="cf-field cf-field--full">
               <label>注册人地址</label>
               <el-input v-model="modalForm.applicantAddress" />
             </div>
-            <div class="cert-field">
-              <label>代理机构</label>
-              <el-input v-model="modalForm.agency" />
-            </div>
           </div>
-        </FormSection>
+        </section>
 
-        <FormSection title="时间信息" description="申请、授权与到期时间">
-          <div class="cert-grid cert-grid--3">
-            <div class="cert-field">
-              <label>申请日</label>
+        <section class="cf-sec">
+          <div class="cf-sec__head">
+            <h3 class="cf-sec__title">时间信息</h3>
+            <span class="cf-sec__hint">到期日 = 申请日 + 法定年限，保存时自动计算</span>
+          </div>
+          <div class="cf-grid cf-grid--4">
+            <div class="cf-field">
+              <label class="required">申请日</label>
               <LqDatePicker v-model="modalForm.applyDate" />
             </div>
-            <div class="cert-field">
+            <div class="cf-field">
               <label>{{ isTrademark ? '注册日期' : '授权日' }}</label>
               <LqDatePicker v-model="modalForm.grantDate" />
             </div>
-            <div class="cert-field">
+            <div class="cf-field">
               <label>法定年限（年）</label>
               <el-input v-model.number="modalForm.legalYears" type="number" min="1" />
             </div>
-          </div>
-        </FormSection>
-
-        <FormSection title="官网展示" description="控制该档案是否以及按什么优先级出现在企业官网">
-          <div class="cert-grid cert-grid--3">
-            <div class="cert-field">
-              <label>官网公开</label>
-              <el-switch v-model="modalForm.websiteEnabled" active-text="公开" inactive-text="不公开" />
-            </div>
-            <div class="cert-field">
-              <label>重点展示</label>
-              <el-switch v-model="modalForm.websiteFeatured" active-text="重点" inactive-text="普通" />
-            </div>
-            <div class="cert-field">
-              <label>官网排序</label>
-              <el-input-number v-model="modalForm.websiteSortOrder" :min="0" :step="1" controls-position="right" />
+            <div class="cf-field">
+              <label>到期日 <span class="opt-note">自动计算</span></label>
+              <el-input :model-value="formExpireDate" disabled placeholder="按申请日 + 法定年限" />
             </div>
           </div>
-          <p class="website-publish-tip">排序数字越小越靠前；设为重点会自动开启官网公开，下线时会自动取消重点。</p>
-        </FormSection>
+        </section>
 
-        <FormSection v-if="!isTrademark" title="缴费信息" description="年费维护与发票记录">
-          <div class="cert-grid">
-            <div class="cert-field">
-              <label>缴费状态</label>
-              <el-select v-model="modalForm.feeStatus" clearable placeholder="--" style="width: 100%">
-                <el-option label="待查询/待核实" value="待查询/待核实" />
-                <el-option label="已支付" value="已支付" />
-                <el-option label="未支付" value="未支付" />
-                <el-option label="已失效待缴费" value="已失效待缴费" />
-                <el-option label="已登记/已公告" value="已登记/已公告" />
-              </el-select>
-            </div>
-            <div class="cert-field">
-              <label>上次缴费金额</label>
-              <el-input v-model.number="modalForm.lastFeeAmount" type="number" placeholder="元" step="0.01" />
-            </div>
-            <div class="cert-field">
-              <label>下次查询日期</label>
-              <LqDatePicker v-model="modalForm.feeQueryDate" />
-            </div>
-            <div class="cert-field">
-              <label>年费截止日</label>
-              <LqDatePicker v-model="modalForm.feeDueDate" />
-            </div>
-            <div class="cert-field cert-field--full">
-              <label>缴费明细</label>
-              <el-input v-model="modalForm.feeDetail" />
-            </div>
-            <div class="cert-field">
-              <label>发票状态</label>
-              <el-select v-model="modalForm.invoiceStatus" clearable placeholder="--" style="width: 100%">
-                <el-option label="未开票" value="未开票" />
-                <el-option label="已开票" value="已开票" />
-                <el-option label="已归档" value="已归档" />
-              </el-select>
-            </div>
-            <div class="cert-field">
-              <label>代理机构联系人</label>
-              <el-input v-model="modalForm.agencyContact" placeholder="联系人姓名" />
-            </div>
+        <section v-if="isTrademark" class="cf-sec">
+          <div class="cf-sec__head">
+            <h3 class="cf-sec__title">商品 / 服务</h3>
+            <span class="cf-sec__hint">核定使用商品或服务项目</span>
           </div>
-        </FormSection>
-
-        <FormSection v-if="isTrademark" title="商品/服务" description="核定使用商品或服务项目">
-          <div class="cert-grid">
-            <div class="cert-field cert-field--full">
-              <label>核定使用商品/服务项目</label>
+          <div class="cf-grid">
+            <div class="cf-field cf-field--full">
               <el-input
                 v-model="modalForm.niceClassDescription"
                 type="textarea"
-                :rows="5"
+                :rows="4"
                 placeholder="如：盆（容器）；黄油碟；碗；瓶；调味瓶..."
               />
             </div>
           </div>
-        </FormSection>
+        </section>
 
-        <FormSection title="附件与备注" :description="isTrademark ? '商标图样、注册证与备注' : '说明书、证书扫描件与备注'">
-          <div class="cert-grid cert-grid--2">
-            <div class="cert-field">
+        <section class="cf-sec">
+          <div class="cf-sec__head">
+            <h3 class="cf-sec__title">官网展示</h3>
+            <span class="cf-sec__hint">排序数字越小越靠前；设为重点会自动开启官网公开，下线时会自动取消重点</span>
+          </div>
+          <div class="cf-grid cf-grid--4">
+            <div class="cf-field">
+              <label>官网公开</label>
+              <el-switch v-model="modalForm.websiteEnabled" active-text="公开" inactive-text="不公开" />
+            </div>
+            <div class="cf-field">
+              <label>重点展示</label>
+              <el-switch v-model="modalForm.websiteFeatured" active-text="重点" inactive-text="普通" />
+            </div>
+            <div class="cf-field">
+              <label>官网排序</label>
+              <el-input-number
+v-model="modalForm.websiteSortOrder"
+:min="0"
+:step="1"
+controls-position="right"
+style="width: 100%" />
+            </div>
+          </div>
+        </section>
+
+        <section class="cf-sec">
+          <div class="cf-sec__head">
+            <h3 class="cf-sec__title">附件</h3>
+            <span class="cf-sec__hint">支持点击选择或拖拽上传</span>
+          </div>
+          <div class="cf-grid cf-grid--2">
+            <div class="cf-field">
               <label>{{ isTrademark ? '商标图样' : '说明书文件' }}</label>
               <div
                 class="file-upload-cell"
@@ -269,7 +495,7 @@
                 </button>
               </div>
             </div>
-            <div class="cert-field">
+            <div class="cf-field">
               <label>{{ isTrademark ? '注册证' : '证书图片' }}</label>
               <div
                 class="file-upload-cell"
@@ -308,115 +534,43 @@
                 </button>
               </div>
             </div>
-            <div class="cert-field cert-field--full">
-              <label>备注</label>
-              <el-input v-model="modalForm.remark" type="textarea" :rows="3" />
+          </div>
+        </section>
+
+        <section class="cf-sec">
+          <div class="cf-sec__head">
+            <h3 class="cf-sec__title">备注与办理</h3>
+            <span class="cf-sec__hint">年费缴纳请在详情页「缴费记录」中登记，保存后自动回填缴费状态</span>
+          </div>
+          <div class="cf-grid">
+            <div v-if="!isTrademark" class="cf-field">
+              <label>发票状态</label>
+              <el-select
+v-model="modalForm.invoiceStatus"
+clearable
+placeholder="--"
+style="width: 100%">
+                <el-option label="未开票" value="未开票" />
+                <el-option label="已开票" value="已开票" />
+                <el-option label="已归档" value="已归档" />
+              </el-select>
             </div>
-            <div v-if="!isTrademark" class="cert-field cert-field--full">
+            <div v-if="!isTrademark" class="cf-field cf-field--full">
               <label>审查进度备注</label>
               <el-input
                 v-model="modalForm.reviewProgress"
                 type="textarea"
-                :rows="3"
+                :rows="2"
                 placeholder="审查意见、补正记录、进度说明等"
               />
             </div>
+            <div class="cf-field cf-field--full">
+              <label>备注</label>
+              <el-input v-model="modalForm.remark" type="textarea" :rows="2" />
+            </div>
           </div>
-        </FormSection>
+        </section>
       </div>
-    </template>
-
-    <template v-else>
-      <div v-if="hasKpi" class="cert-kpi">
-        <div
-          v-if="data.daysRemaining != null"
-          class="cert-kpi__item"
-          :class="kpiDaysClass"
-        >
-          <span class="cert-kpi__value">{{ kpiDaysText }}</span>
-          <span class="cert-kpi__label">距到期</span>
-        </div>
-        <div v-if="data.expireDate" class="cert-kpi__item">
-          <span class="cert-kpi__value">{{ fmtDate(data.expireDate) }}</span>
-          <span class="cert-kpi__label">到期日</span>
-        </div>
-        <div v-if="data.feeStatus" class="cert-kpi__item">
-          <span class="cert-kpi__value">{{ data.feeStatus }}</span>
-          <span class="cert-kpi__label">缴费状态</span>
-        </div>
-        <div
-          v-if="data.feeDueDate"
-          class="cert-kpi__item"
-          :class="{ 'cert-kpi__item--danger': feeDueOverdue }"
-        >
-          <span class="cert-kpi__value">{{ fmtDate(data.feeDueDate) }}</span>
-          <span class="cert-kpi__label">年费截止</span>
-        </div>
-        <div v-if="data.lastFeeAmount != null" class="cert-kpi__item">
-          <span class="cert-kpi__value">¥{{ data.lastFeeAmount }}</span>
-          <span class="cert-kpi__label">上次缴费</span>
-        </div>
-      </div>
-
-      <div v-if="certImage" class="cert-photo-card">
-        <img
-          :src="certImage"
-          class="cert-photo"
-          alt="证书图片"
-          title="点击查看大图"
-          @click="modalEmitPreview('certFile')"
-        />
-        <button class="cert-photo-zoom" @click="modalEmitPreview('certFile')">点击查看大图</button>
-      </div>
-
-      <!-- C17 LqDescriptions 推广：将原 5 段手写 info-item/info-label/info-value 网格替换为统一描述列表 -->
-      <LqDescriptions
-        :groups="detailGroups"
-        :column="2"
-        :border="false"
-        card
-      >
-        <template #value-patentNo="{ value }">
-          <span class="cert-patent-no">{{ value }}</span>
-        </template>
-        <template #value-feeStatus="{ value }">
-          <span class="cert-value-tag" :class="certFeeTagClass(String(value ?? ''))">{{ value }}</span>
-        </template>
-        <template #value-invoiceStatus="{ value }">
-          <span class="cert-value-tag" :class="invoiceStatusTagClass(String(value ?? ''))">{{ value }}</span>
-        </template>
-        <template #value-specFile="{ value }">
-          <span class="file-link" title="点击预览" @click="modalEmitPreview('specFile')">
-            <img
-              v-if="isImageFile(String(value ?? ''))"
-              :src="certificatePreviewUrl(value as string)"
-              class="file-thumb-sm"
-            />
-            <template v-else>{{ value }}</template>
-          </span>
-        </template>
-        <template #value-certFile="{ value }">
-          <span class="file-link" title="点击预览" @click="modalEmitPreview('certFile')">
-            <img
-              v-if="isImageFile(String(value ?? ''))"
-              :src="certificatePreviewUrl(value as string)"
-              class="file-thumb-sm"
-            />
-            <template v-else>{{ value }}</template>
-          </span>
-        </template>
-        <template #value-daysRemaining="{ value }">
-          <span
-            :class="{
-              'days-danger': Number(value) <= 0,
-              'days-warn': Number(value) > 0 && Number(value) <= 180
-            }"
-            >{{ Number(value) }}天</span
-          >
-        </template>
-      </LqDescriptions>
-
-      <FeeRecordsPanel v-if="data.id && !isTrademark" :certificate-id="data.id" @updated="$emit('feeUpdated')" />
     </template>
 
     <template #footer>
@@ -442,9 +596,6 @@ import type { CertificateDetail, CertificatePayload } from '../../types/certific
 import { createCertificate, updateCertificate } from '../../api/certificate'
 import LqDialog from '../common/LqDialog.vue'
 import LqDatePicker from '../common/LqDatePicker.vue'
-import LqDescriptions from '../common/LqDescriptions.vue'
-import type { DescGroup } from '../common/LqDescriptions.vue'
-import FormSection from '../common/FormSection.vue'
 import StatusTag from '../common/StatusTag.vue'
 import FeeRecordsPanel from './FeeRecordsPanel.vue'
 import { clearDirty, setDirty } from '../../composables/common/useDirty'
@@ -460,6 +611,7 @@ import { fmtDate, todayIso } from '../../utils/common/dateUtils'
 import { digitsOnly } from '../../utils/common/textUtils'
 import { isImageFile } from '../../utils/ui/fileUtils'
 import { certificateFileAssetId, type CertificateFileField } from '../../utils/certificate/certificateFileAsset'
+import { copyText } from '../../utils/ui/clipboard'
 
 const props = defineProps<{
   visible: boolean
@@ -480,192 +632,98 @@ const emit = defineEmits<{
 const modalSaving = ref(false)
 
 const modalTitle = computed(() => {
-  if (props.isCreateMode) return '新增证书'
-  if (props.isEditMode) return '编辑证书'
+  if (props.isCreateMode) return '新增知识产权'
+  if (props.isEditMode) return '编辑知识产权'
   return props.data.name || '证书详情'
 })
 
 const modalSubtitle = computed(() => {
-  if (props.isCreateMode || props.isEditMode) return ''
-  return props.data.patentNo || ''
+  if (props.isCreateMode) return ''
+  const parts: string[] = []
+  if (props.isEditMode && props.data.name) parts.push(props.data.name)
+  if (props.data.assetCategory === '商标') parts.push('商标')
+  else if (props.data.patentType) parts.push(props.data.patentType)
+  if (props.data.patentNo) parts.push(props.data.patentNo)
+  return parts.join(' · ')
 })
-
-const modalCurrentData = computed(() => ({
-  assetStatus: props.data.assetStatus || '',
-  patentType: props.data.patentType || '',
-  assetCategory: props.data.assetCategory || '',
-  patentNo: props.data.patentNo || ''
-}))
 
 const isTrademark = computed(() => modalForm.assetCategory === '商标')
 
-const hasKpi = computed(
-  () =>
-    props.data.daysRemaining != null ||
-    !!props.data.expireDate ||
-    !!props.data.feeStatus ||
-    !!props.data.feeDueDate ||
-    props.data.lastFeeAmount != null
+const heroTypeText = computed(() => {
+  const d = props.data
+  if (d.assetCategory === '商标') return d.niceClass != null ? `第${d.niceClass}类` : '商标'
+  return d.patentType || d.assetCategory || '—'
+})
+
+const queryNoText = computed(
+  () => props.data.queryNo || digitsOnly(props.data.applicationNo) || digitsOnly(props.data.patentNo)
 )
-
-const kpiDaysClass = computed(() => ({
-  'cert-kpi__item--danger': props.data.daysRemaining < 0,
-  'cert-kpi__item--warn': props.data.daysRemaining >= 0 && props.data.daysRemaining <= 180
-}))
-
-const kpiDaysText = computed(() => (props.data.daysRemaining < 0 ? '已过期' : `${props.data.daysRemaining}天`))
 
 const feeDueOverdue = computed(() => !!props.data.feeDueDate && props.data.feeDueDate < todayIso())
 
-function invoiceStatusTagClass(status: string): string {
-  if (!status) return ''
-  if (status.includes('已开票') || status.includes('已归档')) return 'tag-ok'
-  if (status.includes('未开票')) return 'tag-warn'
-  return ''
+function copyNo(value: string, label: string) {
+  copyText(digitsOnly(value), `纯数字${label}`)
 }
 
-const certImage = computed(() => {
-  const file = props.data.certFile
-  if (!file || !isImageFile(file)) return ''
-  return certificatePreviewUrl(file)
-})
+// ===== 到期倒计时（申请日 → 到期日，进度条表示已度过年限） =====
+function parseDateSafe(value?: string | null): number | null {
+  if (!value) return null
+  const t = Date.parse(value)
+  return Number.isNaN(t) ? null : t
+}
 
-// C17 LqDescriptions 推广：将原 5 段手写 info-item 网格映射为分组描述列表
-const detailGroups = computed<DescGroup[]>(() => {
+const countdown = computed(() => {
   const d = props.data
-  const isTM = d.assetCategory === '商标'
+  const expire = parseDateSafe(d.expireDate)
+  const apply = parseDateSafe(d.applyDate)
+  const end = fmtDate(d.expireDate) || ''
+  const start = fmtDate(d.applyDate) || ''
+  if (!expire) return { state: 'none', value: '—', unit: '未设置到期日', pct: 0, start: '', end: '' }
 
-  if (isTM) {
-    return [
-      {
-        title: '基本信息',
-        items: [
-          { label: '资产类别', value: d.assetCategory },
-          { label: '国际分类', value: d.niceClass != null ? `第${d.niceClass}类` : null },
-          { label: '法律状态', value: d.legalStatus },
-          { label: '法定年限', value: d.legalYears != null ? `${d.legalYears}年` : null }
-        ]
-      },
-      {
-        title: '注册信息',
-        items: [
-          { label: '商标注册号', value: d.patentNo, mono: true, highlight: true, copyable: 'digits' },
-          { label: '申请号', value: d.applicationNo, mono: true, copyable: true }
-        ]
-      },
-      {
-        title: '权属信息',
-        items: [
-          { label: '注册人', value: d.applicant },
-          { label: '注册人地址', value: d.applicantAddress, wide: true },
-          { label: '代理机构', value: d.agency }
-        ]
-      },
-      {
-        title: '时间信息',
-        items: [
-          { label: '申请日', value: fmtDate(d.applyDate) },
-          { label: '注册日期', value: fmtDate(d.grantDate) },
-          { label: '有效期至', value: fmtDate(d.expireDate), highlight: d.daysRemaining != null && d.daysRemaining <= 180 },
-          ...(d.daysRemaining != null
-            ? [
-                {
-                  label: '剩余天数',
-                  value: d.daysRemaining as number,
-                  slot: 'daysRemaining',
-                  highlight: d.daysRemaining <= 180
-                }
-              ]
-            : [])
-        ]
-      },
-      ...(d.niceClassDescription
-        ? [{ title: '商品/服务', items: [{ label: '核定使用商品/服务项目', value: d.niceClassDescription, wide: true }] }]
-        : [])
-    ]
+  let pct = 0
+  if (apply != null && expire > apply) {
+    const total = expire - apply
+    const elapsed = Date.parse(todayIso()) - apply
+    pct = Math.min(100, Math.max(3, Math.round((elapsed / total) * 100)))
   }
-
-  const groups: DescGroup[] = [
-    {
-      title: '官网展示',
-      items: [
-        { label: '官网状态', value: d.websiteEnabled ? '已公开' : '未公开' },
-        { label: '重点展示', value: d.websiteFeatured ? '是' : '否' },
-        { label: '官网排序', value: d.websiteSortOrder ?? 0 }
-      ]
-    },
-    {
-      title: '基本信息',
-      items: [
-        { label: '资产类别', value: d.assetCategory },
-        { label: '专利类型', value: d.patentType },
-        { label: '法律状态', value: d.legalStatus },
-        { label: '法定年限', value: d.legalYears != null ? `${d.legalYears}年` : null }
-      ]
-    },
-    {
-      title: '号码信息',
-      items: [
-        { label: '专利号/证书号', value: d.patentNo, mono: true, highlight: true, copyable: 'digits', slot: 'patentNo' },
-        { label: '申请号', value: d.applicationNo, mono: true, copyable: true },
-        { label: '公开号', value: d.publicationNo, mono: true, copyable: true },
-        { label: '查询号', value: d.queryNo || digitsOnly(d.applicationNo) || digitsOnly(d.patentNo), mono: true, copyable: true }
-      ]
-    },
-    {
-      title: '权属信息',
-      items: [
-        { label: '申请人', value: d.applicant },
-        { label: '发明人', value: d.inventors },
-        { label: '审查员', value: d.examiner },
-        { label: '代理机构', value: d.agency },
-        { label: '代理联系人', value: d.agencyContact },
-      ]
-    },
-    {
-      title: '时间信息',
-      items: [
-        { label: '申请日', value: fmtDate(d.applyDate) },
-        { label: '授权日', value: fmtDate(d.grantDate) },
-        { label: '到期日', value: fmtDate(d.expireDate), highlight: d.daysRemaining != null && d.daysRemaining <= 180 },
-        ...(d.daysRemaining != null
-          ? [
-              {
-                label: '剩余天数',
-                value: d.daysRemaining as number,
-                slot: 'daysRemaining',
-                highlight: d.daysRemaining <= 180
-              }
-            ]
-          : [])
-      ]
-    },
-    {
-      title: '缴费信息',
-      items: [
-        { label: '缴费状态', value: d.feeStatus, slot: 'feeStatus' },
-        { label: '上次缴费金额', value: d.lastFeeAmount != null ? `￥${d.lastFeeAmount}` : null },
-        { label: '下次查询日', value: fmtDate(d.feeQueryDate) },
-        { label: '年费截止日', value: fmtDate(d.feeDueDate), highlight: !!(d.feeDueDate && d.daysRemaining <= 180) },
-        ...(d.feeDetail ? [{ label: '缴费明细', value: d.feeDetail, wide: true }] : []),
-        ...(d.invoiceStatus ? [{ label: '发票状态', value: d.invoiceStatus, slot: 'invoiceStatus' }] : [])
-      ]
-    }
-  ]
-
-  // 附件与备注（条件渲染）
-  const attachItems: DescGroup['items'] = []
-  if (d.specFile) attachItems.push({ label: isTM ? '商标图样' : '说明书文件', value: d.specFile, slot: 'specFile' })
-  if (d.certFile) attachItems.push({ label: isTM ? '注册证' : '证书图片', value: d.certFile, slot: 'certFile' })
-  if (d.remark) attachItems.push({ label: '备注', value: d.remark, wide: true })
-  if (!isTM && d.reviewProgress) attachItems.push({ label: '审查进度', value: d.reviewProgress, wide: true })
-  if (attachItems.length) {
-    groups.push({ title: '附件与备注', items: attachItems })
+  if (d.daysRemaining == null) {
+    return { state: 'muted', value: end, unit: '', pct, start, end }
   }
-
-  return groups
+  if (d.daysRemaining < 0) {
+    return { state: 'danger', value: String(-d.daysRemaining), unit: '天前已到期', pct: 100, start, end }
+  }
+  if (d.daysRemaining <= 180) {
+    return { state: 'warn', value: String(d.daysRemaining), unit: '天后到期', pct, start, end }
+  }
+  return { state: 'ok', value: String(d.daysRemaining), unit: '天后到期', pct, start, end }
 })
 
+// ===== 右栏主图（商标看图样，专利看证书） =====
+const mainImageField = computed<'specFile' | 'certFile'>(() => (isTrademark.value ? 'specFile' : 'certFile'))
+const secondaryField = computed<'specFile' | 'certFile'>(() => (isTrademark.value ? 'certFile' : 'specFile'))
+
+const mainImageFile = computed(() => {
+  const file = props.data[mainImageField.value]
+  return file && isImageFile(file) ? file : ''
+})
+const mainImageUrl = computed(() => (mainImageFile.value ? certificatePreviewUrl(mainImageFile.value) : ''))
+const secondaryFile = computed(() => props.data[secondaryField.value] || '')
+const secondaryLabel = computed(() =>
+  isTrademark.value ? '注册证' : '说明书文件'
+)
+
+function extOf(fileName: string): string {
+  const m = /\.([A-Za-z0-9]+)$/.exec(fileName)
+  const ext = m ? m[1].toUpperCase() : '文件'
+  return ext.length > 4 ? ext.slice(0, 4) : ext
+}
+
+function fileNameOf(fileName: string): string {
+  const idx = fileName.lastIndexOf('/')
+  return idx >= 0 ? fileName.slice(idx + 1) : fileName
+}
+
+// ===== 编辑表单 =====
 const modalForm = reactive<Partial<CertificatePayload>>({})
 
 watch(
@@ -676,6 +734,30 @@ watch(
   },
   { immediate: true }
 )
+
+/** 到期日只读预览：与后端口径一致（申请日 + 法定年限） */
+const formExpireDate = computed(() => {
+  const apply = modalForm.applyDate
+  const years = modalForm.legalYears
+  if (apply && years != null && Number(years) > 0) {
+    const t = Date.parse(String(apply))
+    if (!Number.isNaN(t)) {
+      const dt = new Date(t)
+      dt.setFullYear(dt.getFullYear() + Number(years))
+      return fmtDate(dt.toISOString().slice(0, 10))
+    }
+  }
+  return modalForm.expireDate ? fmtDate(String(modalForm.expireDate)) : ''
+})
+
+/** 缴费字段不在本表单维护（缴费记录登记后由后端自动回填），保存时整体剔除避免回写旧值 */
+const FEE_FIELDS = ['feeStatus', 'feeQueryDate', 'feeDueDate', 'lastFeeAmount', 'feeDetail'] as const
+
+function buildPayload(): CertificatePayload {
+  const rest: Record<string, unknown> = { ...modalForm }
+  for (const key of FEE_FIELDS) delete rest[key]
+  return rest as unknown as CertificatePayload
+}
 
 const certificateOwnerId = computed(() => props.data?.id ?? null)
 const certificateFileAssets = useFileAssets({
@@ -811,7 +893,7 @@ function onQueryNoBlur() {
   const derived = digitsOnly(modalForm.applicationNo) || digitsOnly(modalForm.patentNo)
   if (derived) {
     modalForm.queryNo = derived
-    setDirty()
+    setDirty('知识产权编辑')
   }
 }
 
@@ -823,11 +905,11 @@ async function modalDoSave() {
   modalSaving.value = true
   try {
     if (props.isCreateMode) {
-      await createCertificate({ ...modalForm } as CertificatePayload)
+      await createCertificate(buildPayload())
     } else {
-      await updateCertificate(props.data.id, { ...modalForm } as CertificatePayload)
+      await updateCertificate(props.data.id, buildPayload())
     }
-    emit('save', { ...modalForm } as CertificatePayload)
+    emit('save', buildPayload())
     notify('保存成功', 'success')
   } catch (err) {
     notify.errorWithDetail('保存失败', err)
@@ -839,246 +921,599 @@ async function modalDoSave() {
 watch(
   () => props.visible,
   v => {
-    if (v) setDirty('证书编辑')
-    else clearDirty('证书编辑')
+    if (v) setDirty('知识产权编辑')
+    else clearDirty('知识产权编辑')
   }
 )
 </script>
 
 <style scoped>
-/* ===== 证书详情/编辑弹窗 ===== */
-
-/* footer 按钮组：自定义 #footer 插槽无 .footer-status 左推元素，需手动右对齐 */
 .cert-dialog-foot {
   display: flex;
   gap: var(--space-control-gap);
   margin-left: auto;
 }
 
-/* 顶部状态条（详情模式） */
-.cert-meta {
+/* ===== 详情：顶部身份条 ===== */
+.cd-hero {
   display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-control-gap);
-  margin-bottom: var(--space-section-gap);
-  padding: var(--space-control-gap) var(--space-control-gap-wide);
-  background: linear-gradient(135deg, var(--color-surface-raised) 0%, var(--color-primary-bg-light) 100%);
+  align-items: stretch;
+  gap: var(--space-2xl, 24px);
+  padding: 14px 18px;
+  margin-bottom: var(--space-lg-xl, 16px);
   border: 1px solid var(--color-border-lighter);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius-xl, 10px);
+  background: linear-gradient(120deg, var(--color-surface-raised) 0%, var(--color-primary-bg-light) 100%);
 }
 
-.cert-meta__tag {
-  padding: 2px 8px;
-  background: var(--color-surface);
-  color: var(--color-primary);
-  border: 1px solid var(--color-primary-border-light);
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-medium);
-}
-
-/* 关键指标条（详情模式） */
-.cert-kpi {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-control-gap);
-  margin-bottom: var(--space-section-gap);
-  padding: var(--space-control-gap);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border-lighter);
-  border-radius: var(--radius-lg);
-}
-
-.cert-kpi__item {
+.cd-hero__main {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 3px;
-  min-width: 110px;
-  flex: 1 1 110px;
-  padding: 10px 16px;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
+  gap: 12px;
 }
 
-.cert-kpi__item--warn {
-  border-color: var(--color-warning);
+.cd-hero__tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm-md, 8px);
+}
+
+.cd-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 9px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 1.5;
+}
+
+.cd-chip--muted {
+  color: var(--color-text-muted);
+  border-color: var(--color-border-lighter);
+  font-weight: var(--fw-normal);
+}
+
+.cd-chip-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm, 6px);
+}
+
+.cd-hero__nums {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 12px 28px;
+}
+
+.cd-num {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cd-num__label {
+  font-size: var(--fs-xxs);
+  letter-spacing: 0.04em;
+  color: var(--color-text-muted);
+}
+
+.cd-num__value {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm-md, 8px);
+}
+
+.cd-num__value code {
+  font-family: var(--font-mono);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.02em;
+  color: var(--color-text-heading);
+}
+
+.cd-copy {
+  padding: 1px 7px;
+  font-size: var(--fs-xxs);
+  color: var(--color-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary-border-light);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.cd-copy:hover {
+  background: var(--color-primary-bg);
+}
+
+/* 到期倒计时 */
+.cd-count {
+  flex: 0 0 232px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 7px;
+  padding: 11px 15px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.cd-count--warn {
+  border-color: var(--color-warning-border);
   background: var(--color-warning-bg-soft);
 }
 
-.cert-kpi__item--danger {
-  border-color: var(--color-danger);
+.cd-count--danger {
+  border-color: var(--color-danger-border);
   background: var(--color-danger-bg-soft);
-  animation: cert-danger-pulse 2s ease-in-out infinite;
 }
 
-@keyframes cert-danger-pulse {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.32);
-  }
-  50% {
-    box-shadow: 0 0 0 6px rgba(239, 68, 68, 0);
-  }
+.cd-count--muted,
+.cd-count--none {
+  background: var(--color-surface-alt);
 }
 
-.cert-kpi__value {
-  font-size: var(--fs-lg);
+.cd-count__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm, 6px);
+}
+
+.cd-count__value {
+  font-size: var(--fs-4xl, 24px);
   font-weight: var(--fw-bold);
+  line-height: 1.1;
+  letter-spacing: -0.02em;
   color: var(--color-text-heading);
-  line-height: 1.2;
 }
 
-.cert-kpi__item--warn .cert-kpi__value {
+.cd-count--muted .cd-count__value,
+.cd-count--none .cd-count__value {
+  font-size: var(--fs-md);
+  font-weight: var(--fw-semibold);
+  color: var(--color-text-muted);
+}
+
+.cd-count--warn .cd-count__value {
   color: var(--color-warning);
 }
 
-.cert-kpi__item--danger .cert-kpi__value {
+.cd-count--danger .cd-count__value {
   color: var(--color-danger);
 }
 
-.cert-kpi__label {
+.cd-count__unit {
   font-size: var(--fs-xs);
   color: var(--color-text-muted);
 }
 
-/* 证书图片大图预览卡片（详情模式） */
-.cert-photo-card {
-  position: relative;
+.cd-count__bar {
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-border-lighter);
+  overflow: hidden;
+}
+
+.cd-count__bar > i {
+  display: block;
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+}
+
+.cd-count--warn .cd-count__bar > i {
+  background: var(--color-warning);
+}
+
+.cd-count--danger .cd-count__bar > i {
+  background: var(--color-danger);
+}
+
+.cd-count__foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: var(--fs-xxs);
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}
+
+/* ===== 详情：两栏布局 ===== */
+.cd-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 288px;
+  gap: var(--space-md-lg, 12px);
+  align-items: start;
+}
+
+.cd-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md-lg, 12px);
+  min-width: 0;
+}
+
+@media (max-width: 960px) {
+  .cd-hero {
+    flex-direction: column;
+  }
+
+  .cd-count {
+    flex-basis: auto;
+  }
+
+  .cd-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* 卡片 */
+.cd-card {
+  padding: 13px 17px 15px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-lighter);
+  border-radius: var(--radius-xl, 10px);
+}
+
+.cd-card__title {
   display: flex;
   align-items: center;
-  justify-content: center;
-  margin-bottom: var(--space-section-gap);
-  padding: var(--space-control-gap);
-  background: var(--color-surface-raised);
+  gap: var(--space-sm-md, 8px);
+  margin: 0 0 11px;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.02em;
+  color: var(--color-text-heading);
+}
+
+.cd-card__title::before {
+  content: '';
+  flex-shrink: 0;
+  width: 3px;
+  height: 13px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  opacity: 0.85;
+}
+
+.cd-card__hint {
+  margin-left: auto;
+  font-size: var(--fs-xxs);
+  font-weight: var(--fw-normal);
+  letter-spacing: 0;
+  color: var(--color-text-faint);
+}
+
+/* 键值网格 */
+.cd-kv {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 13px 26px;
+  margin: 0;
+}
+
+.cd-kv--1 {
+  grid-template-columns: 1fr;
+}
+
+.cd-kv__item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.cd-kv__item--wide {
+  grid-column: 1 / -1;
+}
+
+.cd-kv dt {
+  font-size: var(--fs-xxs);
+  letter-spacing: 0.02em;
+  color: var(--color-text-muted);
+}
+
+.cd-kv dd {
+  margin: 0;
+  font-size: var(--fs-base);
+  line-height: var(--lh-relaxed);
+  color: var(--color-text-primary);
+  word-break: break-word;
+}
+
+.cd-kv__value--mono {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.02em;
+}
+
+.cd-kv__value--empty {
+  color: var(--color-text-faint);
+}
+
+.cd-kv__value--para {
+  font-size: var(--fs-sm);
+  line-height: var(--lh-loose);
+  color: var(--color-text-strong);
+  white-space: pre-wrap;
+}
+
+/* 右栏紧凑键值 */
+.cd-kv-side {
+  margin: 0;
+}
+
+.cd-kv-side__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md-lg, 12px);
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--color-border-lighter);
+}
+
+.cd-kv-side__row:last-child {
+  border-bottom: none;
+}
+
+.cd-kv-side__row dt {
+  flex-shrink: 0;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+.cd-kv-side__row dd {
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-family: var(--font-mono);
+  text-align: right;
+  color: var(--color-text-primary);
+}
+
+.cd-kv-side__row dd.is-danger {
+  color: var(--color-danger);
+  font-weight: var(--fw-semibold);
+}
+
+.cd-fee-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 1.5;
+}
+
+.cd-fee-tag.tag-ok {
+  background: var(--color-success-bg);
+  color: var(--color-success-text);
+  border-color: var(--color-success-border);
+}
+
+.cd-fee-tag.tag-warn {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border-color: var(--color-warning-border);
+}
+
+.cd-fee-tag.tag-expired {
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
+  border-color: var(--color-danger-border);
+}
+
+.cd-side-note {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px dashed var(--color-border-lighter);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-loose);
+  color: var(--color-text-secondary);
+}
+
+/* 文件 */
+.cd-file-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm, 6px);
+  max-width: 100%;
+  font-size: var(--fs-sm);
+  color: var(--color-primary);
+  cursor: pointer;
+}
+
+.cd-file-link span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cd-file-link:hover span {
+  text-decoration: underline;
+}
+
+.cd-file-ico {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  font-size: var(--fs-3xs, 10px);
+  font-weight: var(--fw-semibold);
+  font-style: normal;
+}
+
+/* 证书图 */
+.cd-thumb {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  cursor: zoom-in;
+  background: var(--color-surface-alt);
   border: 1px solid var(--color-border-lighter);
   border-radius: var(--radius-lg);
 }
 
-.cert-photo {
-  max-width: 100%;
-  max-height: 420px;
-  border-radius: var(--radius-md);
-  cursor: zoom-in;
-  box-shadow: var(--shadow-md);
+.cd-thumb img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
-.cert-photo-zoom {
+.cd-thumb__hint {
   position: absolute;
-  right: var(--space-control-gap);
-  bottom: var(--space-control-gap);
-  padding: 4px 10px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  padding: 4px 8px;
+  font-size: var(--fs-xxs);
+  text-align: center;
+  color: var(--color-text-secondary);
+  background: var(--color-glass-bg);
+  border-top: 1px solid var(--color-border-lighter);
+}
+
+.cd-thumb--empty {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 4;
   font-size: var(--fs-xs);
-  color: var(--color-primary);
-  background: var(--color-primary-bg);
-  border: 1px solid var(--color-primary-border-light);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  opacity: 0;
-  transition: opacity var(--transition-fast);
+  color: var(--color-text-faint);
+  background: var(--color-surface-alt);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
 }
 
-.cert-photo-card:hover .cert-photo-zoom {
-  opacity: 1;
+.cd-thumb__extra {
+  margin-top: 8px;
 }
 
-/* 编辑表单 */
-.cert-form {
+/* ===== 编辑表单 ===== */
+.cf {
   display: flex;
   flex-direction: column;
-  gap: var(--space-section-gap);
+  gap: 13px;
 }
 
-.cert-grid {
+.cf-sec {
+  padding: 13px 17px 15px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border-lighter);
+  border-radius: var(--radius-xl, 10px);
+}
+
+.cf-sec--tint {
+  background: var(--color-surface-raised);
+}
+
+.cf-sec__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm-md, 8px);
+  margin-bottom: 12px;
+}
+
+.cf-sec__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm-md, 8px);
+  margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.02em;
+  color: var(--color-text-heading);
+}
+
+.cf-sec__title::before {
+  content: '';
+  flex-shrink: 0;
+  width: 3px;
+  height: 13px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  opacity: 0.85;
+}
+
+.cf-sec__hint {
+  font-size: var(--fs-xxs);
+  color: var(--color-text-faint);
+}
+
+.cf-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-control-gap-wide) var(--space-form-item-gap);
-}
-
-.cert-grid--3 {
   grid-template-columns: repeat(3, 1fr);
+  gap: 12px var(--space-lg-xl, 16px);
 }
 
-.cert-grid--2 {
+.cf-grid--4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.cf-grid--2 {
   grid-template-columns: repeat(2, 1fr);
 }
 
-.cert-field {
+@media (max-width: 960px) {
+  .cf-grid,
+  .cf-grid--4,
+  .cf-grid--2 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.cf-field {
   display: flex;
   flex-direction: column;
   gap: 5px;
   min-width: 0;
 }
 
-.cert-field--full {
+.cf-field--full {
   grid-column: 1 / -1;
 }
 
-.cert-field > label {
+.cf-field > label {
   display: inline-flex;
   align-items: baseline;
-  color: var(--color-text-secondary);
-  font-size: var(--fs-sm);
+  gap: 4px;
+  font-size: var(--fs-xs);
   font-weight: var(--fw-medium);
+  color: var(--color-text-secondary);
 }
 
-.cert-field > label.required::before {
+.cf-field > label.required::before {
   content: '*';
-  margin-right: 3px;
   color: var(--color-danger);
-  font-weight: 700;
+  font-weight: var(--fw-bold);
+}
+
+.opt-note {
+  font-weight: var(--fw-normal);
+  color: var(--color-text-faint);
 }
 
 /* 日期选择器内部实际是 el-date-editor，需穿透子组件确保通栏 */
-.cert-field :deep(.el-date-editor) {
+.cf-field :deep(.el-date-editor) {
   width: 100%;
-}
-
-/* 剩余天数颜色（详情模式 LqDescriptions 槽位） */
-.days-warn {
-  color: var(--color-warning);
-}
-
-.days-danger {
-  color: var(--color-danger);
-}
-
-/* 专利号大字突出（详情模式号码信息组） */
-.cert-patent-no {
-  font-family: var(--font-mono, 'SFMono-Regular', Consolas, monospace);
-  font-size: var(--fs-md);
-  font-weight: var(--fw-bold);
-  letter-spacing: 0.03em;
-}
-
-/* 状态语义色标签（缴费状态 / 发票状态） */
-.cert-value-tag {
-  display: inline-block;
-  padding: 2px 10px;
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-medium);
-  line-height: 1.4;
-}
-
-.cert-value-tag.tag-ok {
-  background: var(--color-success-bg-soft);
-  color: var(--color-success-text);
-  border: 1px solid var(--color-success-border);
-}
-
-.cert-value-tag.tag-warn {
-  background: var(--color-warning-bg-soft);
-  color: var(--color-warning-text);
-  border: 1px solid var(--color-warning-border);
-}
-
-.cert-value-tag.tag-expired {
-  background: var(--color-danger-bg-soft);
-  color: var(--color-danger-text);
-  border: 1px solid var(--color-danger-border);
 }
 
 /* ===== 文件上传 ===== */
@@ -1105,8 +1540,8 @@ watch(
   gap: var(--space-control-gap);
   padding: var(--space-control-gap);
   background: var(--color-surface-raised);
-  border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
 }
 
 .file-thumb {
@@ -1117,18 +1552,11 @@ watch(
   cursor: pointer;
 }
 
-.file-thumb-sm {
-  width: 32px;
-  height: 32px;
-  object-fit: cover;
-  border-radius: var(--radius-sm);
-}
-
 .file-name-text {
   flex: 1;
+  overflow: hidden;
   font-size: var(--fs-sm);
   color: var(--color-text-secondary);
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -1161,8 +1589,8 @@ watch(
 .btn-sm {
   padding: 6px 12px;
   font-size: var(--fs-sm);
-  border-radius: var(--radius-sm);
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -1181,13 +1609,5 @@ watch(
 
 .btn-sm.btn-upload:hover {
   background: var(--color-primary-bg);
-}
-
-.file-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-control-gap);
-  cursor: pointer;
-  color: var(--color-primary);
 }
 </style>

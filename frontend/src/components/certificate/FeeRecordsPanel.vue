@@ -1,50 +1,72 @@
 <template>
   <div class="fee-records-panel">
-    <div class="panel-header">
+    <div class="panel-head">
       <h4 class="panel-title">缴费记录</h4>
-      <button class="btn-sm primary" @click="openAddFeeForm">+ 新增缴费记录</button>
-    </div>
-
-    <div v-if="feeRecords.length" class="fee-summary">
-      <span>共 <strong>{{ feeRecords.length }}</strong> 条</span>
-      <span>合计 <strong class="fee-summary__total">¥{{ totalFeeAmount }}</strong></span>
-      <span v-if="overdueCount" class="fee-summary__overdue">逾期 <strong>{{ overdueCount }}</strong> 条</span>
+      <div v-if="feeRecords.length" class="fee-summary">
+        <span>共 <strong>{{ feeRecords.length }}</strong> 条</span>
+        <span>合计 <strong class="fee-summary__total">¥{{ totalFeeAmount }}</strong></span>
+        <span v-if="overdueCount" class="fee-summary__overdue">逾期 <strong>{{ overdueCount }}</strong> 条</span>
+      </div>
+      <button class="btn-sm primary" @click="openAddFeeForm">＋ 新增缴费记录</button>
     </div>
 
     <div v-if="feeRecordsLoading" class="loading-line">加载中...</div>
-    <div v-else-if="feeRecords.length === 0" class="empty-line">暂无缴费记录</div>
-    <div v-else class="fee-records-list">
-      <div
-        v-for="record in feeRecords"
-        :key="record.id"
-        class="fee-record-item"
-        :class="{ 'fee-record-item--overdue': isOverdue(record) }"
-      >
-        <div class="fee-record-main">
-          <div class="fee-record-header">
-            <span class="fee-type">{{ record.feeType || '年费' }}</span>
-            <span v-if="record.feeYear" class="fee-year">第{{ record.feeYear }}年</span>
-            <span v-if="isOverdue(record)" class="fee-overdue-badge">已逾期</span>
-            <span class="fee-amount">¥{{ record.amount || 0 }}</span>
-          </div>
-          <div class="fee-record-info">
-            <span class="info-item">缴费日期：{{ fmtDate(record.paidDate) }}</span>
-            <span v-if="record.dueDate" class="info-item">截止日期：{{ fmtDate(record.dueDate) }}</span>
-            <span v-if="record.receiptNo" class="info-item">收据号：{{ record.receiptNo }}</span>
-            <span v-if="record.payer" class="info-item">缴费人：{{ record.payer }}</span>
-            <span v-if="record.invoiceStatus" class="info-item">发票：{{ record.invoiceStatus }}</span>
-          </div>
-          <div v-if="record.note" class="fee-record-note">{{ record.note }}</div>
-        </div>
-        <div class="fee-record-actions">
-          <button class="btn-link" @click="openEditFeeRecord(record)">编辑</button>
-          <button class="btn-link danger" @click="confirmDeleteFeeRecord(record)">删除</button>
-        </div>
-      </div>
-    </div>
+    <div v-else-if="feeRecords.length === 0" class="empty-line">暂无缴费记录，点击右上角按钮登记第一笔年费。</div>
+    <table v-else class="fee-table">
+      <thead>
+        <tr>
+          <th class="col-date">缴费日期</th>
+          <th class="col-type">类型</th>
+          <th class="col-year">年度</th>
+          <th class="col-amount">金额</th>
+          <th class="col-date">截止日期</th>
+          <th class="col-rest">收据号 / 缴费人</th>
+          <th class="col-actions"></th>
+        </tr>
+      </thead>
+      <tbody>
+        <template v-for="record in feeRecords" :key="record.id">
+          <tr :class="{ 'fee-record-overdue': isOverdue(record) }">
+            <td class="mono">{{ fmtDate(record.paidDate) || '—' }}</td>
+            <td>
+              <span class="fee-type">{{ record.feeType || '年费' }}</span>
+              <span v-if="record.invoiceStatus" class="fee-invoice" :title="`发票：${record.invoiceStatus}`">{{
+                record.invoiceStatus
+              }}</span>
+            </td>
+            <td>{{ record.feeYear ? `第 ${record.feeYear} 年` : '—' }}</td>
+            <td class="num">¥{{ record.amount || 0 }}</td>
+            <td class="mono" :class="{ 'date-danger': isOverdue(record) }">{{ fmtDate(record.dueDate) || '—' }}</td>
+            <td class="rest-cell">
+              <span class="rest-inner">
+                <span v-if="record.receiptNo" class="mono receipt">{{ record.receiptNo }}</span>
+                <span v-if="record.payer" class="payer">{{ record.payer }}</span>
+                <span v-if="!record.receiptNo && !record.payer" class="text-faint">—</span>
+                <span v-if="isOverdue(record)" class="overdue-badge">已逾期</span>
+              </span>
+            </td>
+            <td class="actions">
+              <button @click="openEditFeeRecord(record)">编辑</button>
+              <button class="danger" @click="confirmDeleteFeeRecord(record)">删除</button>
+            </td>
+          </tr>
+          <tr v-if="record.note" class="note-row">
+            <td :colspan="7">{{ record.note }}</td>
+          </tr>
+        </template>
+      </tbody>
+    </table>
 
-    <LqDialog v-model="feeModal.visible" title="缴费记录" size="sm" mode="form" :close-on-click-modal="false"
-      destroy-on-close :loading="feeModal.saving" :confirm-disabled="feeModal.saving" @cancel="cancelFeeForm"
+    <LqDialog
+v-model="feeModal.visible"
+title="缴费记录"
+size="sm"
+mode="form"
+:close-on-click-modal="false"
+      destroy-on-close
+:loading="feeModal.saving"
+:confirm-disabled="feeModal.saving"
+@cancel="cancelFeeForm"
       @confirm="submitFeeRecord">
       <div class="fee-form">
         <div class="form-group">
@@ -64,11 +86,19 @@
         <div class="form-row">
           <div class="form-group">
             <label>缴费年度</label>
-            <el-input v-model.number="feeForm.feeYear" type="number" min="1" placeholder="第几年" />
+            <el-input
+v-model.number="feeForm.feeYear"
+type="number"
+min="1"
+placeholder="第几年" />
           </div>
           <div class="form-group">
             <label>缴费金额（元）</label>
-            <el-input v-model.number="feeForm.amount" type="number" placeholder="0.00" step="0.01" />
+            <el-input
+v-model.number="feeForm.amount"
+type="number"
+placeholder="0.00"
+step="0.01" />
           </div>
         </div>
         <div class="form-group">
@@ -225,37 +255,47 @@ watch(() => props.certificateId, loadFeeRecords)
 
 <style scoped>
 .fee-records-panel {
+  margin-top: var(--space-md-lg, 12px);
+  padding: 13px 17px 15px;
   background: var(--color-surface);
-  border-radius: var(--radius-lg);
-  padding: var(--space-section-gap);
-  margin-top: var(--space-section-gap);
+  border: 1px solid var(--color-border-lighter);
+  border-radius: var(--radius-xl, 10px);
 }
 
-.panel-header {
+.panel-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-section-gap);
+  gap: var(--space-md-lg, 12px);
+  margin-bottom: 10px;
 }
 
 .panel-title {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-semibold);
-  color: var(--color-text-heading);
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm-md, 8px);
   margin: 0;
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  letter-spacing: 0.02em;
+  color: var(--color-text-heading);
+}
+
+.panel-title::before {
+  content: '';
+  flex-shrink: 0;
+  width: 3px;
+  height: 13px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary);
+  opacity: 0.85;
 }
 
 .fee-summary {
   display: flex;
   align-items: center;
-  gap: var(--space-control-gap-wide);
-  margin-bottom: var(--space-control-gap-wide);
-  padding: var(--space-control-gap) var(--space-control-gap-wide);
-  background: var(--color-surface-raised);
-  border: 1px solid var(--color-border-lighter);
-  border-radius: var(--radius-md);
-  font-size: var(--fs-sm);
-  color: var(--color-text-secondary);
+  gap: var(--space-md-lg, 12px);
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
 }
 
 .fee-summary strong {
@@ -275,26 +315,11 @@ watch(() => props.certificateId, loadFeeRecords)
   color: var(--color-danger);
 }
 
-.fee-record-item--overdue {
-  border-color: var(--color-danger);
-  background: var(--color-danger-bg-soft);
-}
-
-.fee-overdue-badge {
-  padding: 1px 8px;
-  font-size: var(--fs-xs);
-  color: var(--color-danger);
-  background: var(--color-danger-bg-soft);
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-sm);
-  font-weight: var(--fw-medium);
-}
-
 .btn-sm {
-  padding: 6px 12px;
-  font-size: var(--fs-sm);
-  border-radius: var(--radius-sm);
+  padding: 5px 12px;
+  font-size: var(--fs-xs);
   border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
   background: var(--color-surface);
   color: var(--color-text-secondary);
   cursor: pointer;
@@ -307,6 +332,7 @@ watch(() => props.certificateId, loadFeeRecords)
 }
 
 .btn-sm.primary {
+  margin-left: auto;
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: var(--color-surface);
@@ -321,103 +347,140 @@ watch(() => props.certificateId, loadFeeRecords)
   display: flex;
   align-items: center;
   justify-content: center;
-  height: 80px;
-  color: var(--color-text-muted);
+  height: 72px;
+  font-size: var(--fs-sm);
+  color: var(--color-text-faint);
 }
 
-.fee-records-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
+/* 记录表格 */
+.fee-table {
+  width: 100%;
+  border-collapse: collapse;
 }
 
-.fee-record-item {
-  display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  padding: var(--space-control-gap-wide);
-  background: var(--color-surface-raised);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--color-border);
-}
-
-.fee-record-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.fee-record-header {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  margin-bottom: var(--space-sm);
-  flex-wrap: wrap;
-}
-
-.fee-type {
-  padding: 2px 8px;
-  background: var(--color-primary-bg);
-  color: var(--color-primary);
-  border-radius: var(--radius-sm);
-  font-size: var(--fs-xs);
+.fee-table th {
+  padding: 0 10px 7px 0;
+  border-bottom: 1px solid var(--color-border-lighter);
+  font-size: var(--fs-xxs);
   font-weight: var(--fw-medium);
-}
-
-.fee-year {
-  font-size: var(--fs-xs);
+  letter-spacing: 0.02em;
   color: var(--color-text-muted);
+  text-align: left;
 }
 
-.fee-amount {
-  font-size: var(--fs-md);
-  font-weight: var(--fw-bold);
-  color: var(--color-text-heading);
+.fee-table th.col-amount,
+.fee-table td.num {
+  text-align: right;
 }
 
-.fee-record-info {
-  display: flex;
-  gap: var(--space-form-item-gap);
+.fee-table th.col-actions,
+.fee-table td.actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.fee-table td {
+  padding: 9px 10px 9px 0;
+  border-bottom: 1px solid var(--color-border-lighter);
+  font-size: var(--fs-sm);
+  color: var(--color-text-primary);
+  vertical-align: middle;
+}
+
+.fee-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.fee-table .mono {
+  font-family: var(--font-mono);
   font-size: var(--fs-xs);
-  color: var(--color-text-muted);
-  flex-wrap: wrap;
 }
 
-.info-item {
-  display: flex;
-  align-items: center;
+.fee-table td.num {
+  font-family: var(--font-mono);
+  font-weight: var(--fw-semibold);
 }
 
-.fee-record-note {
-  margin-top: var(--space-sm);
-  font-size: var(--fs-xs);
-  color: var(--color-text-secondary);
-  font-style: italic;
-}
-
-.fee-record-actions {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-control-gap);
-  margin-left: var(--space-form-item-gap);
-}
-
-.btn-link {
-  background: none;
-  border: none;
-  color: var(--color-primary);
-  cursor: pointer;
-  font-size: var(--fs-xs);
-  padding: 0;
-}
-
-.btn-link:hover {
-  text-decoration: underline;
-}
-
-.btn-link.danger {
+.date-danger {
   color: var(--color-danger);
 }
 
+.fee-type {
+  display: inline-block;
+  padding: 1px 7px;
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-xxs);
+  font-weight: var(--fw-medium);
+}
+
+.fee-invoice {
+  margin-left: 6px;
+  font-size: var(--fs-xxs);
+  color: var(--color-text-faint);
+}
+
+.rest-cell .rest-inner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rest-cell .receipt {
+  color: var(--color-text-secondary);
+}
+
+.rest-cell .payer {
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+.text-faint {
+  color: var(--color-text-faint);
+}
+
+.overdue-badge {
+  flex-shrink: 0;
+  padding: 1px 7px;
+  font-size: var(--fs-xxs);
+  font-weight: var(--fw-medium);
+  color: var(--color-danger);
+  background: var(--color-danger-bg-soft);
+  border: 1px solid var(--color-danger-border);
+  border-radius: var(--radius-sm);
+}
+
+.fee-record-overdue {
+  background: var(--color-danger-bg-soft);
+}
+
+.note-row td {
+  padding: 0 10px 9px 0;
+  font-size: var(--fs-xs);
+  font-style: italic;
+  color: var(--color-text-secondary);
+}
+
+.actions button {
+  padding: 0 0 0 10px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font-size: var(--fs-xs);
+  color: var(--color-text-muted);
+}
+
+.actions button:hover {
+  color: var(--color-primary);
+}
+
+.actions button.danger:hover {
+  color: var(--color-danger);
+}
+
+/* 缴费记录弹窗表单 */
 .fee-form {
   display: flex;
   flex-direction: column;

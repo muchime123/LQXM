@@ -78,10 +78,6 @@ public class Certificate {
     @Column(length = 500)
     private String inventors;
 
-    /** 审查员 */
-    @Column(length = 100)
-    private String examiner;
-
     /** 代理机构，含机构号 */
     @Column(length = 500)
     private String agency;

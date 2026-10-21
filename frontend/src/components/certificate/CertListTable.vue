@@ -21,7 +21,11 @@
         />
       </template>
     </el-table-column>
-    <el-table-column prop="name" label="名称" min-width="140" sortable="custom">
+    <el-table-column
+prop="name"
+label="名称"
+min-width="140"
+sortable="custom">
       <template #default="{ row }">
         <span class="name-cell" title="点击查看详情" @click="$emit('detail', row)">{{ row.name }}</span>
       </template>
@@ -31,7 +35,11 @@
         <StatusTag :type="certStatusTagClass(row.assetStatus)" :label="row.assetStatus" />
       </template>
     </el-table-column>
-    <el-table-column label="类型" prop="patentType" width="100" sortable="custom">
+    <el-table-column
+label="类型"
+prop="patentType"
+width="100"
+sortable="custom">
       <template #default="{ row }">
         {{
           row.assetCategory === '商标'
@@ -57,17 +65,29 @@
         </div>
       </template>
     </el-table-column>
-    <el-table-column prop="applyDate" label="申请日" width="140" sortable="custom">
+    <el-table-column
+prop="applyDate"
+label="申请日"
+width="140"
+sortable="custom">
       <template #default="{ row }">
         <span class="mono-cell">{{ fmtDate(row.applyDate) }}</span>
       </template>
     </el-table-column>
-    <el-table-column prop="expireDate" label="到期日" width="140" sortable="custom">
+    <el-table-column
+prop="expireDate"
+label="到期日"
+width="140"
+sortable="custom">
       <template #default="{ row }">
         <span class="mono-cell">{{ fmtDate(row.expireDate) }}</span>
       </template>
     </el-table-column>
-    <el-table-column prop="daysRemaining" label="剩余" width="120" sortable="custom">
+    <el-table-column
+prop="daysRemaining"
+label="剩余"
+width="120"
+sortable="custom">
       <template #default="{ row }">
         <span
           :class="{
@@ -84,7 +104,11 @@
         <StatusTag :type="certFeeTagClass(row.feeStatus)" :label="row.feeStatus" />
       </template>
     </el-table-column>
-    <el-table-column prop="feeDueDate" label="年费截止" width="140" sortable="custom">
+    <el-table-column
+prop="feeDueDate"
+label="年费截止"
+width="140"
+sortable="custom">
       <template #default="{ row }">
         <span class="mono-cell">{{ fmtDate(row.feeDueDate) }}</span>
       </template>

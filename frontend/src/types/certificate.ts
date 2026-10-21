@@ -30,7 +30,6 @@ export interface CertificateDetail extends CertificateSummary {
   publicationNo: string
   queryNo: string
   inventors: string
-  examiner: string
   agency: string
   legalYears: number
   legalStatus: string
@@ -54,7 +53,6 @@ export interface CertificatePayload {
   patentNo: string
   applicant: string
   inventors: string
-  examiner: string
   agency: string
   applyDate: string
   grantDate: string

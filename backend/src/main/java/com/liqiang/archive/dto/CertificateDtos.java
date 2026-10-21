@@ -100,7 +100,6 @@ public class CertificateDtos {
             String patentNo,
             String applicant,
             String inventors,
-            String examiner,
             String agency,
             LocalDate applyDate,
             LocalDate grantDate,
@@ -151,7 +150,6 @@ public class CertificateDtos {
                     c.getPatentNo(),
                     c.getApplicant(),
                     c.getInventors(),
-                    c.getExaminer(),
                     c.getAgency(),
                     c.getApplyDate(),
                     c.getGrantDate(),
@@ -195,7 +193,6 @@ public class CertificateDtos {
             String patentNo,
             String applicant,
             String inventors,
-            String examiner,
             String agency,
             LocalDate applyDate,
             LocalDate grantDate,
@@ -233,7 +230,6 @@ public class CertificateDtos {
             if (patentNo != null) c.setPatentNo(patentNo);
             if (applicant != null) c.setApplicant(applicant);
             if (inventors != null) c.setInventors(inventors);
-            if (examiner != null) c.setExaminer(examiner);
             if (agency != null) c.setAgency(agency);
             if (applyDate != null) c.setApplyDate(applyDate);
             if (grantDate != null) c.setGrantDate(grantDate);

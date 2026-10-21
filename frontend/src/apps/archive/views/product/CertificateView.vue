@@ -309,7 +309,6 @@ const batchEditFieldGroups = computed<BatchEditFieldGroup[]>(() => [
     fields: [
       { key: 'applicant', label: '申请人', type: 'text' },
       { key: 'inventors', label: '发明人', type: 'text' },
-      { key: 'examiner', label: '审查员', type: 'text' },
       { key: 'agency', label: '代理机构', type: 'text' },
       { key: 'agencyContact', label: '代理联系人', type: 'text' }
     ]

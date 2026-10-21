@@ -60,7 +60,7 @@ public class CertificateService {
     /** 通用批量更新允许修改的字段白名单（不含名称/编号/日期/金额等标识与运营字段） */
     private static final Set<String> BATCH_EDITABLE_FIELDS = Set.of(
             "assetStatus", "assetCategory", "patentType", "applicant", "inventors",
-            "examiner", "agency", "agencyContact", "legalStatus", "feeStatus",
+            "agency", "agencyContact", "legalStatus", "feeStatus",
             "invoiceStatus", "reviewProgress", "remark",
             "websiteEnabled", "websiteFeatured", "websiteSortOrder"
     );
@@ -228,7 +228,6 @@ public class CertificateService {
                 case "patentType" -> c.setPatentType(StringUtils.blankToNull(v));
                 case "applicant" -> c.setApplicant(StringUtils.blankToNull(v));
                 case "inventors" -> c.setInventors(StringUtils.blankToNull(v));
-                case "examiner" -> c.setExaminer(StringUtils.blankToNull(v));
                 case "agency" -> c.setAgency(StringUtils.blankToNull(v));
                 case "agencyContact" -> c.setAgencyContact(StringUtils.blankToNull(v));
                 case "legalStatus" -> c.setLegalStatus(StringUtils.blankToNull(v));
@@ -539,8 +538,6 @@ public class CertificateService {
             c.setApplicant(payload.applicant());
         if (payload.inventors() != null)
             c.setInventors(payload.inventors());
-        if (payload.examiner() != null)
-            c.setExaminer(payload.examiner());
         if (payload.agency() != null)
             c.setAgency(payload.agency());
         if (payload.applyDate() != null)
