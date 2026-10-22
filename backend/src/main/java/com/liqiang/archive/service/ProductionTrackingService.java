@@ -471,7 +471,8 @@ public class ProductionTrackingService {
     public record State(LocalDate plannedStartDate, LocalDate forecastFinishDate, String riskCategory,
                         String delayReason, LocalDate nextFollowupDate, Long assigneeEmployeeId,
                         String deliveryResult, String shipmentStatus, String remark) {}
-    public record Milestone(String code, String status, LocalDate completedDate, String note) {}
+    public record Milestone(String code, String status, LocalDate completedDate, String note,
+                            LocalDate manualReferenceDate, String manualReferenceReason) {}
     public record EntryRequest(long version, String content, State state, List<Milestone> milestones) {}
     public record DispositionRequest(long version, boolean stopped, String reason) {}
     /**
@@ -2314,7 +2315,7 @@ public class ProductionTrackingService {
                 (r,n)->r.getLong(1),key).stream().findFirst().orElse(null);
     }
 
-    /** 详情里程碑附加参考完成三字段（不改库，纯派生）。 */
+    /** 详情里程碑附加生效参考日期：单据人工预计优先，其余按节点间隔链式推算。 */
     private void attachNodeReferences(Map<String,Object> source,List<Map<String,Object>> milestones,List<String> codes) {
         boolean sealer=ProductionTrackingPolicy.isSealer((String)source.get("workshopType"));
         var benchmarks=benchmarksForOrder(source);
@@ -2328,12 +2329,26 @@ public class ProductionTrackingService {
         LocalDate anchor=source.get("plannedStartDate") instanceof LocalDate d?d
                 :source.get("applicationDate") instanceof LocalDate a?a:null;
         var refs=computeNodeReferences(codes,anchor,benchmarks,applicable,statuses,dates,LocalDate.now());
+        LocalDate cursor=anchor;
         for(var item:milestones){
-            var ref=refs.get(String.valueOf(item.get("code")));
+            String code=String.valueOf(item.get("code"));
+            var ref=refs.get(code);
             if(ref==null)continue;
             item.put("typicalDays",ref.typicalDays());
-            item.put("referenceDate",ref.referenceDate());
-            item.put("referenceOverdueDays",ref.referenceOverdueDays());
+            if(ProductionTrackingPolicy.isOptionalStage(code)&&!Boolean.TRUE.equals(item.get("applicable"))){
+                item.put("referenceDate",null);item.put("referenceOverdueDays",null);item.put("referenceSource","NONE");
+                continue;
+            }
+            LocalDate systemDate=ref.typicalDays()==null||cursor==null?null
+                    :cursor.plusDays(Math.round(ref.typicalDays().doubleValue()));
+            LocalDate manual=item.get("manualReferenceDate") instanceof LocalDate d?d:null;
+            LocalDate effective=manual!=null?manual:systemDate;
+            item.put("referenceDate",effective);
+            item.put("referenceSource",manual!=null?"MANUAL":systemDate!=null?"SYSTEM":"NONE");
+            item.put("referenceOverdueDays",effective!=null&&!"DONE".equals(item.get("status"))&&LocalDate.now().isAfter(effective)
+                    ?(int)ChronoUnit.DAYS.between(effective,LocalDate.now()):null);
+            if("DONE".equals(item.get("status"))&&item.get("completedDate") instanceof LocalDate done)cursor=done;
+            else if(effective!=null)cursor=effective;
         }
     }
 
@@ -2446,7 +2461,7 @@ public class ProductionTrackingService {
         var result=new LinkedHashMap<String,Object>();
         var source=order(id);result.put("order",source);
         var codes=stageCodes((String)source.get("workshopType"));
-        var saved=jdbc.query("SELECT stage_code,stage_status,completed_date,note FROM production_tracking_milestones WHERE production_order_id=?",
+        var saved=jdbc.query("SELECT stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason FROM production_tracking_milestones WHERE production_order_id=?",
                 (r,n)->row(r),id);
         var milestones=new ArrayList<Map<String,Object>>();
         boolean sealer=ProductionTrackingPolicy.isSealer((String)source.get("workshopType"));
@@ -2460,8 +2475,10 @@ public class ProductionTrackingService {
             item.put("applicable",!optional||savedRow.isPresent()||ProductionTrackingPolicy.configuredOptionalStage(code,
                     (String)source.get("sourceOptionalConfiguration")));
             item.put("status","PENDING");item.put("completedDate",null);item.put("note",null);
+            item.put("manualReferenceDate",null);item.put("manualReferenceReason",null);
             savedRow.ifPresent(s->{
                 item.put("status",s.get("stageStatus"));item.put("completedDate",s.get("completedDate"));item.put("note",s.get("note"));
+                item.put("manualReferenceDate",s.get("manualReferenceDate"));item.put("manualReferenceReason",s.get("manualReferenceReason"));
             });
             milestones.add(item);
         }
@@ -2724,6 +2741,12 @@ public class ProductionTrackingService {
                 throw new IllegalArgumentException(ProductionTrackingPolicy.stageLabel(milestone.code(),
                         ProductionTrackingPolicy.isSealer((String)current.get("workshopType")))+"已完成时请填写完成日期");
             clean(milestone.note(),500,"节点备注");
+            if(milestone.manualReferenceDate()!=null){
+                if("DONE".equals(milestone.status()))throw new IllegalArgumentException("已完成节点不需要人工预计日期");
+                if(milestone.manualReferenceReason()==null||milestone.manualReferenceReason().isBlank())
+                    throw new IllegalArgumentException("填写人工预计日期时请说明原因");
+                clean(milestone.manualReferenceReason(),300,"人工预计原因");
+            }
         }
         if(s!=null&&s.forecastFinishDate()!=null
                 &&Objects.equals(s.forecastFinishDate(),current.get("expectedFinishDate")!=null
@@ -2737,8 +2760,30 @@ public class ProductionTrackingService {
                     +"ON DUPLICATE KEY UPDATE production_order_id=production_order_id",id);
             var before=jdbc.queryForMap("SELECT * FROM production_tracking_state WHERE production_order_id=? FOR UPDATE",id);
             if(before.get("stopped_at")!=null)throw new IllegalArgumentException("该任务已停止跟单，请先恢复跟单");
-            var beforeMilestones=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note "
+            var beforeMilestones=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason "
                     +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",id);
+            var submittedByCode=new HashMap<String,Milestone>();
+            for(var milestone:milestones)submittedByCode.put(milestone.code(),milestone);
+            var savedByCode=new HashMap<String,Map<String,Object>>();
+            for(var row:beforeMilestones)savedByCode.put(String.valueOf(row.get("stage_code")),row);
+            var editableManualCodes=new ArrayList<String>();
+            for(String code:allowedStages){
+                if(ProductionTrackingPolicy.isOptionalStage(code)&&!submittedByCode.containsKey(code)&&!savedByCode.containsKey(code))continue;
+                String status=submittedByCode.containsKey(code)?submittedByCode.get(code).status():
+                        savedByCode.containsKey(code)?String.valueOf(savedByCode.get(code).get("stage_status")):"PENDING";
+                if(!"DONE".equals(status)&&editableManualCodes.size()<2)editableManualCodes.add(code);
+            }
+            for(var milestone:milestones){
+                var old=savedByCode.get(milestone.code());
+                LocalDate oldDate=old!=null&&old.get("manual_reference_date") instanceof java.sql.Date d?d.toLocalDate():null;
+                String oldReason=old==null?null:(String)old.get("manual_reference_reason");
+                boolean changed=!Objects.equals(oldDate,milestone.manualReferenceDate())
+                        ||!Objects.equals(oldReason==null?null:oldReason.trim(),
+                                milestone.manualReferenceDate()==null?null:milestone.manualReferenceReason().trim());
+                if(changed&&!editableManualCodes.contains(milestone.code())
+                        &&!("DONE".equals(milestone.status())&&milestone.manualReferenceDate()==null))
+                    throw new IllegalArgumentException("只能修改当前及下一未完成节点的人工预计日期");
+            }
             long version=((Number)before.get("version")).longValue();
             if(version!=request.version())throw new ResponseStatusException(HttpStatus.CONFLICT,"该任务已由其他人更新，请刷新后重试");
             if(s!=null){
@@ -2760,13 +2805,15 @@ public class ProductionTrackingService {
                         +"WHERE production_order_id=?",version+1,id);
             }
             for(var milestone:milestones){
-                jdbc.update("INSERT INTO production_tracking_milestones(production_order_id,stage_code,stage_status,completed_date,note) "
-                                +"VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE stage_status=VALUES(stage_status),"
-                                +"completed_date=VALUES(completed_date),note=VALUES(note)",
-                        id,milestone.code(),milestone.status(),milestone.completedDate(),clean(milestone.note(),500,"节点备注"));
+                jdbc.update("INSERT INTO production_tracking_milestones(production_order_id,stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason) "
+                                +"VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stage_status=VALUES(stage_status),"
+                                +"completed_date=VALUES(completed_date),note=VALUES(note),"
+                                +"manual_reference_date=VALUES(manual_reference_date),manual_reference_reason=VALUES(manual_reference_reason)",
+                        id,milestone.code(),milestone.status(),milestone.completedDate(),clean(milestone.note(),500,"节点备注"),
+                        milestone.manualReferenceDate(),milestone.manualReferenceDate()==null?null:clean(milestone.manualReferenceReason(),300,"人工预计原因"));
             }
             var after=jdbc.queryForMap("SELECT * FROM production_tracking_state WHERE production_order_id=?",id);
-            var milestoneSnapshot=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note "
+            var milestoneSnapshot=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason "
                     +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",id);
             // 跟进内容不再要求手填：按节点或延期至日期的变更自动生成。
             String entryContent=provided;
@@ -2800,6 +2847,10 @@ public class ProductionTrackingService {
             String newDate=m.completedDate()==null?null:m.completedDate().toString();
             String oldNote=old==null||old.get("note")==null?null:str(old.get("note"));
             String newNote=m.note()==null?null:m.note().trim();
+            String oldManual=old==null||old.get("manual_reference_date")==null?null:str(old.get("manual_reference_date"));
+            String newManual=m.manualReferenceDate()==null?null:m.manualReferenceDate().toString();
+            String oldManualReason=old==null||old.get("manual_reference_reason")==null?null:str(old.get("manual_reference_reason"));
+            String newManualReason=m.manualReferenceDate()==null?null:m.manualReferenceReason().trim();
             String label=ProductionTrackingPolicy.stageLabel(m.code(),sealer);
             if(!Objects.equals(oldStatus,m.status())||!Objects.equals(oldDate,newDate)) {
                 String text=switch(m.status()){
@@ -2811,6 +2862,8 @@ public class ProductionTrackingService {
             } else if(!Objects.equals(oldNote,newNote)) {
                 changed.add(label+"（备注更新）");
             }
+            if(!Objects.equals(oldManual,newManual)||!Objects.equals(oldManualReason,newManualReason))
+                changed.add(label+(newManual==null?"（恢复系统参考）":"（人工预计 "+newManual+"："+newManualReason+"）"));
         }
         return changed.isEmpty()?"":"更新节点："+String.join("；",changed);
     }

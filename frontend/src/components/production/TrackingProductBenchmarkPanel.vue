@@ -2,8 +2,17 @@
   <section class="tracking-benchmarks">
     <header>
       <div>
-        <h2>产品节点参考工期</h2>
-        <p>按自然日设置该产品各跟单节点的参考天数；空值沿用通用参考（右上角「通用参考设置」）。只影响参考日期，不改变氚云工序或跟单节点。</p>
+        <h2>{{ productName }} · 产品节点参考工期
+          <el-tooltip placement="top" :show-after="200">
+            <template #content>
+              按自然日设置该产品各跟单节点的参考天数；空值沿用通用参考。<br>
+              只影响参考日期，不改变氚云工序或跟单节点。<br>
+              候选来自本产品的跟单记录，P50 / P75 仅供审核；保存或按 P50 填充后才参与参考日期。<br>
+              批量填充要求样本至少 8 段、零天占比低于一半，且节点尚未发布。
+            </template>
+            <el-icon class="help-icon"><QuestionFilled /></el-icon>
+          </el-tooltip>
+        </h2>
       </div>
       <div class="actions">
         <el-button :loading="calculating" @click="refreshCandidates">计算历史样本</el-button>
@@ -12,10 +21,6 @@
         <el-button :disabled="!peers.length" @click="openCopy">复制其它产品</el-button>
       </div>
     </header>
-    <p class="hint">
-      候选来自本产品自身的跟单记录（P50 / P75 仅供审核）；点击单行保存、或用「按 P50 填充」批量发布后才参与跟单参考日期。
-      <template v-if="!fillableCount">当前没有可批量填充的节点（需候选样本 ≥ 8 段、零天占比不过半、且尚未发布；零天多的节点请人工看样本后单行发布）。</template>
-    </p>
     <el-table v-if="stageRows.length" :data="stageRows" stripe size="small">
       <el-table-column label="跟单节点" min-width="110">
         <template #default="{ row }">
@@ -77,6 +82,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { QuestionFilled } from '@element-plus/icons-vue'
 import {
   applyTrackingProductBenchmarkP50, copyTrackingProductBenchmarks, refreshTrackingProductBenchmarkCandidates,
   saveTrackingProductBenchmark, type TrackingBenchmarkWorkshop, type TrackingProductBenchmarkRow
@@ -281,7 +287,7 @@ async function applyP50() {
 .tracking-benchmarks header h2 { margin: 0 0 4px; font-size: 17px; }
 .tracking-benchmarks header p { margin: 0; color: var(--color-text-secondary, #64748b); font-size: 12px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
-.hint { margin: 0; color: var(--color-text-secondary, #64748b); font-size: 12px; line-height: 1.6; }
+.help-icon { margin-left: 4px; color: var(--color-text-secondary, #94a3b8); font-size: 14px; vertical-align: -1px; cursor: help; }
 .total-row { margin: 0; font-size: 13px; color: var(--color-text-secondary, #5f6f82); display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
 .total-row b { font-size: 18px; color: var(--color-primary, #0f766e); font-variant-numeric: tabular-nums; }
 .total-note { font-size: 12px; color: var(--color-text-secondary, #94a3b8); }

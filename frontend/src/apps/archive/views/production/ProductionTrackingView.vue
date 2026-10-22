@@ -207,7 +207,17 @@
       <el-table-column v-if="isListColumnVisible('assignee')" label="跟单员" width="110"><template #default="{ row }">{{ row.assigneeName }}</template></el-table-column>
       <el-table-column label="操作" width="90" fixed="right"><template #default="{ row }"><el-button link type="primary" @click.stop="openOrderDetail(row)">跟进</el-button></template></el-table-column>
     </el-table>
-    <el-dialog v-model="listCompletionVisible" title="确认节点完成" width="min(700px, 94vw)" append-to-body>
+    <LqDialog
+      v-model="listCompletionVisible"
+      title="确认节点完成"
+      width="min(700px, 94vw)"
+      mode="detail"
+      :show-footer="true"
+      confirm-text="确认登记"
+      :loading="listCompletionSaving"
+      :confirm-disabled="!listCompletionDate"
+      @confirm="confirmListCompletion"
+    >
       <p>将以下 {{ listCompletionRows.length }} 单的<strong>{{ listCompletionStageCode ? '所选节点' : '当前未完成节点' }}</strong>登记为已完成。请核对实际完成日期；每单独立写入跟单历史。</p>
       <el-date-picker v-model="listCompletionDate" type="date" value-format="YYYY-MM-DD" placeholder="实际完成日期" />
       <el-input v-if="listCompletionStageCode" v-model="listCompletionNote" type="textarea" :rows="2" maxlength="500" show-word-limit placeholder="节点备注（可选）" style="margin-top: 12px" />
@@ -216,15 +226,13 @@
         <el-table-column prop="productNameSnapshot" label="产品" min-width="170" show-overflow-tooltip />
         <el-table-column label="本次完成节点" min-width="115"><template #default="{ row }">{{ listCompletionTarget(row, listCompletionStageCode)?.label }}</template></el-table-column>
       </el-table>
-      <template #footer><el-button :disabled="listCompletionSaving" @click="listCompletionVisible = false">取消</el-button><el-button type="primary" :loading="listCompletionSaving" :disabled="!listCompletionDate" @click="confirmListCompletion">确认登记</el-button></template>
-    </el-dialog>
+    </LqDialog>
     <div class="pager">
-      <el-pagination v-model:current-page="page" v-model:page-size="size" :page-sizes="[20, 30, 50, 100]" :total="total"
-        layout="total, sizes, prev, pager, next" @current-change="() => load(false)" @size-change="onSizeChange" />
+      <LqPagination :pagination="pagination" :page-sizes="[20, 30, 50, 100]" @change="() => load(false)" />
     </div>
 
     <!-- 导出：列可选。导出的每个值都取页面同一套显示函数，保证与列表所见完全一致。 -->
-    <el-dialog v-model="exportVisible" title="导出生产跟单" width="min(900px, 94vw)">
+    <LqDialog v-model="exportVisible" title="导出生产跟单" width="min(900px, 94vw)" mode="detail" :show-footer="true">
       <div class="export-scope">
         <span>导出范围</span>
         <el-radio-group v-model="exportScope">
@@ -268,15 +276,15 @@
         </div>
       </el-checkbox-group>
       <template #footer>
-        <el-button @click="exportVisible = false">取消</el-button>
-        <el-button type="primary" :loading="exporting" :disabled="!exportColumns.length" @click="doExport(exportFormat)">
-          {{ exportFormat === 'html' ? '导出网页' : '导出 Excel' }}
-        </el-button>
+        <button type="button" :disabled="exporting" @click="exportVisible = false">取消</button>
+        <button type="button" class="primary" :disabled="exporting || !exportColumns.length" @click="doExport(exportFormat)">
+          {{ exporting ? '导出中…' : exportFormat === 'html' ? '导出网页' : '导出 Excel' }}
+        </button>
       </template>
-    </el-dialog>
+    </LqDialog>
 
     <!-- 导回：把「导出件改完」再导回。只回写跟单员维护的四类字段，其余列只读；空白＝不修改。 -->
-    <el-dialog v-model="roundTripDialog" title="导入跟单表（回写）" width="min(1180px, 96vw)">
+    <LqDialog v-model="roundTripDialog" title="导入跟单表（回写）" width="min(1180px, 96vw)" mode="detail" :show-footer="true">
       <template v-if="roundTripPreview">
         <p class="muted">
           {{ roundTripFile?.name }} · 共 {{ roundTripPreview.total }} 行。按<strong>任务号</strong>匹配生产任务；
@@ -313,17 +321,22 @@
         </el-table>
       </template>
       <template #footer>
-        <el-button @click="roundTripDialog = false">关闭</el-button>
-        <el-button type="primary" :loading="roundTripSaving" :disabled="!roundTripPreview || !roundTripPreview.write" @click="confirmRoundTripImport">
-          确认回写 {{ roundTripPreview?.write || 0 }} 行
-        </el-button>
+        <button type="button" :disabled="roundTripSaving" @click="roundTripDialog = false">关闭</button>
+        <button
+          type="button"
+          class="primary"
+          :disabled="roundTripSaving || !roundTripPreview || !roundTripPreview.write"
+          @click="confirmRoundTripImport"
+        >
+          {{ roundTripSaving ? '回写中…' : `确认回写 ${roundTripPreview?.write || 0} 行` }}
+        </button>
       </template>
-    </el-dialog>
+    </LqDialog>
 
     <!-- 生产任务单导入（跟单员自助）：与氚云导入中心同一套解析/预览/确认，只锁死导入类型。 -->
     <ProductionTaskImportDialog v-model="taskImportVisible" @imported="onProductionTaskImported" />
 
-    <el-dialog v-model="importDialog" title="导入生产跟单进度表" width="min(1180px, 96vw)">
+    <LqDialog v-model="importDialog" title="导入生产跟单进度表" width="min(1180px, 96vw)" mode="detail" :show-footer="true">
       <template v-if="importPreview">
         <p class="muted">{{ importFile?.name }} · 共 {{ importPreview.total }} 行。只有表格导入历史的任务随本次确认更新；已有人工跟进的变化进入主管逐项审核。</p>
         <div class="import-counts">
@@ -348,12 +361,19 @@
         </el-table>
       </template>
       <template #footer>
-        <el-button @click="importDialog = false">关闭</el-button>
-        <el-button type="primary" :loading="importSaving" :disabled="!importPreview || importPreview.alreadyUploaded" @click="confirmWorkbookImport">确认导入</el-button>
+        <button type="button" :disabled="importSaving" @click="importDialog = false">关闭</button>
+        <button
+          type="button"
+          class="primary"
+          :disabled="importSaving || !importPreview || importPreview.alreadyUploaded"
+          @click="confirmWorkbookImport"
+        >
+          {{ importSaving ? '导入中…' : '确认导入' }}
+        </button>
       </template>
-    </el-dialog>
+    </LqDialog>
 
-    <el-dialog v-model="workbookDialog" title="进度表导入记录" width="min(1400px, 96vw)">
+    <LqDialog v-model="workbookDialog" title="进度表导入记录" width="min(1400px, 96vw)" mode="detail">
       <p class="muted">待匹配行需核对工单；已有跟单的变化由主管选择字段后应用。表格版本和原始记录保留。</p>
       <el-radio-group v-model="workbookView" @change="onWorkbookViewChange">
         <el-radio-button value="pending">待处理{{ workbookRows.length ? `（${workbookRows.length}）` : '' }}</el-radio-button>
@@ -420,9 +440,9 @@
           </template>
         </el-table-column>
       </el-table>
-    </el-dialog>
+    </LqDialog>
 
-    <el-dialog v-model="reviewDialog" title="逐项确认表格差异" width="min(680px, 96vw)" append-to-body>
+    <LqDialog v-model="reviewDialog" title="逐项确认表格差异" width="min(680px, 96vw)" mode="detail" :show-footer="true">
       <template v-if="activeReview">
         <p class="muted">仅勾选的字段会写入本地跟单，并生成一条主管审核记录。未勾选字段保留当前值；氚云源工单不变。</p>
         <el-checkbox-group v-model="selectedReviewKeys" class="review-differences">
@@ -433,13 +453,20 @@
         <p v-if="!activeReview.differences.length" class="muted">本地跟单已变化，当前没有可应用的差异；可忽略此版本。</p>
       </template>
       <template #footer>
-        <el-button @click="reviewDialog = false">关闭</el-button>
-        <el-button :loading="reviewSaving" @click="ignoreReview">保留本地记录</el-button>
-        <el-button type="primary" :disabled="!selectedReviewKeys.length" :loading="reviewSaving" @click="applyReview">应用所选差异</el-button>
+        <button type="button" :disabled="reviewSaving" @click="reviewDialog = false">关闭</button>
+        <button type="button" :disabled="reviewSaving" @click="ignoreReview">保留本地记录</button>
+        <button
+          type="button"
+          class="primary"
+          :disabled="reviewSaving || !selectedReviewKeys.length"
+          @click="applyReview"
+        >
+          {{ reviewSaving ? '处理中…' : '应用所选差异' }}
+        </button>
       </template>
-    </el-dialog>
+    </LqDialog>
 
-    <el-dialog v-model="candidateDialog" title="关联氚云工单" width="min(1080px, 96vw)">
+    <LqDialog v-model="candidateDialog" title="关联氚云工单" width="min(1080px, 96vw)" mode="detail">
       <p v-if="selectedWorkbookRow" class="muted">{{ selectedWorkbookRow.sheetName }}第 {{ selectedWorkbookRow.sheetRow }} 行：{{ selectedWorkbookRow.productName }}，{{ selectedWorkbookRow.sourceQuantity }} 台；交期 {{ selectedWorkbookRow.requiredCompletionDate || '未填' }}。</p>
       <div class="candidate-search">
         <el-input v-model="candidateKeyword" clearable placeholder="默认按车间/产品/交期自动推荐；输入工单号、产品或客户可精确查找" @keyup.enter="searchCandidates" />
@@ -472,9 +499,9 @@
           <template #default="{ row }"><el-button link type="primary" @click="selectCandidate(row)">确认导入</el-button></template>
         </el-table-column>
       </el-table>
-    </el-dialog>
+    </LqDialog>
 
-    <el-dialog v-model="archiveRuleDialog" title="归档规则" width="min(820px, 96vw)" append-to-body>
+    <LqDialog v-model="archiveRuleDialog" title="归档规则" width="min(820px, 96vw)" mode="detail">
       <p class="muted">命中以下产品名的表格行，在导入进度表时会直接归为「已归档」，不再进入待处理队列。规则只作用于<strong>匹配不上工单</strong>的行，能唯一匹配的行不受影响。</p>
       <el-table :data="archiveRules" max-height="50vh" empty-text="暂无归档规则">
         <el-table-column prop="productLabel" label="表格产品名" min-width="200" />
@@ -486,7 +513,7 @@
           <template #default="{ row }"><el-button link type="danger" @click="revokeArchiveRule(row)">撤销并恢复</el-button></template>
         </el-table-column>
       </el-table>
-    </el-dialog>
+    </LqDialog>
 
     <TrackingDetailDrawer v-model="detailVisible" :order-id="detailOrderId" :items="items" @saved="load()" />
     <ProductionTrackingAnalyticsDrawer v-model="analysisVisible" @open-order="openFromAnalysis" />
@@ -520,6 +547,9 @@ import { useTrackingListColumns } from '@/composables/tracking/useTrackingListCo
 import { useTrackingWorkbook } from '@/composables/tracking/useTrackingWorkbook'
 import { useTrackingRoundTrip } from '@/composables/tracking/useTrackingRoundTrip'
 import { useTrackingListCompletion } from '@/composables/tracking/useTrackingListCompletion'
+import { useListPagination } from '@/composables/list/useListPagination'
+import LqPagination from '@/components/common/LqPagination.vue'
+import LqDialog from '@/components/common/LqDialog.vue'
 
 /**
  * 筛选条件（关键词 / 车间 / 跟单状态 / 交付结果 / 提交时间 …）的状态与全部派生都收在 useTrackingFilters 里，
@@ -566,10 +596,16 @@ const router = useRouter()
 watch(() => route.query.analysis, value => { if (value === '1') analysisVisible.value = true }, { immediate: true })
 function openFromAnalysis(id: number) { openOrderDetail({ id }) }
 const auth = useCurrentUser()
-const page = ref(1)
+/**
+ * 分页状态唯一来源：公共 useListPagination（0 基）。
+ * 后端 /api/manufacturing/followups 的 page 是 **1 基**（默认 1），故下面只在此处做一次 +1 转换，
+ * 页面其余部分与模板一律沿用与改造前同义的 `page` / `size` / `total`。
+ */
+const pagination = useListPagination({ page: 0, size: 30 })
+const page = computed(() => pagination.pageInfo.page + 1)
 /** 每页条数：由分页器「条/页」下拉选择（后端 list 接受 1~100）。 */
-const size = ref(30)
-const total = ref(0)
+const size = computed(() => pagination.pageInfo.size)
+const total = computed(() => pagination.pageInfo.total)
 const items = ref<TrackingOrder[]>([])
 /**
  * 「业务员」列头可选项：优先取后端 filter-options 的 salespersons（与可见性同口径），
@@ -666,17 +702,18 @@ async function load(refreshOverview = true) {
     if (requestId !== latestListRequest) return
     selectedTrackingRows.value = []
     items.value = result.items
-    total.value = result.total
+    // 只回写总数：响应的 page 是 1 基，直接 updateFromResponse 会把 0 基状态整体偏移一页
+    pagination.pageInfo.total = result.total
+    pagination.pageInfo.pages = Math.ceil(result.total / size.value)
     visibility.value = result.visibility || 'ALL'
     if (visibility.value !== 'ALL') workbookActionable.value = 0
   } catch (error) { if (requestId === latestListRequest) ElMessage.error(error instanceof Error ? error.message : '加载跟单任务失败') }
   finally { if (requestId === latestListRequest) loading.value = false }
   await Promise.all([summaryTask, optionsTask])
 }
-function search() { page.value = 1; void load(false) }
+function search() { pagination.resetPage(); void load(false) }
 function refreshTracking() { void load(true) }
-/** 切换「条/页」后回到第一页，避免停留在越界页码出现空白列表。 */
-function onSizeChange() { page.value = 1; void load(false) }
+/** 切换「条/页」后回到第一页：由 LqPagination 内部 onPageSizeChange 完成（同时触发 change → load）。 */
 /**
  * 列表列的显示/隐藏（本机勾选 > 全站默认 > 代码兜底）收在 useTrackingListColumns 里；
  * 列 key 清单由该模块导出，前后端列契约测试直接读它，不再读本页源码。
@@ -816,10 +853,8 @@ await Promise.all([loadColumnDefaults(), load()])
 .tracking-table small.metric-exception-text { color: #b42318; }
 .tracking-table small.metric-delay { color: #b54708; }
 /* 工期偏差小字：比要求晚=红、早=绿（同样要带前缀提权，否则被通用小字刷灰）。 */
-.tracking-table small.lead-delta-late,
-.metric small.lead-delta-late { color: #b42318; font-weight: 600; }
-.tracking-table small.lead-delta-early,
-.metric small.lead-delta-early { color: #067647; font-weight: 600; }
+.tracking-table small.lead-delta-late { color: #b42318; font-weight: 600; }
+.tracking-table small.lead-delta-early { color: #067647; font-weight: 600; }
 /* 工期列主数值直接着色（小字已撤，颜色+悬停提示，2026-10-15 LQ 定）。 */
 .tracking-table span.lead-delta-late { color: #b42318; font-weight: 600; }
 .tracking-table span.lead-delta-early { color: #067647; font-weight: 600; }
@@ -829,8 +864,7 @@ await Promise.all([loadColumnDefaults(), load()])
    ⚠️ 徽章与小字都要带前缀提权，否则被 `.tracking-table small` 刷成统一灰。 */
 .tracking-table .lead-cell { display: flex; flex-direction: column; gap: 2px; line-height: 1.3; }
 .tracking-table .lead-cell > span { display: flex; align-items: baseline; gap: 4px; }
-.tracking-table small.lead-kind,
-.metric small.lead-kind { color: #475467; background: #f2f4f7; border-radius: 4px; padding: 0 4px; font-size: 11px; font-weight: 600; }
+.tracking-table small.lead-kind { color: #475467; background: #f2f4f7; border-radius: 4px; padding: 0 4px; font-size: 11px; font-weight: 600; }
 .lead-detail-heading { cursor: help; }
 .tracking-table small.lead-others { color: #98a2b3; font-size: 11px; }
 .countdown-undated { color: #175cd3; font-weight: 600; }
@@ -860,96 +894,10 @@ await Promise.all([loadColumnDefaults(), load()])
 .list-stage-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
 .list-stage-actions :deep(.el-button + .el-button) { margin-left: 0; }
 .list-stage-actions :deep(.el-button) { padding: 5px 7px; height: 26px; }
-.detail-content { display: grid; gap: 18px; padding-bottom: 8px; }
-.detail-content section { border-top: 1px solid #e5e7eb; padding-top: 14px; }
-.detail-content h3 { margin: 0; font-size: 15px; }
 .muted { color: #667085; font-size: 13px; }
-.section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
-.stage-quick-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.pending-change-count { color: #b54708; font-weight: 600; }
-.summary-block { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-top: none !important; padding-top: 0 !important; }
-.summary-title { display: flex; align-items: center; gap: 8px; }
-.summary-title strong { font-size: 17px; }
-.summary-spec { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 8px; }
-.summary-tags { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.summary-progress { display: grid; justify-items: center; gap: 4px; }
-.progress-num { font-size: 13px; font-weight: 700; }
-.metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.metric { background: #f9fafb; border: 1px solid #eef0f3; border-radius: 8px; padding: 9px 12px; display: grid; gap: 3px; min-width: 0; }
-.metric span { color: #667085; font-size: 12px; }
-.metric-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
-.metric-heading .el-button { margin: -5px -6px -5px 0; }
 .metric-delay { color: #b54708; font-weight: 600; overflow-wrap: anywhere; }
-.metric strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
-.metric strong.is-danger { color: #d92d20; }
-.metric-link { width: 100%; text-align: left; font: inherit; cursor: pointer; }
-.metric-link:hover, .metric-link:focus-visible { border-color: #409eff; background: #f0f7ff; }
-.metric-link:focus-visible { outline: 2px solid #409eff; outline-offset: 2px; }
-.metric-link:disabled { cursor: wait; }
-.metric-link .metric-link-hint { color: #1677c8; }
-.metric small { font-size: 12px; line-height: 1.5; }
-.metric .el-button { justify-self: start; margin-left: -4px; }
-.detail-stopped .metric .el-button { display: none; }
-.metric.metric-exception { border-color: #fda29b; background: #fff6f5; }
-.metric.metric-exception strong, .metric-exception-text { color: #b42318; }
-.metric-reviewed { color: #667085; }
-/* 「已记录原因」后面的修改入口：与正文同基线，不额外占行高。 */
-.metric-reviewed .el-button { margin-left: 6px; vertical-align: baseline; font-size: 12px; }
-.review-edit-hint { margin-bottom: 12px; }
+.metric-exception-text { color: #b42318; }
 .time-signal-list { display: flex; gap: 4px; flex-wrap: wrap; }
-.delay-dialog-note { margin: 0 0 16px; color: #667085; line-height: 1.6; }
-/* 节点进度：表格式行内编辑——节点 | 阶段状态 | 完成时间 | 节点备注 | 节点记录。 */
-.stage-list {
-  --stage-cols: minmax(140px, 1fr) 112px 108px 132px minmax(200px, 1.6fr) auto;
-  display: grid; gap: 8px;
-}
-.stage-head { display: grid; grid-template-columns: var(--stage-cols); gap: 12px; align-items: center; padding: 0 14px; font-size: 12px; font-weight: 600; color: #667085; }
-.stage-item { display: grid; gap: 6px; background: #fff; border: 1px solid #e5e7eb; border-radius: 9px; padding: 8px 14px; }
-.stage-item.current { box-shadow: 0 0 0 2px rgba(15, 118, 110, .18); border-color: var(--color-primary, #0f766e); }
-.stage-grid { display: grid; grid-template-columns: var(--stage-cols); gap: 12px; align-items: center; }
-.cell-node { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.row-dot { width: 10px; height: 10px; border-radius: 50%; background: #d0d5dd; flex: none; }
-.row-dot.in_progress { background: #f59e0b; }
-.row-dot.done { background: #12b76a; }
-.row-name { font-size: 13px; font-weight: 600; color: #101828; overflow-wrap: anywhere; }
-.cell-status { width: 112px; }
-.cell-date { width: 132px; }
-/* 参考完成：给跟单员的「一般情况该何时完成」参考；超参考未完成标红提示，不阻断保存。 */
-.cell-reference { font-size: 12px; color: #475467; display: flex; flex-direction: column; line-height: 1.35; }
-.cell-reference small { color: #d92d20; font-weight: 600; }
-.cell-reference.is-overdue { color: #d92d20; font-weight: 600; }
-.cell-history { justify-self: end; }
-/* 按需工序（氧化/喷特氟龙）本单不适用：虚线灰边，明确「不是没做完」。 */
-.stage-item.na { border-style: dashed; background: #fcfcfd; }
-.stage-item.na .row-dot { background: transparent; box-shadow: inset 0 0 0 1px #d0d5dd; }
-.stage-item.na .row-name { color: #98a2b3; }
-/* 节点变更记录：点「历史」展开，贴在节点行下方，左竖线对齐。 */
-.row-history { margin-left: 5px; padding-left: 14px; border-left: 2px solid #e5e7eb; display: grid; gap: 3px; }
-.row-history p { margin: 0; font-size: 12px; color: #475467; line-height: 1.5; overflow-wrap: anywhere; }
-.row-history .muted { font-size: 12px; margin-right: 6px; }
-/* 本次编辑会话尚未保存的节点修改：实时预览，保存后转为正式历史。 */
-.row-history .pending { color: #b54708; background: #fffaeb; border-radius: 6px; padding: 4px 8px; }
-.optional-mark { font-style: normal; margin-left: 6px; padding: 1px 5px; border-radius: 4px; background: #f2f4f7; color: #667085; font-size: 11px; font-weight: 600; }
-.reference-panel { border-top: none; }
-.more-title { font-size: 13px; font-weight: 600; color: #344054; }
-.reference-panel :deep(.el-collapse-item__header) { height: auto; min-height: 40px; line-height: 1.5; font-size: 13px; }
-.reference-panel { margin-top: 4px; }
-.entry { display: grid; gap: 6px; }
-.entry-head { display: flex; align-items: baseline; gap: 10px; }
-.entry-head strong { font-size: 13px; }
-.entry-content { margin: 0; white-space: pre-wrap; }
-.entry-diff { display: flex; flex-wrap: wrap; gap: 6px; }
-.diff-chip { background: #f2f4f7; border-radius: 6px; padding: 3px 8px; font-size: 12px; color: #344054; }
-.diff-chip i { font-style: normal; color: #98a2b3; text-decoration: line-through; }
-.diff-chip b { margin: 0 5px; color: #98a2b3; font-weight: 400; }
-.drawer-footer { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
-/* 窄屏时五列放不下：退化为纵向堆叠，隐藏表头。 */
-@media (max-width: 720px) {
-  .stage-head { display: none; }
-  .stage-list { --stage-cols: 1fr; }
-  .cell-history { justify-self: start; }
-}
-@media (max-width: 760px) { .tracking-page { padding: 14px; } .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .summary-block { flex-direction: column; } .summary-progress { justify-items: flex-start; } }
 </style>
 
 <style>

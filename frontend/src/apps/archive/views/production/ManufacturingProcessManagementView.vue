@@ -180,7 +180,14 @@
         </div>
 
     <!-- ============ 工序编辑弹窗 ============ -->
-    <el-dialog v-model="opDialogOpen" :title="opForm?.id ? '编辑工序' : '新增工序'" width="min(560px, calc(100vw - 32px))" :close-on-click-modal="false">
+    <LqDialog
+      v-model="opDialogOpen"
+      :title="opForm?.id ? '编辑工序' : '新增工序'"
+      width="min(560px, calc(100vw - 32px))"
+      mode="form"
+      :loading="savingOp"
+      @confirm="saveOp"
+    >
       <el-form :model="opForm" label-width="100px">
         <el-form-item label="工序编码" required>
           <el-input v-model="opForm.operationCode" :disabled="!!opForm?.id" placeholder="如 DESIGN001（唯一编码，创建后不可改）" />
@@ -218,14 +225,17 @@
           <el-switch v-model="opForm.active" />
         </el-form-item>
       </el-form>
-      <template #footer>
-        <el-button @click="opDialogOpen = false">取消</el-button>
-        <el-button type="primary" :loading="savingOp" @click="saveOp">保存</el-button>
-      </template>
-    </el-dialog>
+    </LqDialog>
 
     <!-- ============ 模板编辑弹窗 ============ -->
-    <el-dialog v-model="tplDialogOpen" :title="tplForm?.id ? '编辑模板' : '新增模板'" width="min(560px, calc(100vw - 32px))" :close-on-click-modal="false">
+    <LqDialog
+      v-model="tplDialogOpen"
+      :title="tplForm?.id ? '编辑模板' : '新增模板'"
+      width="min(560px, calc(100vw - 32px))"
+      mode="form"
+      :loading="savingTpl"
+      @confirm="saveTpl"
+    >
       <el-form :model="tplForm" label-width="110px">
         <el-form-item label="模板编码" required>
           <el-input v-model="tplForm.templateCode" :disabled="!!tplForm?.id" placeholder="如 TPL-SEAL-NORMAL（唯一编码，创建后不可改）" />
@@ -252,14 +262,18 @@
           <el-switch v-model="tplForm.active" />
         </el-form-item>
       </el-form>
-      <template #footer>
-        <el-button @click="tplDialogOpen = false">取消</el-button>
-        <el-button type="primary" :loading="savingTpl" @click="saveTpl">保存</el-button>
-      </template>
-    </el-dialog>
+    </LqDialog>
 
     <!-- ============ 添加工序弹窗 ============ -->
-    <el-dialog v-model="addOpDialogOpen" title="添加工序到模板" width="min(480px, calc(100vw - 32px))">
+    <LqDialog
+      v-model="addOpDialogOpen"
+      title="添加工序到模板"
+      width="min(480px, calc(100vw - 32px))"
+      mode="form"
+      confirm-text="添加"
+      :confirm-disabled="!addOpForm.operationId"
+      @confirm="confirmAddOp"
+    >
       <el-form :model="addOpForm" label-width="80px">
         <el-form-item label="工序" required>
           <el-select v-model="addOpForm.operationId" filterable placeholder="选择工序（仅显示启用的工序）" class="full-width">
@@ -268,12 +282,15 @@
         </el-form-item>
         <el-empty v-if="!availableOps.length" description="没有可添加的工序（全部已添加或未启用）" :image-size="60" />
       </el-form>
-      <template #footer>
-        <el-button @click="addOpDialogOpen = false">取消</el-button>
-        <el-button type="primary" :disabled="!addOpForm.operationId" @click="confirmAddOp">添加</el-button>
-      </template>
-    </el-dialog>
-    <el-dialog v-model="ruleDialogOpen" :title="ruleForm.id ? '编辑产品推荐规则' : '添加产品推荐规则'" width="min(520px, calc(100vw - 32px))">
+    </LqDialog>
+    <LqDialog
+      v-model="ruleDialogOpen"
+      :title="ruleForm.id ? '编辑产品推荐规则' : '添加产品推荐规则'"
+      width="min(520px, calc(100vw - 32px))"
+      mode="form"
+      :loading="savingRule"
+      @confirm="saveRule"
+    >
       <el-form label-width="100px">
         <el-form-item label="标准产品" required><el-select v-model="ruleForm.productModelId" filterable style="width:100%"><el-option v-for="p in productOptions" :key="p.id" :value="p.id" :label="p.name" /></el-select></el-form-item>
         <el-form-item label="订单方式"><el-select v-model="ruleForm.customizationMode" clearable style="width:100%" placeholder="全部订单方式"><el-option v-for="m in MODE_OPTIONS" :key="m.value" :value="m.value" :label="m.label" /></el-select></el-form-item>
@@ -281,8 +298,7 @@
         <el-form-item label="备注"><el-input v-model="ruleForm.remark" /></el-form-item>
         <el-form-item label="启用"><el-switch v-model="ruleForm.active" /></el-form-item>
       </el-form>
-      <template #footer><el-button @click="ruleDialogOpen=false">取消</el-button><el-button type="primary" :loading="savingRule" @click="saveRule">保存</el-button></template>
-    </el-dialog>
+    </LqDialog>
   </div>
 </template>
 
@@ -290,6 +306,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ManufacturingWorkshopPanel from '@/components/production/ManufacturingWorkshopPanel.vue'
+import LqDialog from '@/components/common/LqDialog.vue'
 import { ElMessage } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import {
@@ -630,15 +647,11 @@ await Promise.allSettled([loadOps(), loadTemplates()])
 .ops-table .op-code { display: block; color: var(--color-text-secondary, #94a3b8); font-size: 11px; }
 .ops-table .coef-input { width: 100px; }
 
-/* ============ 弹窗 ============ */
-:deep(.el-dialog) { border-radius: var(--radius-2xl, 14px); }
-:deep(.el-dialog__header) { padding: var(--space-lg-xl, 16px) var(--space-2xl, 24px) var(--space-md-lg, 12px); margin-right: 0; border-bottom: 1px solid var(--color-border, #e2e8f0); }
-:deep(.el-dialog__title) { font-size: 16px; font-weight: 700; color: var(--color-text-heading, #0f172a); }
-:deep(.el-dialog__body) { padding: var(--space-xl-2xl, 20px) var(--space-2xl, 24px); }
-:deep(.el-dialog__footer) { padding: var(--space-md-lg, 12px) var(--space-2xl, 24px) var(--space-lg-xl, 16px); border-top: 1px solid var(--color-border, #e2e8f0); }
-:deep(.el-dialog__footer .el-button + .el-button) { margin-left: var(--space-md-lg, 12px); }
-
-/* 弹窗内表单标签加粗强化 */
+/* ============ 弹窗 ============
+   弹窗外观（圆角/header/body/footer 的 padding 与分隔线）已由公共外壳 LqDialog 与
+   styles/modules/dialog-layout.css 统一提供（.lq-dialog__head / __body / __foot）。
+   此处不再用 :deep(.el-dialog*) 覆盖——那会与外壳结构叠加出双份 padding/边框。
+   仅保留外壳未定义的「弹窗内表单标签强化」，属本页业务侧增强。 */
 :deep(.el-dialog .el-form-item__label) { font-weight: 600; color: var(--color-text-heading, #0f172a); }
 
 @media (max-width: 1100px) {

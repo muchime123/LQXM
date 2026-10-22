@@ -16,9 +16,6 @@
           <span class="ws-name">{{ w.workshopName }}</span>
           <el-tag v-if="!w.enabled" size="small" type="info" effect="plain">停用</el-tag>
         </div>
-        <div class="ws-tpl" :class="{ missing: !w.defaultTemplateName }">
-          {{ w.defaultTemplateName || '未设默认制程' }}
-        </div>
         <div class="ws-counts">
           <span class="c-product">产品 {{ w.productCount }}</span>
           <span class="c-config">配置 {{ w.configCount }}</span>
@@ -33,8 +30,6 @@ export interface WorkshopCard {
   id: number
   workshopName: string
   enabled: boolean
-  defaultProcessTemplateId: number | null
-  defaultTemplateName: string | null
   productCount: number
   configCount: number
 }
@@ -54,8 +49,6 @@ defineEmits<{ 'update:modelValue': [value: number] }>()
 .ws-item.active { border-color: var(--color-primary, #0f766e); background: var(--color-primary-bg-light, #f0fdfa); box-shadow: inset 3px 0 0 var(--color-primary, #0f766e); }
 .ws-title { display: flex; align-items: center; gap: 6px; }
 .ws-name { font-weight: 600; font-size: 14px; color: var(--color-text-heading, #0f172a); }
-.ws-tpl { margin-top: 4px; font-size: 12px; color: var(--color-text-secondary, #5f6f82); }
-.ws-tpl.missing { color: var(--color-danger, #dc2626); }
 .ws-counts { display: flex; gap: 12px; margin-top: 8px; font-size: 12px; }
 .c-product { color: var(--color-text-heading, #0f172a); }
 .c-config { color: var(--color-text-secondary, #5f6f82); }

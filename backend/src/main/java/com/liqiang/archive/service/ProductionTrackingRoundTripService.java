@@ -328,7 +328,7 @@ public class ProductionTrackingRoundTripService {
         var milestones=new ArrayList<ProductionTrackingService.Milestone>();
         if("WRITE".equals(status))
             for(String code:stageCodes)
-                milestones.add(new ProductionTrackingService.Milestone(code,"DONE",row.stageDates().get(code),null));
+                milestones.add(new ProductionTrackingService.Milestone(code,"DONE",row.stageDates().get(code),null,null,null));
         boolean stateChanged=diff!=null&&(diff.forecastChanged()||diff.delayReasonChanged()||diff.remarkChanged());
         return new Planned(new RowPreview(row.sheet(),row.excelRow(),row.orderNo(),
                 current==null?row.fileProduct():current.productName(),

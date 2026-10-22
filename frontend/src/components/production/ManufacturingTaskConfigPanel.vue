@@ -2,27 +2,20 @@
   <section class="detail">
     <el-empty v-if="!workshop" description="选择左侧生产车间以维护该产线下的产品与配置" />
     <template v-else>
-      <header class="detail-head">
-        <div class="detail-title">
-          <h2>{{ workshop.workshopName }}</h2>
-          <p class="detail-sub">
-            默认制程
-            <el-tag v-if="workshop.defaultTemplateName" size="small" effect="plain">{{ workshop.defaultTemplateName }}</el-tag>
-            <el-tag v-else size="small" type="danger" effect="plain">未设置</el-tag>
-            <span v-if="!workshop.defaultTemplateName" class="note">请维护产线默认制程，建单时自动匹配</span>
-          </p>
-        </div>
-      </header>
-
       <div class="blocks">
         <!-- ---------- 产品名称：氚云任务单产品字典的镜像，只读；每行可点选，把节点参考隔间接出去 ---------- -->
         <section class="block">
           <div class="block-head">
             <div>
-              <h3>任务单产品</h3>
-              <p>来源＝氚云生产任务单的产品下拉字典，产品名不可在本地修改。点选行可在右侧维护该产品的产品参考天数；点列头可排序（默认按跟单记录降序）。</p>
+              <h3>{{ workshop.workshopName }} · 任务单产品
+                <el-tooltip content="一行对照产品参考工期、实测工期与各节点生效参考值。点选产品后在下方维护节点；任务和样本数字可查看完整明细。" placement="top">
+                  <el-icon class="help-icon"><QuestionFilled /></el-icon>
+                </el-tooltip>
+              </h3>
             </div>
             <div class="block-actions">
+              <el-button v-if="canManageBaseline" size="small" type="primary" plain :loading="batchWorking" :disabled="!products.length" @click="emit('batch-calculate')">{{ batchWorking ? `批量处理中 ${batchProgress}` : '批量计算并填充' }}</el-button>
+              <el-button size="small" @click="optionalVisible = true">可选配置（{{ optionalConfigs.length }}）</el-button>
               <el-button size="small" @click="openCreate('PRODUCT_NAME')">补录产品</el-button>
             </div>
           </div>
@@ -31,7 +24,7 @@
                两套高亮同时存在会在抽屉/弹窗打开后的焦点变化里互相打架，出现「莫名高亮」的行。 -->
           <el-table v-else :data="products" stripe size="small" class="grid" max-height="380"
             :default-sort="defaultSort" :row-class-name="rowClassName" @row-click="selectRow">
-            <el-table-column prop="configName" label="产品名称" min-width="160" sortable :sort-method="byName">
+            <el-table-column prop="configName" label="产品名称" min-width="180" sortable :sort-method="byName">
               <template #default="{ row }">
                 <div class="name-cell">
                   <span class="product-name">{{ row.configName }}</span>
@@ -39,7 +32,33 @@
                     <el-tag type="warning" size="small" effect="plain">重名 ×{{ row.sameNameCount }}</el-tag>
                   </el-tooltip>
                   <el-tag v-if="row.externalSource === 'MANUAL'" type="info" size="small" effect="plain">本地补录</el-tag>
+                  <el-tooltip v-if="row.externalSource === 'MANUAL'" content="删除本地补录错的产品；已匹配历史任务或已有参考间隔时后端会拒绝" placement="top">
+                    <el-button link type="danger" size="small" @click.stop="removeConfig(row)">删除</el-button>
+                  </el-tooltip>
                 </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="参考工期" width="105" align="center">
+              <template #default="{ row }">
+                <b v-if="durations[row.id] && durations[row.id].missingStages.length < durations[row.id].stageCount">{{ durations[row.id].chainDays }} 天</b>
+                <span v-else class="none">—</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="实测 P50" width="105" align="center">
+              <template #default="{ row }">
+                <span v-if="durations[row.id]?.actualP50Days != null" :title="`${durations[row.id].actualSampleCount} 单完成`">{{ durations[row.id].actualP50Days!.toFixed(1) }} 天</span>
+                <span v-else class="none">—</span>
+              </template>
+            </el-table-column>
+            <el-table-column label="节点参考工期（产品优先，通用兜底）" min-width="330">
+              <template #default="{ row }">
+                <div v-if="durations[row.id]" class="stage-chips">
+                  <span v-for="stage in durations[row.id].stages" :key="stage.stageCode" class="stage-chip" :class="{ product: stage.source === 'PRODUCT', missing: stage.days == null }"
+                    :title="`${stage.stageLabel}：${stage.source === 'PRODUCT' ? '产品已发布' : stage.source === 'GENERAL' ? '沿用通用' : '未配置'}`">
+                    {{ stage.stageLabel }} {{ stage.days == null ? '—' : `${stage.days}天` }}
+                  </span>
+                </div>
+                <span v-else class="none">加载中…</span>
               </template>
             </el-table-column>
             <el-table-column prop="historicalTaskCount" label="任务单" width="120" align="center" sortable>
@@ -69,20 +88,14 @@
                 </el-button>
               </template>
             </el-table-column>
-            <!-- 产品没有启用/禁用：能不能下单由氚云决定。删除只对本地补录行开放——
-                 氚云字典镜像行（H3YUN）没被用过也不许删（可能是氚云新增还没下单的项，2026-10-21 复查 P0）。 -->
-            <el-table-column label="操作" width="72" fixed="right">
-              <template #default="{ row }">
-                <el-tooltip v-if="row.externalSource === 'MANUAL'" content="删除本地补录错的产品行。已匹配历史任务、或已有参考间隔的产品会被后端拒绝。" placement="top">
-                  <el-button link type="danger" @click.stop="removeConfig(row)">删除</el-button>
-                </el-tooltip>
-              </template>
-            </el-table-column>
           </el-table>
         </section>
+      </div>
+    </template>
 
-        <!-- ---------- 可选配置：氚云任务单「可选配置」字典的镜像，同样只读；产线级，不随产品切换 ---------- -->
-        <section class="block">
+    <!-- 可选配置是车间级字典，按需打开，不占产品工期工作区。 -->
+    <el-drawer v-model="optionalVisible" :title="`${workshop?.workshopName ?? ''} · 可选配置`" size="min(620px, 100vw)" append-to-body>
+        <section class="optional-content">
           <div class="block-head">
             <div>
               <h3>可选配置</h3>
@@ -104,23 +117,17 @@
                       <el-tag type="warning" size="small" effect="plain">重名 ×{{ row.sameNameCount }}</el-tag>
                     </el-tooltip>
                     <el-tag v-if="row.externalSource === 'MANUAL'" type="info" size="small" effect="plain">本地补录</el-tag>
+                    <el-tooltip v-if="row.externalSource === 'MANUAL'" content="删除本地补录错的配置；历史任务用过时后端会拒绝" placement="top">
+                      <el-button link type="danger" size="small" @click.stop="removeConfig(row)">删除</el-button>
+                    </el-tooltip>
                   </div>
-                </template>
-              </el-table-column>
-              <!-- 同上：删除只对本地补录行开放，氚云字典镜像行不可删。 -->
-              <el-table-column label="操作" width="90" fixed="right">
-                <template #default="{ row }">
-                  <el-tooltip v-if="row.externalSource === 'MANUAL'" content="删除本地补录错的配置行。已被历史任务用过的会被后端拒绝。" placement="top">
-                    <el-button link type="danger" @click.stop="removeConfig(row)">删除</el-button>
-                  </el-tooltip>
                 </template>
               </el-table-column>
             </el-table>
             <p v-if="configKeyword && !filteredConfigs.length" class="none">没有匹配「{{ configKeyword }}」的配置</p>
           </template>
         </section>
-      </div>
-    </template>
+    </el-drawer>
 
     <!-- 节点发布明细：中栏「发布节点 x/y」数字的下钻。只读——真正的编辑在右栏面板，
          这里回答的是「这 x 个已发布节点分别是哪些、值多少、谁定的」。 -->
@@ -205,7 +212,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { QuestionFilled } from '@element-plus/icons-vue'
 import { http } from '@/api/http'
 import type { WorkshopCard } from './WorkshopSelector.vue'
-import type { TrackingBenchmarkWorkshop, TrackingProductBenchmarkRow } from '@/api/productionTracking'
+import type { ProductDuration, TrackingBenchmarkWorkshop, TrackingProductBenchmarkRow } from '@/api/productionTracking'
 
 /**
  * sameNameCount＝同车间同类型同名配置行数（>1 时产品基准不生效）；
@@ -215,7 +222,7 @@ import type { TrackingBenchmarkWorkshop, TrackingProductBenchmarkRow } from '@/a
 interface ConfigRow { id: number; workshopId: number; configName: string; workshopName: string; configType: string; externalSource: string; historicalTaskCount: number; trackedTaskCount: number; sameNameCount: number }
 
 const props = defineProps<{
-  /** 当前选中的产线（外层提供，含默认制程/产品数等聚合值），便于复用同一卡片样式。 */
+  /** 当前选中的产线（外层提供产品与配置计数）。 */
   workshop: WorkshopCard | null
   /** 当前产线下所有配置（产品 + 可选配置），由父级过滤后传入。 */
   configs: ConfigRow[]
@@ -224,6 +231,10 @@ const props = defineProps<{
   /** 产品级基准矩阵 + 该产品已发布的间隔行，用于「已发布节点」统计与已发布数提示。 */
   matrix: TrackingBenchmarkWorkshop[]
   benchmarks: TrackingProductBenchmarkRow[]
+  durations: Record<number, ProductDuration>
+  canManageBaseline: boolean
+  batchWorking: boolean
+  batchProgress: string
 }>()
 const emit = defineEmits<{
   'update:selectedTaskConfigId': [value: number]
@@ -231,10 +242,12 @@ const emit = defineEmits<{
   'show-orders': [row: ConfigRow]
   /** 点「跟单记录」数字：由外层打开该产品的样本明细抽屉（每单每段间隔）。 */
   'show-samples': [row: ConfigRow]
+  'batch-calculate': []
   changed: []
 }>()
 
 const configKeyword = ref('')
+const optionalVisible = ref(false)
 const dialogOpen = ref(false)
 const creating = ref(false)
 const newForm = () => ({ configType: 'PRODUCT_NAME' as 'PRODUCT_NAME' | 'OPTIONAL_CONFIG', configName: '' })
@@ -368,21 +381,19 @@ async function removeConfig(row: ConfigRow) {
 }
 
 /** 切换产线时清空产品搜索与选中，避免「上条产线的产品」被高亮到新产线。 */
-watch(() => props.workshop?.id, () => { configKeyword.value = '' })
+watch(() => props.workshop?.id, () => { configKeyword.value = ''; optionalVisible.value = false })
 </script>
 
 <style scoped>
 .detail { display: grid; gap: var(--space-lg-xl, 16px); min-width: 0; }
 
-.detail-head { padding: 16px 20px; background: linear-gradient(135deg, var(--color-primary-bg-light, #f0fdfa) 0%, var(--color-surface-raised, #fbfcfd) 100%); border: 1px solid var(--color-primary-border, #a7f3d0); border-radius: var(--radius-2xl, 12px); }
-.detail-title h2 { margin: 0 0 6px; font-size: 20px; color: var(--color-text-heading, #0f172a); }
-.detail-sub { margin: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; color: var(--color-text-secondary, #5f6f82); }
-.detail-sub .note { font-size: 12px; color: var(--color-danger, #dc2626); }
 
 .blocks { display: grid; gap: var(--space-lg-xl, 16px); align-items: start; min-width: 0; }
 .block { min-width: 0; background: var(--color-surface, #fff); border: 1px solid var(--color-border, #e2e8f0); border-radius: var(--radius-2xl, 12px); padding: var(--space-lg-xl, 16px); box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.04)); }
+.optional-content { display: grid; gap: 12px; }
 .block-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .block-head h3 { margin: 0 0 4px; font-size: 15px; color: var(--color-text-heading, #0f172a); }
+.help-icon { margin-left: 4px; color: var(--color-text-secondary, #94a3b8); font-size: 13px; vertical-align: -2px; cursor: help; }
 .block-head p { margin: 0; font-size: 12px; color: var(--color-text-secondary, #5f6f82); }
 .block-actions { display: flex; align-items: center; gap: 8px; }
 .kw { width: 200px; }
@@ -406,6 +417,10 @@ watch(() => props.workshop?.id, () => { configKeyword.value = '' })
 .grid :deep(tbody tr) { cursor: pointer; }
 /* 名称列是表里唯一的弹性列，宽屏下会被拉到三四百像素、整行稀疏：行内输入框限宽，多余空间留在单元格右侧。 */
 .grid :deep(td .el-input) { max-width: 260px; }
+.stage-chips { display: flex; flex-wrap: wrap; gap: 4px; padding: 3px 0; }
+.stage-chip { padding: 2px 6px; border-radius: 5px; background: var(--color-surface-alt, #f1f5f9); color: var(--color-text-secondary, #64748b); font-size: 11px; white-space: nowrap; }
+.stage-chip.product { background: var(--color-primary-bg-light, #ecfdf5); color: var(--color-primary, #0f766e); font-weight: 600; }
+.stage-chip.missing { color: var(--color-danger, #dc2626); }
 
 @media (max-width: 760px) {
   .kw { width: 100%; }

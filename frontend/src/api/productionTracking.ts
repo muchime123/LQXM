@@ -173,13 +173,17 @@ export interface TrackingMilestone {
   status: TrackingMilestoneStatus
   completedDate: string | null
   note: string | null
+  /** 当前任务单的人工预计日期与原因；为空时使用产品/通用参考推算。 */
+  manualReferenceDate?: string | null
+  manualReferenceReason?: string | null
+  referenceSource?: 'MANUAL' | 'SYSTEM' | 'NONE'
   optional?: boolean
   applicable?: boolean
   /** 该工序一般耗时（天）＝基准表里上游完成→本节点完成的中位间隔；无基准（如机器车间暂无数据）为 null。 */
   typicalDays?: number | null
   /**
-   * 参考完成日期（派生，不落库）：锚点=排产日（本地计划开工 → 氚云排产时间，回退申请日），上游已实际完成用实际完成日接力、
-   * 未完成用参考值接力；无锚点或无基准时为 null。供跟单员判断「这道工序一般该何时完成」。
+   * 当前生效的节点参考完成日期：人工预计优先；否则从排产锚点与产品/通用参考天数逐节点推算。
+   * 该结果不落库，人工预计日期单独保存在 manualReferenceDate。
    */
   referenceDate?: string | null
   /** 超参考未完成的天数（今天 > 参考完成日期且状态非已完成）；已完成或未超时为 null。 */

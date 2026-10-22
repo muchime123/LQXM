@@ -45,7 +45,7 @@ const STATE_FIELDS: Array<{ key: string, label: string }> = [
   { key: 'closedAt', label: '结案时间' },
   { key: 'closedNote', label: '结案说明' }
 ]
-interface EntrySnapshotMilestone { code?: string | null, status?: string | null, completedDate?: string | null, note?: string | null }
+interface EntrySnapshotMilestone { code?: string | null, status?: string | null, completedDate?: string | null, note?: string | null, manualReferenceDate?: string | null, manualReferenceReason?: string | null }
 interface EntrySnapshot { state?: Record<string, unknown> | null, milestones?: EntrySnapshotMilestone[] | null }
 interface DiffRow { label: string, from: string, to: string }
 interface TimeHistoryItem { key: string; time: string; by: string; title: string; lines: string[] }
@@ -68,7 +68,9 @@ function snapshotStage(raw: EntrySnapshotMilestone): EntrySnapshotMilestone {
     code: val('code', 'stage_code') as string | undefined,
     status: val('status', 'stage_status') as string | undefined,
     completedDate: val('completedDate', 'completed_date') as string | undefined,
-    note: val('note') as string | undefined
+    note: val('note') as string | undefined,
+    manualReferenceDate: val('manualReferenceDate', 'manual_reference_date') as string | undefined,
+    manualReferenceReason: val('manualReferenceReason', 'manual_reference_reason') as string | undefined
   }
 }
 function parseSnapshot(raw?: string | null): EntrySnapshot | null {
@@ -318,6 +320,8 @@ export function useTrackingDetail(options: {
     return milestones.value.some((stage, index) => {
       const before = originalStages.value[index]
       return !before || before.status !== stage.status || before.completedDate !== stage.completedDate || (before.note || '') !== (stage.note || '')
+        || (before.manualReferenceDate || '') !== (stage.manualReferenceDate || '')
+        || (before.manualReferenceReason || '') !== (stage.manualReferenceReason || '')
     })
   }
   const unsavedStageCount = computed(() => pendingStageChanges.value.size)
@@ -333,6 +337,8 @@ export function useTrackingDetail(options: {
     if (!stage) return
     stage.status = 'DONE'
     stage.completedDate = todayKey()
+    stage.manualReferenceDate = null
+    stage.manualReferenceReason = null
     previousStageStatuses.value[stage.code] = stage.status
   }
   function resetStageDraft() {
@@ -389,6 +395,9 @@ export function useTrackingDetail(options: {
     if (!hasUnsavedStageChanges()) { ElMessage.warning('还没有节点进度的变更'); return false }
     const validationError = stageValidationError(submittableStages.value)
     if (validationError) { ElMessage.warning(validationError); return false }
+    if (submittableStages.value.some(stage => stage.manualReferenceDate && !stage.manualReferenceReason?.trim())) {
+      ElMessage.warning('填写人工预计日期时请说明原因'); return false
+    }
     saving.value = true
     try {
       const id = detail.value.order.id
@@ -510,7 +519,9 @@ export function useTrackingDetail(options: {
           || snapshotStageStatus(prev) !== snapshotStageStatus(stage)
           || normalizeValue(prev.completedDate) !== normalizeValue(stage.completedDate)
         const noteChanged = normalizeValue(prev?.note) !== normalizeValue(stage.note)
-        if (prev && !statusChanged && !noteChanged) continue
+        const manualChanged = normalizeValue(prev?.manualReferenceDate) !== normalizeValue(stage.manualReferenceDate)
+          || normalizeValue(prev?.manualReferenceReason) !== normalizeValue(stage.manualReferenceReason)
+        if (prev && !statusChanged && !noteChanged && !manualChanged) continue
         const parts: string[] = []
         if (!prev) {
           parts.push(`首次记录：${snapshotStageText(stage)}`)
@@ -519,6 +530,9 @@ export function useTrackingDetail(options: {
           if (statusChanged) parts.push(`${snapshotStageText(prev)} → ${snapshotStageText(stage)}`)
           if (noteChanged) parts.push(`备注：${prev.note?.trim() || '未填'} → ${stage.note?.trim() || '未填'}`)
         }
+        if (manualChanged) parts.push(stage.manualReferenceDate
+          ? `人工预计：${stage.manualReferenceDate}（${stage.manualReferenceReason || '未说明'}）`
+          : '已恢复系统参考日期')
         const list = map.get(stage.code) || []
         list.push({ version: entry.version, time: formatTime(entry.createdAt), by: entry.createdByName, text: parts.join('；') })
         map.set(stage.code, list)
@@ -551,6 +565,12 @@ export function useTrackingDetail(options: {
       if (normalizeValue(prev.note) !== normalizeValue(stage.note)) {
         parts.push(`备注：${prev.note?.trim() || '未填'} → ${stage.note?.trim() || '未填'}`)
       }
+      if (normalizeValue(prev.manualReferenceDate) !== normalizeValue(stage.manualReferenceDate)
+        || normalizeValue(prev.manualReferenceReason) !== normalizeValue(stage.manualReferenceReason)) {
+        parts.push(stage.manualReferenceDate
+          ? `人工预计：${stage.manualReferenceDate}（${stage.manualReferenceReason || '未说明'}）`
+          : '恢复系统参考日期')
+      }
       if (parts.length) map.set(stage.code, parts.join('；'))
     }
     return map
@@ -567,6 +587,7 @@ export function useTrackingDetail(options: {
       }
     }
     if (stage.status === 'DONE' && !stage.completedDate) stage.completedDate = todayKey()
+    if (stage.status === 'DONE') { stage.manualReferenceDate = null; stage.manualReferenceReason = null }
     if (stage.status !== 'DONE') stage.completedDate = null
     previousStageStatuses.value[stage.code] = stage.status
   }

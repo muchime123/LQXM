@@ -413,8 +413,8 @@ class ProductionTrackingServiceTest {
                 row("MATERIAL","PENDING",null,null),
                 row("MOLD","IN_PROGRESS",null,null));
         var after=List.of(
-                new ProductionTrackingService.Milestone("MATERIAL","DONE",java.time.LocalDate.parse("2026-10-08"),null),
-                new ProductionTrackingService.Milestone("MOLD","IN_PROGRESS",null,"客户确认后继续"));
+                new ProductionTrackingService.Milestone("MATERIAL","DONE",java.time.LocalDate.parse("2026-10-08"),null,null,null),
+                new ProductionTrackingService.Milestone("MOLD","IN_PROGRESS",null,"客户确认后继续",null,null));
 
         String text=ProductionTrackingService.describeStageChanges(false,after,before);
 

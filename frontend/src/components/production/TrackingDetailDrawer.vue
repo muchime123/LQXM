@@ -95,8 +95,15 @@
                 </el-select>
                 <span v-if="stage.optional && !stage.applicable" class="cell-reference muted">—</span>
                 <span v-else :class="['cell-reference', { 'is-overdue': stageOverdue(stage) }]">
-                  <template v-if="stage.referenceDate">{{ stage.referenceDate }}<small v-if="stageOverdue(stage)">超 {{ stage.referenceOverdueDays }} 天</small></template>
+                  <template v-if="stage.referenceDate">{{ stage.referenceDate }}<small>{{ stage.referenceSource === 'MANUAL' ? '人工预计' : '系统参考' }}</small><small v-if="stageOverdue(stage)" class="overdue-note">超 {{ stage.referenceOverdueDays }} 天</small></template>
                   <template v-else><span class="muted">无参考</span></template>
+                  <el-popover v-if="canEditManualReference(index, stage)" placement="bottom" :width="310" trigger="click">
+                    <template #reference><el-button link type="primary" size="small">{{ stage.manualReferenceDate ? '修改预计' : '填写预计' }}</el-button></template>
+                    <p class="manual-hint">仅本任务单的节点预计日期；不修改产品工期或整单交付日期。</p>
+                    <el-date-picker v-model="stage.manualReferenceDate" type="date" value-format="YYYY-MM-DD" clearable placeholder="节点预计完成日期" class="manual-date" @change="onManualDateChange(stage)" />
+                    <el-input v-if="stage.manualReferenceDate" v-model="stage.manualReferenceReason" type="textarea" :rows="2" maxlength="300" show-word-limit placeholder="填写预计依据或调整原因（必填）" class="manual-reason" />
+                    <small class="manual-hint">修改后点击底部“保存跟单”；清空日期可恢复系统参考。</small>
+                  </el-popover>
                 </span>
                 <el-date-picker v-model="stage.completedDate" type="date" value-format="YYYY-MM-DD" size="small" clearable placeholder="完成日期" :disabled="!canFollowup || Boolean(detail.order.stoppedAt) || stage.status !== 'DONE'" class="cell-date" />
                 <el-input v-model="stage.note" size="small" maxlength="500" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" :placeholder="stageOverdue(stage) ? '超参考日期，建议记录原因（可选）' : '节点备注（可选）'" class="cell-note" />
@@ -189,19 +196,48 @@
         </div>
       </template>
     </el-drawer>
-    <el-dialog v-model="dispositionVisible" :title="dispositionStopped ? '标记不再生产' : '恢复生产跟单'" width="min(500px, 94vw)" append-to-body>
+    <LqDialog v-model="dispositionVisible" :title="dispositionStopped ? '标记不再生产' : '恢复生产跟单'" width="min(500px, 94vw)" mode="detail" :show-footer="true">
       <p class="muted">{{ dispositionStopped ? '仅停止本项目的生产跟单，不修改氚云生产任务单。已有节点和记录会保留，并可日后恢复。' : '恢复后重新进入待跟单或跟单中，原有节点和历史继续保留。' }}</p>
       <el-alert v-if="dispositionStopped && detail?.order.actualFinishDate" type="warning" :closable="false" title="氚云已有报工完工日期，请核实是否属于误报或补录，并在原因中说明。" />
       <el-input v-model="dispositionReason" type="textarea" :rows="4" maxlength="500" show-word-limit :placeholder="dispositionStopped ? '请写明不再生产的具体原因及核实情况（必填）' : '请写明恢复生产的原因（必填）'" />
-      <template #footer><el-button @click="dispositionVisible = false">取消</el-button><el-button :type="dispositionStopped ? 'danger' : 'primary'" :loading="dispositionSaving" :disabled="!dispositionReason.trim()" @click="saveDisposition">{{ dispositionStopped ? '确认停止跟单' : '确认恢复跟单' }}</el-button></template>
-    </el-dialog>
-    <el-dialog v-model="closureVisible" :title="closureClosing ? '确认跟单结案' : '撤销跟单结案'" width="min(520px, 94vw)" append-to-body>
+      <template #footer>
+        <button type="button" :disabled="dispositionSaving" @click="dispositionVisible = false">取消</button>
+        <button
+          type="button"
+          :class="dispositionStopped ? 'danger' : 'primary'"
+          :disabled="dispositionSaving || !dispositionReason.trim()"
+          @click="saveDisposition"
+        >
+          {{ dispositionStopped ? '确认停止跟单' : '确认恢复跟单' }}
+        </button>
+      </template>
+    </LqDialog>
+    <LqDialog v-model="closureVisible" :title="closureClosing ? '确认跟单结案' : '撤销跟单结案'" width="min(520px, 94vw)" mode="detail" :show-footer="true">
       <p class="muted">{{ closureClosing ? '跟单员主动确认结束，状态按「结案优先」展示为「跟单已完成」，节点是否齐全不再强制要求；后续可以撤销结案恢复按节点进度派生。仅本地跟单结案，氚云任务单与节点记录保持原状。' : '撤销后状态按节点进度重新派生：节点齐全仍为「跟单已完成」，缺节点则回退为「跟单中」或「待跟单」。' }}</p>
       <el-alert v-if="closureClosing && !detail?.order.deliveredDate" type="warning" :closable="false" title="该任务尚未登记交付（入库），请在结案说明中写明实际情况与核实结果（不少于 6 字）。" />
       <el-input v-model="closureNote" type="textarea" :rows="4" maxlength="500" show-word-limit :placeholder="closureClosing ? '请写明结案说明，例如：配件任务无需走全部工序；交付已核实；本任务不适用某些节点…（必填）' : '请写明撤销结案的原因（必填）'" />
-      <template #footer><el-button @click="closureVisible = false">取消</el-button><el-button :type="closureClosing ? 'success' : 'primary'" :loading="closureSaving" :disabled="!closureNote.trim() || (closureClosing && !detail?.order.deliveredDate && closureNote.trim().length < 6)" @click="saveClosure">{{ closureClosing ? '确认结案' : '确认撤销' }}</el-button></template>
-    </el-dialog>
-    <el-dialog v-model="delayDialog" title="登记延期完成日期" width="min(520px, 94vw)" append-to-body>
+      <template #footer>
+        <button type="button" :disabled="closureSaving" @click="closureVisible = false">取消</button>
+        <button
+          type="button"
+          :class="closureClosing ? 'success' : 'primary'"
+          :disabled="closureSaving || !closureNote.trim() || (closureClosing && !detail?.order.deliveredDate && closureNote.trim().length < 6)"
+          @click="saveClosure"
+        >
+          {{ closureClosing ? '确认结案' : '确认撤销' }}
+        </button>
+      </template>
+    </LqDialog>
+    <LqDialog
+      v-model="delayDialog"
+      title="登记延期完成日期"
+      width="min(520px, 94vw)"
+      mode="detail"
+      :show-footer="true"
+      confirm-text="保存延期"
+      :loading="delaySaving"
+      @confirm="saveDelay"
+    >
       <p class="delay-dialog-note">车间预计完成实现不了时，登记与车间/业务员协商后的延期完成日期。</p>
       <el-form label-position="top">
         <el-form-item label="车间预计完成"><strong>{{ deadlineDate || '未定' }}</strong></el-form-item>
@@ -209,9 +245,17 @@
         <el-form-item label="延期原因与协商结果" required><el-input v-model="delayDraftReason" type="textarea" :rows="3" maxlength="300" show-word-limit placeholder="记录无法按原预计完成的原因，以及与车间/业务员协商的结果" /></el-form-item>
       </el-form>
       <p v-if="delayDraftDate && deadlineDate && delayDraftDate > deadlineDate" class="muted">比车间预计完成晚 {{ daysBetween(deadlineDate, delayDraftDate) }} 天</p>
-      <template #footer><el-button @click="delayDialog = false">取消</el-button><el-button type="primary" :loading="delaySaving" @click="saveDelay">保存延期</el-button></template>
-    </el-dialog>
-    <el-dialog v-model="timeReviewVisible" :title="`${timeReviewEditingId ? '修改' : '记录'}${reviewKindLabel(timeReviewForm.kind)}`" width="min(580px, 94vw)" append-to-body>
+    </LqDialog>
+    <LqDialog
+      v-model="timeReviewVisible"
+      :title="`${timeReviewEditingId ? '修改' : '记录'}${reviewKindLabel(timeReviewForm.kind)}`"
+      width="min(580px, 94vw)"
+      mode="detail"
+      :show-footer="true"
+      :confirm-text="timeReviewEditingId ? '保存修改' : '保存核实记录'"
+      :loading="timeReviewSaving"
+      @confirm="saveTimeReview"
+    >
       <el-alert v-if="timeReviewEditingId" type="info" :closable="false" class="review-edit-hint" title="正在修改这条核实记录（不会新增一条历史）；改动前后的原文会留在审计里。" />
       <el-form label-position="top">
         <el-form-item label="核实结果"><el-select v-model="timeReviewForm.status" style="width: 100%"><template v-if="timeReviewForm.kind === 'COMMITMENT'"><el-option label="车间确认可按业务员要求完成" value="ON_TIME" /><el-option label="协商后确定新交期" value="NEGOTIATED" /></template><template v-else><el-option label="已了解原因，仍需跟进" value="OPEN" /><el-option label="已处理 / 已核实完成" value="RESOLVED" /></template></el-select></el-form-item>
@@ -220,9 +264,8 @@
         <el-form-item label="核实对象"><el-input v-model="timeReviewForm.contactName" maxlength="100" placeholder="例如车间负责人、业务员（可选）" /></el-form-item>
         <el-form-item label="下次跟进"><el-date-picker v-model="timeReviewForm.nextFollowupDate" type="date" value-format="YYYY-MM-DD" clearable style="width: 100%" /></el-form-item>
       </el-form>
-      <template #footer><el-button @click="timeReviewVisible = false">取消</el-button><el-button type="primary" :loading="timeReviewSaving" @click="saveTimeReview">{{ timeReviewEditingId ? '保存修改' : '保存核实记录' }}</el-button></template>
-    </el-dialog>
-    <el-dialog v-model="purchaseChooserVisible" title="选择采购入库单" width="min(620px, 94vw)" append-to-body>
+    </LqDialog>
+    <LqDialog v-model="purchaseChooserVisible" title="选择采购入库单" width="min(620px, 94vw)" mode="detail">
       <p class="muted">该生产工单关联 {{ purchaseReceipts.length }} 张采购入库单，选择一张查看台账详情。</p>
       <el-table :data="purchaseReceipts" max-height="360" @row-click="openPurchaseDetail">
         <el-table-column prop="sourceNo" label="采购入库单号" min-width="155" />
@@ -230,7 +273,7 @@
         <el-table-column prop="warehouseName" label="仓库" min-width="110" />
         <el-table-column label="操作" width="80"><template #default="{ row }"><el-button link type="primary" @click.stop="openPurchaseDetail(row)">详情</el-button></template></el-table-column>
       </el-table>
-    </el-dialog>
+    </LqDialog>
     <!-- 通用节点参考工期（原「基准设置」）已于 2026-10-22 迁到「生产产品与工期管理」页右上角，
          本页只负责按推算结果显示参考完成日期，不再承担配置入口。 -->
     <TrackingSourceDetailDrawer v-model="purchaseDetailVisible" kind="purchase" :loading="purchaseDetailLoading" :data="purchaseDetailData" :error="purchaseDetailError" />
@@ -250,8 +293,9 @@
  * 产品页没有列表顺序，不传即可。
  */
 import { computed, watch } from 'vue'
-import type { TrackingOrder } from '@/api/productionTracking'
+import type { TrackingMilestone, TrackingOrder } from '@/api/productionTracking'
 import TrackingSourceDetailDrawer from '@/components/production/TrackingSourceDetailDrawer.vue'
+import LqDialog from '@/components/common/LqDialog.vue'
 import ProductionSalesTracePanel from '@/components/production/ProductionSalesTracePanel.vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { isSourceUrgent } from '@/utils/trackingUrgency'
@@ -281,6 +325,15 @@ const emit = defineEmits<{ 'update:modelValue': [boolean]; saved: [] }>()
 
 const auth = useCurrentUser()
 const canFollowup = computed(() => auth.can('manufacturing.followup'))
+function canEditManualReference(index: number, stage: TrackingMilestone) {
+  if (!canFollowup.value || detail.value?.order.stoppedAt || stage.status === 'DONE' || (stage.optional && !stage.applicable)) return false
+  const open = milestones.value.map((item, position) => ({ item, position }))
+    .filter(({ item }) => item.status !== 'DONE' && (!item.optional || item.applicable))
+  return open.slice(0, 2).some(({ position }) => position === index)
+}
+function onManualDateChange(stage: TrackingMilestone) {
+  if (!stage.manualReferenceDate) stage.manualReferenceReason = null
+}
 
 const {
   drawer, nextTrackingOrder, purchaseLinksLoading, purchaseReceipts, purchaseChooserVisible, purchaseDetailVisible,
@@ -317,6 +370,9 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 </script>
 
 <style scoped>
+.manual-date { width: 100%; }
+.manual-reason { margin-top: 8px; }
+.manual-hint { display: block; margin: 0 0 8px; color: var(--color-text-secondary, #64748b); font-size: 12px; line-height: 1.5; }
 .tracking-detail-host { display: contents; }
 .muted { color: #667085; font-size: 13px; }
 .detail-content { display: grid; gap: 18px; padding-bottom: 8px; }
@@ -343,10 +399,12 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .metric strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
 .metric strong.is-danger { color: #d92d20; }
 .metric-link { width: 100%; text-align: left; font: inherit; cursor: pointer; }
-.metric-link:hover, .metric-link:focus-visible { border-color: #409eff; background: #f0f7ff; }
-.metric-link:focus-visible { outline: 2px solid #409eff; outline-offset: 2px; }
+/* 原为 Element Plus 默认蓝 #409eff / #f0f7ff 硬编码，与项目主色（--color-primary #0f766e）不一致，
+   已改为设计令牌，保证与全站交互色一致 */
+.metric-link:hover, .metric-link:focus-visible { border-color: var(--color-primary); background: var(--color-primary-bg); }
+.metric-link:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; }
 .metric-link:disabled { cursor: wait; }
-.metric-link .metric-link-hint { color: #1677c8; }
+.metric-link .metric-link-hint { color: var(--color-primary); }
 .metric small { font-size: 12px; line-height: 1.5; }
 .metric .el-button { justify-self: start; margin-left: -4px; }
 .detail-stopped .metric .el-button { display: none; }
@@ -377,7 +435,8 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .cell-status { width: 112px; }
 .cell-date { width: 132px; }
 .cell-reference { font-size: 12px; color: #475467; display: flex; flex-direction: column; line-height: 1.35; }
-.cell-reference small { color: #d92d20; font-weight: 600; }
+.cell-reference small { color: var(--color-text-secondary, #64748b); }
+.cell-reference .overdue-note { color: #d92d20; font-weight: 600; }
 .cell-reference.is-overdue { color: #d92d20; font-weight: 600; }
 .cell-history { justify-self: end; }
 .stage-item.na { border-style: dashed; background: #fcfcfd; }
