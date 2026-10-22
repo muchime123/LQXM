@@ -1,4 +1,6 @@
-﻿/* ===== 资产网格 ===== */
+﻿/* ===== 资产网格卡片布局（公共级） =====
+   作用域：.asset-grid / .asset-card 通用卡片容器，由 styles/index.css 全局引入。
+   注意：业务级画廊样式在 styles/asset-gallery.css（组件内 @import），两者职责不同，勿混淆。 */
 
 .asset-grid {
   display: grid;

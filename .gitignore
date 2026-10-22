@@ -169,3 +169,8 @@ frontend/*.timestamp-*.mjs
 *.bak-*
 /tools/activate_window.ps1
 /tools/add_git_to_path.ps1
+
+# --- 本地审计/构建校验产物（一次性快照，不入仓，added 2026-10-22） ---
+frontend/_build_check/
+frontend/_audit_shots/
+/db_backup_*.tsv

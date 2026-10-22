@@ -91,44 +91,24 @@ y2="3" />
       </button>
     </nav>
 
-    <div v-if="hasQuickFilters" class="asset-toolbar-chips">
-      <button
-        v-for="qf in visibleQuickFilterOptions"
-        :key="qf.key"
-        type="button"
-        :class="{ active: activeQuickFilter === qf.key }"
-        class="tb-chip"
-        @click="$emit('toggle-quick-filter', qf.key)"
-      >
-        {{ qf.label }}
-        <span v-if="qf.count > 0">{{ qf.count }}</span>
-      </button>
-      <template v-if="allTags.length">
-        <span class="tb-chip-sep"></span>
-        <button
-          v-for="tag in allTags"
-          :key="tag"
-          type="button"
-          :class="{ active: activeTagFilter === tag }"
-          class="tb-chip"
-          @click="$emit('toggle-tag-filter', tag)"
-        >
-          {{ tag }}
-        </button>
-      </template>
-      <button
-        v-if="activeQuickFilter || activeTagFilter"
-        type="button"
-        class="tb-chip tb-chip-clear"
-        @click="$emit('clear-quick-filters')"
-      >
-        清除
-      </button>
-    </div>
+    <CategorySummaryTabs
+      v-if="hasQuickFilters"
+      variant="chip"
+      aria-label="素材快捷筛选"
+      :tabs="chipTabs"
+      :model-value="activeChip"
+      :clearable="!!(activeQuickFilter || activeTagFilter)"
+      @update:model-value="handleChipToggle"
+      @clear="$emit('clear-quick-filters')"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+import CategorySummaryTabs from '../common/CategorySummaryTabs.vue'
+import type { CategorySummaryTab } from '../common/CategorySummaryTabs.vue'
+
 interface FilterOption {
   key: string
   label: string
@@ -147,7 +127,7 @@ interface QuickFilterOption {
   count: number
 }
 
-withDefaults(
+const props = withDefaults(
   defineProps<{
     visibleFilterOptions: FilterOption[]
     activeFilter: string
@@ -170,7 +150,7 @@ withDefaults(
   {}
 )
 
-defineEmits<{
+const emit = defineEmits<{
   'filter-change': [key: string]
   'toggle-quick-filter': [key: string]
   'toggle-tag-filter': [tag: string]
@@ -185,6 +165,33 @@ defineEmits<{
   'export-zip': []
   'change-upload-category': [key: string]
 }>()
+
+// 快捷筛选与标签合并为一组 chip 交给公共 CategorySummaryTabs 渲染，
+// 标签组前插入分隔符，保持原有视觉分组。
+const chipTabs = computed<CategorySummaryTab[]>(() => {
+  const quick = props.visibleQuickFilterOptions.map(item => ({
+    label: item.label,
+    value: item.key,
+    count: item.count
+  }))
+  const tags = props.allTags.map((tag, index) => ({
+    label: tag,
+    value: tag,
+    separatorBefore: index === 0
+  }))
+  return [...quick, ...tags]
+})
+
+/** 当前高亮的 chip（快捷筛选与标签互斥展示，二者同时存在时优先快捷筛选） */
+const activeChip = computed(() => props.activeQuickFilter || props.activeTagFilter || '')
+
+function handleChipToggle(value: string) {
+  if (props.allTags.includes(value)) {
+    emit('toggle-tag-filter', value)
+    return
+  }
+  emit('toggle-quick-filter', value)
+}
 </script>
 
 <style scoped>

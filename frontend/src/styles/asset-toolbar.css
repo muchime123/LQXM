@@ -51,81 +51,8 @@
   border-color: var(--color-success-light, #95d475);
 }
 
-.asset-toolbar-chips {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  align-content: flex-start;
-  gap: 5px 7px;
-  flex-wrap: wrap;
-  padding: 8px 18px;
-  border-bottom: 1px solid var(--color-border-lighter);
-  background: var(--color-surface-raised);
-  min-height: 36px;
-  overflow: visible;
-}
-.tb-chip {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--space-control-gap-tight);
-  width: auto;
-  min-width: 0;
-  max-width: 160px;
-  height: 24px;
-  padding: 0 10px;
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-pill);
-  font-size: var(--fs-xxs);
-  cursor: pointer;
-  white-space: nowrap;
-  color: var(--color-text-muted);
-  line-height: var(--lh-none);
-  flex: 0 0 auto;
-  transition:
-    border-color var(--transition-fast),
-    background var(--transition-fast),
-    color var(--transition-fast),
-    box-shadow var(--transition-fast);
-}
-.tb-chip:hover {
-  border-color: var(--color-border-input-hover);
-  background: var(--color-surface-hover);
-}
-.tb-chip.active {
-  background: var(--color-primary);
-  color: var(--color-surface);
-  border-color: var(--color-primary);
-  font-weight: var(--fw-bold);
-  box-shadow: 0 2px 6px var(--color-primary-shadow);
-}
-.tb-chip.active span {
-  color: var(--color-glass-text);
-}
-.tb-chip span {
-  margin-left: 0;
-  font-size: var(--fs-3xs);
-  color: var(--color-text-faint);
-  line-height: var(--lh-none);
-}
-.tb-chip-sep {
-  display: inline-block;
-  width: 1px;
-  height: 14px;
-  background: var(--color-border);
-  margin: 0 2px;
-  flex: 0 0 auto;
-}
-.tb-chip-clear {
-  color: var(--color-danger) !important;
-  border-color: var(--color-danger-border) !important;
-  background: var(--color-surface) !important;
-  font-weight: var(--fw-medium);
-}
-.tb-chip-clear:hover {
-  background: var(--color-danger-bg-soft) !important;
-}
+/* 筛选 chip 样式已上提到公共模块 styles/modules/list-controls.css（.filter-chip*），
+   由 CategorySummaryTabs variant="chip" 统一渲染，此处不再重复定义。 */
 
 .asset-filter-tabs {
   display: flex;

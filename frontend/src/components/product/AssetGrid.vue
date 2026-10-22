@@ -355,5 +355,5 @@ function fileTypeLabel(asset: CatalogAssetView) {
 </script>
 
 <style scoped>
-@import '../../styles/asset-grid.css';
+@import '../../styles/asset-gallery.css';
 </style>
