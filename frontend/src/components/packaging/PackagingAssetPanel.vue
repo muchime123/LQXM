@@ -22,6 +22,7 @@ import { askConfirm } from '@/composables/ui/useConfirmDialog'
 import { useFileUploadWorkflow } from '@/composables/upload/useFileUploadWorkflow'
 import PackagingTagEditor from './PackagingTagEditor.vue'
 import LqThumbnail from '../common/LqThumbnail.vue'
+import CategorySummaryTabs from '../common/CategorySummaryTabs.vue'
 
 interface Props {
   detail: PackagingModelDetail | null
@@ -131,6 +132,11 @@ const quickFilterOptions = computed(() => {
 
 const visibleQuickFilterOptions = computed(() =>
   quickFilterOptions.value.filter(item => item.count > 0 || item.key === activeQuickFilter.value)
+)
+
+/** 交给公共 CategorySummaryTabs（chip 形态）渲染的候选项 */
+const chipTabs = computed(() =>
+  visibleQuickFilterOptions.value.map(item => ({ label: item.label, value: item.key, count: item.count }))
 )
 
 const filteredAssets = computed(() => {
@@ -521,27 +527,16 @@ onBeforeUnmount(() => {
         </div>
       </nav>
 
-      <div v-if="hasQuickFilters" class="asset-toolbar-chips">
-        <button
-          v-for="qf in visibleQuickFilterOptions"
-          :key="qf.key"
-          type="button"
-          :class="{ active: activeQuickFilter === qf.key }"
-          class="tb-chip"
-          @click="toggleQuickFilter(qf.key)"
-        >
-          {{ qf.label }}
-          <span v-if="qf.count > 0">{{ qf.count }}</span>
-        </button>
-        <button
-          v-if="activeQuickFilter"
-          type="button"
-          class="tb-chip tb-chip-clear"
-          @click="activeQuickFilter = null"
-        >
-          清除
-        </button>
-      </div>
+      <CategorySummaryTabs
+        v-if="hasQuickFilters"
+        variant="chip"
+        aria-label="包材素材快捷筛选"
+        :tabs="chipTabs"
+        :model-value="activeQuickFilter ?? ''"
+        :clearable="!!activeQuickFilter"
+        @update:model-value="toggleQuickFilter"
+        @clear="activeQuickFilter = null"
+      />
     </div>
 
     <div class="asset-gallery-groups">
@@ -677,5 +672,5 @@ onBeforeUnmount(() => {
 
 <style scoped>
 @import '../../styles/asset-toolbar.css';
-@import '../../styles/asset-grid.css';
+@import '../../styles/asset-gallery.css';
 </style>

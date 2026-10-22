@@ -1,3 +1,10 @@
+<!--
+  在同一资产池内把资产【换分类】（不跨产品/不跨实体）。
+  与 components/product/MoveAssetModal.vue 的差异（勿合并）：
+    本组件：只选目标分类，选中态由父级通过 targetCategory 受控（emit selectCategory）。
+    MoveAssetModal：跨产品移动，需选「目标产品」，状态自管。
+  两者 UI 形态（分类按钮列表 vs 表单下拉）与数据契约均不同，属合理业务差异。
+-->
 <template>
   <LqDialog
     :model-value="modelValue"

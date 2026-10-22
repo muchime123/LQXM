@@ -52,11 +52,6 @@
             <slot name="errorActions"></slot>
           </template>
 
-          <BatchActionBar v-if="selectedCount > 0" :selected-count="selectedCount" :loading="batchLoading"
-            :hint="batchHint" @clear="$emit('clearSelection')">
-            <slot name="batchActions"></slot>
-          </BatchActionBar>
-
           <div class="list-page-layout__list-container">
             <div v-if="$slots.listActions" class="list-page-layout__list-header">
               <div class="list-page-layout__list-actions">
@@ -97,7 +92,6 @@ export type ListPageLayoutState =
 import { computed, useId } from 'vue'
 import type { ListPagination } from '@/composables/list/useListPagination'
 import DataState from './DataState.vue'
-import BatchActionBar from './BatchActionBar.vue'
 import LqPagination from './LqPagination.vue'
 
 const titleId = `list-page-title-${useId()}`
@@ -132,11 +126,6 @@ const props = withDefaults(
     skeletonVariant?: 'card' | 'list' | 'table' | 'default'
     skeletonRows?: number
 
-    /* ---- BatchActionBar ---- */
-    selectedCount?: number
-    batchLoading?: boolean
-    batchHint?: string
-
     /* ---- Pagination ---- */
     pagination?: ListPagination
     paginationMode?: 'full' | 'compact'
@@ -170,9 +159,6 @@ const props = withDefaults(
     skeleton: false,
     skeletonVariant: 'table',
     skeletonRows: 8,
-    selectedCount: 0,
-    batchLoading: false,
-    batchHint: '',
     paginationMode: 'full',
     pageSizes: () => [20, 50, 100],
     hideOnSinglePage: false,
@@ -183,7 +169,6 @@ const props = withDefaults(
 
 defineEmits<{
   retry: []
-  clearSelection: []
   pageChange: []
 }>()
 

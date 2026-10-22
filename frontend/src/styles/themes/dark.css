@@ -6,7 +6,7 @@
   --color-surface-alt: #1a2332;
   --color-surface-raised: #243044;
   --color-border: #334155;
-  --color-border-light: #2d3d50;
+  --color-border-light: #2d3748;
   --color-border-lighter: #283548;
   --color-border-input: #3b4c63;
   --color-border-input-hover: #4a5e78;
@@ -98,7 +98,6 @@
 
   --color-danger-accent: #f87171;
   --color-danger-bg-tint: rgba(220, 38, 38, 0.1);
-  --color-border-light: #2d3748;
   --color-text-dim: #94a3b8;
 
   /* Element Plus 扩展色阶 — 深色模式覆盖 */

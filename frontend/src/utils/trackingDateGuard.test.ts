@@ -296,6 +296,11 @@ describe('trackingDateGuard · 导出与页面接线', () => {
   // 「两处导出都取本模块口径」这条契约跟着去新宿主查；页面侧只留列表列与详情卡片。
   const exportSource = readFileSync(
     resolve(here, '../composables/tracking/useTrackingExport.ts'), 'utf8')
+  const displaySource = readFileSync(resolve(here, 'tracking/leadDaysDisplay.ts'), 'utf8')
+  // 详情卡 2026-10-22 抽成 TrackingDetailDrawer（生产跟单页与「生产产品与工期管理」页共用），
+  // 详情侧的接线契约跟着去该组件查，不再钉页面。
+  const drawerSource = readFileSync(
+    resolve(here, '../components/production/TrackingDetailDrawer.vue'), 'utf8')
 
   it('页面不得再自带一份日期判据 / 工期实现', () => {
     expect(viewSource).toContain("from '@/utils/trackingDateGuard'")
@@ -303,16 +308,24 @@ describe('trackingDateGuard · 导出与页面接线', () => {
   })
 
   it('列表列、详情卡片、两处导出都取本模块的口径', () => {
-    expect(viewSource.match(/effectiveLeadDaysText\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
-    expect(exportSource.match(/effectiveLeadDaysCellText\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
+    // 列表列：页面里直接取本模块（悬停明细走 leadDaysDisplay）
+    expect(viewSource.match(/effectiveLeadDaysText\(/g)?.length ?? 0).toBeGreaterThanOrEqual(1)
     expect(viewSource).toContain('leadDaysKindText(row)')
     expect(viewSource).toContain('otherLeadDaysText(row)')
-    expect(viewSource).toContain('leadDaysBreakdown(row)')
-    // 详情卡：10-15 起「工期构成」从一段纯文本改成悬停明细（leadDaysTooltipHtml），
-    // 原来那句 leadBreakdownText(detail.order) 已随重构下线，契约改钉现行入口。
-    expect(viewSource).toContain('leadDaysTooltipHtml(detail.order)')
-    expect(viewSource).toContain('leadDaysAlarm(detail.order)')
-    expect(viewSource).toContain('negativeLeadReason(detail.order)')
-    expect(viewSource).toContain('leadDaysDeltaText(detail.order)')
+    expect(viewSource).toContain('leadDaysTooltipHtml(row)')
+
+    // 详情卡：同一套口径，宿主是 TrackingDetailDrawer
+    expect(drawerSource).toContain('effectiveLeadDaysText(detail.order)')
+    expect(drawerSource).toContain('leadDaysTooltipHtml(detail.order)')
+    expect(drawerSource).toContain('leadDaysAlarm(detail.order)')
+    expect(drawerSource).toContain('negativeLeadReason(detail.order)')
+    expect(drawerSource).toContain('leadDaysDeltaText(detail.order)')
+
+    // 配色与悬停明细由 leadDaysDisplay 提供，它自己只从本模块取数
+    expect(displaySource).toContain("from '@/utils/trackingDateGuard'")
+    expect(displaySource).toContain('leadDaysBreakdown(row)')
+
+    // 两处导出：Excel 独立列 + 网页版并入「要求完成」格的副行
+    expect(exportSource.match(/effectiveLeadDaysCellText\(/g)?.length ?? 0).toBeGreaterThanOrEqual(2)
   })
 })

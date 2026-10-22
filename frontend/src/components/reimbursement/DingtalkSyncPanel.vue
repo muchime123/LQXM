@@ -91,7 +91,7 @@ unit="次"
     >
       <LqTable :data="runs" row-key="id" @row-click="openRunDetail">
         <el-table-column label="#" width="48" align="center">
-          <template #default="{ $index }">{{ (runsPage - 1) * runsSize + $index + 1 }}</template>
+          <template #default="{ $index }">{{ runsPagination.indexMethod($index) }}</template>
         </el-table-column>
         <el-table-column label="类型" width="100">
           <template #default="{ row }">
@@ -331,9 +331,7 @@ const syncDaysBack = ref(7)
 const runs = ref<SyncRunRow[]>([])
 const runsLoading = ref(false)
 const runsError = ref('')
-const runsPage = ref(1)
-const runsSize = ref(10)
-
+// 分页唯一状态来源（0 基）；后端 /sync-runs 的 page 为 1 基，请求时 +1
 const runsPagination = useListPagination({ page: 0, size: 10 })
 
 const runDrawer = reactive<{
@@ -409,7 +407,7 @@ async function reloadRuns() {
   runsLoading.value = true
   runsError.value = ''
   try {
-    const r = await fetchSyncRuns({ page: runsPage.value, size: runsSize.value })
+    const r = await fetchSyncRuns({ page: runsPagination.pageInfo.page + 1, size: runsPagination.pageInfo.size })
     runs.value = r.items
     runsPagination.updateFromResponse({ total: r.total, page: r.page - 1, size: r.size, totalPages: Math.ceil(r.total / r.size) })
   } catch (e: any) {
@@ -417,17 +415,6 @@ async function reloadRuns() {
     notify.errorWithDetail('同步记录加载失败', e)
   } finally { runsLoading.value = false }
 }
-
-runsPagination.onPageChange(runsPagination.pageInfo.page, () => {
-  runsPage.value = runsPagination.pageInfo.page + 1
-  reloadRuns()
-})
-runsPagination.onPageSizeChange(runsPagination.pageInfo.size, () => {
-  runsSize.value = runsPagination.pageInfo.size
-  runsPage.value = 1
-  runsPagination.resetPage()
-  reloadRuns()
-})
 
 // ===== 操作 =====
 async function doSync() {

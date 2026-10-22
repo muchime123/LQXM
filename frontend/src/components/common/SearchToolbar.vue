@@ -127,6 +127,8 @@
       :selected-count="selectedCount"
       :models-count="modelsCount"
       :is-all-selected="isAllSelected"
+      :show-edit="hasBatchEditListener()"
+      :show-remove="hasBatchRemoveListener()"
       @toggle-select-all="emit('toggle-select-all')"
       @edit="emit('batch-edit')"
       @remove="emit('batch-remove')"
@@ -138,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onBeforeUnmount, reactive, ref, watch, type Component } from 'vue'
+import { computed, getCurrentInstance, onBeforeUnmount, reactive, ref, watch, type Component } from 'vue'
 import { Collection, Grid, List, Operation, Search } from '@element-plus/icons-vue'
 import SearchToolbarBatchBar from './SearchToolbarBatchBar.vue'
 
@@ -437,6 +439,12 @@ const hasActiveFilters = computed(() => {
 const showClearButton = computed(() => props.clearVisible ?? hasActiveFilters.value)
 const showBatchBar = computed(() => props.batchEnabled && props.batchMode)
 const showBatchEntry = computed(() => props.batchEnabled && props.batchEntryVisible && !props.batchMode)
+
+// batch-edit / batch-remove 已在 defineEmits 中声明，声明的监听器不会留在 $attrs，
+// 只能从 vnode.props 探测。用函数而非 computed：vnode.props 非响应式，依赖渲染时机重新取值。
+const instance = getCurrentInstance()
+const hasBatchEditListener = () => Boolean(instance?.vnode.props?.onBatchEdit)
+const hasBatchRemoveListener = () => Boolean(instance?.vnode.props?.onBatchRemove)
 
 const showViewToggle = computed(
   () =>

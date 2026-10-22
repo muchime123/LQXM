@@ -47,6 +47,18 @@ describe('LqConfirmDialog', () => {
     expect(wrapper.findAll('button').every(button => button.attributes('disabled') !== undefined)).toBe(true)
   })
 
+  it('emits close exactly once when the inner dialog syncs modelValue and then closes', async () => {
+    // 内层 LqDialog 的真实关闭序列：先 update:modelValue=false，再派发 @close
+    const wrapper = mount(LqConfirmDialog, { props: { modelValue: true }, global })
+    const inner = wrapper.findComponent({ name: 'LqDialog' })
+
+    await inner.vm.$emit('update:modelValue', false)
+    await inner.vm.$emit('close')
+
+    expect(wrapper.emitted('update:modelValue')).toEqual([[false]])
+    expect(wrapper.emitted('close')).toHaveLength(1)
+  })
+
   it('closes on cancel but only emits confirm for the primary action', async () => {
     const wrapper = mount(LqConfirmDialog, { props: { modelValue: true }, global })
     const buttons = wrapper.findAll('button')

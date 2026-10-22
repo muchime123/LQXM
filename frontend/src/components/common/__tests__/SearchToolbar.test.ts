@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { defineComponent } from 'vue'
 import SearchToolbar from '../SearchToolbar.vue'
 
 const global = {
@@ -78,10 +79,23 @@ describe('SearchToolbar', () => {
   })
 
   it('forwards batch actions and disables destructive actions without a selection', async () => {
-    const wrapper = mount(SearchToolbar, {
-      props: { batchEnabled: true, batchMode: true, selectedCount: 0, modelsCount: 3 },
-      global
+    // 用宿主组件挂载：batch-edit / batch-remove 已在 defineEmits 中声明，
+    // 只有真实模板监听才会进入 vnode.props，onXxx 属性写法无法验证探测逻辑。
+    const Host = defineComponent({
+      components: { SearchToolbar },
+      setup: () => ({ onBatchEdit: vi.fn(), onBatchRemove: vi.fn() }),
+      template: `
+        <SearchToolbar
+          batch-enabled
+          batch-mode
+          :selected-count="0"
+          :models-count="3"
+          @batch-edit="onBatchEdit"
+          @batch-remove="onBatchRemove"
+        />
+      `
     })
+    const wrapper = mount(Host, { global })
     const batch = wrapper.findComponent({ name: 'SearchToolbarBatchBar' })
 
     expect(batch.attributes('aria-label')).toBe('批量管理操作')
@@ -90,7 +104,21 @@ describe('SearchToolbar', () => {
     expect(batch.findAll('button').filter(button => button.attributes('disabled') !== undefined)).toHaveLength(2)
 
     await batch.findAll('button')[0].trigger('click')
-    expect(wrapper.emitted('toggle-select-all')).toHaveLength(1)
+    expect(wrapper.findComponent(SearchToolbar).emitted('toggle-select-all')).toHaveLength(1)
+  })
+
+  it('hides built-in batch actions when the owner does not listen to them', () => {
+    // 未监听 batch-edit / batch-remove 时不应渲染对应按钮（否则点击静默无响应）
+    const wrapper = mount(SearchToolbar, {
+      props: { batchEnabled: true, batchMode: true, selectedCount: 2, modelsCount: 3 },
+      global
+    })
+
+    const labels = wrapper.findAll('button').map(button => button.text())
+
+    expect(labels.join('|')).not.toContain('批量编辑')
+    expect(labels.join('|')).not.toContain('批量删除所选')
+    expect(labels.join('|')).toContain('退出批量')
   })
 
   it('can hide the batch entry when a table keeps its selection column visible', () => {

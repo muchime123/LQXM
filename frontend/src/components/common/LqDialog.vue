@@ -19,11 +19,11 @@
       内容区域
     </LqDialog>
 
-  尺寸规范（size）：
-    sm  420px   简单确认、删除、提示
-    md  720px   普通编辑、表单、基础资料
-    lg  1100px  复杂业务、表格、多区域编辑
-    xl  min(1400px, 90vw)  大型工作台
+  尺寸规范（size）：取自 styles/tokens.css 的 --dialog-width-* 令牌
+    sm  --dialog-width-sm (420px)    简单确认、删除、提示
+    md  --dialog-width-md (720px)    普通编辑、表单、基础资料
+    lg  --dialog-width-lg (1100px)   复杂业务、表格、多区域编辑
+    xl  --dialog-width-xl (min(1400px,90vw))  大型工作台
 
   模式（mode）：
     detail     查看详情，默认无 footer，内容区域滚动
@@ -32,6 +32,11 @@
 
   也可通过 width 自定义覆盖 size 默认值。
 
+  关闭一致性约定：
+    1. 关闭按钮 / ESC / 点击遮罩 / 取消按钮 全部经过 beforeClose 拦截，
+       业务语义事件（cancel）仅在关闭被允许后派发，不会绕过脏数据拦截。
+    2. loading 期间禁止所有关闭方式（关闭按钮隐藏，ESC 与遮罩同步失效）。
+
   命名注意：自定义类名使用 lq-dialog__head / lq-dialog__foot（不是 __header/__footer），
   以避免与 Element Plus 的 .el-dialog__header / .el-dialog__footer 命名混淆。
 -->
@@ -39,7 +44,8 @@
   <el-dialog
     :model-value="modelValue"
     :width="resolvedWidth"
-    :close-on-click-modal="closeOnClickModal"
+    :close-on-click-modal="closeOnClickModal && !loading"
+    :close-on-press-escape="!loading"
     :destroy-on-close="destroyOnClose"
     :show-close="false"
     :align-center="!fullscreen"
@@ -72,7 +78,7 @@
             type="button"
             class="lq-dialog__close"
             aria-label="关闭"
-            @click="requestClose"
+            @click="() => requestClose()"
           >
             <svg
               viewBox="0 0 16 16"
@@ -209,11 +215,13 @@ const emit = defineEmits<{
   confirm: []
 }>()
 
+// 尺寸唯一来源：styles/tokens.css 的 --dialog-width-* 令牌
+// （el-dialog 会把 width 透传为 --el-dialog-width，故此处可直接引用 CSS 变量）
 const sizeWidthMap: Record<DialogSize, string> = {
-  sm: '420px',
-  md: '720px',
-  lg: '1100px',
-  xl: 'min(1400px, 90vw)'
+  sm: 'var(--dialog-width-sm)',
+  md: 'var(--dialog-width-md)',
+  lg: 'var(--dialog-width-lg)',
+  xl: 'var(--dialog-width-xl)'
 }
 
 const resolvedWidth = computed(() => {
@@ -241,9 +249,15 @@ function handleModelUpdate(value: boolean) {
  */
 let suppressNextClose = false
 
-/** 按钮/遮罩请求关闭：只同步状态，由 el-dialog @close 统一派发 close */
-function requestClose() {
+/**
+ * 按钮/遮罩请求关闭：只同步状态，由 el-dialog @close 统一派发 close。
+ * @param onAllowed 关闭被允许（未被 beforeClose 拦截）时才执行的回调。
+ *   业务侧语义事件（如 cancel）必须走这里，否则会绕过脏数据拦截，
+ *   造成「点取消直接关、点 X 才提示」的不一致。
+ */
+function requestClose(onAllowed?: () => void) {
   elBeforeClose(() => {
+    onAllowed?.()
     emit('update:modelValue', false)
     // 兜底：部分消费者仅监听 @close（:model-value + @close 模式），
     // 不会响应 update:modelValue。若下一帧仍未关闭，则改派 close 让其自行关闭。
@@ -266,8 +280,8 @@ function handleClose() {
 }
 
 function handleCancel() {
-  emit('cancel')
-  requestClose()
+  // cancel 与关闭按钮同样受 beforeClose 拦截：仅在确认允许关闭后才派发
+  requestClose(() => emit('cancel'))
 }
 
 function handleConfirm() {

@@ -6,36 +6,32 @@
 backend/                          # Spring Boot + Maven
   src/main/java/.../archive/
     config/                        # Spring 配置 (6)
-    controller/                    # REST API (21，2026-08-17 核实)
-    service/                       # 业务逻辑 (53：主包 39 + file 子包 14)
-    repository/                    # JPA 仓库 (41)
-    entity/                        # JPA 实体 (41 实体 + 2 枚举)
-    dto/                           # 内联 record DTO (19)
+    controller/                    # REST API (42)
+    service/                       # 业务逻辑 (91：主包 77 + file 子包 14)
+    repository/                    # JPA 仓库 (55)
+    entity/                        # JPA 实体 (59)
+    dto/                           # 内联 record DTO
     util/                          # 工具类
   src/main/resources/
-    db/migration/                  # Flyway 迁移 (V{版本}__{描述}.sql，当前已达 V116，共 125 个脚本)
+    db/migration/                  # Flyway 迁移 (V{版本}__{描述}.sql，当前最大 V401，共 408 个脚本)
 frontend/                         # Vue 3 + Vite + TS + Element Plus
   src/
-    api/                           # API 调用 (.ts，40 文件：30 源 + 10 测试)
-    components/                    # Vue 组件 (120 个)
-      common/                      # 通用组件 (46)
-      product/                     # 产品相关 (20)
-      packaging/                   # 包材详情 (16)
-      company/                     # 公司信息 (15)
-      media/                       # 自媒体 (10)
-      master/                      # 主从布局 (4)
-      website/                    # 官网管理 (6，含 RichTextEditor 富文本封装)
-      certificate/                 # 知识产权 (3)
-    composables/                   # 组合式函数 (55 源 + 18 测试：catalog/13 + upload/9 + ui/11 + list/5 + common/5 + packaging/9 + mold/2)
-      catalog/                     # 产品工作台编排（useCatalogModels/Filters/Editors/Assets/BatchOps 等）
-      upload/                      # 文件上传（useFileUpload/useFileAssets/useCatalogFileUpload 等多套入口）
-      list/                        # 列表通用（useListPagination/useBatchSelection/useDragSort 等）
-    constants/                     # 常量定义
-    router/                        # 路由（14 业务路由 + 2 错误页）
-    types/                         # TypeScript 类型 (11，含 wangeditor 模块声明)
-    utils/                         # 工具函数
-    views/                         # 页面视图（按业务域分组：auth/error/workbench/product(含 mold)/marketing/sales/business/settlement(commission)/production/governance/system；已下线：密码管理/软件管理/展会档案/报价管理/UiLab、SalesOutboundSettlementView 死文件、settlement/profit/*）
-    styles/                        # 样式 (27 个 CSS：tokens/reset/element-plus/utilities + 11 modules + 2 themes + 5 页面级)
+    api/                           # API 调用 (60：52 源 + 8 测试)，统一走 api/http.ts 的单一 axios 实例
+    apps/                          # 业务应用装配层（当前仅 archive）；不存在 src/views/
+      index.ts                     # allNavItems 侧栏导航唯一入口
+      types.ts                     # NavItem 结构
+      archive/
+        routes.ts                  # 路由表本体（不在 router/ 内）
+        navigation.ts              # 侧栏导航数据（含 permission 声明）
+        views/                     # 页面视图 (30 .vue：system/product/marketing/production/settlement/governance/customer)
+    components/                    # Vue 组件 (169，其中 common/ 59)
+    composables/                   # 组合式函数 (86：upload/20、ui/16、catalog/15、list/6、common/6，另有 packaging/mold/tracking/auth 等)
+    constants/                     # 常量与枚举元数据 (15)
+    router/                        # 路由装配层 (2：index.ts + 契约测试)；路由表见 apps/archive/routes.ts
+    shell/                         # 登录 / 403 / 404 视图 (3)
+    types/                         # TypeScript 类型 (16)
+    utils/                         # 工具函数 (69)
+    styles/                        # 样式 (28 CSS：tokens/reset/element-plus/utilities + modules 11 + themes + 页面级)
 corporate-website/                # Vue 3 + Vite（无 TS）官网
   src/
     api/                           # API 调用 (2 文件，30 导出函数)
@@ -49,12 +45,14 @@ corporate-website/                # Vue 3 + Vite（无 TS）官网
     public/images/                 # 公共图片 (23 个，jpg/png + webp 双格式配对)
 ```
 
+> 目录与数量为 2026-10-22 实际核对结果，仅表示规模。具体引用关系（谁在复用哪个公共组件、哪些是死代码）必须现场核对，不要仅凭本文件推断；本文件历史上曾长期保留不存在的 `frontend/src/views/`。
+
 ## 命名规范
 
 - Java: PascalCase, snake_case 资源文件
 - Vue: PascalCase 组件, kebab-case 模板
 - TypeScript: camelCase 函数/变量, PascalCase 类型/接口
-- 数据库迁移: `V{版本}__{描述}.sql` (英文 snake_case)。历史脚本存在 V1_x 与 V2~V37 两套编号，均已执行不可改动；新脚本一律从现有最大整数版本号递增（2026-09-07 当前最大 V268），不再使用 `V{主}_{次}` 子版本号
+- 数据库迁移: `V{版本}__{描述}.sql` (英文 snake_case)。历史脚本存在 V1_x 与 V2~V37 两套编号，均已执行不可改动；新脚本一律从现有最大整数版本号递增（2026-10-22 当前最大 V401），不再使用 `V{主}_{次}` 子版本号
 - CSS 类名: kebab-case
 
 ## 前端修改策略
@@ -110,7 +108,7 @@ DTO 文件需要多处修改时，使用 create_file 重写整个文件更可靠
 1. 后端：给实体新增 `batchUpdateFields(ids, Map<String,Object>)`（白名单校验 + 类型转换 + 审计）+ 控制器 `PUT /batch`。
 2. 前端 API：新增 `batchXxx(ids, fields)`。
 3. 页面：`SearchToolbar` 加 `batch-enabled :batch-mode :selected-count :models-count :is-all-selected` 及 `@toggle-batch-mode @toggle-select-all @batch-edit @batch-remove`；`@batch-edit` 打开 `FieldBatchEditModal` 并传入字段 Schema；`@batch-remove` 接原有批量删除逻辑。
-4. 移除页面内旧的 `BatchActionBar` 与 `prompt()` 批量改字段逻辑，避免双入口。
+4. 移除页面内旧的批量改字段逻辑（`prompt()` 之类），避免双入口。批量栏只有 `SearchToolbar` + `SearchToolbarBatchBar` 一套；`components/common/BatchActionBar.vue` 已于 2026-10-22 删除，不要再引用。
 5. 新增控件类型时（如 tags 的 disabled），需确认组件支持 `disabled` prop（`LqTagInput` 已在 2026-08 补上）。
 6. 表格/卡片选择改用 `useBatchSelection`（`selectedIds` 为 Set，卡片模式传 `selectedCertIds` 数组派生）。行点击 `@row-click` 在批量模式下切换选中（列表），卡片模式用 `onCardClick`（批量模式切换选中，否则打开详情）。`useBatchSelection<number>()` 在需要 `Set<number>` 传给子组件时使用。
 

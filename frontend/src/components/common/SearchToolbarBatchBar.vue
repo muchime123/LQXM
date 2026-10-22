@@ -8,8 +8,21 @@
       {{ isAllSelected ? '取消全选' : '全选当前页' }}
     </el-button>
     <slot />
-    <el-button size="small" type="primary" :disabled="selectedCount === 0" @click="emit('edit')">批量编辑</el-button>
-    <el-button size="small" type="danger" plain :disabled="selectedCount === 0" @click="emit('remove')">
+    <el-button
+v-if="showEdit"
+size="small"
+type="primary"
+:disabled="selectedCount === 0"
+@click="emit('edit')">
+      批量编辑
+    </el-button>
+    <el-button
+v-if="showRemove"
+size="small"
+type="danger"
+plain
+:disabled="selectedCount === 0"
+@click="emit('remove')">
       批量删除所选
     </el-button>
     <el-button size="small" @click="emit('exit')">退出批量</el-button>
@@ -17,11 +30,24 @@
 </template>
 
 <script setup lang="ts">
-withDefaults(defineProps<{ selectedCount?: number; modelsCount?: number; isAllSelected?: boolean }>(), {
-  selectedCount: 0,
-  modelsCount: 0,
-  isAllSelected: false
-})
+withDefaults(
+  defineProps<{
+    selectedCount?: number
+    modelsCount?: number
+    isAllSelected?: boolean
+    /** 父级未监听 batch-edit 时不渲染内置按钮，避免点击后静默无响应 */
+    showEdit?: boolean
+    /** 父级未监听 batch-remove 时不渲染内置按钮 */
+    showRemove?: boolean
+  }>(),
+  {
+    selectedCount: 0,
+    modelsCount: 0,
+    isAllSelected: false,
+    showEdit: true,
+    showRemove: true
+  }
+)
 
 const emit = defineEmits<{
   'toggle-select-all': []

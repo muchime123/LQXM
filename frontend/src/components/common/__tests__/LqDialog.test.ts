@@ -302,11 +302,13 @@ describe('LqDialog', () => {
   })
 
   describe('width resolution', () => {
+    // 尺寸唯一来源为 styles/tokens.css 的 --dialog-width-* 令牌，
+    // 组件只负责把 size 映射到对应令牌，具体数值不在此处重复定义。
     it.each([
-      ['sm', '420px'],
-      ['md', '720px'],
-      ['lg', '1100px'],
-      ['xl', 'min(1400px, 90vw)']
+      ['sm', 'var(--dialog-width-sm)'],
+      ['md', 'var(--dialog-width-md)'],
+      ['lg', 'var(--dialog-width-lg)'],
+      ['xl', 'var(--dialog-width-xl)']
     ] as const)('resolves size %s to %s', (size, expected) => {
       const wrapper = factory({ size })
       const elDialog = wrapper.findComponent(ElDialogStub)

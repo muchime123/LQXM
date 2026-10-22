@@ -18,13 +18,14 @@ import type {
 import { notify } from '@/composables/ui/useToast'
 import { askConfirm } from '@/composables/ui/useConfirmDialog'
 import BannerFormDialog from '@/components/website/BannerFormDialog.vue'
+import LqPagination from '@/components/common/LqPagination.vue'
+import { useListPagination } from '@/composables/list/useListPagination'
 
 const router = useRouter()
 const loading = ref(false)
 const banners = ref<WebsiteBannerSummary[]>([])
-const total = ref(0)
-const currentPage = ref(0)
-const pageSize = ref(20)
+// 后端 /api/admin/website/banners 的 page 为 0 基（Spring Page），与 useListPagination 一致
+const pagination = useListPagination({ size: 20 })
 
 const searchKeyword = ref('')
 const filterPosition = ref<BannerPosition | ''>('SIDE')
@@ -48,12 +49,11 @@ async function loadData() {
       keyword: searchKeyword.value || undefined,
       position: filterPosition.value || undefined,
       websiteEnabled: filterEnabled.value === '' ? undefined : filterEnabled.value,
-      page: currentPage.value,
-      size: pageSize.value
+      ...pagination.getPageParams()
     }
     const result = await fetchBanners(params)
     banners.value = result.content
-    total.value = result.totalElements
+    pagination.updateFromResponse(result)
   } catch (err) {
     notify.errorWithDetail('加载失败', err)
   } finally {
@@ -62,7 +62,7 @@ async function loadData() {
 }
 
 function handleSearch() {
-  currentPage.value = 0
+  pagination.resetPage()
   loadData()
 }
 
@@ -70,12 +70,7 @@ function handleReset() {
   searchKeyword.value = ''
   filterPosition.value = 'SIDE'
   filterEnabled.value = ''
-  currentPage.value = 0
-  loadData()
-}
-
-function handlePageChange(page: number) {
-  currentPage.value = page
+  pagination.resetPage()
   loadData()
 }
 
@@ -250,14 +245,11 @@ await loadData()
         </template>
       </el-table>
 
-      <div v-if="total > 0" class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="currentPage"
-          :page-size="pageSize"
-          :total="total"
-          layout="prev, pager, next, total"
-          background
-          @current-change="handlePageChange"
+      <div v-if="pagination.pageInfo.total > 0" class="pagination-wrapper">
+        <LqPagination
+          :pagination="pagination"
+          :page-sizes="[20, 50, 100]"
+          @change="loadData"
         />
       </div>
     </div>

@@ -5,11 +5,8 @@
  *
  * 标准三段式：Header（标题区）→ Body（内容）→ Footer（操作区）
  *
- * 尺寸规范：
- * - sm  420px             简单确认、删除、提示
- * - md  720px             普通编辑、表单、基础资料
- * - lg  1100px            复杂业务、表格、多区域编辑
- * - xl  min(1400px,90vw)  大型工作台，兼容 1366 办公电脑
+ * 尺寸规范：唯一来源为 styles/tokens.css 的 --dialog-width-* 令牌
+ * （由 LqDialog 的 size 映射注入 --el-dialog-width，此处不再重复维护具体数值）
  *
  * 模式（mode）：
  * - detail     查看详情，默认无 footer，内容区域滚动
@@ -219,7 +216,7 @@
 /* workspace 模式：减少 padding，更大内容区 */
 /* 使用 CSS 变量 fallback，让 :width prop 可覆盖默认值 */
 .lq-dialog--workspace.el-dialog {
-  width: var(--el-dialog-width, min(1200px, 96vw));
+  width: var(--el-dialog-width, var(--dialog-width-workspace));
   max-height: 96vh;
 }
 
@@ -295,6 +292,8 @@
   background: #b91c1c !important;
   border-color: #b91c1c !important;
   color: #ffffff !important;
+  /* 抵消 button.primary:hover 的 brightness 提亮，保证 danger 三档红色一致 */
+  filter: none !important;
 }
 
 .lq-dialog__foot button.danger:active:not(:disabled) {
@@ -312,6 +311,20 @@
   background: #ef4444 !important;
   border-color: #ef4444 !important;
   color: #ffffff !important;
+}
+
+/* 成功语义主操作（如确认结案）：与 danger 对称，同样抵消 primary 的 brightness 提亮 */
+.lq-dialog__foot button.success {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  color: #ffffff;
+}
+
+.lq-dialog__foot button.success:hover:not(:disabled) {
+  border-color: var(--color-success-text);
+  background: var(--color-success-text);
+  color: #ffffff;
+  filter: none !important;
 }
 
 .lq-dialog__foot button:disabled {

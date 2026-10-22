@@ -21,6 +21,93 @@
   border: 1px solid var(--color-border);
 }
 
+/* ===== 筛选 chip（公共） =====
+   用于「候选项 + 计数 + 单选高亮 + 清除」形态的筛选行，
+   由 components/common/CategorySummaryTabs.vue 的 variant="chip" 渲染。 */
+.filter-chip-row {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  align-content: flex-start;
+  gap: 5px 7px;
+  flex-wrap: wrap;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--color-border-lighter);
+  background: var(--color-surface-raised);
+  min-height: 36px;
+  overflow: visible;
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-control-gap-tight);
+  width: auto;
+  min-width: 0;
+  max-width: 160px;
+  height: 24px;
+  padding: 0 10px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-pill);
+  font-size: var(--fs-xxs);
+  cursor: pointer;
+  white-space: nowrap;
+  color: var(--color-text-muted);
+  line-height: var(--lh-none);
+  flex: 0 0 auto;
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    color var(--transition-fast),
+    box-shadow var(--transition-fast);
+}
+
+.filter-chip:hover {
+  border-color: var(--color-border-input-hover);
+  background: var(--color-surface-hover);
+}
+
+.filter-chip--active {
+  background: var(--color-primary);
+  color: var(--color-surface);
+  border-color: var(--color-primary);
+  font-weight: var(--fw-bold);
+  box-shadow: 0 2px 6px var(--color-primary-shadow);
+}
+
+.filter-chip--active .filter-chip__count {
+  color: var(--color-glass-text);
+}
+
+.filter-chip__count {
+  margin-left: 0;
+  font-size: var(--fs-3xs);
+  color: var(--color-text-faint);
+  line-height: var(--lh-none);
+}
+
+.filter-chip-sep {
+  display: inline-block;
+  width: 1px;
+  height: 14px;
+  background: var(--color-border);
+  margin: 0 2px;
+  flex: 0 0 auto;
+}
+
+.filter-chip--clear {
+  color: var(--color-danger) !important;
+  border-color: var(--color-danger-border) !important;
+  background: var(--color-surface) !important;
+  font-weight: var(--fw-medium);
+}
+
+.filter-chip--clear:hover {
+  background: var(--color-danger-bg-soft) !important;
+}
+
 .lq-search-input {
   width: min(280px, 100%);
 }

@@ -152,7 +152,7 @@
             </el-select>
           </div>
           <LqPagination
-            class="list-pagination"
+            class="molds-group-pagination"
             mode="compact"
             :pagination="pagination"
             :disabled="loading"
@@ -1624,98 +1624,19 @@ defineExpose({
   width: 92px;
 }
 
-.list-pagination {
+/* 本组件的分页器实例：使用私有类名，不与公共 styles/modules/list-controls.css 的
+   .list-pagination 同名（原同名时同时吃到了全局的 margin-top，属于隐式耦合）。
+   下列 display / justify-content / margin-top 原由全局 .list-pagination 提供，显式复述以保持渲染不变。
+   注：此前这里用 `.list-pagination :deep(.el-pagination …)` 写了一套紧凑分页皮肤，
+   但 class 落在 el-pagination 根节点自身，`:deep()` 生成的是后代选择器，规则从未命中（死样式），
+   故一并移除；如需启用紧凑皮肤，选择器应去掉中间的 .el-pagination 层级。 */
+.molds-group-pagination {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: var(--space-md);
   flex-shrink: 0;
   padding: 6px 10px;
   min-height: 44px;
-}
-
-.list-pagination :deep(.el-pagination) {
-  justify-content: flex-start;
-  align-items: center;
-  width: 100%;
-  gap: 4px;
-  --el-pagination-button-bg-color: var(--color-surface, #fff);
-  --el-pagination-hover-color: var(--color-primary, #0f766e);
-  font-size: 12px;
-}
-
-/* 每页条数选择器更紧凑 */
-.list-pagination :deep(.el-pagination__sizes) {
-  margin-right: 0;
-}
-.list-pagination :deep(.el-pagination__sizes .el-select) {
-  --el-select-input-font-size: 12px;
-}
-.list-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper) {
-  padding: 0 8px;
-  box-shadow: none;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: var(--radius-md, 6px);
-  min-height: 28px;
-}
-.list-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper:hover),
-.list-pagination :deep(.el-pagination__sizes .el-select .el-input__wrapper.is-focus) {
-  border-color: var(--color-primary, #0f766e);
-}
-
-/* 页码按钮更小更圆 */
-.list-pagination :deep(.el-pagination .btn-prev),
-.list-pagination :deep(.el-pagination .btn-next),
-.list-pagination :deep(.el-pagination .el-pager li) {
-  min-width: 26px;
-  height: 26px;
-  line-height: 24px;
-  font-size: 12px;
-  border-radius: 6px;
-  padding: 0 4px;
-  border: 1px solid var(--color-border, #e2e8f0);
-  background: var(--color-surface, #fff);
-  color: var(--color-text-secondary, #6b7280);
-  transition: all 0.15s;
-  margin: 0 2px;
-}
-
-.list-pagination :deep(.el-pagination .btn-prev:hover),
-.list-pagination :deep(.el-pagination .btn-next:hover),
-.list-pagination :deep(.el-pagination .el-pager li:not(.is-active):hover) {
-  color: var(--color-primary, #0f766e);
-  border-color: var(--color-primary-border, #a7f3d0);
-  background: var(--color-primary-bg-light, #f0fdfa);
-}
-
-.list-pagination :deep(.el-pagination .el-pager li.is-active) {
-  background: linear-gradient(135deg, var(--color-primary-light, #0d9488), var(--color-primary, #0f766e));
-  color: var(--color-text-on-primary, #fff);
-  border-color: transparent;
-  box-shadow: 0 1px 3px var(--color-primary-shadow, rgba(15, 118, 110, 0.3));
-  font-weight: 600;
-}
-
-.list-pagination :deep(.el-pagination .el-pager li.more) {
-  background: transparent;
-  border-color: transparent;
-  color: var(--color-text-muted, #94a3b8);
-}
-
-.list-pagination :deep(.el-pagination button:disabled),
-.list-pagination :deep(.el-pagination .el-pager li.is-disabled) {
-  background: var(--color-surface-alt, #f3f4f6);
-  color: var(--color-text-faint, #cbd5e1);
-  border-color: var(--color-border-lighter, #e5e7eb);
-  cursor: not-allowed;
-}
-
-/* 左栏分页空间有限时，隐藏跳页器（保留 sizes / prev / pager / next） */
-.list-pagination :deep(.el-pagination .el-pagination__jump) {
-  display: none;
-}
-
-/* 超窄（左栏 < 440px）时进一步：分页 total 文字也隐藏，仅留 sizes + 导航 */
-@media (max-width: 440px) {
-  .list-pagination :deep(.el-pagination .el-pagination__total) {
-    display: none;
-  }
 }
 
 .filter-empty {

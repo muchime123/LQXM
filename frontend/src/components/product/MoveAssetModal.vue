@@ -1,3 +1,10 @@
+<!--
+  移动素材到【其它产品】（跨产品移动）+ 可选重分类。
+  与 components/company/MoveAssetDialog.vue 的差异（勿合并）：
+    本组件：跨产品，需选「目标产品」，分类为次选项，状态自管（内部 ref）。
+    MoveAssetDialog：仅在同一资产池内换分类，不跨产品，选中态由父级受控。
+  两者 UI 形态（表单下拉 vs 分类按钮列表）与数据契约均不同，属合理业务差异。
+-->
 <template>
   <LqDialog
     :model-value="visible"

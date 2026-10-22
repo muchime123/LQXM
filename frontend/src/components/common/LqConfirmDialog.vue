@@ -192,8 +192,9 @@ const emit = defineEmits<{
 }>()
 
 function handleUpdate(value: boolean) {
+  // 关闭事件由内层 LqDialog 的 @close 唯一派发（见 LqDialog.requestClose / handleClose），
+  // 这里再补一次 close 会让消费者收到两次。
   emit('update:modelValue', value)
-  if (!value) emit('close')
 }
 
 function handleClose() {
@@ -270,33 +271,6 @@ function handleSecondary() {
   color: var(--color-text-strong);
 }
 
-.lq-confirm-footer button.danger {
-  border-color: #dc2626 !important;
-  background: #dc2626 !important;
-  color: #ffffff !important;
-}
-
-.lq-confirm-footer button.danger:hover:not(:disabled) {
-  background: #b91c1c !important;
-  border-color: #b91c1c !important;
-  color: #ffffff !important;
-  filter: none !important;
-}
-
-.lq-confirm-footer button.danger:active:not(:disabled) {
-  background: #991b1b !important;
-  border-color: #991b1b !important;
-  color: #ffffff !important;
-}
-
-[data-theme='dark'] .lq-confirm-footer button.danger {
-  border-color: #dc2626 !important;
-  background: #dc2626 !important;
-  color: #ffffff !important;
-}
-[data-theme='dark'] .lq-confirm-footer button.danger:hover:not(:disabled) {
-  background: #ef4444 !important;
-  border-color: #ef4444 !important;
-  color: #ffffff !important;
-}
+/* danger 按钮样式由公共外壳统一提供（styles/modules/dialog-layout.css 的
+   .lq-dialog__foot button.danger），此处不重复维护 */
 </style>
