@@ -1,6 +1,6 @@
 <template>
   <div class="tracking-detail-host">
-    <el-drawer v-model="drawer" :title="detail?.order.orderNo ? `生产跟单 · ${detail.order.orderNo}` : '生产跟单'" size="min(880px, 96vw)" header-class="tracking-drawer-header" append-to-body destroy-on-close>
+    <el-drawer v-model="drawer" :title="detail?.order.orderNo ? `生产跟单 · ${detail.order.orderNo}` : '生产跟单'" size="min(1120px, 98vw)" header-class="tracking-drawer-header" append-to-body destroy-on-close>
       <div v-if="detail" :class="['detail-content', { 'detail-stopped': detail.order.stoppedAt }]">
         <section class="summary-block">
           <div class="summary-head">
@@ -44,7 +44,7 @@
           :title="`跟单待办 · ${actionLabel(detail.order.trackingAction)}`"
           :description="actionHint(detail.order)" />
 
-        <div class="metric-grid">
+        <div class="metric-grid" :class="{ 'show-secondary': showSecondaryMetrics }">
           <div :class="['metric', { 'metric-exception': invalidApplicationDate(detail.order) }]"><span>生产工单申请时间</span><strong>{{ detail.order.applicationDate || '未填写' }}</strong><small v-if="detail.order.sourceCreatedAt" class="muted">任务单提交 {{ formatMinute(detail.order.sourceCreatedAt) }}</small><small v-if="invalidApplicationDate(detail.order)" class="metric-exception-text">申请日期早于任务单提交日期，疑似填写错误</small><el-button v-if="invalidApplicationDate(detail.order) && needsTimeReason(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE')">记录日期核实</el-button><span v-else-if="invalidApplicationDate(detail.order)" class="metric-reviewed">已记录核实：{{ reviewOf(detail.order, 'SOURCE_DATE')?.reason }}<el-button v-if="reviewOf(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE', reviewOf(detail.order, 'SOURCE_DATE'))">修改</el-button></span></div>
           <div :class="['metric', { 'metric-exception': invalidRequiredDate(detail.order) }]"><span>订单要求完成（业务员）</span><strong :class="{ 'is-danger': invalidRequiredDate(detail.order) }">{{ detail.order.dueDate || '未定' }}</strong><small v-if="invalidRequiredDate(detail.order)" class="metric-exception-text">早于申请日期或任务单提交日期，疑似填写错误；请核对源工单日期</small><el-button v-if="invalidRequiredDate(detail.order) && !invalidApplicationDate(detail.order) && needsTimeReason(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE')">记录日期核实</el-button><span v-else-if="invalidRequiredDate(detail.order) && !invalidApplicationDate(detail.order)" class="metric-reviewed">已记录核实：{{ reviewOf(detail.order, 'SOURCE_DATE')?.reason }}<el-button v-if="reviewOf(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE', reviewOf(detail.order, 'SOURCE_DATE'))">修改</el-button></span></div>
           <div class="metric"><el-tooltip placement="top" raw-content :content="leadDaysTooltipHtml(detail.order)"><span class="lead-detail-heading">工期（当前） ⓘ</span></el-tooltip><strong :class="{ 'is-danger': leadDaysAlarm(detail.order) }">{{ effectiveLeadDaysText(detail.order) }}<small class="lead-kind">{{ leadDaysKindText(detail.order) }}</small></strong><small v-if="otherLeadDaysText(detail.order)" class="muted">{{ otherLeadDaysText(detail.order) }}</small><small v-if="leadDaysDeltaText(detail.order)" :class="leadDeltaClass(detail.order)">{{ leadDaysDeltaText(detail.order) }}</small><small v-if="negativeLeadDays(detail.order)" class="metric-exception-text">{{ negativeLeadReason(detail.order) }}</small></div>
@@ -61,6 +61,9 @@
           </button>
           <div v-else class="metric"><span>采购入库时间（仅供对照）</span><strong>尚无采购入库</strong><small v-if="detail.order.actualFinishDate" class="muted">报工后尚未入库，不据此判定未完工</small><el-button v-if="detail.order.actualFinishDate" link type="info" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('WAREHOUSING', reviewOf(detail.order, 'WAREHOUSING'))">{{ reviewOf(detail.order, 'WAREHOUSING') ? '修改暂缓入库安排' : '记录暂缓入库安排（可选）' }}</el-button></div>
         </div>
+        <el-button class="secondary-toggle" link type="primary" size="small" @click="showSecondaryMetrics = !showSecondaryMetrics">
+          {{ showSecondaryMetrics ? '收起对照信息' : '展开交付、报工与采购入库信息' }}
+        </el-button>
         <section v-if="detail.order.sourceOptionalConfiguration?.trim() || detail.order.sourceOrderRemark?.trim()" class="source-order-remark">
           <header class="section-head"><h3>生产任务单配置与备注</h3><span class="muted">氚云原文 · 与本地跟单备注分开</span></header>
           <p v-if="detail.order.sourceOptionalConfiguration?.trim()"><strong>可选配置：</strong>{{ detail.order.sourceOptionalConfiguration }}</p>
@@ -122,7 +125,7 @@
 
         <ProductionSalesTracePanel v-if="showSalesTrace" :order-id="detail.order.id" :can-confirm="auth.can('manufacturing.followup') && !detail.order.stoppedAt" />
 
-        <section>
+        <section v-if="timeHistoryItems.length">
           <header class="section-head">
             <h3>时间记录</h3>
             <span class="muted">车间预计完成调整与时间异常核实，按记录时间展示</span>
@@ -292,7 +295,7 @@
  * `order-id` 变化或打开时都会重新拉详情；`items` 只服务「保存并下一单」（列表顺序），
  * 产品页没有列表顺序，不传即可。
  */
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import type { TrackingMilestone, TrackingOrder } from '@/api/productionTracking'
 import TrackingSourceDetailDrawer from '@/components/production/TrackingSourceDetailDrawer.vue'
 import LqDialog from '@/components/common/LqDialog.vue'
@@ -325,6 +328,7 @@ const emit = defineEmits<{ 'update:modelValue': [boolean]; saved: [] }>()
 
 const auth = useCurrentUser()
 const canFollowup = computed(() => auth.can('manufacturing.followup'))
+const showSecondaryMetrics = ref(false)
 function canEditManualReference(index: number, stage: TrackingMilestone) {
   if (!canFollowup.value || detail.value?.order.stoppedAt || stage.status === 'DONE' || (stage.optional && !stage.applicable)) return false
   const open = milestones.value.map((item, position) => ({ item, position }))
@@ -391,6 +395,8 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .summary-progress { display: grid; justify-items: center; gap: 4px; }
 .progress-num { font-size: 13px; font-weight: 700; }
 .metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.metric-grid:not(.show-secondary) > :nth-child(n+6) { display: none; }
+.secondary-toggle { justify-self: start; margin: -8px 0 0; }
 .metric { background: #f9fafb; border: 1px solid #eef0f3; border-radius: 8px; padding: 9px 12px; display: grid; gap: 3px; min-width: 0; }
 .metric span { color: #667085; font-size: 12px; }
 .metric-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
