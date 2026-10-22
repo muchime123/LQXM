@@ -7,6 +7,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -139,4 +140,75 @@ public class CashflowJournalReviewService {
 
     record Comparison(List<Map<String, Object>> items, int oldOnlyCount, int newOnlyCount,
                       List<String> accounts) {}
+
+    // ==================== 来源结存核对（只读派生，P1） ====================
+
+    /**
+     * 单个账户在期间内的来源结存核对。
+     *
+     * <p>行序取「账户内 entry_date, id」——这是**展示顺序**，不是交易发生顺序的断言。
+     * 核对只回答「相邻两行的来源结存能不能接上」，不做任何重新排序以求连续。
+     */
+    public CashflowReviewRules.SourceBalanceReview sourceBalanceReview(Long accountId, LocalDate start, LocalDate end) {
+        List<CashflowReviewRules.SourceBalanceRow> rows = jdbc.query("""
+                SELECT e.id,e.entry_date,e.income,e.expense,e.balance
+                  FROM h3_cashflow_entries e JOIN h3_cash_accounts a ON a.id=?
+                 WHERE e.external_source='H3YUN' AND e.account_name=a.account_name
+                   AND e.entry_date BETWEEN ? AND ?
+                 ORDER BY e.entry_date,e.id
+                """, (rs, ignored) -> {
+            java.sql.Date date = rs.getDate("entry_date");
+            return new CashflowReviewRules.SourceBalanceRow(rs.getLong("id"),
+                    date == null ? null : date.toLocalDate(), rs.getBigDecimal("income"),
+                    rs.getBigDecimal("expense"), rs.getBigDecimal("balance"));
+        }, accountId, start, end);
+        return CashflowReviewRules.reviewSourceBalance(rows, null);
+    }
+
+    /**
+     * 期间内**全部**有流水的账户的核对结果（含 0 断点的账户）。
+     *
+     * <p>含干净账户是刻意的：账户行需要显示自己真实的「已衔接链接数」，汇总卡片也需要按筛选后的账户集求和。
+     * 判断「是否有异常」一律用 {@link CashflowReviewRules.SourceBalanceReview#hasExceptions()}，不要用 map 是否命中。
+     */
+    public Map<String, CashflowReviewRules.SourceBalanceReview> sourceBalanceReviewsAll(LocalDate start, LocalDate end) {
+        List<String> accounts = new ArrayList<>();
+        List<CashflowReviewRules.SourceBalanceRow> rows = jdbc.query("""
+                SELECT account_name,id,entry_date,income,expense,balance
+                  FROM h3_cashflow_entries
+                 WHERE external_source='H3YUN' AND entry_date BETWEEN ? AND ?
+                 ORDER BY account_name,entry_date,id
+                """, (rs, ignored) -> {
+            accounts.add(rs.getString("account_name"));
+            java.sql.Date date = rs.getDate("entry_date");
+            return new CashflowReviewRules.SourceBalanceRow(rs.getLong("id"),
+                    date == null ? null : date.toLocalDate(), rs.getBigDecimal("income"),
+                    rs.getBigDecimal("expense"), rs.getBigDecimal("balance"));
+        }, start, end);
+        Map<String, List<CashflowReviewRules.SourceBalanceRow>> grouped = new LinkedHashMap<>();
+        for (int i = 0; i < rows.size(); i++) {
+            grouped.computeIfAbsent(accounts.get(i), ignored -> new ArrayList<>()).add(rows.get(i));
+        }
+        Map<String, CashflowReviewRules.SourceBalanceReview> result = new LinkedHashMap<>();
+        grouped.forEach((account, list) -> result.put(account, CashflowReviewRules.reviewSourceBalance(list, null)));
+        return result;
+    }
+
+    /** 期间内全部账户的来源结存核对；只返回存在断点的账户（兼容既有调用方）。 */
+    public Map<String, CashflowReviewRules.SourceBalanceReview> sourceBalanceReviewByAccount(LocalDate start, LocalDate end) {
+        Map<String, CashflowReviewRules.SourceBalanceReview> result = new LinkedHashMap<>();
+        sourceBalanceReviewsAll(start, end).forEach((account, review) -> {
+            if (review.hasExceptions()) result.put(account, review);
+        });
+        return result;
+    }
+
+    /** 期间内全部账户的断点明细（账户 → 断点列表），供核对清单展开。只含存在断点的账户。 */
+    public Map<String, List<CashflowReviewRules.SourceBalanceException>> sourceBalanceBreakdown(LocalDate start, LocalDate end) {
+        Map<String, List<CashflowReviewRules.SourceBalanceException>> result = new LinkedHashMap<>();
+        sourceBalanceReviewsAll(start, end).forEach((account, review) -> {
+            if (review.hasExceptions()) result.put(account, review.exceptions());
+        });
+        return result;
+    }
 }

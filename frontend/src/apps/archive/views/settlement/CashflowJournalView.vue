@@ -1,376 +1,795 @@
 <template>
-  <section class="cashflow-page">
-    <header class="cashflow-head">
-      <div>
-        <h1>资金日记账</h1>
-        <p>按账户查看期间收支与结存。金额均为账户原币，外币不与人民币合计。</p>
+  <ListPageLayout
+    class="cashflow-page"
+    title="资金日记账"
+    description="按来源日记账查看流水、账户收支与核对结论。金额均为账户原币，外币不与人民币合计。"
+    :busy="reportLoading || entriesLoading"
+    content-label="资金流水"
+  >
+    <template #eyebrow>资金 · CASH JOURNAL</template>
+
+    <template #actions>
+      <el-button @click="reviewOpen = true">导入差异复核</el-button>
+      <el-button @click="router.push('/h3-imports?tab=ledger&ledger=cashflowJournal')">查看来源台账</el-button>
+    </template>
+
+    <template #summary>
+      <MetricGrid :columns="4" density="compact">
+        <MetricCard
+          title="期间收入"
+          :value="amount(summary.income)"
+          :loading="reportLoading && !accounts.length"
+          :empty="!reportLoading && !accounts.length"
+          :hint="rangeHint"
+        />
+        <MetricCard
+          title="期间支出"
+          :value="amount(summary.expense)"
+          :loading="reportLoading && !accounts.length"
+          :empty="!reportLoading && !accounts.length"
+          :hint="rangeHint"
+        />
+        <MetricCard
+          title="净流入"
+          :value="amount(summary.netFlow)"
+          :tone="summary.netFlow < 0 ? 'warning' : 'default'"
+          :loading="reportLoading && !accounts.length"
+          :empty="!reportLoading && !accounts.length"
+          :hint="`${accounts.length} 个账户有流水`"
+        />
+        <MetricCard
+          title="期间期末（分币种）"
+          :value="currencyClosingText"
+          :loading="reportLoading && !accounts.length"
+          :empty="!reportLoading && !accounts.length"
+          :hint="closingCardHint"
+        />
+      </MetricGrid>
+    </template>
+
+    <template #notice>
+      <div class="cf-notice">
+        <el-alert
+          v-if="reportBlockedCount > 0"
+          type="warning"
+          :closable="false"
+          show-icon
+          :title="`${reportBlockedCount} 个账户缺少期初余额，其期间期末不可计算（仍照常显示收支）`"
+          description="期间期末 = 期间期初 + 期间收入 − 期间支出。缺期初时不做任何兜底填充，也不以 0 代替。"
+        />
+        <p class="cf-legend">
+          <strong>三个维度互不代表：</strong>
+          <em>期间余额核对</em>只说明期末能否计算；<em>逐笔结存核对</em>只说明明细能否衔接；
+          <em>人工对账</em>才是财务与银行确认的结果（P1 尚未开放，一律显示未对账）。
+          系统算出的数与财务确认过的数是两件事。
+        </p>
       </div>
-      <div class="cashflow-head-actions">
-        <el-button @click="openReview">导入差异复核</el-button>
-        <el-button @click="router.push('/h3-imports?tab=ledger&ledger=cashflowJournal')">查看来源台账</el-button>
+    </template>
+
+    <template #toolbar>
+      <div class="cf-toolbar">
+        <LqTabs v-model="activeTab" :items="tabItems" @tab-change="onTabChange" />
+        <div class="cf-toolbar__right">
+          <el-select
+            v-model="accountFilter"
+            clearable
+            filterable
+            placeholder="全部账户"
+            class="cf-toolbar__account"
+            @change="onAccountFilterChange"
+          >
+            <el-option
+              v-for="account in accounts"
+              :key="account.id"
+              :value="account.id"
+              :label="`${account.accountName} · ${account.currency}`"
+            />
+          </el-select>
+          <el-date-picker
+            v-model="period"
+            type="daterange"
+            value-format="YYYY-MM-DD"
+            range-separator="至"
+            start-placeholder="开始日期"
+            end-placeholder="结束日期"
+            :disabled-date="disableOtherYears"
+            :clearable="false"
+            style="width: 250px"
+            @change="onPeriodPicked"
+          />
+          <el-button-group>
+            <el-button :type="preset === 'month' ? 'primary' : ''" @click="setPeriod('month')">本月</el-button>
+            <el-button :type="preset === 'quarter' ? 'primary' : ''" @click="setPeriod('quarter')">本季</el-button>
+            <el-button :type="preset === 'year' ? 'primary' : ''" @click="setPeriod('year')">本年</el-button>
+          </el-button-group>
+        </div>
       </div>
-    </header>
-
-    <div class="cashflow-toolbar">
-      <el-date-picker v-model="period" type="daterange" value-format="YYYY-MM-DD" range-separator="至"
-        start-placeholder="开始日期" end-placeholder="结束日期" :disabled-date="disableOtherYears" @change="applyPeriod" />
-      <el-button @click="setPeriod('year')">本年</el-button>
-      <el-button @click="setPeriod('month')">本月</el-button>
-      <el-input v-model="accountKeyword" clearable placeholder="搜索账户" class="cashflow-account-search" />
-      <el-select v-model="currencyFilter" clearable placeholder="全部币种" class="cashflow-currency-filter">
-        <el-option v-for="currency in availableCurrencies" :key="currency" :label="currency" :value="currency" />
-      </el-select>
-      <el-button :disabled="!visibleAccounts.length" @click="exportAccountReport">导出账户报表</el-button>
-      <span>2026 年 · {{ visibleAccounts.length }} 个账户</span>
-    </div>
-
-    <el-alert type="info" :closable="false" title="当前为已导入日记账的来源汇总。财务若插行或修改历史流水，旧导入可能出现重复；正式资金余额须完成跨批次复核。" />
-
-    <el-alert v-if="!loading && accounts.length === 0" type="warning" :closable="false"
-      title="暂无账户数据，请先在氚云导入中心导入流水日记账。" class="cashflow-empty" />
-    <div v-if="currencyTotals.length" class="cashflow-totals">
-      <div v-for="group in currencyTotals" :key="group.currency" class="cashflow-total-card">
-        <strong>{{ group.currency }} · {{ group.count }} 个账户</strong>
-        <span>收入 {{ amount(group.income) }}　支出 {{ amount(group.expense) }}</span>
-        <span>期末 {{ group.unknownOpening ? '部分账户缺期初' : amount(group.closing) }}</span>
-      </div>
-    </div>
-    <el-table v-loading="loading" :data="visibleAccounts" stripe @row-click="openAccount">
-      <el-table-column prop="accountName" label="账户" min-width="190" show-overflow-tooltip />
-      <el-table-column prop="currency" label="币种" width="85" />
-      <el-table-column label="期间期初" width="145" align="right">
-        <template #default="{ row }">{{ openingAmount(row.openingBalance) }}</template>
-      </el-table-column>
-      <el-table-column label="收入" width="145" align="right">
-        <template #default="{ row }">{{ amount(row.income) }}</template>
-      </el-table-column>
-      <el-table-column label="支出" width="145" align="right">
-        <template #default="{ row }">{{ amount(row.expense) }}</template>
-      </el-table-column>
-      <el-table-column label="净流量" width="145" align="right">
-        <template #default="{ row }">{{ amount(row.netFlow) }}</template>
-      </el-table-column>
-      <el-table-column label="期间期末" width="145" align="right">
-        <template #default="{ row }">{{ openingAmount(row.closingBalance) }}</template>
-      </el-table-column>
-      <el-table-column prop="entryCount" label="笔数" width="85" align="right" />
-      <el-table-column label="操作" width="90">
-        <template #default="{ row }"><el-button link type="primary" @click.stop="openAccount(row)">明细</el-button></template>
-      </el-table-column>
-    </el-table>
-
-    <section class="cashflow-issues">
-      <div class="cashflow-issues-head">
-        <h2>数据核对 <span>{{ issues.length }} 项</span></h2>
-        <p>检查缺期初、缺日期、收支双填和外币缺汇率。逐笔结存核对需先确认跨次导入的流水身份。</p>
-      </div>
-      <el-table v-loading="issuesLoading" :data="issues" stripe max-height="360">
-        <el-table-column prop="accountName" label="账户" min-width="190" show-overflow-tooltip />
-        <el-table-column prop="entryDate" label="日期" width="120">
-          <template #default="{ row }">{{ row.entryDate || '—' }}</template>
-        </el-table-column>
-        <el-table-column prop="detail" label="异常" min-width="240" />
-        <el-table-column label="操作" width="90">
-          <template #default="{ row }"><el-button link type="primary" @click="openIssue(row)">来源台账</el-button></template>
-        </el-table-column>
-      </el-table>
-    </section>
-
-    <el-drawer v-model="drawerOpen" :title="selected?.accountName || '账户明细'" size="85%">
-      <p v-if="selected" class="cashflow-detail-summary">
-        {{ start }} 至 {{ end }} · 期初 {{ openingAmount(selected.openingBalance) }} · 收入 {{ amount(selected.income) }} ·
-        支出 {{ amount(selected.expense) }} · 期末 {{ openingAmount(selected.closingBalance) }} {{ selected.currency }}
+      <p class="cf-range">
+        查询范围：<strong>{{ start }}</strong> 至 <strong>{{ end }}</strong>
+        <span v-if="isPresetCappedToday" class="cf-range__hint">（{{ presetLabel }}默认截至今天）</span>
+        <span v-else class="cf-range__hint">（自定义期间，可包含未来日期）</span>
       </p>
-      <el-tabs v-model="detailTab">
-        <el-tab-pane label="期间流水" name="entries">
-      <el-table v-loading="entriesLoading" :data="entries" stripe>
-        <el-table-column prop="entry_date" label="日期" width="120" />
-        <el-table-column prop="summary" label="摘要" min-width="230" show-overflow-tooltip />
-        <el-table-column prop="supplier_raw" label="供应商" min-width="140" show-overflow-tooltip />
-        <el-table-column prop="counterparty_raw" label="客户 / 供应商" min-width="150" show-overflow-tooltip />
-        <el-table-column prop="reimbursed_by" label="报销人" width="110" />
-        <el-table-column prop="invoiced" label="开票" width="80" />
-        <el-table-column label="收入" width="130" align="right"><template #default="{ row }">{{ amount(row.income) }}</template></el-table-column>
-        <el-table-column label="支出" width="130" align="right"><template #default="{ row }">{{ amount(row.expense) }}</template></el-table-column>
-        <el-table-column label="来源结存" width="140" align="right"><template #default="{ row }">{{ amount(row.balance) }}</template></el-table-column>
-      </el-table>
-      <el-pagination v-if="entryTotal > 30" v-model:current-page="entryPage" layout="prev, pager, next, total"
-        :total="entryTotal" :page-size="30" class="cashflow-pagination" @current-change="loadEntries" />
-        </el-tab-pane>
-        <el-tab-pane label="2026 月度汇总" name="monthly">
-          <div class="cashflow-monthly-actions">
-            <span>全年 12 个月，金额为账户原币；缺期初时余额不计算。</span>
-            <el-button :disabled="!monthlyRows.length" @click="exportMonthly">导出 CSV</el-button>
-          </div>
-          <el-table v-loading="monthlyLoading" :data="monthlyRows" stripe max-height="580">
-            <el-table-column label="月份" width="90"><template #default="{ row }">{{ row.month }} 月</template></el-table-column>
-            <el-table-column label="月初" width="145" align="right"><template #default="{ row }">{{ openingAmount(row.openingBalance) }}</template></el-table-column>
-            <el-table-column label="收入" width="145" align="right"><template #default="{ row }">{{ amount(row.income) }}</template></el-table-column>
-            <el-table-column label="支出" width="145" align="right"><template #default="{ row }">{{ amount(row.expense) }}</template></el-table-column>
-            <el-table-column label="净流量" width="145" align="right"><template #default="{ row }">{{ amount(row.netFlow) }}</template></el-table-column>
-            <el-table-column label="月末" width="145" align="right"><template #default="{ row }">{{ openingAmount(row.closingBalance) }}</template></el-table-column>
-            <el-table-column prop="entryCount" label="笔数" width="90" align="right" />
-          </el-table>
-        </el-tab-pane>
-      </el-tabs>
-    </el-drawer>
+    </template>
 
-    <el-drawer v-model="reviewOpen" title="流水日记账导入差异" size="86%">
-      <el-alert type="info" :closable="false" title="这里仅列出旧库与新文件的差异，不自动认定两行是同一笔。财务调整历史行后，须复核再确认。" />
-      <div class="cashflow-review-toolbar">
-        <el-select v-model="reviewBatchId" placeholder="选择待确认批次" filterable @change="changeReviewBatch">
-          <el-option v-for="batch in reviewBatches" :key="batch.id" :value="batch.id"
-            :label="`#${batch.id} · ${batch.fileName} · ${batch.totalCount} 行`" />
+    <ActiveFilterChips :filters="activeChips" @remove="removeChip" @clear="clearAllFilters" />
+
+    <!-- ========== 视图一：流水明细（主视图） ========== -->
+    <template v-if="activeTab === 'entries'">
+      <SearchToolbar
+        v-model:keyword="entryKeyword"
+        search-placeholder="搜索摘要、往来对象或经办人"
+        :fields="[]"
+        :field-values="{}"
+        :batch-enabled="false"
+        aria-label="资金流水"
+        @search="searchEntries"
+        @clear="clearEntryFilters"
+      >
+        <template #actions>
+          <el-button @click="router.push('/h3-imports?tab=import')">导入流水</el-button>
+          <el-button :disabled="!entries.length" @click="exportEntries">导出本页</el-button>
+        </template>
+      </SearchToolbar>
+
+      <DataState
+        :state="entriesState"
+        :skeleton="entriesState === 'loading'"
+        skeleton-variant="table"
+        :skeleton-rows="10"
+        :refreshing="entriesLoading && entries.length > 0"
+        error-title="流水明细加载失败"
+        :error-message="entriesError"
+        stale-message="刷新失败，当前仍显示上一次成功加载的流水。"
+        empty-text="该期间没有流水"
+        empty-hint="可在氚云导入中心导入流水日记账。"
+        filtered-empty-text="没有符合条件的流水"
+        filtered-empty-hint="请调整搜索内容或账户筛选。"
+        @retry="loadEntries"
+      >
+        <template #emptyActions="{ state }">
+          <el-button v-if="state === 'filtered-empty'" @click="clearEntryFilters">清除筛选</el-button>
+        </template>
+
+        <CashflowEntryTable :entries="entries" />
+      </DataState>
+
+      <p class="cf-note">
+        共 {{ pagination.pageInfo.total }} 笔，按日期从新到旧显示。「来源结存」是 Excel 原值，系统不做任何改写；
+        手工记账将在 P2 开放，届时手工流水以 <code>MANUAL-</code> 前缀区分来源。
+      </p>
+
+      <LqPagination :pagination="pagination" @change="loadEntries" />
+    </template>
+
+    <!-- ========== 视图二：账户汇总 ========== -->
+    <template v-else-if="activeTab === 'accounts'">
+      <div class="cf-account-tools">
+        <el-select v-model="currencyFilter" clearable placeholder="全部币种" class="cf-account-tools__currency">
+          <el-option v-for="currency in availableCurrencies" :key="currency" :label="currency" :value="currency" />
         </el-select>
-        <el-select v-model="reviewAccount" clearable filterable placeholder="全部受影响账户" @change="changeReviewAccount">
-          <el-option v-for="name in reviewDiff?.accounts || []" :key="name" :label="name" :value="name" />
+        <el-select v-model="reconcileFilter" clearable placeholder="全部核对状态" class="cf-account-tools__status">
+          <el-option label="期末可计算" value="CLOSING_OK" />
+          <el-option label="缺期初，期末不可计算" value="CLOSING_BLOCKED" />
+          <el-option label="明细全部衔接" value="DETAIL_OK" />
+          <el-option label="明细有断点待核实" value="DETAIL_EXCEPTIONS" />
+          <el-option label="未人工对账" value="MANUAL_NOT_STARTED" />
         </el-select>
+        <el-button :disabled="!visibleAccounts.length" @click="exportAccountReport">导出账户报表</el-button>
+        <span class="cf-account-tools__hint">{{ visibleAccounts.length }} 个账户 · 按流水笔数降序</span>
       </div>
-      <el-empty v-if="!reviewBatches.length && !reviewLoading" description="目前没有待确认的流水日记账批次" />
-      <template v-else-if="reviewDiff">
-        <el-alert v-if="!reviewDiff.stagingAvailable" type="warning" :closable="false" title="该批次暂存行不可用，请重新上传文件。" />
-        <p class="cashflow-review-counts">旧库有而新文件没有：{{ reviewDiff.oldOnlyCount }} 行　·　新文件有而旧库没有：{{ reviewDiff.newOnlyCount }} 行</p>
-        <el-table v-loading="reviewLoading" :data="reviewDiff.items" stripe max-height="550">
-          <el-table-column label="差异" width="145">
-            <template #default="{ row }"><el-tag :type="row.kind === 'OLD_ONLY' ? 'warning' : 'info'">{{ row.kind === 'OLD_ONLY' ? '旧库独有' : '新文件独有' }}</el-tag></template>
-          </el-table-column>
-          <el-table-column prop="accountName" label="账户" min-width="170" show-overflow-tooltip />
-          <el-table-column prop="sourceRowNumber" label="本批 Excel 行号" width="135">
-            <template #default="{ row }">{{ row.sourceRowNumber || '—' }}</template>
-          </el-table-column>
-          <el-table-column prop="entryDate" label="日期" width="135" show-overflow-tooltip />
-          <el-table-column prop="summary" label="摘要" min-width="190" show-overflow-tooltip />
-          <el-table-column label="收入" width="120" align="right"><template #default="{ row }">{{ amount(row.income) }}</template></el-table-column>
-          <el-table-column label="支出" width="120" align="right"><template #default="{ row }">{{ amount(row.expense) }}</template></el-table-column>
-          <el-table-column label="来源结存" width="130" align="right"><template #default="{ row }">{{ amount(row.balance) }}</template></el-table-column>
-        </el-table>
-        <el-pagination v-if="reviewDiff.total > 50" v-model:current-page="reviewPage" layout="prev, pager, next, total"
-          :total="reviewDiff.total" :page-size="50" class="cashflow-pagination" @current-change="loadReviewDiff" />
-      </template>
-    </el-drawer>
-  </section>
+
+      <DataState
+        :state="accountsState"
+        :skeleton="accountsState === 'loading'"
+        skeleton-variant="table"
+        :skeleton-rows="8"
+        :refreshing="reportLoading && accounts.length > 0"
+        error-title="账户汇总加载失败"
+        :error-message="reportError"
+        stale-message="刷新失败，当前仍显示上一次成功加载的账户汇总。"
+        empty-text="暂无账户数据"
+        empty-hint="请先在氚云导入中心导入流水日记账。"
+        filtered-empty-text="没有符合条件的账户"
+        filtered-empty-hint="请调整账户、币种或核对状态筛选。"
+        @retry="loadReport"
+      >
+        <template #emptyActions="{ state }">
+          <el-button v-if="state === 'filtered-empty'" @click="clearAccountFilters">清除筛选</el-button>
+        </template>
+
+        <CashflowAccountTable :accounts="visibleAccounts" :year="PERIOD_YEAR" @open-entries="openAccount" />
+      </DataState>
+    </template>
+
+    <!-- ========== 视图三：对账核对 ========== -->
+    <template v-else>
+      <div class="cf-reconcile-head">
+        <h2>数据核对 <span v-if="issues.length">· {{ issues.length }} 项</span></h2>
+        <p>
+          本页只列「确定性的数据事实」，不自动改写任何来源结存。
+          <strong>期间余额核对</strong>是账户级结论（期初 + 收支 = 期末）；
+          <strong>逐笔结存核对</strong>是明细级结论（相邻两行能否接上）——后者有异常不等于前者不可信。
+          卡片与清单均按当前账户筛选口径统计。
+        </p>
+      </div>
+
+      <MetricGrid :columns="4" density="compact" class="cf-reconcile-metrics">
+        <MetricCard
+          title="期末可计算"
+          :value="reconcileScope.closingComputable"
+          unit="个账户"
+          :loading="reportLoading"
+          :hint="reconcileScope.closingBlocked ? `${reconcileScope.closingBlocked} 个缺期初不可计算` : '全部账户期末可计算'"
+        />
+        <MetricCard
+          title="逐笔链接已衔接"
+          :value="reconcileScope.checkedLinks"
+          unit="条"
+          :loading="reportLoading"
+          hint="相邻两行来源结存是否接得上"
+        />
+        <MetricCard
+          title="明细断点"
+          :value="reconcileScope.exceptionCount"
+          unit="处"
+          :tone="reconcileScope.exceptionCount ? 'warning' : 'success'"
+          :loading="reportLoading"
+          :hint="reconcileScope.exceptionCount
+            ? `涉及 ${reconcileScope.affectedAccounts} 个账户`
+            : '全部账户逐笔衔接'"
+        />
+        <MetricCard
+          title="已人工对账"
+          :value="reportSummary.manualReconciledCount"
+          unit="个账户"
+          :loading="reportLoading"
+          hint="P1 未开放人工对账；上三项均为系统计算，不代表财务已确认"
+        />
+      </MetricGrid>
+
+      <DataState
+        :state="issuesState"
+        :skeleton="issuesState === 'loading'"
+        skeleton-variant="table"
+        :skeleton-rows="8"
+        :refreshing="issuesLoading && issues.length > 0"
+        error-title="核对清单加载失败"
+        :error-message="issuesError"
+        stale-message="刷新失败，当前仍显示上一次成功加载的核对清单。"
+        empty-text="该期间没有发现数据异常"
+        empty-hint="缺期初、缺日期、收支双填、外币缺汇率与逐笔结存断点均会列在这里。"
+        @retry="loadIssues"
+      >
+        <CashflowIssueTable :issues="issues" @open-source="openIssue" />
+      </DataState>
+    </template>
+
+    <CashflowReviewDrawer v-model="reviewOpen" />
+  </ListPageLayout>
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
-import { fetchCashflowEntries, fetchCashflowIssues, fetchCashflowMonthly, fetchCashflowReport, fetchCashflowReviewBatches, fetchCashflowReviewDiff, type CashflowAccount, type CashflowCurrencyTotal, type CashflowEntry, type CashflowIssue, type CashflowMonthlyRow, type CashflowReviewBatch, type CashflowReviewDiff } from '@/api/cashflowJournal'
-import { downloadBlob } from '@/utils/ui/downloadBlob'
+import { computed, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import ActiveFilterChips, { type ActiveFilter } from '@/components/common/ActiveFilterChips.vue'
+import DataState, { type DataStateStatus } from '@/components/common/DataState.vue'
+import ListPageLayout from '@/components/common/ListPageLayout.vue'
+import LqPagination from '@/components/common/LqPagination.vue'
+import LqTabs, { type TabItem } from '@/components/common/LqTabs.vue'
+import MetricCard from '@/components/common/MetricCard.vue'
+import MetricGrid from '@/components/common/MetricGrid.vue'
+import SearchToolbar from '@/components/common/SearchToolbar.vue'
+import { useListPagination } from '@/composables/list/useListPagination'
+import { notify } from '@/composables/ui/useToast'
+import {
+  fetchCashflowEntries,
+  fetchCashflowIssues,
+  fetchCashflowReport,
+  type CashflowAccount,
+  type CashflowCurrencyTotal,
+  type CashflowEntry,
+  type CashflowIssue,
+  type CashflowReportSummary
+} from '@/api/cashflowJournal'
+import CashflowAccountTable from './cashflow/CashflowAccountTable.vue'
+import CashflowEntryTable from './cashflow/CashflowEntryTable.vue'
+import CashflowIssueTable from './cashflow/CashflowIssueTable.vue'
+import CashflowReviewDrawer from './cashflow/CashflowReviewDrawer.vue'
+import { amount, downloadCsv } from './cashflow/cashflowFormat'
+import { useCashflowPeriod } from './cashflow/useCashflowPeriod'
 
 const router = useRouter()
-const today = new Date()
-const currentMonth = today.getFullYear() === 2026 ? today.getMonth() : 11
-const dateText = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
-const start = ref(dateText(new Date(2026, currentMonth, 1)))
-const end = ref(dateText(new Date(2026, currentMonth + 1, 0)))
-const period = ref<[string, string]>([start.value, end.value])
+const route = useRoute()
+
+// ==================== 期间 + 快捷期间（唯一状态源在 cashflow/useCashflowPeriod.ts） ====================
+const {
+  CASHFLOW_PERIOD_YEAR: PERIOD_YEAR,
+  start,
+  end,
+  period,
+  preset,
+  presetLabel,
+  isPresetCappedToday,
+  setPeriod,
+  onPeriodPicked,
+  disableOtherYears
+} = useCashflowPeriod({
+  initialStart: route.query.start,
+  initialEnd: route.query.end,
+  onChange: () => {
+    pagination.resetPage()
+    syncQuery()
+    void loadReport()
+    void loadIssues()
+    void loadEntries()
+  }
+})
+
+const initialTab = String(route.query.tab || '')
+const activeTab = ref<'entries' | 'accounts' | 'reconcile'>(
+  initialTab === 'accounts' || initialTab === 'reconcile' ? initialTab : 'entries'
+)
+const tabItems = computed<TabItem[]>(() => [
+  { label: '流水明细', name: 'entries' },
+  { label: '账户汇总', name: 'accounts' },
+  { label: `对账核对${issues.value.length ? ` · ${issues.value.length}` : ''}`, name: 'reconcile' }
+])
+
+
+// ==================== 账户汇总 ====================
 const accounts = ref<CashflowAccount[]>([])
-const accountKeyword = ref('')
-const currencyFilter = ref('')
-const availableCurrencies = computed(() => [...new Set(accounts.value.map(account => account.currency))].sort())
-const visibleAccounts = computed(() => accounts.value.filter(account =>
-  account.accountName.includes(accountKeyword.value.trim()) &&
-  (!currencyFilter.value || account.currency === currencyFilter.value)
-))
 const currencyTotals = ref<CashflowCurrencyTotal[]>([])
-const loading = ref(false)
-const drawerOpen = ref(false)
-const selected = ref<CashflowAccount | null>(null)
+const reportSummary = reactive<CashflowReportSummary>({
+  closingComputableCount: 0,
+  closingBlockedCount: 0,
+  sourceBalanceExceptionCount: 0,
+  sourceBalanceCheckedLinks: 0,
+  sourceBalanceAffectedAccounts: 0,
+  manualReconciledCount: 0,
+  manualReconcilePendingCount: 0
+})
+const reportLoading = ref(false)
+const reportError = ref('')
+const hasLoadedReport = ref(false)
+
+/** 跨三个视图共享的账户筛选（流水 / 账户汇总 / 对账核对同一份状态）。 */
+const accountFilter = ref<number | null>(
+  Number(route.query.accountId) > 0 ? Number(route.query.accountId) : null
+)
+const currencyFilter = ref('')
+const reconcileFilter = ref('')
+const availableCurrencies = computed(() => [...new Set(accounts.value.map(account => account.currency))].sort())
+
+const visibleAccounts = computed(() =>
+  accounts.value.filter(account => {
+    if (accountFilter.value != null && account.id !== accountFilter.value) return false
+    if (currencyFilter.value && account.currency !== currencyFilter.value) return false
+    const status = reconcileFilter.value
+    if (status === 'CLOSING_OK' && account.closingStatus !== 'OK') return false
+    if (status === 'CLOSING_BLOCKED' && account.closingStatus === 'OK') return false
+    if (status === 'DETAIL_OK' && account.sourceBalanceStatus !== 'DETAIL_OK') return false
+    if (status === 'DETAIL_EXCEPTIONS' && account.sourceBalanceStatus !== 'DETAIL_EXCEPTIONS') return false
+    if (status === 'MANUAL_NOT_STARTED' && account.manualReconcileStatus !== 'NOT_STARTED') return false
+    return true
+  })
+)
+
+/** 对账视图的卡片按「账户筛选」口径统计，与下方清单（/issues 只接受 accountId）严格同源。 */
+const reconcileScope = computed(() => {
+  const scope = accounts.value.filter(
+    account => accountFilter.value == null || account.id === accountFilter.value
+  )
+  return {
+    closingComputable: scope.filter(account => account.closingStatus === 'OK').length,
+    closingBlocked: scope.filter(account => account.closingStatus !== 'OK').length,
+    checkedLinks: scope.reduce((sum, account) => sum + Number(account.sourceBalanceCheckedLinks || 0), 0),
+    exceptionCount: scope.reduce((sum, account) => sum + Number(account.sourceBalanceExceptionCount || 0), 0),
+    affectedAccounts: scope.filter(account => account.sourceBalanceStatus === 'DETAIL_EXCEPTIONS').length
+  }
+})
+
+const summary = computed(() => {
+  const totals = currencyTotals.value.filter(group => group.currency === 'CNY')
+  const income = totals.reduce((sum, group) => sum + Number(group.income || 0), 0)
+  const expense = totals.reduce((sum, group) => sum + Number(group.expense || 0), 0)
+  return { income, expense, netFlow: income - expense }
+})
+const rangeHint = computed(() => `${start.value} 至 ${end.value}（人民币账户）`)
+const currencyClosingText = computed(() =>
+  currencyTotals.value.length > 1
+    ? `${currencyTotals.value.length} 个币种`
+    : currencyTotals.value.length === 1
+      ? amount(currencyTotals.value[0].closing)
+      : '—'
+)
+const closingCardHint = computed(() => {
+  if (!currencyTotals.value.length) return '暂无可计算账户'
+  if (currencyTotals.value.length === 1) return currencyTotals.value[0].currency
+  return currencyTotals.value
+    .map(group => `${group.currency} ${group.unknownOpening ? '部分缺期初' : amount(group.closing)}`)
+    .join(' · ')
+})
+const reportBlockedCount = computed(() => reportSummary.closingBlockedCount)
+
+const accountsState = computed<DataStateStatus>(() => {
+  if (reportLoading.value && !hasLoadedReport.value) return 'loading'
+  if (reportError.value && accounts.value.length) return 'stale'
+  if (reportError.value) return 'error'
+  if (!accounts.value.length) return 'empty'
+  if (!visibleAccounts.value.length) return 'filtered-empty'
+  return 'ready'
+})
+
+// ==================== 流水明细 ====================
 const entries = ref<CashflowEntry[]>([])
 const entriesLoading = ref(false)
+const entriesError = ref('')
+const hasLoadedEntries = ref(false)
+const entryKeyword = ref('')
+const pagination = useListPagination({ size: 30 })
+const entriesState = computed<DataStateStatus>(() => {
+  if (entriesLoading.value && !hasLoadedEntries.value) return 'loading'
+  if (entriesError.value && entries.value.length) return 'stale'
+  if (entriesError.value) return 'error'
+  if (!entries.value.length) {
+    return entryKeyword.value.trim() || accountFilter.value != null ? 'filtered-empty' : 'empty'
+  }
+  return 'ready'
+})
+let entryRequestId = 0
+
+// ==================== 对账核对 ====================
 const issues = ref<CashflowIssue[]>([])
 const issuesLoading = ref(false)
-const entryPage = ref(1)
-const entryTotal = ref(0)
-const detailTab = ref<'entries' | 'monthly'>('entries')
-const monthlyRows = ref<CashflowMonthlyRow[]>([])
-const monthlyLoading = ref(false)
+const issuesError = ref('')
+const hasLoadedIssues = ref(false)
+const issuesState = computed<DataStateStatus>(() => {
+  if (issuesLoading.value && !hasLoadedIssues.value) return 'loading'
+  if (issuesError.value && issues.value.length) return 'stale'
+  if (issuesError.value) return 'error'
+  return issues.value.length ? 'ready' : 'empty'
+})
+
+// ==================== 导入差异复核 ====================
 const reviewOpen = ref(false)
-const reviewLoading = ref(false)
-const reviewBatches = ref<CashflowReviewBatch[]>([])
-const reviewBatchId = ref<number | null>(null)
-const reviewAccount = ref('')
-const reviewPage = ref(1)
-const reviewDiff = ref<CashflowReviewDiff | null>(null)
 
-const amount = (value: number | string | null | undefined) => value == null || value === '' ? '—' : Number(value).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
-const openingAmount = (value: number | null | undefined) => value == null ? '期初缺失' : amount(value)
-const disableOtherYears = (date: Date) => date.getFullYear() !== 2026
+// ==================== 已应用条件 ====================
+const activeChips = computed<ActiveFilter[]>(() => {
+  const chips: ActiveFilter[] = [{ key: 'period', label: '期间', valueLabel: `${start.value} 至 ${end.value}` }]
+  if (activeTab.value === 'entries' && entryKeyword.value.trim()) {
+    chips.push({ key: 'keyword', label: '关键词', valueLabel: entryKeyword.value.trim() })
+  }
+  if (accountFilter.value != null) {
+    const account = accounts.value.find(item => item.id === accountFilter.value)
+    chips.push({ key: 'accountId', label: '账户', valueLabel: account?.accountName ?? `#${accountFilter.value}` })
+  }
+  if (activeTab.value === 'accounts') {
+    if (currencyFilter.value) chips.push({ key: 'currency', label: '币种', valueLabel: currencyFilter.value })
+    if (reconcileFilter.value) chips.push({ key: 'reconcile', label: '核对状态', valueLabel: reconcileFilter.value })
+  }
+  return chips
+})
 
+function removeChip(key: string) {
+  if (key === 'period') return
+  if (key === 'keyword') entryKeyword.value = ''
+  else if (key === 'accountId') accountFilter.value = null
+  else if (key === 'currency') currencyFilter.value = ''
+  else if (key === 'reconcile') reconcileFilter.value = ''
+  syncQuery()
+  if (key === 'keyword' || key === 'accountId') {
+    pagination.resetPage()
+    void loadEntries()
+  }
+  if (key === 'accountId') void loadIssues()
+}
+
+function clearAllFilters() {
+  entryKeyword.value = ''
+  accountFilter.value = null
+  clearAccountFilters()
+  pagination.resetPage()
+  syncQuery()
+  void loadEntries()
+  void loadIssues()
+}
+
+function clearAccountFilters() {
+  currencyFilter.value = ''
+  reconcileFilter.value = ''
+}
+
+// ==================== 加载 ====================
 async function loadReport() {
-  loading.value = true
+  reportLoading.value = true
+  reportError.value = ''
   try {
     const report = await fetchCashflowReport(start.value, end.value)
     accounts.value = report.items
     currencyTotals.value = report.totals
-  } catch {
-    ElMessage.error('资金日记账加载失败')
+    Object.assign(reportSummary, report.summary)
+    hasLoadedReport.value = true
+    if (accountFilter.value != null && !report.items.some(item => item.id === accountFilter.value)) {
+      accountFilter.value = null
+      syncQuery()
+    }
+  } catch (e: any) {
+    reportError.value = e?.message || '资金日记账账户汇总加载失败'
+    notify.error(reportError.value)
   } finally {
-    loading.value = false
+    reportLoading.value = false
+  }
+}
+
+async function loadEntries() {
+  const requestId = ++entryRequestId
+  entriesLoading.value = true
+  entriesError.value = ''
+  try {
+    const { page, size } = pagination.getPageParams()
+    const result = await fetchCashflowEntries(
+      accountFilter.value,
+      start.value,
+      end.value,
+      page + 1,
+      size,
+      entryKeyword.value.trim()
+    )
+    if (requestId !== entryRequestId) return
+    entries.value = result.items
+    pagination.updateFromResponse({ total: result.total, number: page, size })
+    hasLoadedEntries.value = true
+  } catch (e: any) {
+    if (requestId !== entryRequestId) return
+    entriesError.value = e?.message || '流水明细加载失败'
+    notify.error(entriesError.value)
+  } finally {
+    if (requestId === entryRequestId) entriesLoading.value = false
   }
 }
 
 async function loadIssues() {
   issuesLoading.value = true
+  issuesError.value = ''
   try {
-    issues.value = (await fetchCashflowIssues(start.value, end.value)).items
-  } catch {
-    ElMessage.error('数据核对加载失败')
+    const result = await fetchCashflowIssues(start.value, end.value, accountFilter.value)
+    issues.value = result.items.map(
+      (item, index) => ({ ...item, issueKey: `${item.issueCode}-${item.accountId}-${item.entryId ?? 'x'}-${index}` })
+    )
+    hasLoadedIssues.value = true
+  } catch (e: any) {
+    issuesError.value = e?.message || '数据核对加载失败'
+    notify.error(issuesError.value)
   } finally {
     issuesLoading.value = false
   }
 }
 
-async function loadEntries() {
-  if (!selected.value) return
-  entriesLoading.value = true
-  try {
-    const result = await fetchCashflowEntries(selected.value.id, start.value, end.value, entryPage.value)
-    entries.value = result.items
-    entryTotal.value = result.total
-  } catch {
-    ElMessage.error('流水明细加载失败')
-  } finally {
-    entriesLoading.value = false
-  }
+// ==================== 交互 ====================
+function syncQuery() {
+  void router.replace({
+    query: {
+      ...route.query,
+      tab: activeTab.value,
+      start: start.value,
+      end: end.value,
+      accountId: accountFilter.value == null ? undefined : String(accountFilter.value)
+    }
+  })
 }
 
+function onTabChange(name: string) {
+  activeTab.value = name as typeof activeTab.value
+  syncQuery()
+}
+
+function searchEntries(keyword: string) {
+  entryKeyword.value = keyword
+  pagination.resetPage()
+  void loadEntries()
+}
+
+function clearEntryFilters() {
+  entryKeyword.value = ''
+  accountFilter.value = null
+  pagination.resetPage()
+  syncQuery()
+  void loadEntries()
+  void loadIssues()
+}
+
+function onAccountFilterChange(value: unknown) {
+  // el-select 清空时会回传 ''，这里统一归一成 null，否则 '' 会被当成一个有效账户 id 过滤掉全部行
+  accountFilter.value = typeof value === 'number' && value > 0 ? value : null
+  pagination.resetPage()
+  syncQuery()
+  void loadEntries()
+  void loadIssues()
+}
 
 function openAccount(account: CashflowAccount) {
-  selected.value = account
-  entryPage.value = 1
-  detailTab.value = 'entries'
-  drawerOpen.value = true
+  accountFilter.value = account.id
+  entryKeyword.value = ''
+  pagination.resetPage()
+  activeTab.value = 'entries'
+  syncQuery()
   void loadEntries()
-  void loadMonthly()
+  void loadIssues()
 }
 
-async function loadMonthly() {
-  if (!selected.value) return
-  monthlyLoading.value = true
-  try {
-    monthlyRows.value = (await fetchCashflowMonthly(selected.value.id)).items
-  } catch {
-    monthlyRows.value = []
-    ElMessage.error('月度汇总加载失败')
-  } finally {
-    monthlyLoading.value = false
-  }
+function openIssue(issue: CashflowIssue) {
+  void router.push({
+    path: '/h3-imports',
+    query: { tab: 'ledger', ledger: 'cashflowJournal', keyword: issue.accountName }
+  })
 }
 
-function exportMonthly() {
-  if (!selected.value || !monthlyRows.value.length) return
-  const account = selected.value
-  const rows = [['账户', '币种', '月份', '月初', '收入', '支出', '净流量', '月末', '笔数'],
-    ...monthlyRows.value.map(row => [account.accountName, account.currency, `2026-${String(row.month).padStart(2, '0')}`,
-      row.openingBalance, row.income, row.expense, row.netFlow, row.closingBalance, row.entryCount])]
-  downloadCsv(rows, `${account.accountName}_2026月度汇总.csv`)
+// ==================== 导出 ====================
+function exportEntries() {
+  if (!entries.value.length) return
+  const rows: unknown[][] = [
+    ['日期', '账户', '摘要', '往来对象', '经办/报销', '收入', '支出', '来源结存'],
+    ...entries.value.map(entry => [
+      entry.entry_date,
+      entry.account_name,
+      entry.summary,
+      entry.counterparty_raw,
+      entry.reimbursed_by,
+      entry.income,
+      entry.expense,
+      entry.balance
+    ])
+  ]
+  downloadCsv(rows, `资金流水_${start.value}_${end.value}.csv`)
 }
 
 function exportAccountReport() {
   if (!visibleAccounts.value.length) return
-  const rows = [['期间起', '期间止', '账户', '币种', '期间期初', '收入', '支出', '净流量', '期间期末', '笔数'],
-    ...visibleAccounts.value.map(account => [start.value, end.value, account.accountName, account.currency,
-      account.openingBalance, account.income, account.expense, account.netFlow, account.closingBalance, account.entryCount])]
+  const rows: unknown[][] = [
+    ['期间起', '期间止', '账户', '币种', '期间期初', '收入', '支出', '净流量', '期间期末', '笔数',
+      '期间余额核对', '逐笔结存核对', '断点处数', '已衔接链接', '人工对账', '系统结论'],
+    ...visibleAccounts.value.map(account => [
+      start.value,
+      end.value,
+      account.accountName,
+      account.currency,
+      account.openingBalance,
+      account.income,
+      account.expense,
+      account.netFlow,
+      account.closingBalance,
+      account.entryCount,
+      account.closingStatusLabel,
+      account.sourceBalanceStatus === 'DETAIL_OK' ? '全部衔接' : '待核实',
+      account.sourceBalanceExceptionCount,
+      account.sourceBalanceCheckedLinks,
+      account.manualReconcileStatusLabel,
+      account.reconcileSummary
+    ])
+  ]
   downloadCsv(rows, `资金日记账账户报表_${start.value}_${end.value}.csv`)
 }
 
-function downloadCsv(rows: unknown[][], filename: string) {
-  const escape = (value: unknown) => {
-    const text = String(value ?? '')
-    const safe = typeof value === 'string' && /^[=+\-@]/.test(text) ? `'${text}` : text
-    return `"${safe.replace(/"/g, '""')}"`
-  }
-  const csv = rows.map(row => row.map(escape).join(',')).join('\r\n')
-  downloadBlob(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }), filename)
-}
-
-function openIssue(issue: CashflowIssue) {
-  void router.push({ path: '/h3-imports', query: { tab: 'ledger', ledger: 'cashflowJournal', keyword: issue.accountName } })
-}
-
-async function openReview() {
-  reviewOpen.value = true
-  reviewLoading.value = true
-  try {
-    reviewBatches.value = (await fetchCashflowReviewBatches()).items
-    reviewBatchId.value = reviewBatches.value[0]?.id ?? null
-    reviewAccount.value = ''
-    reviewPage.value = 1
-    if (reviewBatchId.value) await loadReviewDiff()
-    else reviewDiff.value = null
-  } catch {
-    ElMessage.error('导入差异加载失败')
-  } finally {
-    reviewLoading.value = false
-  }
-}
-
-async function loadReviewDiff() {
-  if (!reviewBatchId.value) return
-  reviewLoading.value = true
-  try {
-    reviewDiff.value = await fetchCashflowReviewDiff(reviewBatchId.value, reviewAccount.value, reviewPage.value)
-  } catch {
-    ElMessage.error('批次差异加载失败')
-  } finally {
-    reviewLoading.value = false
-  }
-}
-
-function changeReviewBatch() {
-  reviewAccount.value = ''
-  reviewPage.value = 1
-  void loadReviewDiff()
-}
-
-function changeReviewAccount() {
-  reviewPage.value = 1
-  void loadReviewDiff()
-}
-
-function applyPeriod() {
-  if (!period.value || period.value.length !== 2) return
-  ;[start.value, end.value] = period.value
-  drawerOpen.value = false
-  void loadReport()
-  void loadIssues()
-}
-
-function setPeriod(kind: 'year' | 'month') {
-  period.value = kind === 'year'
-    ? ['2026-01-01', '2026-12-31']
-    : [dateText(new Date(2026, currentMonth, 1)), dateText(new Date(2026, currentMonth + 1, 0))]
-  applyPeriod()
-}
-
-await loadReport()
-await loadIssues()
+// ==================== 初始化 ====================
+await Promise.all([loadReport(), loadIssues()])
+await loadEntries()
 </script>
 
 <style scoped>
-.cashflow-page { padding: 22px; display: grid; gap: 18px; }
-.cashflow-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
-.cashflow-head-actions { display: flex; flex-wrap: wrap; gap: 8px; }
-.cashflow-head h1 { margin: 0 0 8px; font-size: 23px; }
-.cashflow-head p, .cashflow-detail-summary { margin: 0; color: var(--el-text-color-secondary); }
-.cashflow-toolbar { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
-.cashflow-toolbar span { margin-left: auto; color: var(--el-text-color-secondary); }
-.cashflow-account-search { width: 180px; }
-.cashflow-currency-filter { width: 125px; }
-.cashflow-monthly-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin: 8px 0 12px; color: var(--el-text-color-secondary); }
-.cashflow-pagination { margin-top: 16px; justify-content: flex-end; }
-.cashflow-review-toolbar { display: flex; gap: 12px; margin: 18px 0; }
-.cashflow-review-toolbar .el-select:first-child { width: 390px; }
-.cashflow-review-toolbar .el-select:last-child { width: 230px; }
-.cashflow-review-counts { margin: 0 0 12px; color: var(--el-text-color-secondary); }
-.cashflow-totals { display: flex; flex-wrap: wrap; gap: 12px; }
-.cashflow-total-card { display: grid; gap: 5px; min-width: 230px; padding: 12px 16px; border: 1px solid var(--el-border-color-light); border-radius: 8px; background: var(--el-fill-color-light); }
-.cashflow-total-card span { color: var(--el-text-color-secondary); }
-.cashflow-issues { display: grid; gap: 10px; }
-.cashflow-issues-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
-.cashflow-issues-head h2 { margin: 0; font-size: 18px; }
-.cashflow-issues-head h2 span { font-size: 13px; color: var(--el-color-warning); }
-.cashflow-issues-head p { margin: 0; color: var(--el-text-color-secondary); font-size: 13px; }
+/* 页面只保留自己的排列；金额/徽标等展示细节在 cashflow/ 子组件内 */
+.cf-notice {
+  display: grid;
+  gap: var(--space-control-gap);
+}
+
+.cf-legend {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-loose);
+}
+
+.cf-legend strong {
+  color: var(--color-text-primary);
+}
+
+.cf-legend em {
+  font-style: normal;
+  color: var(--color-text-primary);
+  font-weight: var(--fw-medium);
+}
+
+.cf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-control-gap);
+}
+
+.cf-toolbar__right {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-control-gap-tight);
+  margin-left: auto;
+}
+
+.cf-toolbar__account {
+  width: 210px;
+}
+
+.cf-range {
+  margin: var(--space-control-gap-tight) 0 0;
+  color: var(--color-text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.cf-range__hint {
+  margin-left: 4px;
+}
+
+.cf-note {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-relaxed);
+}
+
+.cf-note code {
+  padding: 1px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface-alt);
+  font-size: var(--fs-xs);
+}
+
+.cf-account-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-control-gap);
+}
+
+.cf-account-tools__currency {
+  width: 125px;
+}
+
+.cf-account-tools__status {
+  width: 190px;
+}
+
+.cf-account-tools__hint {
+  margin-left: auto;
+  color: var(--color-text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.cf-reconcile-head h2 {
+  margin: 0 0 4px;
+  color: var(--color-text-heading);
+  font-size: var(--fs-lg);
+  font-weight: var(--fw-semibold);
+}
+
+.cf-reconcile-head p {
+  max-width: 96ch;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-loose);
+}
+
+.cf-reconcile-metrics {
+  margin-top: var(--space-control-gap);
+}
+
+@media (max-width: 767px) {
+  .cf-toolbar__right {
+    margin-left: 0;
+  }
+
+  .cf-account-tools__hint {
+    margin-left: 0;
+  }
+}
 </style>

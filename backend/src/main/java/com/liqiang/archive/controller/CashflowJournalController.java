@@ -2,6 +2,7 @@ package com.liqiang.archive.controller;
 
 import com.liqiang.archive.security.RequirePermission;
 import com.liqiang.archive.service.CashflowJournalReviewService;
+import com.liqiang.archive.service.CashflowReviewRules;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,6 +17,7 @@ import java.sql.SQLException;
 import java.time.LocalDate;
 import java.time.Month;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +62,14 @@ public class CashflowJournalController {
                  ORDER BY entry_count DESC, a.account_name ASC
                 """, (rs, ignored) -> accountRow(rs), start, start, end, start, end, start, end);
         Map<String, CurrencyTotal> byCurrency = new LinkedHashMap<>();
+        // 取全部账户的核对结果（含 0 断点），这样每个账户都能报出自己真实的「已衔接链接数」。
+        Map<String, CashflowReviewRules.SourceBalanceReview> review =
+                reviewService.sourceBalanceReviewsAll(start, end);
+        String startText = start.toString();
+        String endText = end.toString();
+        int totalExceptions = 0;
+        int totalLinks = 0;
+        int affectedAccounts = 0;
         for (Map<String, Object> item : items) {
             String currency = (String) item.get("currency");
             CurrencyTotal total = byCurrency.computeIfAbsent(currency, CurrencyTotal::new);
@@ -69,6 +79,11 @@ public class CashflowJournalController {
             BigDecimal closing = (BigDecimal) item.get("closingBalance");
             if (closing == null) total.unknownOpening = true;
             else total.closing = total.closing.add(closing);
+            CashflowReviewRules.SourceBalanceReview accountReview = review.get((String) item.get("accountName"));
+            int exceptions = attachReview(item, accountReview, startText, endText);
+            totalExceptions += exceptions;
+            if (exceptions > 0) affectedAccounts++;
+            totalLinks += accountReview == null ? 0 : accountReview.checkedLinks();
         }
         List<Map<String, Object>> totals = new ArrayList<>();
         for (CurrencyTotal total : byCurrency.values()) {
@@ -76,7 +91,22 @@ public class CashflowJournalController {
                     "income", total.income, "expense", total.expense,
                     "closing", total.closing, "unknownOpening", total.unknownOpening));
         }
-        return Map.of("items", items, "totals", totals, "start", start, "end", end);
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("closingComputableCount",
+                items.stream().filter(item -> CashflowReviewRules.CLOSING_OK.equals(item.get("closingStatus"))).count());
+        summary.put("closingBlockedCount",
+                items.stream().filter(item -> !CashflowReviewRules.CLOSING_OK.equals(item.get("closingStatus"))).count());
+        summary.put("sourceBalanceExceptionCount", totalExceptions);
+        summary.put("sourceBalanceCheckedLinks", totalLinks);
+        summary.put("sourceBalanceAffectedAccounts", affectedAccounts);
+        // 人工对账维度单独计数：P1 恒为 0，前端不能用它冒充「已核对」。
+        summary.put("manualReconciledCount",
+                items.stream().filter(item -> !CashflowReviewRules.MANUAL_NOT_STARTED
+                        .equals(item.get("manualReconcileStatus"))).count());
+        summary.put("manualReconcilePendingCount",
+                items.stream().filter(item -> CashflowReviewRules.MANUAL_NOT_STARTED
+                        .equals(item.get("manualReconcileStatus"))).count());
+        return Map.of("items", items, "totals", totals, "start", start, "end", end, "summary", summary);
     }
 
     @GetMapping("/accounts/{accountId}/monthly")
@@ -133,25 +163,41 @@ public class CashflowJournalController {
 
     @GetMapping("/entries")
     @RequirePermission("integration.h3")
-    public Map<String, Object> entries(@RequestParam long accountId, @RequestParam LocalDate start,
-                                       @RequestParam LocalDate end, @RequestParam(defaultValue = "1") int page,
+    public Map<String, Object> entries(@RequestParam(required = false) Long accountId, @RequestParam LocalDate start,
+                                       @RequestParam LocalDate end, @RequestParam(required = false) String keyword,
+                                       @RequestParam(defaultValue = "1") int page,
                                        @RequestParam(defaultValue = "30") int size) {
         validatePeriod(start, end);
         if (page < 1 || size < 1 || size > 100) throw new IllegalArgumentException("分页参数无效");
-        String name = jdbc.query("SELECT account_name FROM h3_cash_accounts WHERE id=? AND external_source='H3YUN'",
-                rs -> rs.next() ? rs.getString(1) : null, accountId);
-        if (name == null) throw new IllegalArgumentException("账户不存在");
-        Long total = jdbc.queryForObject("""
-                SELECT COUNT(*) FROM h3_cashflow_entries
-                 WHERE external_source='H3YUN' AND account_name=? AND entry_date BETWEEN ? AND ?
-                """, Long.class, name, start, end);
+        String name = null;
+        if (accountId != null) {
+            name = jdbc.query("SELECT account_name FROM h3_cash_accounts WHERE id=? AND external_source='H3YUN'",
+                    rs -> rs.next() ? rs.getString(1) : null, accountId);
+            if (name == null) throw new IllegalArgumentException("账户不存在");
+        }
+        StringBuilder where = new StringBuilder(" WHERE external_source='H3YUN' AND entry_date BETWEEN ? AND ?");
+        List<Object> params = new ArrayList<>(List.of(start, end));
+        if (name != null) {
+            where.append(" AND account_name=?");
+            params.add(name);
+        }
+        if (keyword != null && !keyword.isBlank()) {
+            where.append(" AND (INSTR(COALESCE(summary,''),?)>0 OR INSTR(COALESCE(supplier_raw,''),?)>0")
+                    .append(" OR INSTR(COALESCE(counterparty_raw,''),?)>0 OR INSTR(COALESCE(reimbursed_by,''),?)>0)");
+            String text = keyword.trim();
+            for (int i = 0; i < 4; i++) params.add(text);
+        }
+        Long total = jdbc.queryForObject("SELECT COUNT(*) FROM h3_cashflow_entries" + where,
+                Long.class, params.toArray());
+        List<Object> pageParams = new ArrayList<>(params);
+        pageParams.add(size);
+        pageParams.add((page - 1) * size);
         List<Map<String, Object>> items = jdbc.query("""
-                SELECT id,entry_date,summary,supplier_raw,counterparty_raw,reimbursed_by,invoiced,
+                SELECT id,account_name,entry_date,summary,supplier_raw,counterparty_raw,reimbursed_by,invoiced,
                        income,expense,balance,fx_rate,fx_cny,settle_rate,settle_cny,fx_gain_loss
                   FROM h3_cashflow_entries
-                 WHERE external_source='H3YUN' AND account_name=? AND entry_date BETWEEN ? AND ?
-                 ORDER BY entry_date,id LIMIT ? OFFSET ?
-                """, (rs, ignored) -> entryRow(rs), name, start, end, size, (page - 1) * size);
+                """ + where + " ORDER BY entry_date DESC,id DESC LIMIT ? OFFSET ?",
+                (rs, ignored) -> entryRow(rs), pageParams.toArray());
         return Map.of("items", items, "total", total == null ? 0 : total, "page", page, "size", size);
     }
 
@@ -161,7 +207,58 @@ public class CashflowJournalController {
     public Map<String, Object> issues(@RequestParam LocalDate start, @RequestParam LocalDate end,
                                       @RequestParam(required = false) Long accountId) {
         validatePeriod(start, end);
-        List<Map<String, Object>> items = jdbc.query("""
+        List<Map<String, Object>> items = new ArrayList<>(dataIssues(start, end, accountId));
+        items.addAll(detailIssues(start, end, accountId));
+        return Map.of("items", items, "total", items.size(),
+                "detailCheckedLinks", detailCheckedLinks(start, end, accountId));
+    }
+
+    /**
+     * 来源结存断点 → 核对清单条目。
+     *
+     * <p>每条断点单独列出，附带「断在哪一行、差多少、未核实区间起止」，全部由数据推导；
+     * 前端只按 issueCode 展示，不认账户名。
+     */
+    private List<Map<String, Object>> detailIssues(LocalDate start, LocalDate end, Long accountId) {
+        List<Map<String, Object>> result = new ArrayList<>();
+        Map<String, Long> accountIds = new HashMap<>();
+        reviewService.sourceBalanceBreakdown(start, end).forEach((account, exceptions) -> {
+            Long id = accountIds.computeIfAbsent(account, name -> jdbc.query(
+                    "SELECT id FROM h3_cash_accounts WHERE external_source='H3YUN' AND account_name=?",
+                    rs -> rs.next() ? rs.getLong(1) : null, name));
+            if (accountId != null && !accountId.equals(id)) return;
+            for (CashflowReviewRules.SourceBalanceException exception : exceptions) {
+                Map<String, Object> row = new LinkedHashMap<>();
+                row.put("accountId", id);
+                row.put("accountName", account);
+                row.put("entryId", exception.entryId());
+                row.put("entryDate", exception.entryDate() == null ? null : exception.entryDate().toString());
+                row.put("issueCode", "SOURCE_BALANCE_BREAK");
+                row.put("severity", "REVIEW");
+                row.put("detail", "本行来源结存与上一行不衔接，差额 " + exception.gap().stripTrailingZeros().toPlainString());
+                row.put("expectedBalance", exception.previousBalance() == null ? null
+                        : exception.previousBalance().stripTrailingZeros().toPlainString());
+                row.put("actualBalance", exception.balance().stripTrailingZeros().toPlainString());
+                row.put("gap", exception.gap().stripTrailingZeros().toPlainString());
+                row.put("rangeStart", start.toString());
+                row.put("rangeEnd", end.toString());
+                result.add(row);
+            }
+        });
+        return result;
+    }
+
+    private int detailCheckedLinks(LocalDate start, LocalDate end, Long accountId) {
+        if (accountId != null) {
+            CashflowReviewRules.SourceBalanceReview review = reviewService.sourceBalanceReview(accountId, start, end);
+            return review == null ? 0 : review.checkedLinks();
+        }
+        return reviewService.sourceBalanceReviewsAll(start, end).values().stream()
+                .mapToInt(CashflowReviewRules.SourceBalanceReview::checkedLinks).sum();
+    }
+
+    private List<Map<String, Object>> dataIssues(LocalDate start, LocalDate end, Long accountId) {
+        return jdbc.query("""
                 SELECT a.id AS account_id,a.account_name,NULL AS entry_id,NULL AS entry_date,
                        'MISSING_OPENING' AS issue_code,'账户缺少期初余额' AS detail
                   FROM h3_cash_accounts a
@@ -200,7 +297,50 @@ public class CashflowJournalController {
             return row;
         }, accountId, accountId, accountId, accountId, start, end, accountId, accountId,
                 start, end, accountId, accountId);
-        return Map.of("items", items, "total", items.size());
+    }
+
+    /**
+     * 把两类核对结论挂到账户行上。两者刻意分开：
+     * <ul>
+     *   <li>{@code closingStatus} —— 期间余额（期初+收支）是否可用，是账户级结论；</li>
+     *   <li>{@code sourceBalanceStatus} —— 逐笔来源结存是否全部衔接，是明细级结论。
+     *       它有异常**不**影响 closingStatus，也不隐藏期间期末。</li>
+     * </ul>
+     */
+    private static int attachReview(Map<String, Object> item,
+                                    CashflowReviewRules.SourceBalanceReview review,
+                                    String rangeStart, String rangeEnd) {
+        BigDecimal opening = (BigDecimal) item.get("openingBalance");
+        String closingStatus = CashflowReviewRules.closingStatusOf(opening, false);
+        item.put("closingStatus", closingStatus);
+        item.put("closingStatusLabel", CashflowJournalController.closingStatusLabel(closingStatus));
+        // 人工对账维度：P1 无人工对账记录，恒为 NOT_STARTED。前端据此显式标注，避免把「可计算」读成「已核对」。
+        item.put("manualReconcileStatus", CashflowReviewRules.MANUAL_NOT_STARTED);
+        item.put("manualReconcileStatusLabel", CashflowReviewRules.manualReconcileLabel(CashflowReviewRules.MANUAL_NOT_STARTED));
+        if (review == null || !review.hasExceptions()) {
+        item.put("sourceBalanceStatus", CashflowReviewRules.DETAIL_OK);
+        item.put("sourceBalanceExceptionCount", 0);
+        item.put("sourceBalanceCheckedLinks", review == null ? 0 : review.checkedLinks());
+        item.put("sourceBalanceReviewStart", null);
+            item.put("sourceBalanceReviewEnd", null);
+            item.put("reconcileSummary", CashflowReviewRules.reconcileSummaryOf(closingStatus, 0));
+            return 0;
+        }
+        item.put("sourceBalanceStatus", CashflowReviewRules.DETAIL_EXCEPTIONS);
+        item.put("sourceBalanceExceptionCount", review.exceptionCount());
+        item.put("sourceBalanceCheckedLinks", review.checkedLinks());
+        item.put("sourceBalanceReviewStart", review.firstDate() == null ? rangeStart : review.firstDate().toString());
+        item.put("sourceBalanceReviewEnd", review.lastDate() == null ? rangeEnd : review.lastDate().toString());
+        item.put("reconcileSummary", CashflowReviewRules.reconcileSummaryOf(closingStatus, review.exceptionCount()));
+        return review.exceptionCount();
+    }
+
+    private static String closingStatusLabel(String status) {
+        return switch (status) {
+            case CashflowReviewRules.CLOSING_OK -> "期末可计算";
+            case CashflowReviewRules.CLOSING_OPENING_MISSING -> "缺期初，期末不可计算";
+            default -> status;
+        };
     }
 
     private static void validatePeriod(LocalDate start, LocalDate end) {
@@ -229,7 +369,7 @@ public class CashflowJournalController {
 
     private static Map<String, Object> entryRow(ResultSet rs) throws SQLException {
         Map<String, Object> row = new LinkedHashMap<>();
-        for (String key : List.of("id", "entry_date", "summary", "supplier_raw", "counterparty_raw",
+        for (String key : List.of("id", "account_name", "entry_date", "summary", "supplier_raw", "counterparty_raw",
                 "reimbursed_by", "invoiced", "income", "expense", "balance", "fx_rate", "fx_cny",
                 "settle_rate", "settle_cny", "fx_gain_loss")) {
             row.put(key, rs.getObject(key));
