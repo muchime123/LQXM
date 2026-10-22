@@ -8,7 +8,7 @@ import { http } from '../http'
  * 共 67 个导出）。后端执行链端点同期一并拆除；留底于 commit 23a0eda，需要恢复可从该提交取回。
  *
  * 现仅保留「制程与工序管理」页所需的主数据读写：工序库、制程模板、模板工序行、产品规则。
- * 注：任务单产品与配置、车间维护两个面板走 `http` 直调 `/manufacturing/master/*`，不经本文件。
+ * 注：生产产品与工期管理、车间维护两个面板走 `http` 直调 `/manufacturing/master/*`，不经本文件。
  */
 
 export interface OperationMaster { id:number; operationCode:string; operationName:string; operationCategory:string; defaultWorkshop?:string; standardHours?:number; reportingUnit?:string; requiresInspection:boolean; description?:string; active:boolean; sortOrder:number }

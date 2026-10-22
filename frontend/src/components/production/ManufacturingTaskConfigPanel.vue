@@ -20,7 +20,7 @@
           <div class="block-head">
             <div>
               <h3>任务单产品</h3>
-              <p>来源＝氚云生产任务单的产品下拉字典，产品名不可在本地修改。点选行可在右侧维护该产品的节点参考间隔。</p>
+              <p>来源＝氚云生产任务单的产品下拉字典，产品名不可在本地修改。点选行可在右侧维护该产品的产品参考天数；点列头可排序（默认按跟单记录降序）。</p>
             </div>
             <div class="block-actions">
               <el-button size="small" @click="openCreate('PRODUCT_NAME')">补录产品</el-button>
@@ -30,28 +30,28 @@
           <!-- 选中态只用受控的 is-selected 表达：不再叠 Element 自己的 highlight-current-row，
                两套高亮同时存在会在抽屉/弹窗打开后的焦点变化里互相打架，出现「莫名高亮」的行。 -->
           <el-table v-else :data="products" stripe size="small" class="grid" max-height="380"
-            :row-class-name="rowClassName" @row-click="selectRow">
-            <el-table-column label="产品名称" min-width="160">
+            :default-sort="defaultSort" :row-class-name="rowClassName" @row-click="selectRow">
+            <el-table-column prop="configName" label="产品名称" min-width="160" sortable :sort-method="byName">
               <template #default="{ row }">
                 <div class="name-cell">
                   <span class="product-name">{{ row.configName }}</span>
-                  <el-tooltip v-if="row.sameNameCount > 1" content="该车间存在多个同名产品配置：参考日期匹配不猜，会沿用车间基准。请删除多余的那行以消除歧义（产品名不可改）。" placement="top">
+                  <el-tooltip v-if="row.sameNameCount > 1" content="该车间存在多个同名产品配置：参考日期匹配不猜，会沿用通用参考。请删除多余的那行以消除歧义（产品名不可改）。" placement="top">
                     <el-tag type="warning" size="small" effect="plain">重名 ×{{ row.sameNameCount }}</el-tag>
                   </el-tooltip>
                   <el-tag v-if="row.externalSource === 'MANUAL'" type="info" size="small" effect="plain">本地补录</el-tag>
                 </div>
               </template>
             </el-table-column>
-            <el-table-column prop="historicalTaskCount" label="历史任务单" width="118" align="center">
-              <template #header>历史任务单 <el-tooltip content="氚云历史任务中「该车间 + 该产品名」的全部张数（含从未跟单、含草稿与已取消）。这不是样本量；点击数字看具体是哪些单。" placement="top"><el-icon><QuestionFilled /></el-icon></el-tooltip></template>
+            <el-table-column prop="historicalTaskCount" label="任务单" width="120" align="center" sortable>
+              <template #header>任务单 <el-tooltip content="氚云历史任务中「该车间 + 该产品名」的全部张数（含从未跟单、含草稿与已取消）。这不是样本量；点击数字看具体是哪些单。" placement="top"><el-icon><QuestionFilled /></el-icon></el-tooltip></template>
               <template #default="{ row }">
                 <el-button link type="primary" class="count-link" @click.stop="emit('show-orders', row)">
                   {{ row.historicalTaskCount ?? '—' }}
                 </el-button>
               </template>
             </el-table-column>
-            <el-table-column prop="trackedTaskCount" label="跟单记录" width="100" align="center">
-              <template #header>跟单记录 <el-tooltip content="历史任务单中已建跟单记录的张数——节点参考间隔的样本只取这些记录。点击查看每一单每段间隔。" placement="top"><el-icon><QuestionFilled /></el-icon></el-tooltip></template>
+            <el-table-column prop="trackedTaskCount" label="跟单" width="120" align="center" sortable>
+              <template #header>跟单 <el-tooltip content="历史任务单中已建跟单记录的张数——产品参考工期的样本只取这些记录。点击查看每一单每段间隔。" placement="top"><el-icon><QuestionFilled /></el-icon></el-tooltip></template>
               <template #default="{ row }">
                 <el-button v-if="row.trackedTaskCount" link type="primary" class="count-link" @click.stop="emit('show-samples', row)">
                   {{ row.trackedTaskCount }}
@@ -59,9 +59,14 @@
                 <span v-else class="none">—</span>
               </template>
             </el-table-column>
-            <el-table-column label="发布节点" width="92" align="center">
+            <!-- 发布节点：分子＝该产品已发布的必经节点数，分母＝该车间类别的必经节点总数。
+                 点开看每个节点「发布的参考天数 / 来源 / 样本量」，未发布的节点在这里也列出来（沿用通用参考）。 -->
+            <el-table-column prop="publishedCount" label="发布节点" width="135" align="center" sortable :sort-method="byPublished">
+              <template #header>发布节点 <el-tooltip content="已发布的必经节点数 / 该车间类别的必经节点总数（按需工序不计入分母）。点数字看每个节点发布的间隔与来源。" placement="top"><el-icon><QuestionFilled /></el-icon></el-tooltip></template>
               <template #default="{ row }">
-                <span :class="{ none: publishedCount(row) === 0 }">{{ stageTotal ? `${publishedCount(row)} / ${stageTotal}` : '—' }}</span>
+                <el-button link :type="publishedCount(row) ? 'primary' : 'info'" class="count-link" @click.stop="openStages(row)">
+                  {{ stageTotal ? `${publishedCount(row)} / ${stageTotal}` : '—' }}
+                </el-button>
               </template>
             </el-table-column>
             <!-- 产品没有启用/禁用：能不能下单由氚云决定。删除只对本地补录行开放——
@@ -116,6 +121,58 @@
         </section>
       </div>
     </template>
+
+    <!-- 节点发布明细：中栏「发布节点 x/y」数字的下钻。只读——真正的编辑在右栏面板，
+         这里回答的是「这 x 个已发布节点分别是哪些、值多少、谁定的」。 -->
+    <el-dialog v-model="stagesVisible" :title="`节点发布明细 · ${stageProduct?.configName ?? ''}`"
+      width="min(720px, calc(100vw - 32px))">
+      <!-- 节点矩阵需要 manufacturing.baseline.manage：无权限时 matrix 为空，这里给明确空态，
+           不能留骨架屏转圈（那会让用户以为还在加载）。 -->
+      <el-empty v-if="!stageDetailRows.length" :image-size="70" description="没有加载到节点矩阵：查看节点明细需要产品参考工期权限" />
+      <template v-else>
+        <p class="stage-hint">
+          分母只数<b>必经节点</b>（按需工序如氧化、木箱不计）；未发布的节点沿用通用参考。
+          编辑产品参考天数请关闭本窗后在右侧面板操作。
+        </p>
+        <el-table :data="stageDetailRows" size="small" stripe border>
+          <el-table-column label="节点" min-width="110">
+            <template #default="{ row }">
+              <span class="product-name">{{ row.stageLabel }}</span>
+              <el-tag v-if="row.optionalStage" size="small" effect="plain" type="info">按需</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="区间" min-width="140">
+            <template #default="{ row }"><span class="muted">{{ row.intervalLabel }}</span></template>
+          </el-table-column>
+          <el-table-column label="参考天数" width="110" align="right">
+            <template #default="{ row }">
+              <b v-if="row.typicalDays != null">{{ row.typicalDays }} 天</b>
+              <span v-else class="muted">{{ row.workshopDays != null ? `${row.workshopDays} 天` : '—' }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="来源" width="120">
+            <template #default="{ row }">
+              <el-tag v-if="row.typicalDays != null" size="small" effect="plain"
+                :type="row.publishedSource === 'MANUAL' ? 'success' : 'warning'">{{ publishText(row) }}</el-tag>
+              <span v-else class="muted">未发布（沿用通用）</span>
+            </template>
+          </el-table-column>
+          <el-table-column label="样本 / 零天" width="100" align="center">
+            <template #default="{ row }">
+              <span :class="{ muted: !row.sampleCount }">{{ row.sampleCount || '—' }}</span>
+              <template v-if="row.sampleCount"><span class="muted"> / {{ row.zeroDayCount }}</span></template>
+            </template>
+          </el-table-column>
+          <el-table-column label="P50 / P75" width="108" align="right">
+            <template #default="{ row }">
+              <span :class="{ muted: row.p50Days == null }">{{ row.p50Days ?? '—' }}</span>
+              <span class="muted"> / {{ row.p75Days ?? '—' }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </template>
+      <template #footer><el-button @click="stagesVisible = false">关闭</el-button></template>
+    </el-dialog>
 
     <!-- 新增配置：父级 View 通过 :dialogOpen 接收，由子组件触发打开 -->
     <el-dialog v-model="dialogOpen" :title="createForm.configType === 'PRODUCT_NAME' ? '补录产品' : '补录可选配置'" width="min(520px, calc(100vw - 32px))">
@@ -183,7 +240,7 @@ const creating = ref(false)
 const newForm = () => ({ configType: 'PRODUCT_NAME' as 'PRODUCT_NAME' | 'OPTIONAL_CONFIG', configName: '' })
 const createForm = ref(newForm())
 
-/** 当前产线下的「产品名称」配置：作为右栏「节点参考间隔」的入口。
+/** 当前产线下的「产品名称」配置：作为右栏「产品节点参考工期」的入口。
  *  **不按启用过滤**：产品没有启用/停用状态，50 个实测全在用，多一个开关只会让参考工期静默失效。 */
 const products = computed<ConfigRow[]>(() => props.configs.filter(c => c.configType === 'PRODUCT_NAME'))
 const optionalConfigs = computed<ConfigRow[]>(() => props.configs.filter(c => c.configType !== 'PRODUCT_NAME'))
@@ -199,7 +256,7 @@ const optionalStageCodes = computed(() => new Set(
   (props.matrix.find(m => m.workshopKind === workshopKind.value)?.stages ?? [])
     .filter(s => s.optionalStage).map(s => s.stageCode)))
 
-/** 节点数取该产线类别（封口机 / 其他机器）对应的车间基准表，且**只数必经节点**：
+/** 节点数取该产线类别（封口机 / 其他机器）对应的通用参考矩阵，且**只数必经节点**：
  *  按需工序（氧化 / 木箱）没做不算缺，否则分母虚高、永远显示不满。 */
 const stageTotal = computed(() => {
   if (!props.workshop) return 0
@@ -210,6 +267,57 @@ const stageTotal = computed(() => {
 const publishedCount = (row: ConfigRow) => props.benchmarks.filter(b =>
   b.taskConfigId === row.id && b.typicalDays != null
   && b.stageCode != null && !optionalStageCodes.value.has(b.stageCode)).length
+
+/* ---------------- 排序：默认按「跟单记录」降序 ---------------- */
+
+/**
+ * 默认排序＝跟单记录降序（2026-10-22 LQ 定）：这是唯一能说明「这个产品有多少可算样本」的列，
+ * 历史任务单多但没人跟单的产品对参考工期没有价值，排在后面才不会被当成主力。
+ * 排序在本地做（一台车间只有二十来个产品，全部已加载），不额外加后端参数。
+ */
+const defaultSort = { prop: 'trackedTaskCount', order: 'descending' } as const
+/** 产品名用中文 Collator 排：默认的码点排序会把「气动…」和「手动…」按 Unicode 打散，看着像乱序。 */
+const nameCollator = new Intl.Collator('zh-Hans-CN', { numeric: true, sensitivity: 'base' })
+const byName = (a: ConfigRow, b: ConfigRow) => nameCollator.compare(a.configName ?? '', b.configName ?? '')
+const byPublished = (a: ConfigRow, b: ConfigRow) => publishedCount(a) - publishedCount(b)
+
+/* ---------------- 「发布节点 x/y」下钻 ---------------- */
+
+interface StageDetail { stageCode: string; stageLabel: string; intervalLabel: string; optionalStage: boolean; workshopDays: number | null; typicalDays: number | null; publishedSource: 'MANUAL' | 'P50' | 'COPY' | null; publishedAt: string | null; sampleCount: number; p50Days: number | null; p75Days: number | null; zeroDayCount: number }
+
+const stagesVisible = ref(false)
+const stageProduct = ref<ConfigRow | null>(null)
+
+/** 该产品每个节点的发布值 + 候选统计：未发布的也列出来，才能看出「差哪几个节点」。 */
+const stageDetailRows = computed<StageDetail[]>(() => {
+  const product = stageProduct.value
+  if (!product) return []
+  const stages = props.matrix.find(m => m.workshopKind === workshopKind.value)?.stages ?? []
+  return stages.map(stage => {
+    const value = props.benchmarks.find(b => b.taskConfigId === product.id && b.stageCode === stage.stageCode)
+    return {
+      stageCode: stage.stageCode,
+      stageLabel: stage.stageLabel,
+      intervalLabel: stage.intervalLabel,
+      optionalStage: stage.optionalStage,
+      workshopDays: stage.typicalDays,
+      typicalDays: value?.typicalDays ?? null,
+      publishedSource: value?.publishedSource ?? null,
+      publishedAt: value?.publishedAt ?? null,
+      sampleCount: value?.sampleCount ?? 0,
+      p50Days: value?.p50Days ?? null,
+      p75Days: value?.p75Days ?? null,
+      zeroDayCount: value?.zeroDayCount ?? 0
+    }
+  })
+})
+
+function openStages(row: ConfigRow) { stageProduct.value = row; stagesVisible.value = true }
+/** 与右栏面板同一套来源文案：人工发布 / P50 填充 / 复制，附带发布日。 */
+function publishText(row: StageDetail) {
+  const source = row.publishedSource === 'P50' ? 'P50 填充' : row.publishedSource === 'COPY' ? '复制' : '人工发布'
+  return row.publishedAt ? `${source} · ${String(row.publishedAt).slice(5, 10)}` : source
+}
 
 const rowClassName = ({ row }: { row: ConfigRow }) => row.id === props.selectedTaskConfigId ? 'is-selected' : ''
 
@@ -283,6 +391,8 @@ watch(() => props.workshop?.id, () => { configKeyword.value = '' })
 .product-name { color: var(--color-text-heading, #0f172a); font-weight: 500; }
 .hint { margin: 0; font-size: 12px; line-height: 1.6; color: var(--color-warning, #d97706); }
 .none { margin: 0; font-size: 12px; color: var(--color-text-secondary, #94a3b8); }
+.muted { color: var(--color-text-secondary, #94a3b8); }
+.stage-hint { margin: 0 0 10px; font-size: 12px; line-height: 1.6; color: var(--color-text-secondary, #5f6f82); }
 /* 可点的计数：数字本身就是明细入口，用等宽数字避免行与行之间跳动。 */
 .count-link { font-variant-numeric: tabular-nums; font-weight: 600; }
 

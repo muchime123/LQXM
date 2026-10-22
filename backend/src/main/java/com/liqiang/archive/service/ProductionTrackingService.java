@@ -1624,8 +1624,8 @@ public class ProductionTrackingService {
             saved.put(r.getString(1)+"/"+r.getString(2),hit);
         });
         var workshops=new ArrayList<Map<String,Object>>();
-        workshops.add(benchmarkWorkshop(BENCHMARK_SEALER,"封口机",saved));
-        workshops.add(benchmarkWorkshop(BENCHMARK_MACHINE,"机器车间",saved));
+        workshops.add(benchmarkWorkshop(BENCHMARK_SEALER,"封口机跟单",saved));
+        workshops.add(benchmarkWorkshop(BENCHMARK_MACHINE,"其他机器跟单",saved));
         return Map.of("workshops",workshops);
     }
 
@@ -1852,6 +1852,110 @@ public class ProductionTrackingService {
         summary.put("spanFrom",from);
         summary.put("spanTo",to);
         return Map.of("workshop",workshop,"product",product,"stageCodes",codes,"summary",summary,"orders",rows);
+    }
+
+    /**
+     * 产品的「生产工期」：这个产品从排产到入库完成大概要几天。
+     *
+     * <p><b>为什么单独有这一层</b>（2026-10-22）：配置页此前只有「相邻两个节点之间几天」，
+     * 跟单侧虽然拿这些天数逐节点链式推算出末节点的参考日期，但「整段」从来不是一个可读的数字，
+     * 「这个产品多久能做完」只能人工把几段加起来。这里把整段显式化。
+     *
+     * <p><b>两个口径并列，互为校验</b>（LQ 定：排产日起算）：
+     * <ul>
+     *   <li><b>参考工期</b>＝各必经节点「生效参考值」之和（产品发布值优先、通用参考兜底）。
+     *       返回两个数：{@code referenceDays}（各段小数的精确和，用来看构成）、
+     *       {@code chainDays}（<b>逐段取整后</b>相加，＝「末节点参考日期 − 锚点」）。
+     *       页面主数字用后者——跟单侧的链式推算每走一个节点就取整到整天，系统真正在用的就是它；
+     *       只给小数和会出现「配置页 12.5 天、跟单推到 13 天」这种对不上账的差。
+     *       缺值的节点<b>不进和</b>，在 {@code missingStages} 里点名——宁可显示「3 天（缺备料）」，
+     *       也不拿 0 冒充足额，否则配置缺口会被一个偏小的总数掩盖。</li>
+     *   <li><b>历史实测</b>＝该产品跟单记录里「排产锚点 → 入库完成」的实际天数 P50/P75。
+     *       <b>只用排产锚点</b>（本地计划开工 / 氚云排产时间）：申请日兜底的单子把「等排产」
+     *       那段等待也算进去了，与排产日起算的口径不符，单独计数不进分位。</li>
+     * </ul>
+     *
+     * <p>末节点＝必经节点的最后一个（封口机与机器车间都是入库）；按需工序不参与——
+     * 木箱在入库之后，不属于生产段。排除规则与候选算法一致（倒序 / 超 60 天 / 完成日在未来）。
+     */
+    public Map<String,Object> productDuration(long taskConfigId) {
+        var items=jdbc.queryForList("SELECT c.config_name,w.workshop_name FROM manufacturing_task_config_items c "
+                +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
+                +"WHERE c.id=? AND c.config_type='PRODUCT_NAME'",taskConfigId);
+        if(items.isEmpty())throw new IllegalArgumentException("产品不存在、不是产品名称配置，或没有所属车间");
+        String product=(String)items.getFirst().get("config_name");
+        String workshop=(String)items.getFirst().get("workshop_name");
+        boolean sealer=ProductionTrackingPolicy.isSealer(workshop);
+        var required=ProductionTrackingPolicy.requiredStages(workshop);
+
+        var published=new HashMap<String,BigDecimal>();
+        jdbc.query("SELECT stage_code,typical_days FROM production_tracking_product_benchmarks "
+                +"WHERE task_config_id=? AND typical_days IS NOT NULL",
+                r->{published.put(r.getString(1),r.getBigDecimal(2));},taskConfigId);
+        var general=nodeBenchmarks().getOrDefault(sealer?BENCHMARK_SEALER:BENCHMARK_MACHINE,Map.of());
+
+        var stages=new ArrayList<Map<String,Object>>();
+        var missing=new ArrayList<String>();
+        BigDecimal exactTotal=BigDecimal.ZERO;
+        // 逐段取整后的天数：跟单侧的链式推算每往前走一个节点就 Math.round 到整天（日期只能是整天），
+        // 所以「系统真正在用的工期」是这个整数和，不是小数和。页面上两个数必须一致，
+        // 否则会出现「配置页 12.5 天、跟单详情推到 13 天」这种对不上账的差（2026-10-22 实库核对发现）。
+        long chainDays=0;
+        int fromProduct=0;
+        for(String code:required){
+            BigDecimal days=published.get(code);
+            String source=days==null?"NONE":"PRODUCT";
+            if(days==null){days=general.get(code);if(days!=null)source="GENERAL";}
+            if(days==null)missing.add(ProductionTrackingPolicy.stageLabel(code,sealer));
+            else{
+                exactTotal=exactTotal.add(days);
+                chainDays+=Math.round(days.doubleValue());
+                if("PRODUCT".equals(source))fromProduct++;
+            }
+            var row=new LinkedHashMap<String,Object>();
+            row.put("stageCode",code);
+            row.put("stageLabel",ProductionTrackingPolicy.stageLabel(code,sealer));
+            row.put("days",days);
+            row.put("source",source);
+            stages.add(row);
+        }
+
+        String last=required.getLast();
+        var leads=new ArrayList<Long>();
+        int openOrders=0,applicationAnchors=0,excluded=0;
+        LocalDate today=LocalDate.now();
+        for(OrderSample o:loadOrderSamples(workshop,product)){
+            LocalDate done=o.stageDays().get(last);
+            if(o.anchor()==null||!o.plannedAnchor()){applicationAnchors++;continue;}
+            if(done==null){openOrders++;continue;}
+            long days=ChronoUnit.DAYS.between(o.anchor(),done);
+            if(days<0||days>60||done.isAfter(today)){excluded++;continue;}
+            leads.add(days);
+        }
+        leads.sort(Long::compareTo);
+
+        var result=new LinkedHashMap<String,Object>();
+        result.put("taskConfigId",taskConfigId);
+        result.put("productName",product);
+        result.put("workshopName",workshop);
+        result.put("workshopKind",sealer?BENCHMARK_SEALER:BENCHMARK_MACHINE);
+        result.put("lastStage",last);
+        result.put("lastStageLabel",ProductionTrackingPolicy.stageLabel(last,sealer));
+        result.put("referenceDays",exactTotal.setScale(1,java.math.RoundingMode.HALF_UP));
+        /** 与跟单侧推算入库参考日期同源的天数（逐段取整后相加）。 */
+        result.put("chainDays",chainDays);
+        result.put("referenceComplete",missing.isEmpty());
+        result.put("stageCount",required.size());
+        result.put("productStageCount",fromProduct);
+        result.put("missingStages",missing);
+        result.put("stages",stages);
+        result.put("actualP50Days",percentile(leads,0.5));
+        result.put("actualP75Days",percentile(leads,0.75));
+        result.put("actualSampleCount",leads.size());
+        result.put("openOrderCount",openOrders);
+        result.put("applicationAnchorCount",applicationAnchors);
+        result.put("excludedCount",excluded);
+        return result;
     }
 
     /**

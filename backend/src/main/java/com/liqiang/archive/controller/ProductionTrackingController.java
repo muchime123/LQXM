@@ -475,6 +475,18 @@ public class ProductionTrackingController {
     }
 
     /**
+     * 产品生产工期（只读）：各必经节点生效参考值之和 + 历史实测「排产 → 入库」P50/P75。
+     *
+     * <p>权限与 {@link #productOrderHistory} 同口径（any-of）：维护参考间隔的人与维护任务单字典的人
+     * 都该看见这个数字，否则会出现「配置页有工期、某个角色点不开」。
+     */
+    @GetMapping("/product-duration/{taskConfigId}")
+    @RequirePermission({"manufacturing.baseline.manage","manufacturing.template.manage"})
+    public Map<String,Object> productDuration(@PathVariable long taskConfigId){
+        return service.productDuration(taskConfigId);
+    }
+
+    /**
      * 列表「默认可见列」的全站配置（2026-10-12）。
      * <p>读用页面读权限——全站默认列要**对所有人生效**，员工必须能读到；写用独立权限码
      * manufacturing.listcolumns.manage（只绑 ADMIN）：看得到列表 ≠ 有权决定全公司看到哪些列。

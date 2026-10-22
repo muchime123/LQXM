@@ -807,7 +807,7 @@ export const saveTrackingNodeBenchmarks = async (
 ) => (await http.put<{ changed: number }>('/manufacturing/followups/node-benchmarks', rows)).data
 
 /**
- * 产品级节点参考间隔：每个产品（任务单产品名称配置行）用自己的历史工单统计候选，
+ * 产品级节点参考工期：每个产品（任务单产品名称配置行）用自己的历史工单统计候选，
  * 候选值与人工发布值并存，只有 typicalDays 参与参考日期计算。
  * 产品未计算过候选时，该产品在矩阵里只有一行 stageCode 为 null 的产品信息。
  */
@@ -816,7 +816,7 @@ export interface TrackingProductBenchmarkRow {
   workshopName: string | null
   configName: string | null
   stageCode: string | null
-  /** 人工审核发布值；null＝沿用车间基准。 */
+  /** 人工审核发布值；null＝沿用通用参考。 */
   typicalDays: number | null
   /** 发布来源：MANUAL 人工审核 / P50 按历史样本批量填充 / COPY 从同车间产品复制；null＝未发布（含已撤销）。 */
   publishedSource: 'MANUAL' | 'P50' | 'COPY' | null
@@ -892,6 +892,53 @@ export const copyTrackingProductBenchmarks = async (taskConfigId: number, source
 export const fetchProductBenchmarkSamples = async (taskConfigId: number) =>
   (await http.get<ProductBenchmarkSamples>(`/manufacturing/followups/product-benchmark-samples/${taskConfigId}`)).data
 
+/** 生产工期里的一个节点：days 为 null＝产品发布值与通用参考都没有值，不计入合计。 */
+export interface ProductDurationStage {
+  stageCode: string
+  stageLabel: string
+  days: number | null
+  /** PRODUCT＝产品发布值 / GENERAL＝通用参考兜底 / NONE＝两级都没值。 */
+  source: 'PRODUCT' | 'GENERAL' | 'NONE'
+}
+
+/**
+ * 产品生产工期（排产 → 入库完成）。两个数互为校验：
+ * - referenceDays：各必经节点「生效参考值」之和，与跟单侧推算参考日期同源；
+ * - actualP50Days：该产品跟单记录里真实走完的整体天数。
+ * 口径差异要点：实测只用**排产锚点**的单，退到申请日的单不进分位（那段是等排产，不是生产）。
+ */
+export interface ProductDuration {
+  taskConfigId: number
+  productName: string
+  workshopName: string
+  workshopKind: 'SEALER' | 'MACHINE'
+  lastStage: string
+  lastStageLabel: string
+  /** 各段参考值的精确和（小数），用来看构成；主数字请用 chainDays。 */
+  referenceDays: number
+  /**
+   * 与跟单侧推算同源的天数：每段先取整到整天再相加（日期只能是整天）。
+   * 系统真正在用的是这个数——跟单详情的「入库参考日期」就是 锚点 + chainDays。
+   */
+  chainDays: number
+  referenceComplete: boolean
+  stageCount: number
+  /** 合计里来自产品自己发布值的节点数（其余来自通用参考）。 */
+  productStageCount: number
+  missingStages: string[]
+  stages: ProductDurationStage[]
+  actualP50Days: number | null
+  actualP75Days: number | null
+  actualSampleCount: number
+  /** 未走完（缺末节点完成日）／只用申请日锚点被排除／倒序或超 60 天被排除。 */
+  openOrderCount: number
+  applicationAnchorCount: number
+  excludedCount: number
+}
+
+export const fetchProductDuration = async (taskConfigId: number) =>
+  (await http.get<ProductDuration>(`/manufacturing/followups/product-duration/${taskConfigId}`)).data
+
 /** 产品的历史生产任务一行：不排除草稿/已取消，与配置页「历史任务单」计数同源。 */
 export interface ProductOrderHistoryRow {
   orderId: number
@@ -907,7 +954,7 @@ export interface ProductOrderHistoryRow {
   createdAt: string | null
   /** 是否已建跟单记录——历史任务里只有一部分会被跟单。 */
   tracked: boolean
-  /** 已完成的**必经**节点数（按需工序不计，与参考间隔分母同源）。 */
+  /** 已完成的**必经**节点数（按需工序不计，与产品参考工期分母同源）。 */
   doneStages: number
   lastDoneDate: string | null
 }

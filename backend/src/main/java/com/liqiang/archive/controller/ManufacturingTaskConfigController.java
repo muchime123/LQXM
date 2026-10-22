@@ -95,6 +95,40 @@ public class ManufacturingTaskConfigController {
                 +"AND w.workshop_name=p.production_line)) AS benchmarkMatched FROM production_orders p");
     }
 
+    /**
+     * 覆盖率按产品分布：把 {@link #durationCoverage()} 的汇总数字摊到「车间 + 产品名」上，
+     * 供页面「点统计数字 → 看是哪些产品/哪些单」下钻。
+     *
+     * <p>口径必须与汇总一致：{@code configCount} 用同一「车间+产品名」COUNT，
+     * 因此 {@code configCount==1} 才是唯一匹配（重名与缺失都是治理对象，不在这里猜）。
+     * {@code configId} 只在唯一匹配时有意义，前端据此把行点进产品（右栏节点间隔）。
+     *
+     * <p>产品名为 NULL 的订单会自成一组（configCount=0）——那是源数据缺口，
+     * 保留展示比隐藏更诚实：它确实占着历史任务总数，却不属于任何产品。
+     */
+    @GetMapping("/duration-coverage/breakdown")
+    public List<Map<String,Object>> durationCoverageBreakdown() {
+        return jdbc.queryForList("SELECT p.production_line AS workshopName,p.product_name AS productName,"
+                +"COUNT(*) AS orders,"
+                +"SUM(EXISTS(SELECT 1 FROM production_tracking_state ts WHERE ts.production_order_id=p.id)) AS tracked,"
+                +"(SELECT COUNT(*) FROM manufacturing_task_config_items c "
+                +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
+                +"WHERE c.config_type='PRODUCT_NAME' AND c.config_name=p.product_name "
+                +"AND w.workshop_name=p.production_line) AS configCount,"
+                +"(SELECT MIN(c.id) FROM manufacturing_task_config_items c "
+                +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
+                +"WHERE c.config_type='PRODUCT_NAME' AND c.config_name=p.product_name "
+                +"AND w.workshop_name=p.production_line) AS configId,"
+                +"(SELECT COUNT(*) FROM manufacturing_task_config_items c "
+                +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
+                +"JOIN production_tracking_product_benchmarks b ON b.task_config_id=c.id AND b.typical_days IS NOT NULL "
+                +"WHERE c.config_type='PRODUCT_NAME' AND c.config_name=p.product_name "
+                +"AND w.workshop_name=p.production_line) AS publishedStages "
+                +"FROM production_orders p "
+                +"GROUP BY p.production_line,p.product_name "
+                +"ORDER BY orders DESC,p.production_line,p.product_name");
+    }
+
     @GetMapping("/workshops")
     public List<Map<String,Object>> workshops() {
         return jdbc.queryForList("SELECT id,workshop_name AS workshopName,enabled,order_receiver_name AS orderReceiverName,warehouse_clerk_name AS warehouseClerkName,default_process_template_id AS defaultProcessTemplateId FROM manufacturing_workshops ORDER BY enabled DESC,id");

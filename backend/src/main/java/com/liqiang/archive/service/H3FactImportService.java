@@ -306,6 +306,7 @@ private final class StreamingSheetHandler implements XSSFSheetXMLHandler.SheetCo
             // 流水日记账=「账户」（覆盖源表账户列错填，sheet 名为确定性来源）。注入 + 组键防跨 sheet 串组。
             values.put(type == FactType.CASHFLOW_JOURNAL ? "账户" : "供应商", sheetName);
         }
+        if (type == FactType.CASHFLOW_JOURNAL) values.put("__sourceRowNumber", String.valueOf(rowNum + 1));
         String key;
         if (type == FactType.CASHFLOW_JOURNAL) {
             // 流水日记账（2026-09-18 第 18 类）：无单号/数据ID，幂等必须行级。
@@ -490,6 +491,7 @@ for (int r = header.rowIndex() + 1; r <= sheet.getLastRowNum(); r++) {
 Row row = sheet.getRow(r);
 if (row == null || blank(row)) continue;
 Map<String, String> values = rowValues(row, header.columns());
+if (type == FactType.CASHFLOW_JOURNAL) values.put("__sourceRowNumber", String.valueOf(r + 1));
 String key;
 if (type == FactType.CASHFLOW_JOURNAL) {
     // 与流式路径同口径：行级组键（账户#日期#收入#支出#结存#同键序号），保证两路径 source_hash 一致
@@ -715,7 +717,19 @@ m.get("销售订单编号"), m.get("关联销售订单"), m.get("产品订单子
 m.get("创建人"), dateTime(m.get("创建时间")), dateTime(m.get("修改时间")), g.hash());
 Long id = existingId(FactType.PRODUCTION, g);
 if (id == null) throw new IllegalStateException("生产工单写入后未能定位（external_id=" + g.externalId() + ", 单号=" + g.key() + "）");
+// ⚠️ 先删后插只在「本次文件真的带了零部件制程子表」时才做。
+// 氚云同一张表单有两种导出件：管理员件 97 列含「零部件制程.*」，跟单员件 77 列**没有这 19 列**。
+// 若一律先删，用跟单员件重导一次，就会把该单已入库的工序明细（跟单详情「工序」区、台账 component_count）
+// 静默清空且不报任何错 —— 这正是「两种导出件都要能导入」必须堵的坑（2026-10-22）。
+// 判据用「本组行里是否出现 零部件制程. 前缀的键」：跟单员件整表没有这些列 ⇒ 永远为 false ⇒ 保留原明细。
+// 代价：管理员件里某张单的工序在氚云被删到 0 条时，本地也会保留旧的（宁可留旧，不可误清）。
+boolean carriesComponents = false;
+for (Map<String, String> row : g.rows()) {
+if (row.keySet().stream().anyMatch(k -> k.startsWith("零部件制程."))) { carriesComponents = true; break; }
+}
+if (carriesComponents) {
 jdbc.update("DELETE FROM production_order_components WHERE production_order_id=?", id);
+}
 for (Map<String, String> row : g.rows()) {
 if (empty(row.get("零部件制程.数据ID(不可修改)")) && empty(row.get("零部件制程.零部件名"))) continue;
 jdbc.update("""
@@ -1803,6 +1817,130 @@ private void ensureCashflowAccounts(List<Group> groups) {
     for (String account : accounts) ensureCashAccountExists(account);
 }
 
+/**
+ * 手填日记账无稳定交易号。若本批覆盖某账户，却不再包含该账户已有的行键，
+ * 可能是插行后结存连锁变化、编辑旧行、删行或误传部分文件；当前 upsert 会把变更行当新增。
+ * 在跨批次人工匹配上线前，拒绝自动确认，避免资金汇总静默重复。
+ */
+private void rejectCashflowHistoryRewrite(List<Group> groups) {
+    Map<String, java.util.Set<String>> incoming = new java.util.HashMap<>();
+    for (Group group : groups) {
+        String account = clean(group.main().get("账户"));
+        if (account != null) {
+            java.util.Set<String> keys = incoming.computeIfAbsent(account, ignored -> new java.util.HashSet<>());
+            if (!isCashflowOpeningGroup(group)) keys.add(group.externalId());
+        }
+    }
+    if (incoming.isEmpty()) return;
+    List<Map<String, String>> existing = jdbc.query("""
+            SELECT account_name,external_id FROM h3_cashflow_entries WHERE external_source='H3YUN'
+            """, (rs, ignored) -> Map.of("account", rs.getString("account_name"),
+            "externalId", rs.getString("external_id")));
+    List<String> missing = missingCashflowAccounts(incoming, existing);
+    if (!missing.isEmpty()) {
+        throw new IllegalStateException("流水日记账已有历史行在本次文件中消失或改变（账户："
+                + String.join("、", missing)
+                + "）。为避免重复计入资金，已停止自动确认；请保留本批快照并复核旧行与新行。");
+    }
+}
+
+/**
+ * 插入较早流水会改变后续公式结存，从而改变旧版 external_id。先以日期、收支和结存
+ * 找唯一对应；结存变化时再以日期、收支找两侧唯一对应。人工注释会修改，不能作为身份键。
+ * 有歧义的资金行仍交给差异复核，不猜测身份。
+ * 调用方处于确认事务内，两段换键与后续事实写入一起提交或回滚。
+ */
+private void rekeyCashflowBalanceShifts(List<Group> groups) {
+    Map<String, Group> incomingByKey = new HashMap<>();
+    Map<String, List<Group>> incomingByExact = new HashMap<>();
+    Map<String, List<Group>> incomingByCore = new HashMap<>();
+    Set<String> incomingAccounts = new HashSet<>();
+    for (Group group : groups) {
+        if (isCashflowOpeningGroup(group)) continue;
+        incomingByKey.put(group.externalId(), group);
+        incomingAccounts.add(clean(group.main().get("账户")));
+        incomingByExact.computeIfAbsent(cashflowIdentity(group.main(), true), ignored -> new ArrayList<>()).add(group);
+        incomingByCore.computeIfAbsent(cashflowIdentity(group.main(), false), ignored -> new ArrayList<>()).add(group);
+    }
+    record OldRow(long id, String key, String account, String exact, String core, boolean noMoney) {}
+    List<OldRow> oldRows = jdbc.query("""
+            SELECT id,external_id,account_name,entry_date,income,expense,balance
+              FROM h3_cashflow_entries WHERE external_source='H3YUN'
+            """, (rs, ignored) -> {
+        Map<String, String> values = new HashMap<>();
+        values.put("账户", rs.getString("account_name"));
+        values.put("日期", rs.getDate("entry_date") == null ? null : rs.getDate("entry_date").toString());
+        values.put("收入", rs.getString("income"));
+        values.put("支出", rs.getString("expense"));
+        values.put("结存", rs.getString("balance"));
+        return new OldRow(rs.getLong("id"), rs.getString("external_id"), rs.getString("account_name"),
+                cashflowIdentity(values, true), cashflowIdentity(values, false),
+                rs.getBigDecimal("income") == null && rs.getBigDecimal("expense") == null);
+    });
+    Set<String> oldKeys = oldRows.stream().map(OldRow::key).collect(java.util.stream.Collectors.toSet());
+    Map<String, List<OldRow>> oldByExact = new HashMap<>();
+    Map<String, List<OldRow>> oldByCore = new HashMap<>();
+    for (OldRow row : oldRows) {
+        oldByExact.computeIfAbsent(row.exact(), ignored -> new ArrayList<>()).add(row);
+        oldByCore.computeIfAbsent(row.core(), ignored -> new ArrayList<>()).add(row);
+    }
+
+    Map<Long, String> matches = new LinkedHashMap<>();
+    List<Long> emptyRowsRemovedFromSource = new ArrayList<>();
+    for (OldRow old : oldRows) {
+        if (incomingByKey.containsKey(old.key())) continue;
+        if (old.noMoney() && !incomingByCore.containsKey(old.core()) && incomingAccounts.contains(old.account())) {
+            // 旧版曾把有日期但无收支的占位行写成分录；新版文件移除了这些行。
+            // 它们没有资金影响，批次原始快照仍保留历史证据。
+            emptyRowsRemovedFromSource.add(old.id());
+            continue;
+        }
+        List<OldRow> exactOld = oldByExact.get(old.exact());
+        List<Group> exactNew = incomingByExact.get(old.exact());
+        List<OldRow> coreOld = oldByCore.get(old.core());
+        List<Group> coreNew = incomingByCore.get(old.core());
+        Group candidate = exactOld != null && exactOld.size() == 1 && exactNew != null && exactNew.size() == 1
+                ? exactNew.getFirst()
+                : coreOld != null && coreOld.size() == 1 && coreNew != null && coreNew.size() == 1
+                    ? coreNew.getFirst() : null;
+        if (candidate == null) continue;
+        String newKey = candidate.externalId();
+        if (oldKeys.contains(newKey)) continue;
+        matches.put(old.id(), newKey);
+    }
+    for (Long id : emptyRowsRemovedFromSource) {
+        jdbc.update("DELETE FROM h3_cashflow_entries WHERE id=? AND income IS NULL AND expense IS NULL", id);
+    }
+    if (matches.isEmpty()) return;
+    for (Long id : matches.keySet()) {
+        String temporary = "__cashflow_rekey_" + id;
+        jdbc.update("UPDATE h3_cashflow_entries SET external_id=?,source_no=? WHERE id=?", temporary, temporary, id);
+    }
+    matches.forEach((id, key) -> jdbc.update(
+            "UPDATE h3_cashflow_entries SET external_id=?,source_no=? WHERE id=?", key, key, id));
+}
+
+private String cashflowIdentity(Map<String, String> values, boolean includeBalance) {
+    LocalDate entryDate = cashflowDate(values);
+    String core = String.join("\u001f", orDash(clean(values.get("账户"))),
+            entryDate == null ? "-" : entryDate.toString(),
+            decimalIdentity(values.get("收入")), decimalIdentity(values.get("支出")));
+    return includeBalance ? core + "\u001f" + decimalIdentity(values.get("结存")) : core;
+}
+
+private String decimalIdentity(String value) {
+    BigDecimal number = normDecimal(value);
+    return number == null ? "-" : number.stripTrailingZeros().toPlainString();
+}
+
+static List<String> missingCashflowAccounts(Map<String, java.util.Set<String>> incoming,
+                                            List<Map<String, String>> existing) {
+    return existing.stream().filter(row -> {
+        java.util.Set<String> keys = incoming.get(row.get("account"));
+        return keys != null && !keys.contains(row.get("externalId"));
+    }).map(row -> row.get("account")).distinct().limit(5).toList();
+}
+
 /** 币种按账户名判定（账户 sheet 命名含币种，如「浙江利强中国银行美元」）。 */
 private static String currencyOf(String account) {
     return account.contains("美元") ? "USD" : account.contains("欧元") ? "EUR" : "CNY";
@@ -2137,8 +2275,13 @@ return Objects.requireNonNull(holder.getKey()).longValue();
 }
 
 private void saveImportRow(long batchId, Group group, String action, Long businessId) {
-jdbc.update("INSERT INTO h3_import_rows(batch_id,external_id,source_row_number,raw_data,source_hash,action,business_id,processed_at) VALUES(?,?,NULL,?,?,?,?,NOW())",
-batchId, group.externalId(), groupJson(group), group.hash(), action, businessId);
+jdbc.update("INSERT INTO h3_import_rows(batch_id,external_id,source_row_number,raw_data,source_hash,action,business_id,processed_at) VALUES(?,?,?,?,?,?,?,NOW())",
+batchId, group.externalId(), sourceRowNumber(group.main()), groupJson(group), group.hash(), action, businessId);
+}
+
+private static Integer sourceRowNumber(Map<String, String> values) {
+    String value = values.get("__sourceRowNumber");
+    return value == null ? null : Integer.valueOf(value);
 }
 
 private String groupJson(Group group) {
@@ -2424,9 +2567,18 @@ private String json(Object value) { try{return objectMapper.writeValueAsString(v
 private String hashGroup(String key, Map<String, String> main, List<Map<String, String>> rows) {
     Map<String, Object> payload = new LinkedHashMap<>();
     payload.put("key", key);
-    payload.put("main", H3SnapshotKey.canonicalize(main));
-    payload.put("rows", rows.stream().map(H3SnapshotKey::canonicalize).toList());
+    // 原 Excel 行号只是本批文件的定位信息，不是业务内容；插行/排序不能触发 UPDATE。
+    payload.put("main", H3SnapshotKey.canonicalize(withoutImportLocation(main)));
+    payload.put("rows", rows.stream().map(H3FactImportService::withoutImportLocation)
+            .map(H3SnapshotKey::canonicalize).toList());
     return hash(payload);
+}
+
+private static Map<String, String> withoutImportLocation(Map<String, String> values) {
+    if (values == null || !values.containsKey("__sourceRowNumber")) return values;
+    Map<String, String> business = new LinkedHashMap<>(values);
+    business.remove("__sourceRowNumber");
+    return business;
 }
 
 private String hash(Object value) {
@@ -2564,7 +2716,11 @@ public Result confirmFromStaging(Long batchId) {
     rejectStoppedFactTypes(factType);
     List<Group> groups = loadStagingGroups(batchId);
     // 流水日记账（第 18 类）：先把账户档案补齐（含无「上期结存」行的欧元账户），再逐组写分录/期初
-    if (factType == FactType.CASHFLOW_JOURNAL) ensureCashflowAccounts(groups);
+    if (factType == FactType.CASHFLOW_JOURNAL) {
+        rekeyCashflowBalanceShifts(groups);
+        rejectCashflowHistoryRewrite(groups);
+        ensureCashflowAccounts(groups);
+    }
     Map<String, ExistingFact> existingFacts = loadExistingFacts(factType);
     // 已生效出库单变化跟踪：导入事务提交后，逐单对比「当前值 vs 基线」识别修正变化（单据级）
     final boolean trackChanges = factType == FactType.OUTBOUND;
@@ -3126,11 +3282,11 @@ private String computeFieldVersion(FactType type, List<Group> groups) {
     // 用第 1 组 main 的 key 列表哈希作为字段版本（表头变更则 version 变）
     Map<String, Object> keys = new LinkedHashMap<>();
     keys.put("type", type.dbType);
-    keys.put("mainKeys", new ArrayList<>(groups.getFirst().main().keySet()));
+    keys.put("mainKeys", new ArrayList<>(withoutImportLocation(groups.getFirst().main()).keySet()));
     // 子表 key 取前 5 行去重（避免全量哈希过大）
     Set<String> subKeys = new LinkedHashSet<>();
     for (int i = 0; i < Math.min(5, groups.size()); i++) {
-        for (Map<String, String> r : groups.get(i).rows()) subKeys.addAll(r.keySet());
+        for (Map<String, String> r : groups.get(i).rows()) subKeys.addAll(withoutImportLocation(r).keySet());
         if (subKeys.size() > 200) break;
     }
     keys.put("subKeysSample", new ArrayList<>(subKeys));

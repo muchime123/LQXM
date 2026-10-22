@@ -76,6 +76,26 @@ class ManufacturingTaskConfigControllerTest {
                 "benchmarkMatched 必须先唯一匹配、再要求该产品已发布间隔："+value);
     }
 
+    /**
+     * 覆盖率下钻：必须按「车间 + 产品名」分组，并带回 configCount（唯一匹配判据）与 configId（点行进产品）。
+     * 不能改成一个只返回汇总的数——页面统计数字点开就是要看「哪些产品」，没有分组行就等于没下钻。
+     */
+    @Test
+    void durationCoverageBreakdownGroupsByWorkshopAndProduct() {
+        var sql=org.mockito.ArgumentCaptor.forClass(String.class);
+        when(jdbc.queryForList(sql.capture())).thenReturn(List.of());
+
+        controller.durationCoverageBreakdown();
+
+        String value=sql.getValue();
+        assertTrue(value.contains("GROUP BY p.production_line,p.product_name"),
+                "下钻明细必须按车间+产品名分组，否则点开只有一个总数："+value);
+        assertTrue(value.contains("AS configCount")&&value.contains("AS configId"),
+                "必须带回 configCount（唯一匹配）与 configId（点行进产品）："+value);
+        assertTrue(value.contains("AS publishedStages"),
+                "必须带回该产品已发布节点数，才能筛『未命中已发布间隔』："+value);
+    }
+
     /** 跟单侧：产品级参考工期与基准矩阵都按「车间 + 产品名」精确匹配，不看启用状态。 */
     @Test
     void trackingServiceNeverFiltersProductsByActive() throws IOException {

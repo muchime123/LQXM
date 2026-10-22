@@ -2,8 +2,8 @@
   <section class="tracking-benchmarks">
     <header>
       <div>
-        <h2>节点参考间隔</h2>
-        <p>按自然日设置该产品各跟单节点的参考间隔；空值沿用车间基准。只影响参考日期，不改变氚云工序或跟单节点。</p>
+        <h2>产品节点参考工期</h2>
+        <p>按自然日设置该产品各跟单节点的参考天数；空值沿用通用参考（右上角「通用参考设置」）。只影响参考日期，不改变氚云工序或跟单节点。</p>
       </div>
       <div class="actions">
         <el-button :loading="calculating" @click="refreshCandidates">计算历史样本</el-button>
@@ -23,12 +23,12 @@
           <small class="stage-interval">{{ row.intervalLabel }}</small>
         </template>
       </el-table-column>
-      <el-table-column label="车间基准" width="86" align="center">
+      <el-table-column label="通用参考" width="86" align="center">
         <template #default="{ row }">{{ row.workshopDays ?? '未设' }} 天</template>
       </el-table-column>
-      <el-table-column label="本产品间隔（天）" min-width="150">
+      <el-table-column label="产品参考天数" min-width="150">
         <template #default="{ row }">
-          <el-input-number v-model="row.typicalDays" :min="0" :max="60" :precision="1" :step="0.5" controls-position="right" size="small" placeholder="沿用车间" />
+          <el-input-number v-model="row.typicalDays" :min="0" :max="60" :precision="1" :step="0.5" controls-position="right" size="small" placeholder="沿用通用" />
           <small v-if="row.publishedSource" class="publish-note">{{ publishText(row) }}</small>
         </template>
       </el-table-column>
@@ -49,6 +49,14 @@
     </el-table>
     <el-empty v-else :image-size="52" description="该产品所属车间类别没有可配置的跟单节点" />
 
+    <!-- 合计：把这一列数字还原成「整段」。与画像卡的参考工期同源（都是必经节点生效值相加），
+         区别是这里就地按表格当前值算，保存后立刻能看到合计变化，不必等接口回来。 -->
+    <p v-if="stageRows.length" class="total-row">
+      合计参考工期 <b>{{ totalText }}</b> 天
+      <span class="total-note">＝各必经节点生效参考值相加（产品优先、通用兜底）{{ totalNote }}</span>
+      <span v-if="missingLabel" class="total-warn">缺 {{ missingLabel }}，未计入合计。</span>
+    </p>
+
     <!-- 复制：同系列产品常共用一套节奏，逐个维护太慢；只补未发布节点，不覆盖人工审核值。 -->
     <el-dialog v-model="copyVisible" title="从同车间其它产品复制" width="min(460px, calc(100vw - 32px))">
       <p class="copy-hint">把所选产品已发布的节点间隔复制到「{{ productName }}」，只补尚未发布的节点；已发布的人工审核值不会被覆盖。</p>
@@ -61,7 +69,8 @@
       </template>
     </el-dialog>
 
-    <ProductBenchmarkSamplesDrawer v-model="samplesVisible" :task-config-id="taskConfigId" :product-name="productName" :stage-labels="stageLabels" />
+    <ProductBenchmarkSamplesDrawer v-model="samplesVisible" :task-config-id="taskConfigId" :product-name="productName" :stage-labels="stageLabels"
+      @open-order="emit('open-order', $event)" />
   </section>
 </template>
 
@@ -78,6 +87,8 @@ interface StageRow {
   stageCode: string
   stageLabel: string
   intervalLabel: string
+  /** 按需工序（氧化 / 木箱）：不占链，不计入合计。 */
+  optionalStage: boolean
   workshopDays: number | null
   typicalDays: number | null
   /** 发布来源：MANUAL 人工审核 / P50 批量填充 / COPY 从同车间产品复制 / null 未发布（含已撤销）。 */
@@ -101,7 +112,7 @@ const props = defineProps<{
   /** 同车间其它产品：作为「复制间隔」的来源候选。 */
   peers: { id: number; configName: string }[]
 }>()
-const emit = defineEmits<{ changed: [] }>()
+const emit = defineEmits<{ changed: []; 'open-order': [number] }>()
 
 const saving = ref<string | null>(null)
 const calculating = ref(false)
@@ -124,6 +135,7 @@ const stageRows = computed<StageRow[]>(() => {
       stageCode: stage.stageCode,
       stageLabel: stage.stageLabel,
       intervalLabel: stage.intervalLabel,
+      optionalStage: stage.optionalStage,
       workshopDays: stage.typicalDays,
       typicalDays: value?.typicalDays ?? null,
       publishedSource: value?.publishedSource ?? null,
@@ -150,12 +162,35 @@ const fillableCount = computed(() => stageRows.value.filter(row =>
   row.typicalDays == null && row.p50Days != null && row.sampleCount >= 8
   && row.zeroDayCount * 2 < row.sampleCount).length)
 
+/**
+ * 合计只算必经节点（按需工序不占链，与分母同源）。
+ * 缺值节点按 0 参与求和会把合计说小，所以缺一个就点名一个——宁可显示「3.0 天（缺备料）」，
+ * 也不让一个偏小的总数盖住配置缺口。
+ */
+const requiredRows = computed(() => stageRows.value.filter(row => !row.optionalStage))
+const effectiveDays = (row: StageRow) => row.typicalDays ?? row.workshopDays
+/** 逐段取整后相加：跟单侧的链式推算每走一个节点就取整到整天，合计必须跟它同源，否则两个页面各说各话。 */
+const totalDays = computed(() => requiredRows.value.reduce((sum, row) => {
+  const days = effectiveDays(row)
+  return days == null ? sum : sum + Math.round(days)
+}, 0))
+/** 精确和（含小数）：只在有半天值、取整后对不上时用来解释差额。 */
+const exactDays = computed(() => requiredRows.value.reduce((sum, row) => sum + (effectiveDays(row) ?? 0), 0))
+const missingLabel = computed(() => requiredRows.value
+  .filter(row => effectiveDays(row) == null).map(row => row.stageLabel).join('、'))
+/** 一个节点都没值时显示「—」：0 会被读成「当天做完」，含义完全相反。 */
+const totalText = computed(() => requiredRows.value.some(row => effectiveDays(row) != null)
+  ? String(totalDays.value) : '—')
+const totalNote = computed(() => Math.abs(exactDays.value - totalDays.value) >= 0.05
+  ? `（各段相加 ${exactDays.value.toFixed(1)} 天，每段按整天取整后为 ${totalDays.value} 天，与跟单推算的入库参考日期同源）`
+  : '')
+
 async function save(row: StageRow) {
   saving.value = row.stageCode
   try {
     await saveTrackingProductBenchmark({ taskConfigId: props.taskConfigId, stageCode: row.stageCode, typicalDays: row.typicalDays ?? null })
     emit('changed')
-    ElMessage.success('本产品节点参考间隔已更新')
+    ElMessage.success('本产品参考天数已更新')
   } catch (error) {
     ElMessage.error(error instanceof Error ? error.message : '保存失败')
   } finally { saving.value = null }
@@ -178,11 +213,11 @@ function publishText(row: StageRow) {
   return at ? `${source} · ${at}` : source
 }
 
-/** 撤销发布：清掉发布值与来源，参考日期回到车间基准；候选统计保留，下次仍可参考。 */
+/** 撤销发布：清掉发布值与来源，参考日期回到通用参考；候选统计保留，下次仍可参考。 */
 async function revoke(row: StageRow) {
   try {
     await ElMessageBox.confirm(
-      `撤销后「${row.stageLabel}」不再使用本产品间隔，参考日期回到车间基准；历史候选统计保留。`,
+      `撤销后「${row.stageLabel}」不再使用本产品参考天数，参考日期回到通用参考；历史候选统计保留。`,
       '撤销发布',
       { type: 'warning', confirmButtonText: '撤销发布', cancelButtonText: '取消' }
     )
@@ -226,7 +261,7 @@ async function refreshCandidates() {
 async function applyP50() {
   try {
     await ElMessageBox.confirm(
-      `将把 ${fillableCount.value} 个未发布节点的候选 P50 写成参考间隔（已发布的节点不变）。发布后即时影响跟单参考日期，请确认样本可信。`,
+      `将把 ${fillableCount.value} 个未发布节点的候选 P50 写成产品参考天数（已发布的节点不变）。发布后即时影响跟单参考日期，请确认样本可信。`,
       '按 P50 批量发布', { type: 'warning' })
   } catch { return }
   applying.value = true
@@ -247,6 +282,10 @@ async function applyP50() {
 .tracking-benchmarks header p { margin: 0; color: var(--color-text-secondary, #64748b); font-size: 12px; }
 .actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .hint { margin: 0; color: var(--color-text-secondary, #64748b); font-size: 12px; line-height: 1.6; }
+.total-row { margin: 0; font-size: 13px; color: var(--color-text-secondary, #5f6f82); display: flex; flex-wrap: wrap; gap: 6px; align-items: baseline; }
+.total-row b { font-size: 18px; color: var(--color-primary, #0f766e); font-variant-numeric: tabular-nums; }
+.total-note { font-size: 12px; color: var(--color-text-secondary, #94a3b8); }
+.total-warn { font-size: 12px; color: var(--color-warning, #d97706); }
 .stage-name { font-weight: 600; color: var(--color-text-heading, #0f172a); }
 .stage-interval { display: block; color: var(--color-text-secondary, #94a3b8); font-size: 11px; }
 .publish-note { display: block; color: var(--color-text-secondary, #94a3b8); font-size: 11px; }

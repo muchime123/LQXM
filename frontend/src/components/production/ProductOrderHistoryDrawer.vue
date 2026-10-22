@@ -65,21 +65,34 @@
             <span v-else class="none">未建跟单记录</span>
           </template>
         </el-table-column>
+        <!-- 下钻到底：在本页打开这张单的跟单详情抽屉（节点进度 / 报工 / 时间核实），不跳转页面。
+             只对有读权限的人显示——没权限的人点开也只会拿到后端「无权查看」。 -->
+        <el-table-column v-if="canOpenTracking" label="操作" width="96" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="emit('open-order', row.orderId)">跟单详情</el-button>
+          </template>
+        </el-table-column>
       </el-table>
     </template>
   </el-drawer>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { fetchProductOrderHistory, type ProductOrderHistory } from '@/api/productionTracking'
+import { useCurrentUser } from '@/composables/auth/useCurrentUser'
+import { TRACKING_READ_PERMISSIONS } from '@/utils/tracking/detailLink'
 
 const props = defineProps<{
   modelValue: boolean
   taskConfigId: number | null
   productName: string
 }>()
-defineEmits<{ 'update:modelValue': [boolean] }>()
+const emit = defineEmits<{ 'update:modelValue': [boolean]; 'open-order': [number] }>()
+
+/** 「跟单详情」需要生产跟单页的读权限（任一即可），否则不给入口。 */
+const { can } = useCurrentUser()
+const canOpenTracking = computed(() => can(TRACKING_READ_PERMISSIONS))
 
 /** 空值＝全部；其余按氚云任务单状态原样筛。 */
 const status = ref('')

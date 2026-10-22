@@ -15,7 +15,6 @@
         <el-button v-if="canFollowup" title="上传氚云导出的生产任务单 Excel，预检确认后写入系统；与氚云导入中心同一套解析规则" @click="taskImportVisible = true">导入生产任务单</el-button>
         <input v-if="canFollowup" ref="roundTripInput" type="file" accept=".xlsx" hidden @change="onRoundTripSelected" />
         <el-button v-if="canFollowup" @click="roundTripInput?.click()">导入跟单表（回写）</el-button>
-        <el-button v-if="canManageBaseline" @click="openBaseline">基准设置</el-button>
         <el-button @click="analysisVisible = true">生产分析</el-button>
         <el-button @click="weeklyReviewVisible = true">周复盘</el-button>
         <el-button :loading="exporting" @click="openExport">导出</el-button>
@@ -119,7 +118,7 @@
       <span class="muted">{{ canFollowup ? '勾选当前页工单可导出；批量完成仅处理尚有未完成节点的工单。' : '勾选当前页工单可导出。' }}</span>
     </div>
 
-    <el-table v-loading="loading" :data="items" row-key="id" class="tracking-table" :style="stickyHeaderStyle" @row-click="openDetail" @selection-change="onTrackingSelectionChange">
+    <el-table v-loading="loading" :data="items" row-key="id" class="tracking-table" :style="stickyHeaderStyle" @row-click="openOrderDetail" @selection-change="onTrackingSelectionChange">
       <el-table-column type="selection" width="38" fixed />
       <el-table-column label="编号" min-width="78" fixed>
         <template #default="{ row }"><span :title="row.orderNo">{{ shortOrderNo(row.orderNo) }}</span><el-tag v-if="row.stoppedAt" class="urgent-list-tag" size="small" type="info" effect="plain" :title="row.stoppedReason || ''">停止跟单</el-tag><el-tag v-else-if="isSourceUrgent(row.sourceOrderRemark)" class="urgent-list-tag" size="small" type="danger" effect="dark" :title="row.sourceOrderRemark">加急</el-tag></template>
@@ -186,7 +185,7 @@
           <div class="list-stage-actions" :aria-label="`${row.stageDoneCount || 0}/${row.stageTotal || rowStages(row).length} 节点已完成`">
             <el-button v-for="stage in rowStages(row)" :key="stage.code" size="small" :type="stage.status === 'DONE' ? 'success' : stage.status === 'IN_PROGRESS' ? 'warning' : 'default'"
               :plain="stage.status !== 'DONE'" :title="stage.status === 'DONE' ? `${stage.label}：${stage.completedDate || '已完成'}，点击查看详情` : `${stage.label}：${stageStatusText(stage.status)}，点击核对并登记完成`"
-              @click.stop="stage.status === 'DONE' || row.stoppedAt || !canFollowup ? openDetail(row) : openListCompletion([row], stage.code)">
+              @click.stop="stage.status === 'DONE' || row.stoppedAt || !canFollowup ? openOrderDetail(row) : openListCompletion([row], stage.code)">
               {{ stage.status === 'DONE' ? '✓ ' : '' }}{{ stage.label }}
             </el-button>
           </div>
@@ -206,7 +205,7 @@
         <small v-else-if="Number(row.salesTraceReceivedQuantity) > 0">{{ row.salesTraceConfirmedQuantity || 0 }} / {{ row.salesTraceReceivedQuantity }} 已确认</small>
       </template></el-table-column>
       <el-table-column v-if="isListColumnVisible('assignee')" label="跟单员" width="110"><template #default="{ row }">{{ row.assigneeName }}</template></el-table-column>
-      <el-table-column label="操作" width="90" fixed="right"><template #default="{ row }"><el-button link type="primary" @click.stop="openDetail(row)">跟进</el-button></template></el-table-column>
+      <el-table-column label="操作" width="90" fixed="right"><template #default="{ row }"><el-button link type="primary" @click.stop="openOrderDetail(row)">跟进</el-button></template></el-table-column>
     </el-table>
     <el-dialog v-model="listCompletionVisible" title="确认节点完成" width="min(700px, 94vw)" append-to-body>
       <p>将以下 {{ listCompletionRows.length }} 单的<strong>{{ listCompletionStageCode ? '所选节点' : '当前未完成节点' }}</strong>登记为已完成。请核对实际完成日期；每单独立写入跟单历史。</p>
@@ -489,268 +488,7 @@
       </el-table>
     </el-dialog>
 
-    <el-drawer v-model="drawer" :title="detail?.order.orderNo ? `生产跟单 · ${detail.order.orderNo}` : '生产跟单'" size="min(880px, 96vw)" header-class="tracking-drawer-header" append-to-body destroy-on-close>
-      <div v-if="detail" :class="['detail-content', { 'detail-stopped': detail.order.stoppedAt }]">
-        <section class="summary-block">
-          <div class="summary-head">
-            <div class="summary-title">
-              <strong>{{ detail.order.productNameSnapshot }}</strong>
-              <el-tag :type="trackingStatusTone(detail.order.trackingStatus)" effect="light" size="small">{{ trackingStatusText(detail.order.trackingStatus) }}</el-tag>
-            </div>
-            <div class="summary-spec">
-              <span>{{ detail.order.specificationSnapshot || '规格未提供' }}</span>
-              <el-tag size="small" type="info" effect="plain">{{ detail.order.plannedQuantity }} {{ detail.order.unit }}</el-tag>
-              <el-tag v-if="detail.order.moldLayout?.trim()" size="small" type="info" effect="plain">{{ detail.order.moldLayout }}</el-tag>
-            </div>
-            <div class="summary-tags">
-              <el-tag size="small" type="info" effect="plain">{{ shortWorkshop(detail.order.workshopType) || '车间未提供' }}</el-tag>
-              <el-tag size="small" type="info" effect="plain">{{ detail.order.externalSource === 'H3YUN' ? '氚云工单' : '本地工单' }}</el-tag>
-              <el-tag size="small" type="info" effect="plain">任务单：{{ detail.order.sourceStatus || '状态未提供' }}</el-tag>
-              <el-tag size="small" type="info" effect="plain">跟单责任人：{{ detail.order.assigneeName || '未指定' }}</el-tag>
-              <el-tag size="small" type="info" effect="plain">客户：{{ detail.order.customerNameSnapshot || '未提供' }}<template v-if="detail.order.salespersonNameSnapshot"> · {{ detail.order.salespersonNameSnapshot }}</template></el-tag>
-              <el-tag v-if="detail.order.riskCategory" size="small" type="warning" effect="plain">风险：{{ riskText(detail.order.riskCategory) }}</el-tag>
-              <el-tag v-if="isSourceUrgent(detail.order.sourceOrderRemark)" size="small" type="danger" effect="dark">任务单备注加急</el-tag>
-              <span class="muted">最近跟进 {{ formatTime(detail.order.lastFollowupAt) || '暂无' }}</span>
-            </div>
-          </div>
-          <div class="summary-progress">
-            <el-progress type="circle" :percentage="stagePercent" :width="72" :stroke-width="7">
-              <template #default><span class="progress-num">{{ doneStages }}/{{ requiredTotal }}</span></template>
-            </el-progress>
-            <span class="muted">节点已完成</span>
-          </div>
-        </section>
-
-        <el-alert v-if="!detail.order.stoppedAt && isSourceUrgent(detail.order.sourceOrderRemark)" class="urgent-detail-alert" type="error" :closable="false" show-icon title="氚云生产任务单标注加急" :description="detail.order.sourceOrderRemark || ''" />
-
-        <el-alert v-if="detail.order.stoppedAt" type="info" :closable="false" show-icon title="已停止生产跟单"
-          :description="`${detail.order.stoppedByName || '跟单员'} · ${formatTime(detail.order.stoppedAt)} · 原因：${detail.order.stoppedReason || '见跟单历史'}。仅本地跟单停止，氚云任务单保持原状。`" />
-
-        <el-alert v-if="!detail.order.stoppedAt && detail.order.closedAt" type="success" :closable="false" show-icon title="跟单已结案（人工确认）"
-          :description="`${detail.order.closedByName || '跟单员'} · ${formatTime(detail.order.closedAt)} · 说明：${detail.order.closedNote || '见跟单历史'}。状态按「结案优先」展示为「跟单已完成」，节点未补齐无需补充。`" />
-
-        <el-alert v-if="detail.order.trackingAction" type="warning" :closable="false" show-icon
-          :title="`跟单待办 · ${actionLabel(detail.order.trackingAction)}`"
-          :description="actionHint(detail.order)" />
-
-        <div class="metric-grid">
-          <div :class="['metric', { 'metric-exception': invalidApplicationDate(detail.order) }]"><span>生产工单申请时间</span><strong>{{ detail.order.applicationDate || '未填写' }}</strong><small v-if="detail.order.sourceCreatedAt" class="muted">任务单提交 {{ formatMinute(detail.order.sourceCreatedAt) }}</small><small v-if="invalidApplicationDate(detail.order)" class="metric-exception-text">申请日期早于任务单提交日期，疑似填写错误</small><el-button v-if="invalidApplicationDate(detail.order) && needsTimeReason(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE')">记录日期核实</el-button><span v-else-if="invalidApplicationDate(detail.order)" class="metric-reviewed">已记录核实：{{ reviewOf(detail.order, 'SOURCE_DATE')?.reason }}<el-button v-if="reviewOf(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE', reviewOf(detail.order, 'SOURCE_DATE'))">修改</el-button></span></div>
-          <div :class="['metric', { 'metric-exception': invalidRequiredDate(detail.order) }]"><span>订单要求完成（业务员）</span><strong :class="{ 'is-danger': invalidRequiredDate(detail.order) }">{{ detail.order.dueDate || '未定' }}</strong><small v-if="invalidRequiredDate(detail.order)" class="metric-exception-text">早于申请日期或任务单提交日期，疑似填写错误；请核对源工单日期</small><el-button v-if="invalidRequiredDate(detail.order) && !invalidApplicationDate(detail.order) && needsTimeReason(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE')">记录日期核实</el-button><span v-else-if="invalidRequiredDate(detail.order) && !invalidApplicationDate(detail.order)" class="metric-reviewed">已记录核实：{{ reviewOf(detail.order, 'SOURCE_DATE')?.reason }}<el-button v-if="reviewOf(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE', reviewOf(detail.order, 'SOURCE_DATE'))">修改</el-button></span></div>
-          <div class="metric"><el-tooltip placement="top" raw-content :content="leadDaysTooltipHtml(detail.order)"><span class="lead-detail-heading">工期（当前） ⓘ</span></el-tooltip><strong :class="{ 'is-danger': leadDaysAlarm(detail.order) }">{{ effectiveLeadDaysText(detail.order) }}<small class="lead-kind">{{ leadDaysKindText(detail.order) }}</small></strong><small v-if="otherLeadDaysText(detail.order)" class="muted">{{ otherLeadDaysText(detail.order) }}</small><small v-if="leadDaysDeltaText(detail.order)" :class="leadDeltaClass(detail.order)">{{ leadDaysDeltaText(detail.order) }}</small><small v-if="negativeLeadDays(detail.order)" class="metric-exception-text">{{ negativeLeadReason(detail.order) }}</small></div>
-          <div :class="['metric', { 'metric-exception': timeException(detail.order, 'ACCEPTANCE') }]"><span>排产时间（确认是否开工）</span><strong>{{ formatMinute(detail.order.scheduleTime) || '未排产' }}</strong><small v-if="scheduleLagDays(detail.order) != null" class="muted">提交后 {{ scheduleLagDays(detail.order) }} 天排产</small><small class="muted">计划/实际工期自排产日起算</small><small v-if="timeException(detail.order, 'ACCEPTANCE')" class="metric-exception-text">{{ timeException(detail.order, 'ACCEPTANCE') }}</small><el-button v-if="needsTimeReason(detail.order, 'ACCEPTANCE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('ACCEPTANCE')">注明接单原因</el-button><span v-else-if="timeException(detail.order, 'ACCEPTANCE')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'ACCEPTANCE')?.reason }}<el-button v-if="reviewOf(detail.order, 'ACCEPTANCE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('ACCEPTANCE', reviewOf(detail.order, 'ACCEPTANCE'))">修改</el-button></span></div>
-          <div :class="['metric', { 'metric-exception': timeException(detail.order, 'COMMITMENT') }]"><div class="metric-heading"><span>车间预计完成</span><el-button link type="primary" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openDelayDialog">{{ detail.order.forecastFinishDate ? '修改延期' : '延期' }}</el-button></div><strong>{{ currentCompletionDate(detail.order) || '未定' }}</strong><small class="muted">{{ detail.order.forecastFinishDate ? '原车间预计：' : '' }}{{ expectedCompareText(detail.order) }}</small><small v-if="detail.order.forecastFinishDate" class="metric-delay">{{ forecastAdjustText(detail.order) }}<template v-if="deadlineOf(detail.order)"> · 原预计 {{ deadlineOf(detail.order) }}</template><template v-if="detail.order.delayReason"> · {{ detail.order.delayReason }}</template></small><small v-else-if="detail.order.delayReason" class="muted">原有延期 / 风险说明：{{ detail.order.delayReason }}</small><small v-if="timeException(detail.order, 'COMMITMENT')" class="metric-exception-text">{{ timeException(detail.order, 'COMMITMENT') }}</small><el-button v-if="needsTimeReason(detail.order, 'COMMITMENT')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('COMMITMENT')">注明协商原因</el-button><span v-else-if="timeException(detail.order, 'COMMITMENT')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'COMMITMENT')?.reason }}<el-button v-if="reviewOf(detail.order, 'COMMITMENT')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('COMMITMENT', reviewOf(detail.order, 'COMMITMENT'))">修改</el-button></span></div>
-          <div :class="['metric', { 'metric-exception': timeException(detail.order, 'OVERDUE') }]"><span>生产交付结果</span><strong :class="{ 'is-danger': detail.order.deliveryOutcome === 'OVERDUE' }">{{ deliveryOutcomeText(detail.order) }}</strong><small v-if="detail.order.deliveryBaseline" class="muted">基准：车间预计完成 {{ detail.order.deliveryBaseline }}</small><el-button v-if="needsTimeReason(detail.order, 'OVERDUE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('OVERDUE')">记录逾期原因</el-button><span v-else-if="timeException(detail.order, 'OVERDUE')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'OVERDUE')?.reason }}<el-button v-if="reviewOf(detail.order, 'OVERDUE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('OVERDUE', reviewOf(detail.order, 'OVERDUE'))">修改</el-button></span></div>          <div :class="['metric', { 'metric-exception': timeException(detail.order, 'REPORTING') }]"><span>氚云报工完工（仅供对照）</span><strong>{{ detail.order.actualFinishDate || '源工单未填' }}</strong><small v-if="!detail.order.expectedFinishDate" class="muted">车间预计未填，暂无法比较报工日期</small><small v-else-if="!timeException(detail.order, 'REPORTING') && detail.order.actualFinishDate" class="muted">{{ reportCompareText(detail.order) }}</small><small v-if="timeException(detail.order, 'REPORTING')" class="metric-exception-text">{{ timeException(detail.order, 'REPORTING') }}</small><el-button v-if="needsTimeReason(detail.order, 'REPORTING')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('REPORTING')">核实并注明原因</el-button><span v-else-if="timeException(detail.order, 'REPORTING')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'REPORTING')?.reason }}<el-button v-if="reviewOf(detail.order, 'REPORTING')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('REPORTING', reviewOf(detail.order, 'REPORTING'))">修改</el-button></span></div>
-          <button v-if="detail.order.inboundCount" type="button" :class="['metric', 'metric-link', { 'metric-exception': inboundBeforeReporting(detail.order) }]" :disabled="purchaseLinksLoading" @click="openPurchaseReceipts">
-            <span>采购入库时间（仅供对照）</span>
-            <strong>{{ detail.order.inboundDate || '尚无采购入库' }}</strong>
-            <span v-if="inboundHint(detail.order)" class="muted">{{ inboundHint(detail.order) }}</span>
-            <span v-else-if="inboundGapText(detail.order)" class="muted">{{ inboundGapText(detail.order) }}</span>
-            <span v-if="inboundBeforeReporting(detail.order)" class="metric-exception-text">{{ inboundReportingHint(detail.order) }}</span>
-            <span class="metric-link-hint">{{ purchaseLinksLoading ? '正在查询入库单…' : '点击查看采购入库详情 →' }}</span>
-          </button>
-          <div v-else class="metric"><span>采购入库时间（仅供对照）</span><strong>尚无采购入库</strong><small v-if="detail.order.actualFinishDate" class="muted">报工后尚未入库，不据此判定未完工</small><el-button v-if="detail.order.actualFinishDate" link type="info" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('WAREHOUSING', reviewOf(detail.order, 'WAREHOUSING'))">{{ reviewOf(detail.order, 'WAREHOUSING') ? '修改暂缓入库安排' : '记录暂缓入库安排（可选）' }}</el-button></div>
-        </div>
-        <section v-if="detail.order.sourceOptionalConfiguration?.trim() || detail.order.sourceOrderRemark?.trim()" class="source-order-remark">
-          <header class="section-head"><h3>生产任务单配置与备注</h3><span class="muted">氚云原文 · 与本地跟单备注分开</span></header>
-          <p v-if="detail.order.sourceOptionalConfiguration?.trim()"><strong>可选配置：</strong>{{ detail.order.sourceOptionalConfiguration }}</p>
-          <p v-if="detail.order.sourceOrderRemark?.trim()"><strong>备注：</strong>{{ detail.order.sourceOrderRemark }}</p>
-        </section>
-        <section>
-          <header class="section-head">
-            <h3>节点进度</h3>
-            <div class="stage-quick-actions">
-              <span class="muted">{{ detail.order.stoppedAt ? '已停止跟单，节点记录只读' : '快捷操作只填写当前节点，核对后点底部“保存跟单”' }}</span>
-              <el-button v-if="canFollowup && !detail.order.stoppedAt && currentStage && currentStage.status === 'PENDING'" size="small" @click="quickStartCurrentStage">开始{{ currentStage.label }}</el-button>
-              <el-button v-if="canFollowup && !detail.order.stoppedAt && currentStage" size="small" type="primary" plain @click="quickCompleteCurrentStage">今天完成{{ currentStage.label }}</el-button>
-            </div>
-          </header>
-          <el-alert v-if="!detail.order.stoppedAt && stageGapLabels.length" type="warning" :closable="false" show-icon
-            :title="`后续节点已完成，前面的 ${stageGapLabels.join('、')} 尚未完成或未核实顺序。`"
-            description="确实完成的节点请补完成日期；未按常规顺序经过的节点可逐项记录原因并保存，保存后不再重复提醒。" />
-          <div class="stage-list">
-            <div class="stage-head" aria-hidden="true">
-              <span>节点</span><span>阶段状态</span><span>参考完成</span><span>完成时间</span><span>节点备注</span><span>节点记录</span>
-            </div>
-            <div v-for="(stage, index) in milestones" :key="stage.code" :class="['stage-item', stage.optional && !stage.applicable ? 'na' : '', { current: index === currentStageIndex }]">
-              <div class="stage-grid">
-                <span class="cell-node">
-                  <span class="row-dot" :class="stage.status.toLowerCase()" />
-                  <span class="row-name">{{ stage.label }}<em v-if="stage.optional" class="optional-mark">按需</em></span>
-                </span>
-                <el-select v-model="stage.status" size="small" class="cell-status" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @change="onStageStatusChange(stage)">
-                  <el-option value="PENDING" label="未开始" />
-                  <el-option value="IN_PROGRESS" label="进行中" />
-                  <el-option value="DONE" label="已完成" />
-                </el-select>
-                <span v-if="stage.optional && !stage.applicable" class="cell-reference muted">—</span>
-                <span v-else :class="['cell-reference', { 'is-overdue': stageOverdue(stage) }]">
-                  <template v-if="stage.referenceDate">{{ stage.referenceDate }}<small v-if="stageOverdue(stage)">超 {{ stage.referenceOverdueDays }} 天</small></template>
-                  <template v-else><span class="muted">无基准</span></template>
-                </span>
-                <el-date-picker v-model="stage.completedDate" type="date" value-format="YYYY-MM-DD" size="small" clearable placeholder="完成日期" :disabled="!canFollowup || Boolean(detail.order.stoppedAt) || stage.status !== 'DONE'" class="cell-date" />
-                <el-input v-model="stage.note" size="small" maxlength="500" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" :placeholder="stageOverdue(stage) ? '超参考日期，建议记录原因（可选）' : '节点备注（可选）'" class="cell-note" />
-                <div class="cell-history">
-                <el-button v-if="canFollowup && !detail.order.stoppedAt && gapStages.some(gap => gap.code === stage.code) && stage.status !== 'DONE'" link type="warning" size="small" @click="recordStageSequenceReason(stage)">核实顺序</el-button>
-                  <el-button link type="primary" size="small" :disabled="!stageRecordCount(stage.code)" @click="toggleStage(stage.code)">{{ expandedStages.has(stage.code) ? '收起历史' : `历史(${stageRecordCount(stage.code)})` }}</el-button>
-                </div>
-              </div>
-              <div v-if="expandedStages.has(stage.code) && stageRecordCount(stage.code)" class="row-history">
-                <p v-for="(item, i) in stageNodeHistory(stage.code)" :key="i"><span class="muted">第 {{ item.version }} 次 · {{ item.time }} · {{ item.by }}</span>{{ item.text }}</p>
-                <p v-if="pendingStageChanges.get(stage.code)" class="pending">本次修改（未保存）：{{ pendingStageChanges.get(stage.code) }}</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <ProductionSalesTracePanel v-if="showSalesTrace" :order-id="detail.order.id" :can-confirm="auth.can('manufacturing.followup') && !detail.order.stoppedAt" />
-
-        <section>
-          <header class="section-head">
-            <h3>时间记录</h3>
-            <span class="muted">车间预计完成调整与时间异常核实，按记录时间展示</span>
-          </header>
-          <el-timeline v-if="timeHistoryItems.length">
-            <el-timeline-item v-for="item in timeHistoryItems" :key="item.key" :timestamp="item.time" placement="top">
-              <div class="entry">
-                <div class="entry-head"><strong>{{ item.title }}</strong><span class="muted">{{ item.by }}</span></div>
-                <p v-for="line in item.lines" :key="line" class="time-history-line">{{ line }}</p>
-              </div>
-            </el-timeline-item>
-          </el-timeline>
-          <el-empty v-else description="暂无车间时间调整或时间核实记录" :image-size="52" />
-        </section>
-
-        <section>
-          <header class="section-head">
-            <h3>跟单历史</h3>
-            <span class="muted">共 {{ detail.entries.length }} 次 · 保存节点或车间交期变更时留存前后快照</span>
-          </header>
-          <el-timeline v-if="detail.entries.length">
-            <el-timeline-item v-for="entry in detail.entries" :key="entry.id" placement="top">
-              <div class="entry">
-                <div class="entry-head">
-                  <strong>第 {{ entry.version }} 次跟单</strong>
-                  <span class="muted">{{ formatTime(entry.createdAt) }} · {{ entry.createdByName }}</span>
-                </div>
-                <p v-if="entry.content.startsWith('停止生产跟单：') || entry.content.startsWith('恢复生产跟单：') || entry.content.startsWith('跟单结案确认：') || entry.content.startsWith('撤销跟单结案：')" class="entry-content">{{ entry.content }}</p>
-                <div v-if="entryDiff(entry.id).length" class="entry-diff">
-                  <span v-for="row in visibleDiff(entry.id)" :key="row.label" class="diff-chip">
-                    {{ row.label }}：<i>{{ row.from }}</i><b>→</b>{{ row.to }}
-                  </span>
-                  <el-button v-if="entryDiff(entry.id).length > 4" link type="primary" size="small" @click="toggleEntry(entry.id)">
-                    {{ expandedEntries.has(entry.id) ? '收起' : `还有 ${entryDiff(entry.id).length - 4} 项变更` }}
-                  </el-button>
-                </div>
-                <p v-else-if="!entry.content.startsWith('停止生产跟单：') && !entry.content.startsWith('恢复生产跟单：') && !entry.content.startsWith('跟单结案确认：') && !entry.content.startsWith('撤销跟单结案：')" class="entry-content">{{ entry.content }}</p>
-              </div>
-            </el-timeline-item>
-          </el-timeline>
-          <el-empty v-else description="暂无跟单记录，点击上方节点开始第一次跟单" :image-size="52" />
-        </section>
-
-        <el-collapse v-model="referencePanels" class="reference-panel">
-          <el-collapse-item name="ops">
-            <template #title>
-              <span class="more-title">氚云零部件制程 <span class="muted">（{{ opDone }}/{{ detail.operations.length }} 已完成 · 仅供对照，不随跟单修改）</span></span>
-            </template>
-            <el-timeline v-if="detail.operations.length">
-              <el-timeline-item v-for="op in detail.operations" :key="op.id" :timestamp="op.completedAt || '未完成'" :type="op.status === 'COMPLETED' ? 'success' : 'primary'">
-                {{ op.operationNameSnapshot }} · {{ op.reportedQuantity || 0 }}/{{ op.requiredQuantity || 0 }}
-              </el-timeline-item>
-            </el-timeline>
-            <el-empty v-else description="该任务暂无工序" :image-size="52" />
-          </el-collapse-item>
-        </el-collapse>
-      </div>
-      <template #footer>
-        <div class="drawer-footer">
-          <span :class="unsavedStageCount ? 'pending-change-count' : 'muted'">{{ unsavedStageCount ? `${unsavedStageCount} 个节点有未保存修改` : requiredTotal ? `${doneStages}/${requiredTotal} 节点已完成` : '' }}</span>
-          <div>
-            <el-button v-if="canFollowup && detail && !detail.order.stoppedAt && detail.order.trackingStatus !== 'completed' && !detail.order.deliveredDate" type="danger" plain @click="openDisposition(true)">标记不再生产</el-button>
-            <el-button v-if="canFollowup && detail?.order.stoppedAt" type="primary" plain @click="openDisposition(false)">恢复跟单</el-button>
-            <el-button v-if="canFollowup && detail && !detail.order.stoppedAt && !detail.order.closedAt" type="success" plain @click="openClosure(true)">确认结案</el-button>
-            <el-button v-if="canFollowup && detail && !detail.order.stoppedAt && detail.order.closedAt" type="primary" plain @click="openClosure(false)">撤销结案</el-button>
-            <el-button v-if="unsavedStageCount" @click="resetStageDraft">撤销未保存修改</el-button>
-            <el-button @click="drawer = false">关闭</el-button>
-            <el-button v-if="canFollowup && detail && !detail.order.stoppedAt" type="primary" :loading="saving" :disabled="!unsavedStageCount" @click="save">保存跟单</el-button>
-            <el-button v-if="nextTrackingOrder" type="primary" plain :loading="saving" :disabled="!detail" @click="saveAndNext">{{ unsavedStageCount && !detail?.order.stoppedAt ? '保存并下一单' : '下一单' }}</el-button>
-          </div>
-        </div>
-      </template>
-    </el-drawer>
-    <el-dialog v-model="dispositionVisible" :title="dispositionStopped ? '标记不再生产' : '恢复生产跟单'" width="min(500px, 94vw)" append-to-body>
-      <p class="muted">{{ dispositionStopped ? '仅停止本项目的生产跟单，不修改氚云生产任务单。已有节点和记录会保留，并可日后恢复。' : '恢复后重新进入待跟单或跟单中，原有节点和历史继续保留。' }}</p>
-      <el-alert v-if="dispositionStopped && detail?.order.actualFinishDate" type="warning" :closable="false" title="氚云已有报工完工日期，请核实是否属于误报或补录，并在原因中说明。" />
-      <el-input v-model="dispositionReason" type="textarea" :rows="4" maxlength="500" show-word-limit :placeholder="dispositionStopped ? '请写明不再生产的具体原因及核实情况（必填）' : '请写明恢复生产的原因（必填）'" />
-      <template #footer><el-button @click="dispositionVisible = false">取消</el-button><el-button :type="dispositionStopped ? 'danger' : 'primary'" :loading="dispositionSaving" :disabled="!dispositionReason.trim()" @click="saveDisposition">{{ dispositionStopped ? '确认停止跟单' : '确认恢复跟单' }}</el-button></template>
-    </el-dialog>
-    <el-dialog v-model="closureVisible" :title="closureClosing ? '确认跟单结案' : '撤销跟单结案'" width="min(520px, 94vw)" append-to-body>
-      <p class="muted">{{ closureClosing ? '跟单员主动确认结束，状态按「结案优先」展示为「跟单已完成」，节点是否齐全不再强制要求；后续可以撤销结案恢复按节点进度派生。仅本地跟单结案，氚云任务单与节点记录保持原状。' : '撤销后状态按节点进度重新派生：节点齐全仍为「跟单已完成」，缺节点则回退为「跟单中」或「待跟单」。' }}</p>
-      <el-alert v-if="closureClosing && !detail?.order.deliveredDate" type="warning" :closable="false" title="该任务尚未登记交付（入库），请在结案说明中写明实际情况与核实结果（不少于 6 字）。" />
-      <el-input v-model="closureNote" type="textarea" :rows="4" maxlength="500" show-word-limit :placeholder="closureClosing ? '请写明结案说明，例如：配件任务无需走全部工序；交付已核实；本任务不适用某些节点…（必填）' : '请写明撤销结案的原因（必填）'" />
-      <template #footer><el-button @click="closureVisible = false">取消</el-button><el-button :type="closureClosing ? 'success' : 'primary'" :loading="closureSaving" :disabled="!closureNote.trim() || (closureClosing && !detail?.order.deliveredDate && closureNote.trim().length < 6)" @click="saveClosure">{{ closureClosing ? '确认结案' : '确认撤销' }}</el-button></template>
-    </el-dialog>
-    <el-dialog v-model="delayDialog" title="登记延期完成日期" width="min(520px, 94vw)" append-to-body>
-      <p class="delay-dialog-note">车间预计完成实现不了时，登记与车间/业务员协商后的延期完成日期。</p>
-      <el-form label-position="top">
-        <el-form-item label="车间预计完成"><strong>{{ deadlineDate || '未定' }}</strong></el-form-item>
-        <el-form-item label="延期至" required><el-date-picker v-model="delayDraftDate" type="date" value-format="YYYY-MM-DD" placeholder="选择协商后的完成日期" style="width: 100%" /></el-form-item>
-        <el-form-item label="延期原因与协商结果" required><el-input v-model="delayDraftReason" type="textarea" :rows="3" maxlength="300" show-word-limit placeholder="记录无法按原预计完成的原因，以及与车间/业务员协商的结果" /></el-form-item>
-      </el-form>
-      <p v-if="delayDraftDate && deadlineDate && delayDraftDate > deadlineDate" class="muted">比车间预计完成晚 {{ daysBetween(deadlineDate, delayDraftDate) }} 天</p>
-      <template #footer><el-button @click="delayDialog = false">取消</el-button><el-button type="primary" :loading="delaySaving" @click="saveDelay">保存延期</el-button></template>
-    </el-dialog>
-    <el-dialog v-model="timeReviewVisible" :title="`${timeReviewEditingId ? '修改' : '记录'}${reviewKindLabel(timeReviewForm.kind)}`" width="min(580px, 94vw)" append-to-body>
-      <el-alert v-if="timeReviewEditingId" type="info" :closable="false" class="review-edit-hint" title="正在修改这条核实记录（不会新增一条历史）；改动前后的原文会留在审计里。" />
-      <el-form label-position="top">
-        <el-form-item label="核实结果"><el-select v-model="timeReviewForm.status" style="width: 100%"><template v-if="timeReviewForm.kind === 'COMMITMENT'"><el-option label="车间确认可按业务员要求完成" value="ON_TIME" /><el-option label="协商后确定新交期" value="NEGOTIATED" /></template><template v-else><el-option label="已了解原因，仍需跟进" value="OPEN" /><el-option label="已处理 / 已核实完成" value="RESOLVED" /></template></el-select></el-form-item>
-        <el-form-item v-if="timeReviewForm.status === 'NEGOTIATED'" label="协商后的交期"><el-date-picker v-model="timeReviewForm.agreedDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" /></el-form-item>
-        <el-form-item label="原因及处理记录"><el-input v-model="timeReviewForm.reason" type="textarea" :rows="3" maxlength="500" show-word-limit placeholder="写明实际情况、核实结果或暂缓入库原因" /></el-form-item>
-        <el-form-item label="核实对象"><el-input v-model="timeReviewForm.contactName" maxlength="100" placeholder="例如车间负责人、业务员（可选）" /></el-form-item>
-        <el-form-item label="下次跟进"><el-date-picker v-model="timeReviewForm.nextFollowupDate" type="date" value-format="YYYY-MM-DD" clearable style="width: 100%" /></el-form-item>
-      </el-form>
-      <template #footer><el-button @click="timeReviewVisible = false">取消</el-button><el-button type="primary" :loading="timeReviewSaving" @click="saveTimeReview">{{ timeReviewEditingId ? '保存修改' : '保存核实记录' }}</el-button></template>
-    </el-dialog>
-    <el-dialog v-model="purchaseChooserVisible" title="选择采购入库单" width="min(620px, 94vw)" append-to-body>
-      <p class="muted">该生产工单关联 {{ purchaseReceipts.length }} 张采购入库单，选择一张查看台账详情。</p>
-      <el-table :data="purchaseReceipts" max-height="360" @row-click="openPurchaseDetail">
-        <el-table-column prop="sourceNo" label="采购入库单号" min-width="155" />
-        <el-table-column prop="purchaseDate" label="入库日期" width="120" />
-        <el-table-column prop="warehouseName" label="仓库" min-width="110" />
-        <el-table-column label="操作" width="80"><template #default="{ row }"><el-button link type="primary" @click.stop="openPurchaseDetail(row)">详情</el-button></template></el-table-column>
-      </el-table>
-    </el-dialog>
-    <el-dialog v-model="baselineVisible" title="节点参考完成基准" width="min(760px, 94vw)" append-to-body>
-      <p class="muted baseline-hint">
-        参考完成时间＝按「一般情况下这道工序需要几天」逐节点推算，供跟单员判断进度是否偏慢；超参考未完成可记录原因，不影响保存。
-        基准按车间类别配置，改完立即对全部在制单生效（参考值为派生、不落库，不保留旧判定）。
-      </p>
-      <div v-loading="baselineLoading" class="baseline-body">
-        <section v-for="w in baselineWorkshops" :key="w.workshopKind" class="baseline-group">
-          <h4>{{ w.workshopLabel }}</h4>
-          <el-table :data="w.stages" size="small" border>
-            <el-table-column prop="intervalLabel" label="节点区间" min-width="190" />
-            <el-table-column label="参考天数" width="150">
-              <template #default="{ row }">
-                <el-input-number v-model="row.typicalDays" :min="0" :max="60" :step="0.5" size="small" controls-position="right" placeholder="不设" class="baseline-days" />
-              </template>
-            </el-table-column>
-            <el-table-column label="现有基准来源" min-width="220">
-              <template #default="{ row }">
-                <span class="muted">{{ row.baselineNote || '未配置' }}<template v-if="row.sampleCount">（样本 {{ row.sampleCount }} 单）</template></span>
-                <el-tag v-if="row.optionalStage" size="small" type="info" effect="plain" class="baseline-tag">按需工序</el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
-        </section>
-        <p v-if="!baselineLoading && !baselineWorkshops.length" class="muted">未获取到基准配置。</p>
-      </div>
-      <template #footer>
-        <el-button @click="baselineVisible = false">取消</el-button>
-        <el-button type="primary" :loading="baselineSaving" @click="saveBaseline">保存</el-button>
-      </template>
-    </el-dialog>
-    <TrackingSourceDetailDrawer v-model="purchaseDetailVisible" kind="purchase" :loading="purchaseDetailLoading" :data="purchaseDetailData" :error="purchaseDetailError" />
+    <TrackingDetailDrawer v-model="detailVisible" :order-id="detailOrderId" :items="items" @saved="load()" />
     <ProductionTrackingAnalyticsDrawer v-model="analysisVisible" @open-order="openFromAnalysis" />
     <ProductionTrackingWeeklyReviewDrawer v-model="weeklyReviewVisible" @open-order="openFromAnalysis" />
   </div>
@@ -758,30 +496,29 @@
 
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchTracking } from '@/api/productionTracking'
 import type { TrackingOrder } from '@/api/productionTracking'
-import TrackingSourceDetailDrawer from '@/components/production/TrackingSourceDetailDrawer.vue'
-import ProductionSalesTracePanel from '@/components/production/ProductionSalesTracePanel.vue'
 import ProductionTaskImportDialog from '@/components/production/ProductionTaskImportDialog.vue'
+import TrackingDetailDrawer from '@/components/production/TrackingDetailDrawer.vue'
 import ProductionTrackingAnalyticsDrawer from './ProductionTrackingAnalyticsDrawer.vue'
 import ProductionTrackingWeeklyReviewDrawer from './ProductionTrackingWeeklyReviewDrawer.vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { isSourceUrgent } from '@/utils/trackingUrgency'
 import { trackingActionHint as actionHint, trackingActionLabel as actionLabel, trackingActionTone as actionTone } from '@/utils/trackingAction'
 // 源工单日期判据与「业务员要求工期」的口径唯一来源（列表 / 详情 / 导出共用，见该模块头注释）。
-import { daysBetween, effectiveLeadDaysText, invalidApplicationDate, invalidRequiredDate, leadDaysAlarm, leadDaysAwaitingScheduleNote, leadDaysBreakdown, leadDaysDeltaText, leadDaysDeltaTone, leadDaysKindText, leadDaysStartFallback, negativeLeadDays, negativeLeadReason, otherLeadDaysText } from '@/utils/trackingDateGuard'
+import { leadDaysCellClass, leadDaysTooltipHtml } from '@/utils/tracking/leadDaysDisplay'
+import { effectiveLeadDaysText, invalidApplicationDate, invalidRequiredDate, leadDaysKindText, otherLeadDaysText } from '@/utils/trackingDateGuard'
 // 页面的纯业务规则（节点 / 日期组合取数 / 时间核实 / 交付结果）不在这里写第二份，见该模块头注释。
-import { canQuickComplete, countdownTone, currentCompletionDate, deadlineOf, deliveryOutcomeText, expectedCompareText, forecastAdjustText, formatMinute, formatTime, inboundBeforeReporting, inboundGapText, inboundHint, inboundReportingHint, listCompletionTarget, listStages, needsTimeReason, productSize, productionCountdown, reportCompareText, reviewKindLabel, reviewOf, riskText, scheduleLagDays, shortDate, shortOrderNo, shortWorkshop, stageOverdue, stageStatusText, timeException, timeSignals, trackingStatusText, trackingStatusTone } from '@/utils/tracking/rules'
+import { canQuickComplete, countdownTone, currentCompletionDate, deliveryOutcomeText, forecastAdjustText, formatMinute, formatTime, inboundBeforeReporting, inboundHint, listCompletionTarget, listStages, productSize, productionCountdown, shortDate, shortOrderNo, shortWorkshop, stageStatusText, timeSignals, trackingStatusText, trackingStatusTone } from '@/utils/tracking/rules'
 import { todayKey } from '@/utils/tracking/today'
+import { TRACKING_ORDER_QUERY } from '@/utils/tracking/detailLink'
 import { useTrackingFilters } from '@/composables/tracking/useTrackingFilters'
 import { useTrackingExport } from '@/composables/tracking/useTrackingExport'
 import { useTrackingListColumns } from '@/composables/tracking/useTrackingListColumns'
 import { useTrackingWorkbook } from '@/composables/tracking/useTrackingWorkbook'
-import { useTrackingBaseline } from '@/composables/tracking/useTrackingBaseline'
 import { useTrackingRoundTrip } from '@/composables/tracking/useTrackingRoundTrip'
-import { useTrackingDetail } from '@/composables/tracking/useTrackingDetail'
 import { useTrackingListCompletion } from '@/composables/tracking/useTrackingListCompletion'
 
 /**
@@ -790,7 +527,7 @@ import { useTrackingListCompletion } from '@/composables/tracking/useTrackingLis
  */
 const {
   keyword, advancedFiltersVisible, dateFilters, countdownFilter, deliveryFilter, optionalStageFilter,
-  moldStageFilter, salespersonFilter, workshop, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
+  moldStageFilter, salespersonFilter, workshop, trackingStatus, timeFilter, urgentOnly, mine,
   filterOptions, COUNTDOWN_FILTER_OPTIONS, DELIVERY_FILTER_OPTIONS, optionalStageOptions, MOLD_STAGE_OPTIONS,
   quickFilterPresets, quickFilterActive, applyQuickFilter, activeAdvancedFilterCount,
   activeFilterChips, clearFilterChip, resetTrackingFilters, onCreatedDateChange, onExpectedDateChange,
@@ -825,15 +562,10 @@ const visibility = ref('ALL')
 const analysisVisible = ref(false)
 const weeklyReviewVisible = ref(false)
 const route = useRoute()
+const router = useRouter()
 watch(() => route.query.analysis, value => { if (value === '1') analysisVisible.value = true }, { immediate: true })
-function openFromAnalysis(id: number) { void openDetail({ id } as TrackingOrder) }
+function openFromAnalysis(id: number) { openOrderDetail({ id }) }
 const auth = useCurrentUser()
-/**
- * 节点参考基准天数的配置收在 useTrackingBaseline 里（权限判定也随模块走，页面只注入 auth.can）。
- */
-const {
-  canManageBaseline, baselineVisible, baselineLoading, baselineSaving, baselineWorkshops, openBaseline, saveBaseline
-} = useTrackingBaseline({ canManage: () => auth.can('manufacturing.baseline.manage'), reload: () => load() })
 const page = ref(1)
 /** 每页条数：由分页器「条/页」下拉选择（后端 list 接受 1~100）。 */
 const size = ref(30)
@@ -862,83 +594,35 @@ function onTrackingSelectionChange(rows: TrackingOrder[]) {
   selectedTrackingRows.value = rows
 }
 /**
- * 详情抽屉（打开 / 保存跟进 / 延期 / 处置 / 时间核实 / 采购入库 / 历史对照）收在 useTrackingDetail 里：
- * 抽屉里改的是节点副本、originalStages 存快照、保存时才提交；页面只保留模板绑定。
+ * 详情抽屉本身抽成 `TrackingDetailDrawer`（2026-10-22）：生产跟单页与「生产产品与工期管理」页
+ * 共用同一份模板与保存逻辑，产品页从历史任务 / 样本明细下钻时在原地打开、不再跳转过来。
+ * 页面这边只留「打开哪一单」，`items` 只为「保存并下一单」提供列表顺序。
  */
-const {
-  drawer, nextTrackingOrder, purchaseLinksLoading, purchaseReceipts, purchaseChooserVisible, purchaseDetailVisible,
-  purchaseDetailLoading, purchaseDetailData, purchaseDetailError,
-  detail, milestones, requiredTotal, doneStages, showSalesTrace, gapStages, stageGapLabels,
-  stagePercent, currentStageIndex, currentStage, referencePanels, expandedEntries,
-  timeReviewVisible, timeReviewSaving, timeReviewForm, timeReviewEditingId, deadlineDate, opDone, saving,
-  dispositionVisible, dispositionStopped, dispositionReason, dispositionSaving,
-  closureVisible, closureClosing, closureNote, closureSaving,
-  delayDialog, delaySaving, delayDraftDate, delayDraftReason, unsavedStageCount,
-  entryDiff, visibleDiff, toggleEntry, timeHistoryItems, stageNodeHistory,
-  expandedStages, toggleStage, pendingStageChanges, stageRecordCount,
-  openDetail, openPurchaseReceipts, openPurchaseDetail, quickStartCurrentStage,
-  quickCompleteCurrentStage, resetStageDraft, recordStageSequenceReason, openDelayDialog, saveDelay, save, saveAndNext,
-  openTimeReview, saveTimeReview, openDisposition, saveDisposition, openClosure, saveClosure, onStageStatusChange
-} = useTrackingDetail({ items: () => items.value, reload: () => load() })
+const detailVisible = ref(false)
+const detailOrderId = ref<number | null>(null)
+function openOrderDetail(row: { id: number }) {
+  detailOrderId.value = row.id
+  detailVisible.value = true
+}
+/**
+ * 深链打开某张工单的详情：`/production-tracking?order=<production_orders.id>`。
+ * 来源是「生产产品与工期管理」页的「历史任务 / 样本明细」里的「跟单详情」——
+ * 那边只认任务单号与 id，不认当前列表筛选，所以必须靠 query 直接把抽屉拉到前台。
+ * 打开后立刻把参数抹掉：否则关掉抽屉再点同一张单，watch 的值没变、不会重新触发（点了像没反应）。
+ */
+watch(() => route.query[TRACKING_ORDER_QUERY], value => {
+  if (value == null || value === '') return
+  const orderId = Number(value)
+  if (!Number.isInteger(orderId) || orderId <= 0) return
+  openOrderDetail({ id: orderId })
+  void router.replace({ path: route.path, query: { ...route.query, [TRACKING_ORDER_QUERY]: undefined } })
+}, { immediate: true })
 /**
  * 【日期语义 · 唯一说明】三个日期是三种性质，禁止互相顶替：车间预计完成 expectedFinishDate（源数据，
  * 本页只读）/ 订单要求完成 dueDate（业务员提出）/ 延期至 forecastFinishDate（协商后的新完成日）。
  * 它们共同构成的「截止基准 / 当前承诺日」口径已下沉到 `@/utils/tracking/rules`：
  * deadlineOf / currentCompletionDate / validRequiredDate 即唯一实现，页面只调用，不再自留一份 COALESCE。
  */
-/** 偏差小字的配色：晚=红、早=绿、一致=中性灰。 */
-function leadDeltaClass(row: TrackingOrder) {
-  const tone = leadDaysDeltaTone(row)
-  return tone === 'late' ? 'lead-delta-late' : tone === 'early' ? 'lead-delta-early' : ''
-}
-/**
- * 工期列主数值的配色：负数 / 「日期待核实」=红（日期本身可疑，必须看得见）；
- * 否则比要求晚=红、比要求早=绿、与要求一致=不着色。
- */
-function leadDaysCellClass(row: TrackingOrder) {
-  if (leadDaysAlarm(row)) return 'is-danger'
-  const tone = leadDaysDeltaTone(row)
-  return tone === 'late' ? 'lead-delta-late' : tone === 'early' ? 'lead-delta-early' : ''
-}
-/**
- * 工期列悬停提示里的**原因**部分；返回空串＝没有需要解释的事。
- * 三真身起算日不同（要求从申请日、计划/实际从车间排产日），起算口径不在这里复述——
- * 由明细行自带起止日期说清，避免同一件事讲两遍。
- */
-function leadDaysTooltip(row: TrackingOrder) {
-  const notes: string[] = []
-  if (negativeLeadDays(row)) notes.push(negativeLeadReason(row))
-  if (leadDaysStartFallback(row)) notes.push('排产时间未登记，实际工期按任务单提交日起算')
-  else if (leadDaysAwaitingScheduleNote(row)) notes.push(leadDaysAwaitingScheduleNote(row))
-  if (invalidApplicationDate(row)) notes.push('申请日期早于任务单提交日期，要求工期仍按申请日起算，天数偏长')
-  if (invalidRequiredDate(row)) notes.push('业务员要求日期早于申请/提交日期，要求工期无法计算')
-  else {
-    // 未排产的单只有要求工期：偏差恒为「与要求一致」（下面会跳过），只补一句为什么没有计划/实际
-    const delta = leadDaysDeltaText(row)
-    if (delta && delta !== '与要求一致') notes.push(delta)
-  }
-  return notes.join('；')
-}
-/**
- * 工期列的悬停明细（10-15 LQ 提：列里只显示一个数，「分不清到底是哪个工期」）。
- * 先列出这条工单实际具备的几个真身（**各带起算日与终点日**——三个真身起算日不同，
- * 不写出来就会被当成同一个起算日去比大小），当前取用的那个打「当前」，再挂原因说明。
- *
- * ⚠️ 用 el-tooltip 的 `raw-content` 才能换行 —— 内容全部由本页用日期与数字拼出，
- * 不含任何用户输入，不做转义是安全的；不要往里塞备注类的自由文本。
- */
-function leadDaysTooltipHtml(row: TrackingOrder) {
-  const lines = leadDaysBreakdown(row).map(item => {
-    const range = item.start && item.date ? `（${shortDate(item.start)} → ${shortDate(item.date)}）` : ''
-    const delay = item.delayed ? '，含延期' : ''
-    // 算不出天数时要把「缺的是起算日」写出来：明细只有终点、起算空白，会像日期填漏
-    const hint = item.missing && item.date && !item.start ? `（起算日缺失 → ${shortDate(item.date)}）` : ''
-    return `${item.current ? '<b>当前</b> ' : ''}${item.label} ${item.text}${range}${hint}${delay}`
-  })
-  const note = leadDaysTooltip(row)
-  if (note) lines.push(note)
-  return lines.join('<br/>')
-}
 /**
  * 进度表导入闭环（预览 / 待处理 / 关联 / 归档规则 / 差异审核）收在 useTrackingWorkbook 里：
  * 这条链路与列表、详情没有共享状态，唯一的交点是「导入或审核落地后刷新列表」⇒ reload。
@@ -1108,13 +792,6 @@ await Promise.all([loadColumnDefaults(), load()])
 @media (max-width: 960px) { .tracking-filter-bottom { margin-left: 0; width: 100%; justify-content: space-between; } .tracking-extra-filters { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); } }
 @media (max-width: 600px) { .toolbar { padding: 12px; } .tracking-filter-fields { width: 100%; } .tracking-filter-fields .tracking-keyword, .tracking-common-date { flex: 1 1 100%; width: 100%; } .tracking-filter-fields > :deep(.el-select) { flex: 1 1 calc(50% - 4px); width: calc(50% - 4px); } .tracking-filter-bottom { align-items: stretch; } .tracking-filter-actions { width: 100%; } .tracking-filter-actions :deep(.el-button) { flex: 1 1 auto; } .tracking-quick-filters, .tracking-active-filters { padding: 10px 12px; } .tracking-extra-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; } }
 .list-batch-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.baseline-hint { margin: 0 0 12px; line-height: 1.6; }
-.baseline-body { min-height: 120px; }
-.baseline-group { margin-bottom: 16px; }
-.baseline-group:last-of-type { margin-bottom: 0; }
-.baseline-group h4 { margin: 0 0 8px; font-size: 13px; font-weight: 600; }
-.baseline-days { width: 130px; }
-.baseline-tag { margin-left: 6px; }
 .tracking-table { width: 100%; }
 /* 表头吸顶（10-15）：
    ① .el-table 自带 overflow:hidden，会把表头的 sticky 拘在表格内部——而表格自身不滚动

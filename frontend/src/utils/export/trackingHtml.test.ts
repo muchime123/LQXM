@@ -421,6 +421,24 @@ describe('生产跟单导出：网页(HTML)组装', () => {
     expect(input.value).toBe('48')
   })
 
+  it('工具条四组排布：视图/纸张/编辑/打印分组，打印是主按钮，提示语独立成第二行', () => {
+    const html = buildTrackingHtml({ sheets: SAMPLE })
+    // 分组顺序与组名（梳理谁在哪组：观感调版归视图，介质与预览归纸张，改字与落盘归编辑）
+    const groups = [...html.matchAll(/<div class="tool-group"><span class="group-name">([^<]+)<\/span>/g)].map(m => m[1])
+    expect(groups).toEqual(['视图', '纸张', '编辑'])
+    expect(html.indexOf('group-name">纸张')).toBeGreaterThan(html.indexOf('group-name">视图'))
+    expect(html.indexOf('group-name">编辑')).toBeGreaterThan(html.indexOf('group-name">纸张'))
+    // 打印主操作在最后一个组里，且是 primary 实底按钮（跟次要按钮拉开层级）
+    const lastGroup = html.slice(html.lastIndexOf('<div class="tool-group">'))
+    expect(lastGroup).toContain('<button class="btn primary" type="button" onclick="window.print()">打印 / 另存为 PDF</button>')
+    expect(lastGroup).not.toContain('id="toggle-edit"')
+    // 提示语按「改字 / 调版 / 落盘」三段分句，独立占一整行（flex-basis:100%）
+    expect(html).toContain('.print-tip{flex-basis:100%;')
+    expect(html).toContain('<b>改字</b>')
+    expect(html).toContain('<b>调版</b>')
+    expect(html).toContain('<b>落盘</b>')
+  })
+
   it('页面内编辑：打开即是编辑态（数据格可改、改字挂黄底、空表提示格不可编），「完成编辑」退出后可再开', () => {
     const html = buildTrackingHtml({
       sheets: [{ name: 'A', headers: ['任务号', '备注'], body: [['SCGD1', 'x']] }, { name: 'B', headers: ['任务号'], body: [] }]

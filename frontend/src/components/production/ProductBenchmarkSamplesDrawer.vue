@@ -38,14 +38,23 @@
             <span v-else class="cell none">—</span>
           </template>
         </el-table-column>
+        <!-- 样本可疑（零天 / 被排除）时最想看的其实是原始那张单：在本页打开跟单详情核对节点完成日期，
+             不离开当前产品上下文（与「历史任务」抽屉同一个事件出口）。 -->
+        <el-table-column v-if="canOpenTracking" label="操作" width="96" fixed="right">
+          <template #default="{ row }">
+            <el-button link type="primary" @click="emit('open-order', row.orderId)">跟单详情</el-button>
+          </template>
+        </el-table-column>
       </el-table>
     </template>
   </el-drawer>
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { fetchProductBenchmarkSamples, type ProductBenchmarkSampleOrder, type ProductBenchmarkSampleStage, type ProductBenchmarkSamples } from '@/api/productionTracking'
+import { useCurrentUser } from '@/composables/auth/useCurrentUser'
+import { TRACKING_READ_PERMISSIONS } from '@/utils/tracking/detailLink'
 
 const props = defineProps<{
   modelValue: boolean
@@ -54,7 +63,11 @@ const props = defineProps<{
   /** 节点 code → 中文名，由调用方从基准矩阵带过来（本组件不再自己拉矩阵）。 */
   stageLabels: Record<string, string>
 }>()
-defineEmits<{ 'update:modelValue': [boolean] }>()
+const emit = defineEmits<{ 'update:modelValue': [boolean]; 'open-order': [number] }>()
+
+/** 「跟单详情」需要生产跟单页的读权限（任一即可），否则不给入口。 */
+const { can } = useCurrentUser()
+const canOpenTracking = computed(() => can(TRACKING_READ_PERMISSIONS))
 
 const loading = ref(false)
 const error = ref('')

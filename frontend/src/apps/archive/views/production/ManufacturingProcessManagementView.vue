@@ -9,7 +9,7 @@
       <div class="master-actions">
         <el-button @click="workshopDrawerOpen=true">车间管理</el-button>
         <el-button @click="operationDrawerOpen=true">工序库</el-button>
-        <el-button @click="openTaskConfigs">任务单产品与配置</el-button>
+        <el-button @click="openTaskConfigs">生产产品与工期管理</el-button>
       </div>
     </header>
 
@@ -326,7 +326,7 @@ const categoryTagType = (v: string): 'info' | 'warning' | 'success' | 'primary' 
   return 'info'
 }
 
-// 「任务单产品与配置」已独立成页（/manufacturing-task-configs），本页只保留入口按钮。
+// 「生产产品与工期管理」已独立成页（/manufacturing-task-configs），本页只保留入口按钮。
 const router=useRouter()
 const openTaskConfigs=()=>router.push('/manufacturing-task-configs')
 const workshopDrawerOpen=ref(false)
