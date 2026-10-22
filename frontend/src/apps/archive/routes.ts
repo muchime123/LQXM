@@ -131,6 +131,12 @@ export const archiveRoutes: RouteRecordRaw[] = [
     meta: { title: '氚云导入中心', layout: 'list', permission: 'integration.h3', group: 'h3' }
   },
   {
+    path: '/cashflow-journal',
+    name: 'cashflowJournal',
+    component: () => import('@/apps/archive/views/settlement/CashflowJournalView.vue'),
+    meta: { title: '资金日记账', layout: 'list', permission: 'integration.h3', group: 'h3' }
+  },
+  {
     path: '/h3-sales-products',
     name: 'h3SalesProducts',
     component: () => import('@/apps/archive/views/governance/H3SalesProductAnalysisView.vue'),
@@ -169,13 +175,14 @@ export const archiveRoutes: RouteRecordRaw[] = [
     component: () => import('@/apps/archive/views/production/ManufacturingProcessManagementView.vue'),
     meta: { title: '制程与工序管理', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
   },
-  // 「任务单产品与配置」原为制程管理页内的抽屉，2026-09-24 独立成页：
+  // 「生产产品与工期管理」原为制程管理页内的抽屉，2026-09-24 独立成页：
   // 它是新建任务单的联动数据源，也是产品身份（可售库存口径）的锚点，需要独立演进。
+  // 2026-10-22 更名并接管原生产跟单页的「基准设置」（通用参考）；路由保持不变，避免影响已有跳转。
   {
     path: '/manufacturing-task-configs',
     name: 'manufacturingTaskConfigs',
     component: () => import('@/apps/archive/views/production/ManufacturingTaskConfigView.vue'),
-    meta: { title: '任务单产品与配置', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
+    meta: { title: '生产产品与工期管理', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
   },
   // 月度提成核算（现行简化口径，独立只读视图）：本月实际回款 − 上月运杂费，不依赖旧提成体系
   {

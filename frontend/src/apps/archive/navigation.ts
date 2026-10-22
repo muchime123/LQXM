@@ -28,6 +28,14 @@ export const archiveNavItems: NavItem[] = [
         group: 'h3'
       },
       {
+        to: '/cashflow-journal',
+        permission: 'integration.h3',
+        label: '资金日记账',
+        description: '按期间查看各账户收入、支出、期初、期末及流水明细。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>',
+        group: 'h3'
+      },
+      {
         to: '/h3-sales-products',
         permission: 'integration.h3',
         label: '销售出库产品分析',
@@ -76,8 +84,8 @@ export const archiveNavItems: NavItem[] = [
       {
         to: '/manufacturing-task-configs',
         permission: 'manufacturing.template.manage',
-        label: '任务单产品与配置',
-        description: '维护各产线可下单的产品名称与可选配置，并在同一页按产品逐个维护跟单节点参考间隔（未发布时沿用车间基准）。',
+        label: '生产产品与工期管理',
+        description: '维护氚云产品字典镜像与各产品的节点参考工期，并在右上角「通用参考设置」统一维护兜底用的通用节点参考工期（产品优先、通用兜底）。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="15" width="18" height="5" rx="1.5"/><circle cx="8" cy="7.5" r="1.2"/></svg>',
         group: 'h3'
       },
