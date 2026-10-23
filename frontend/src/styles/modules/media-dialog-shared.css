@@ -44,7 +44,11 @@
 }
 
 .media-form-dialog .form-dialog-header {
+  align-items: center;
+  display: flex;
   flex: 1 1 auto;
+  gap: var(--space-control-gap-wide);
+  justify-content: space-between;
   min-width: 0;
   padding: 0;
 }
@@ -60,12 +64,21 @@
 }
 
 .media-form-dialog .form-dialog-header h3 {
+  color: var(--color-text-heading);
+  font-size: var(--fs-xl);
+  font-weight: var(--fw-extrabold);
+  line-height: var(--lh-tight);
+  margin: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .media-form-dialog .form-dialog-header p {
+  color: var(--color-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-bold);
+  margin: 5px 0 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;

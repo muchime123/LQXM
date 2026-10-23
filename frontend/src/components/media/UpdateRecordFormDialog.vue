@@ -75,28 +75,6 @@ function handleSave() {
 <style scoped>
 @import '../../styles/media-account-view.css';
 
-.form-dialog-header {
-  align-items: center;
-  display: flex;
-  gap: var(--space-control-gap-wide);
-  justify-content: space-between;
-  padding: 0;
-}
-
-.form-dialog-header h3 {
-  color: var(--color-text-heading);
-  font-size: var(--fs-xl);
-  font-weight: var(--fw-extrabold);
-  line-height: var(--lh-tight);
-  margin: 0;
-}
-
-.form-dialog-header p {
-  color: var(--color-text-muted);
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-bold);
-  margin: 5px 0 0;
-}
 
 .platform-badge {
   background: var(--color-surface-alt);
