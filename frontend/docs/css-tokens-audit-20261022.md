@@ -535,4 +535,79 @@ C5 标记为治理完成，未决项（EP 深色变体、`--color-primary-border
 
 ### C6 收口
 
-C6 为只读审计，本轮**未修改任何代码**。核实结果改变了初期的判断：`.btn-sm` 不抽统一按钮组件，`utilities.css` 的 `btn-danger` / `btn-success` 归入 C8 删除候选而非在中途改颜色，真正动手的重复实现留给 C7。下一步进入 **C7：跨文件重复实现专项**。
+C6 为只读审计，本轮**未修改任何代码**。核实结果改变了初期的判断：`.btn-sm` 不抽统一按钮组件，`utilities.css` 的 `btn-danger` / `btn-success` 归入 C8 删除候选而非在中途改颜色，真正动手的重复实现留给 C7。
+
+---
+
+## C7 跨文件重复样式实现专项（2026-10-23，只读审计）
+
+工具 `frontend/scripts/audit/style-duplicates.mjs`。解析 5,391 条规则，剔除 `__tests__` / `*.test.*` / `*.spec.*`、构建产物与注释内容。
+
+**分类**：C7-A 完全重复（同选择器 + 同声明跨文件）· C7-B 轻微漂移（同选择器、声明不一致）· C7-C 相似但职责不同（人工判定）· C7-D 重复引入（同一份样式文件被多个组件导入编译）。
+
+> 口径修正：置于 `src/styles/` 下的文件若在组件 `<style scoped>` 里 `@import`，运行时会被加上 `data-v`，**实际是组件级作用域而非全局**。C6 把它们一律记为 global，此处更正——`media-account-view.css` 与 `packaging-detail-drawer.css` 均属这种情况。
+
+### C7-D 重复引入（合规 ⇒ 但实际以体积与维护为代价）
+
+| 样式文件 | 被引入次数 | 引入方 | 引入方式 |
+|---|---|---|---|
+| `src/styles/media-account-view.css` | **7** | `ImportUpdatePreviewModal`、`MediaAccountDetailModal`、`MediaAccountEditorModal`、`MediaAccountStats`、`MediaAnalyticsPanel`、`MediaPlatformConfigModal`、`UpdateRecordFormDialog` | 均在 `<style scoped>` 中 `@import` |
+| `src/styles/packaging-detail-drawer.css` | 3 | `PackagingDetailDrawer`、`PackagingSpecDetailPanel`、`PackagingVariantCards` | 同上 |
+
+同一份文件被编译 7 / 3 份，每份都换一个 `data-v`。**不建议直接改为全局导入**——那会改变选择器作用域，可能引入新的覆盖问题（风险：高）。正确方向是先分清其中哪些规则是真正跨组件复用的，再决定提取到 `modules/` 层由单一入口引入。
+
+### C7-A 完全重复：其中大部分是**未使用的复制块**（新发现）
+
+`form-dialog-header` / `form-dialog-footer` / `dialog-actions` / `btn-cancel` / `btn-save` / `batch-count-pill` 在 4–6 个 media 对话框里逐字节重复。但逐行核对后，**模板使用情况并不一致**：
+
+| 类 | 定义处 | 模板是否使用 |
+|---|---|---|
+| `.form-dialog-header`（含 `h3` / `p`） | 6 个文件 | 是（4 个 media 对话框 + `MediaAccountEditorModal`） |
+| `.batch-count-pill` | 5 个文件 | 是（3 个批量对话框） |
+| `.dialog-actions` / `.form-dialog-footer` / `.btn-cancel` / `.btn-save`（含 `:hover`、`:disabled`） | 4 个文件 × 9 条 ≈ **36 条规则** | **否** |
+
+未使用的结论经过全仓核验：4 个对话框里这 9 处命中**全部落在 `<style>` 内**；对全仓 `*.vue` 模板与 `*.ts`（含父组件插槽内容）检索这几个类名，**零命中**。→ 转 **C8**，低风险。
+
+仍在使用的 `form-dialog-header` 与 `batch-count-pill` 属真实重复实现，且 `modules/media-dialog-shared.css` 本来就为这层服务 → 收敛进该文件是最自然的方向（中风险，需视觉确认前后一致）。
+
+### 表格 / 分页：原假设被推翻
+
+原假设是"业务页面重复实现了 `LqTable` / `LqPagination` 的视觉规范"。实测并非如此：
+
+| 层 | 实际写法 |
+|---|---|
+| `LqTable.vue`（公共） | 提供字号、表头背景/字色/字重、条纹、hover、三种密度的 cell padding 等完整规范（11 条） |
+| 业务侧 | 只做局部打补丁：`ManufacturingTaskConfigPanel` 与 `WebsiteSolutionsView` 改 EP 主题变量（`--el-table-border-color`、`--el-table-header-bg-color`、`--el-table-row-hover-bg-color`、`--el-table-header-text-color`）；`ProductionTrackingWeeklyReviewDrawer` 改分页对齐（`margin-top`、`justify-content`） |
+
+**没有重复实现表头外观**。真正的问题是这些页面**裸用 `el-table`（8 / 17 / 24 处，均未使用 `LqTable`）**，绕过公共组件后再局部打补丁；分页同理，`ProductionTrackingWeeklyReviewDrawer` 裸用 `el-pagination`，而 `MasterListPanel` 已用 `LqPagination`。这属于"是否迁移到现有公共组件"的问题而非样式去重，属高风险改造，本轮只记录。
+
+### C7-B 轻微漂移（需视觉确认）
+
+| 选择器 | 文件数 / 写法数 | 漂移内容 |
+|---|---|---|
+| `.page-head` | 6 / 8 | `gap` 有 `24px` / `var(--space-lg-xl, 16px)` / `12px` / `16px` / `14px` 五种；`align-items` 有 `flex-start` / `center` / `stretch` |
+| `.page-header` | 4 / 5 | `margin-bottom` `16px` vs 缺；部分文件用 `position: relative` + flex 布局，部分不用 |
+| `.batch-bar` | 4 / 4 | `gap` `10px` / `8px` / `var(--space-md)`；`padding` `8px 12px` / `10px 12px` / `10px 18px` |
+| `.filter-chip` | 2 / 2 | `padding` `3px 12px` vs `0 10px`；边框用 `--color-border-light` vs `--color-border`；文字 `--color-text-secondary` vs `--color-text-muted`；字号 `12px` vs `--fs-xxs` |
+| `.btn-sm` | 9 / 6 | 已在 C6 记录（`padding` 五种、`border-radius` 四种、文字色四类） |
+
+均为**中风险**：职责相似，统一与否取决于是否确认视觉一致，需前后截图比对，不凭文本相似度判定。
+
+### C7 结论清单
+
+| 问题 | 涉及文件 | 是否同一职责 | 实际影响 | 建议 | 风险 |
+|---|---|---|---|---|---|
+| `media-account-view.css` 编译 7 份 | 7 个 media 组件 | 是 | 样式体积与维护成本：改一处要同步 7 个认知入口 | 先区分真正复用部分，再评估提取到 `modules/` 由单一入口引入；**不要**简单改全局导入 | 高（涉作用域与加载顺序） |
+| `packaging-detail-drawer.css` 编译 3 份 | 3 个包材组件 | 是 | 同上，但规模较小 | 同上；已确认其在 scoped 下不外溢，非紧急 | 高（同上） |
+| `.dialog-actions` / `.form-dialog-footer` / `.btn-cancel` / `.btn-save` 复制块 ≈ 36 条 | 4 个 media 对话框 | —（根本没在用） | 无视觉效果，只增加维护噪音 | **删除**，转 C8 | 低（全仓零引用，可证明删除后样式不变） |
+| `.form-dialog-header`（含 `h3`/`p`）重复 6 份 | 4 个 media 对话框 + `MediaAccountEditorModal` | 是（同为表单弹窗标题区） | 同素材维护 6 份，易漂移 | 收敛进已有的 `modules/media-dialog-shared.css` | 中（需视觉确认前后一致） |
+| `.batch-count-pill` 重复 5 份 | 3 个批量对话框在用 | 是 | 同上 | 同上 | 中 |
+| `.page-head` / `.page-header` / `.batch-bar` / `.filter-chip` 漂移 | 6 / 4 / 4 / 2 个文件 | 待核实（名称相同，场景可能有别） | 页面头部间距不统一 | 视觉专项：先确认哪些页面应一致，再决定是否统一 | 中（需前后截图） |
+| 裸用 `el-table` / `el-pagination` 后局部打补丁 | 4 个页面/组件 | 否（不是重复实现） | 公共组件规范未覆盖到这些页面，靠 EP 变量微调 | 记录；是否迁移到 `LqTable` / `LqPagination` 属独立改造 | 高 |
+| `:root` / `[data-theme='dark']` 令牌分层定义 | `tokens.css`、`element-plus.css` 等 | 否 | 无 | **不修改**，扫描器已排除该类误报 | 无 |
+
+**实施顺序（按收益/风险，而非重复行数）**：① 删除未使用的复制块（低风险、无视觉影响，转 C8）→ ② `form-dialog-header` / `batch-count-pill` 收敛进已有 `media-dialog-shared.css`（中风险、收益明确）→ ③ 重复引入文件的单一入口评估（高风险，需专项验证作用域）→ ④ 漂移类统一（中风险，依赖视觉确认）。
+
+### C7 收口
+
+本轮**未修改任何代码**，未新建组件，未把业务 CSS 搬进 `utilities.css`。结论按「可直接去重 / 需视觉确认 / 合理重复应保留 / 转 C8」四类归档，下一步按上述顺序推动。
