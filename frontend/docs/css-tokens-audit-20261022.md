@@ -84,3 +84,68 @@
 - 计数为"命中行数"下限；`.vue` 硬编码间距/字号在 141/80+ 文件上输出截断，数字为下限。
 - **深色模式未做渲染截图验证**——C1-C3 的判断基于源码比对（dark.css 变量补集），修复后应补一轮深色截图对比。
 - `--text-body` 等"字号+行高组合令牌"的实际使用率未逐个统计。
+
+---
+
+## 修订记录（2026-10-23 实测校正）
+
+### C3 范围修正：审计低估
+
+审计原文把 C3 描述为"`utilities.css:38,146,265` 三处"。真实渲染实测后，**范围远大于此**：
+
+| 项 | 审计原判 | 实测真实值 |
+|---|---|---|
+| 命中文件数 | 1 | **23** |
+| 命中处数 | 3 | **47**（`^\s*color:\s*var\(--color-surface\)`） |
+| 分布 | utilities.css | packaging-detail-drawer.css(8)、asset-gallery.css(7)、media-account-view.css(5)、asset-toolbar.css(3)、CertificateView.vue(3)、MediaAccountDetailModal.vue(3)、modules/dialog-layout.css(2)、master-layout.css(2)、modules/list-controls.css(1)，以及 15 个组件各 1 处 |
+
+**实测纠正（重要）**：此前基于目视判断的"深色对比度崩坏"结论**不成立**。`/packaging`「新增规格」按钮（`.btn-sm.primary`）实测计算样式为 `color: rgb(30, 41, 59)` + `background: rgb(20, 184, 166)`，按 WCAG 2.1 计算对比度为 **5.88:1，达到 AA（4.5:1）**；浅色同为 **5.47:1**。原因是深色主题把主色调亮（`#14b8a6`）而把 `--color-surface` 调暗（`#1e293b`），二者恰好构成及格的明暗配对。
+
+同时实测推翻了"修 utilities.css 即可"的隐含结论：该按钮的实际渲染由**局部定义**（`PackagingVariantEditor.vue:381` 等的 `.btn-sm.primary`）决定，全局 utilities.css 那份被组件 scoped 样式覆盖。
+
+### 对比度实测矩阵（WCAG 2.1，脚本 `frontend/scripts/audit/primary-btn-probe.mjs`）
+
+| 场景 | 深色现状（surface 作文字） | 改为白字后 | 判定 |
+|---|---|---|---|
+| A 主色实心（`#14b8a6`） | **5.88:1 ✓** | 2.49:1 ✗ | 现状达标，改白**劣化** |
+| E 琥珀底（`#f59e0b`） | **6.82:1 ✓** | 2.15:1 ✗ | 现状达标，改白**劣化** |
+| E 绿色底（`#22c55e`） | **6.42:1 ✓** | 2.28:1 ✗ | 现状达标，改白**劣化** |
+| B 图片遮罩（`rgba(0,0,0,.6)`） | 约 1.4:1 ✗ | 约 8.9:1 ✓ | **确实崩坏**，改白修复 |
+| C 危险色实心（`#ef4444`） | 3.89:1 ✗ | 3.77:1 ✗ | 控件内容是字符 `x`（文本，门槛 4.5），两者均未达标 → 不动，归 P1 |
+| E 灰底徽标（`--color-text-tertiary`） | 3.08:1 ✗ | 4.76:1 ✓ | **确实不足**，改白修复 |
+| D 反转（`--color-text-heading` 底 + surface 字） | 双主题均高对比 ✓ | 改白会破坏 | 保持 |
+
+> 根源：深色主题为"在深色背景上可辨"而**调亮**了主色/状态色，但这些调亮后的色值又被用作**填充面背景**，此时白字反而不达标。这是缺少"填充面色阶（solid/filled scale）"的系统性问题，不是单靠替换文字色能解决的。
+
+### 最终分类与处置（47 处，A–E）
+
+| 类 | 处数 | 处置 | 依据 |
+|---|---|---|---|
+| A 主色实心 | 34（含 `utilities.css:146`） | **不动**（并回退先前误改） | 深色 5.88 ✓；改白 2.49 ✗ |
+| B 遮罩/图片 | 7 | 改 `--color-text-on-overlay`（新增） | 深色 1.4 ✗ → 8.9 ✓ |
+| C 危险色实心 | 1（`CertDetailModal.vue:1586`） | **不动**（曾改后回退） | 该控件内容是字符 `x`（文本字形，适用 4.5 门槛），白 3.77 / 深 3.89 **均未达标**；浅色下两值同为 `#ffffff` 属零变化，深色下改白为 −0.12 的微小劣化，无改善 → 归入 P1 填充色阶 |
+| D 刻意反转 | 1（`DingtalkSyncPanel.vue:637`） | 不动 | 双主题均高对比 |
+| E 灰底徽标 | 1（`asset-gallery.css:325`） | 改 `--color-text-on-overlay` | 3.08 ✗ → 4.76 ✓ |
+| E 琥珀/绿色底 | 3 | 不动 | 深色 6.82/6.42 ✓，改白 2.15/2.28 ✗ |
+
+**浅色零变化保证**：浅色 `--color-surface` 与新令牌同为 `#ffffff`，故 B/E 所有改动在浅色模式下计算色完全不变（已实测 `.thumb-drop-label` 浅色 = `rgb(255,255,255)`）。
+
+### B 类「图片上的文字」实测（真实图片亮度，非固定色值推断）
+
+`/packaging` 采集 24 张真实图片的亮度分布：`p50` 范围 0 → **0.999**，`p95` 范围 0.266 → **1.0**——**近乎纯白的图片真实存在**，因此必须按纯白最坏情况核算：
+
+| 元素 | 遮罩层 | 纯白图下白字对比度 | 判定 |
+|---|---|---|---|
+| `.asset-ext-corner` | `rgba(15,23,42,.62)` | 5.03 | ✓ |
+| `.htb-btn:hover` | 父层 `--color-overlay-dark`(.82) + `.14` 白叠加 | 7.16 | ✓ |
+| `.manager-actions button` | 父层 `overlay-image-strong`(.7/.8) + `.2` 白叠加 | 4.94 / 6.69 | ✓ |
+| `.thumb-drop-label` | `rgba(15,23,42,.55)` → 已提到 `.62` | 4.04 → **5.03** | ✓（本轮一并修） |
+| `.hero-image-count`、`.carousel-*` | `--color-overlay-image`(.5/.6) | 深色 5.74 ✓ / 浅色 3.95 | 浅色为既有状态、本轮零变化，记 P2 |
+
+### 已修与未修（截至 2026-10-23）
+
+- **已修并实测通过**：dark.css 补 12 条令牌（C1+C2）+ 新增 1 条语义令牌（`--color-text-on-overlay`）；浏览器实测 13/13 令牌解析正确（脚本 `frontend/scripts/audit/dark-check.mjs`）。
+- **已修**：B 类 7 处、E 灰底 1 处；另 `.thumb-drop-label` 遮罩透明度 0.55 → 0.62（与 `.asset-ext-corner` 对齐）。
+- **回退（C 类）**：`CertDetailModal.vue` 的 `.btn-icon:hover` 保持 `--color-surface`。理由见上：内容为文本字形 `x`，两种取值均未达 4.5，改动无改善。
+- **回退**：`utilities.css` 三处（A 类改白会劣化；其中 `.btn-primary`、`a.shop-link` 为 0 使用死代码，宜在 C10 删除而非改色）。
+- **遗留 P1**：深色"填充主色/状态色面 + 白字"体系不达标（EP 主按钮白字压 `#14b8a6` 实测 2.49 ✗，全站性）。需引入 `--color-primary-solid` / `--color-danger-solid` 等填充色阶并与 Element Plus 填充色统一后再一并处理。
