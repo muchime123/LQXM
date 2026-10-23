@@ -1,5 +1,6 @@
 """Read-only B-1 acceptance; run only after an authorized Flyway migration."""
 import json
+import os
 from decimal import Decimal
 from pathlib import Path
 import pymysql
@@ -7,7 +8,10 @@ import pymysql
 backup = json.loads(Path("db_backup_cashflow_b1_20261023.json").read_text(encoding="utf-8"))
 expected = {int(row["id"]): Decimal(row["opening_balance"]) for row in backup["rows"]}
 assert len(expected) == 35
-con = pymysql.connect(host="localhost", user="root", password="123456", database="product_archive")
+con = pymysql.connect(host=os.environ.get("DB_HOST", "localhost"),
+                      user=os.environ.get("DB_USER", "root"),
+                      password=os.environ["DB_PASSWORD"],
+                      database=os.environ.get("DB_NAME", "product_archive"))
 cur = con.cursor()
 cur.execute("SELECT account_id,amount,source,active,finance_confirmed FROM cashflow_account_opening WHERE fiscal_year=2026")
 rows = cur.fetchall()

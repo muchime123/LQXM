@@ -4,6 +4,7 @@ import com.liqiang.archive.entity.*;
 import com.liqiang.archive.service.CompanyCertificationService;
 import com.liqiang.archive.service.CompanyInfoService;
 import com.liqiang.archive.dto.CompanyDtos.*;
+import com.liqiang.archive.dto.CompanyInfoUpdateRequest;
 import com.liqiang.archive.security.RequirePermission;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -38,13 +39,14 @@ public class CompanyInfoController {
 
     @RequirePermission("company.manage")
     @PutMapping("/info")
-    public ResponseEntity<CompanyInfoView> updateCompanyInfo(@RequestBody CompanyInfo info) {
+    public ResponseEntity<CompanyInfoView> updateCompanyInfo(@RequestBody CompanyInfoUpdateRequest info) {
         return ResponseEntity.ok(CompanyInfoView.from(service.updateCompanyInfo(info)));
     }
 
     // ===== 财务账户 =====
 
     @GetMapping("/accounts")
+    @RequirePermission("company.manage")
     public ResponseEntity<List<AccountView>> getAccounts() {
         return ResponseEntity.ok(map(service.getAccounts(), AccountView::from));
     }

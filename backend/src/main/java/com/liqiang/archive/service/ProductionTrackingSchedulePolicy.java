@@ -18,8 +18,12 @@ final class ProductionTrackingSchedulePolicy {
                             Map<String,Boolean> applicable, Map<String,String> statuses,
                             Map<String,LocalDate> completed, Map<String,LocalDate> manual,
                             LocalDate scheduled, LocalDate deadline, LocalDate today) {
-        var active=codes.stream().filter(code->!ProductionTrackingPolicy.isOptionalStage(code)
+        var filtered=codes.stream().filter(code->!ProductionTrackingPolicy.isOptionalStage(code)
                 ||Boolean.TRUE.equals(applicable.get(code))).toList();
+        // #39: 交期口径终点＝入库（WAREHOUSE）；入库后的节点（如木箱）不参与交期倒排与预测完成。
+        int warehouseIdx=filtered.indexOf("WAREHOUSE");
+        var active=warehouseIdx>=0&&warehouseIdx<filtered.size()-1
+                ?filtered.subList(0,warehouseIdx+1):filtered;
         var targets=new LinkedHashMap<String,LocalDate>();
         LocalDate target=deadline;
         for(int i=active.size()-1;i>=0;i--){

@@ -481,7 +481,7 @@ y2="16" />
     </template>
 
     <!-- ===== 财务账户 Tab（仅管理员） ===== -->
-    <template v-else-if="activeTab === 'accounts' && isAdmin">
+    <template v-else-if="activeTab === 'accounts' && canManageCompany">
       <CompanyAccountsTab :file-url-resolver="companyFieldFileUrl" />
     </template>
 
@@ -540,7 +540,7 @@ const canManageCompany = computed(() => can('company.manage'))
 /** 仅系统管理员（ADMIN）可见的 Tab：财务账户、知识库 */
 const ADMIN_ONLY_TAB_KEYS: CompanyManagementTabKey[] = ['accounts', 'kb']
 const isAdmin = computed(() => !!user.value?.roles?.includes('ADMIN'))
-const tabs = computed(() => COMPANY_MANAGEMENT_TABS.filter(tab => !ADMIN_ONLY_TAB_KEYS.includes(tab.key) || isAdmin.value))
+const tabs = computed(() => COMPANY_MANAGEMENT_TABS.filter(tab => tab.key === 'accounts' ? canManageCompany.value : !ADMIN_ONLY_TAB_KEYS.includes(tab.key) || isAdmin.value))
 
 const activeTab = ref<CompanyManagementTabKey>('overview')
 watch([() => route.query.tab, tabs], ([tab, list]) => {

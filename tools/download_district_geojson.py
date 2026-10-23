@@ -19,7 +19,9 @@ CHINA_JSON = os.path.join(MAP_ROOT, 'china.json')
 PROV_DIR = os.path.join(MAP_ROOT, 'provinces')
 OUT_DIR = os.path.join(MAP_ROOT, 'cities')
 BASE_URL = 'https://geo.datav.aliyun.com/areas_v3/bound/{adcode}_full.json'
-DB = dict(host='127.0.0.1', port=3306, user='root', password='123456', database='product_archive', charset='utf8mb4')
+DB = dict(host=os.environ.get('DB_HOST', '127.0.0.1'), port=int(os.environ.get('DB_PORT', '3306')),
+          user=os.environ.get('DB_USER', 'root'), password=os.environ['DB_PASSWORD'],
+          database=os.environ.get('DB_NAME', 'product_archive'), charset='utf8mb4')
 
 ADMIN_SUFFIX = ['特别行政区', '维吾尔自治区', '壮族自治区', '回族自治区', '自治区', '自治州', '自治县', '地区', '省', '市', '县', '区', '盟']
 ETHNIC_RE = re.compile(r'(?:蒙古族?|回族?|藏族?|维吾尔族?|苗族?|彝族?|壮族?|布依族?|朝鲜族?|满族?|侗族?|瑶族?|白族?|土家族?|哈尼族?|哈萨克族?|傣族?|黎族?|傈僳族?|佤族?|畲族?|高山族?|拉祜族?|水族?|东乡族?|纳西族?|景颇族?|柯尔克孜族?|土族?|达斡尔族?|仫佬族?|羌族?|布朗族?|撒拉族?|毛南族?|仡佬族?|锡伯族?|阿昌族?|普米族?|怒族?|鄂温克族?|鄂伦春族?|赫哲族?|门巴族?|珞巴族?|塔吉克族?|乌孜别克族?|俄罗斯族?|裕固族?|保安族?|京族?|塔塔尔族?|德昂族?|独龙族?|基诺族?)+$')

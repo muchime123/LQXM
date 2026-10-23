@@ -181,3 +181,5 @@ frontend/dist-p2a/
 /db_backup_*.json
 backend/_*.py
 /tools/_*.py
+frontend/_build_c8a_before/
+/val_perler_work/

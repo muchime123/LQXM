@@ -1,6 +1,9 @@
 package com.liqiang.archive.service;
 
 import com.liqiang.archive.entity.*;
+import com.liqiang.archive.dto.CompanyInfoUpdateRequest;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import com.liqiang.archive.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -86,46 +89,43 @@ public class CompanyInfoService {
     }
 
     @Transactional
-    public CompanyInfo updateCompanyInfo(CompanyInfo info) {
+    public CompanyInfo updateCompanyInfo(CompanyInfoUpdateRequest info) {
         CompanyInfo existing = getCompanyInfo();
-        existing.setCompanyName(info.getCompanyName());
-        existing.setFormerName(info.getFormerName());
-        existing.setCompanyNameEn(info.getCompanyNameEn());
-        existing.setBrandName(info.getBrandName());
-        existing.setBrandNameEn(info.getBrandNameEn());
-        existing.setBrandSlogan(info.getBrandSlogan());
-        existing.setMission(info.getMission());
-        existing.setVision(info.getVision());
-        existing.setValues(info.getValues());
-        existing.setBusinessModel(info.getBusinessModel());
-        existing.setServiceCapabilities(info.getServiceCapabilities());
-        existing.setCustomerTypes(info.getCustomerTypes());
-        existing.setApplicationScenarios(info.getApplicationScenarios());
-        existing.setUnifiedSocialCode(info.getUnifiedSocialCode());
-        existing.setLegalRepresentative(info.getLegalRepresentative());
-        existing.setCompanyType(info.getCompanyType());
-        existing.setRegisteredCapital(info.getRegisteredCapital());
-        existing.setPaidCapital(info.getPaidCapital());
-        existing.setInsuredCount(info.getInsuredCount());
-        existing.setEnterpriseScale(info.getEnterpriseScale());
-        existing.setEstablishmentDate(info.getEstablishmentDate());
-        existing.setBusinessTerm(info.getBusinessTerm());
-        existing.setBusinessScope(info.getBusinessScope());
-        existing.setRegisteredAddress(info.getRegisteredAddress());
-        existing.setOfficeAddress(info.getOfficeAddress());
-        existing.setFactoryAddress(info.getFactoryAddress());
-        existing.setPhone(info.getPhone());
-        existing.setEmail(info.getEmail());
-        existing.setWebsite(info.getWebsite());
-        existing.setCorePositioning(info.getCorePositioning());
-        existing.setMainBusiness(info.getMainBusiness());
-        existing.setTargetIndustries(info.getTargetIndustries());
-        existing.setAdvantages(info.getAdvantages());
-        existing.setRevenueDevicePct(info.getRevenueDevicePct());
-        existing.setRevenueConsumablePct(info.getRevenueConsumablePct());
-        existing.setLicenseFileName(info.getLicenseFileName());
-        existing.setSealFileName(info.getSealFileName());
-        existing.setLogoFileName(info.getLogoFileName());
+        if (info.has("companyName")) existing.setCompanyName(info.getCompanyName());
+        if (info.has("formerName")) existing.setFormerName(info.getFormerName());
+        if (info.has("companyNameEn")) existing.setCompanyNameEn(info.getCompanyNameEn());
+        if (info.has("brandName")) existing.setBrandName(info.getBrandName());
+        if (info.has("brandNameEn")) existing.setBrandNameEn(info.getBrandNameEn());
+        if (info.has("brandSlogan")) existing.setBrandSlogan(info.getBrandSlogan());
+        if (info.has("mission")) existing.setMission(info.getMission());
+        if (info.has("vision")) existing.setVision(info.getVision());
+        if (info.has("values")) existing.setValues(info.getValues());
+        if (info.has("businessModel")) existing.setBusinessModel(info.getBusinessModel());
+        if (info.has("serviceCapabilities")) existing.setServiceCapabilities(info.getServiceCapabilities());
+        if (info.has("customerTypes")) existing.setCustomerTypes(info.getCustomerTypes());
+        if (info.has("applicationScenarios")) existing.setApplicationScenarios(info.getApplicationScenarios());
+        if (info.has("unifiedSocialCode")) existing.setUnifiedSocialCode(info.getUnifiedSocialCode());
+        if (info.has("legalRepresentative")) existing.setLegalRepresentative(info.getLegalRepresentative());
+        if (info.has("companyType")) existing.setCompanyType(info.getCompanyType());
+        if (info.has("registeredCapital")) existing.setRegisteredCapital(info.getRegisteredCapital());
+        if (info.has("paidCapital")) existing.setPaidCapital(info.getPaidCapital());
+        if (info.has("insuredCount")) existing.setInsuredCount(info.getInsuredCount());
+        if (info.has("enterpriseScale")) existing.setEnterpriseScale(info.getEnterpriseScale());
+        if (info.has("establishmentDate")) existing.setEstablishmentDate(info.getEstablishmentDate());
+        if (info.has("businessTerm")) existing.setBusinessTerm(info.getBusinessTerm());
+        if (info.has("businessScope")) existing.setBusinessScope(info.getBusinessScope());
+        if (info.has("registeredAddress")) existing.setRegisteredAddress(info.getRegisteredAddress());
+        if (info.has("officeAddress")) existing.setOfficeAddress(info.getOfficeAddress());
+        if (info.has("factoryAddress")) existing.setFactoryAddress(info.getFactoryAddress());
+        if (info.has("phone")) existing.setPhone(info.getPhone());
+        if (info.has("email")) existing.setEmail(info.getEmail());
+        if (info.has("website")) existing.setWebsite(info.getWebsite());
+        if (info.has("corePositioning")) existing.setCorePositioning(info.getCorePositioning());
+        if (info.has("mainBusiness")) existing.setMainBusiness(info.getMainBusiness());
+        if (info.has("targetIndustries")) existing.setTargetIndustries(info.getTargetIndustries());
+        if (info.has("advantages")) existing.setAdvantages(info.getAdvantages());
+        if (info.has("revenueDevicePct")) existing.setRevenueDevicePct(info.getRevenueDevicePct());
+        if (info.has("revenueConsumablePct")) existing.setRevenueConsumablePct(info.getRevenueConsumablePct());
         CompanyInfo saved = companyInfoRepository.save(existing);
         auditLogService.log("CompanyInfo", saved.getId(), saved.getCompanyName(),
                 "COMPANY_INFO_UPDATE", "更新公司基本信息");
@@ -158,6 +158,11 @@ public class CompanyInfoService {
         existing.setAccountHolder(account.getAccountHolder());
         existing.setCurrency(account.getCurrency());
         existing.setSwiftCode(account.getSwiftCode());
+        existing.setIban(account.getIban());
+        existing.setRoutingNumber(account.getRoutingNumber());
+        existing.setBankAddress(account.getBankAddress());
+        existing.setBankLocation(account.getBankLocation());
+        existing.setDomesticBankCode(account.getDomesticBankCode());
         existing.setQrCodeFile(account.getQrCodeFile());
         existing.setIsPrimary(account.getIsPrimary());
         existing.setNotes(account.getNotes());

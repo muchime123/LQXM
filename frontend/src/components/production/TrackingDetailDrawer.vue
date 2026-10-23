@@ -105,7 +105,7 @@
                 <span v-if="stage.optional && !stage.applicable" class="cell-reference muted">—</span>
                 <span v-else :class="['cell-reference', { 'is-overdue': stageOverdue(stage), 'is-late-target': referenceTargetDelay(stage) > 0 }]">
                   <span class="reference-main">
-                    <strong v-if="detail.order.scheduleTime && (stage.manualReferenceDate || stage.referenceDate)" class="reference-date">{{ stage.manualReferenceDate || stage.referenceDate }}</strong>
+                    <strong v-if="detail.order.scheduleTime && (stage.manualReferenceDate || stage.referenceDate)" class="reference-date" :title="referenceDetail(stage)">{{ stage.manualReferenceDate || stage.referenceDate }}</strong>
                     <span v-else-if="!canEditManualReference(stage)" class="reference-empty">未设置</span>
                   <el-popover v-if="canEditManualReference(stage)" placement="bottom" :width="310" trigger="click">
                     <template #reference>
@@ -117,13 +117,8 @@
                     <el-input v-if="stage.manualReferenceDate" v-model="stage.manualReferenceReason" type="textarea" :rows="2" maxlength="300" show-word-limit placeholder="填写预计依据或调整原因（必填）" class="manual-reason" />
                     <small class="manual-hint">修改后点击底部“保存跟单”；清空日期可恢复系统参考。</small>
                   </el-popover>
+                  <small v-if="referenceMeta(stage)" class="reference-meta" :class="{ 'is-late': referenceTargetDelay(stage) > 0, 'is-draft': referenceDraft(stage) }" :title="referenceDetail(stage)">{{ referenceMeta(stage) }}</small>
                   </span>
-                  <small v-if="stage.manualReferenceDate && stage.manualReferenceDate !== stage.referenceDate" class="reference-source draft">待保存 · 人工预计</small>
-                  <small v-else-if="stage.referenceSource === 'MANUAL' && !stage.manualReferenceDate" class="reference-source draft">恢复系统参考待保存</small>
-                  <small v-else-if="stage.referenceDate" class="reference-source">{{ stage.referenceSource === 'MANUAL' ? '人工预计' : '系统参考' }}</small>
-                  <small v-if="stage.manualReferenceDate && stage.systemReferenceDate && stage.manualReferenceDate !== stage.systemReferenceDate" class="reference-source">系统原参考 {{ stage.systemReferenceDate }}</small>
-                  <small v-if="referenceTargetDelay(stage) > 0" class="target-delay-note">晚于目标 {{ referenceTargetDelay(stage) }} 天</small>
-                  <small v-if="stageOverdue(stage)" class="overdue-note">超 {{ stage.referenceOverdueDays }} 天</small>
                 </span>
                 <span class="cell-target">{{ stage.status === 'DONE' ? '已完成' : stage.targetDate || '—' }}</span>
                 <el-date-picker v-model="stage.completedDate" type="date" value-format="YYYY-MM-DD" size="small" clearable placeholder="完成日期" :disabled="!canFollowup || Boolean(detail.order.stoppedAt) || stage.status !== 'DONE'" class="cell-date" />
@@ -378,6 +373,27 @@ function referenceTargetDelay(stage: TrackingMilestone) {
   return difference != null && difference > 0 ? difference : 0
 }
 
+function referenceDraft(stage: TrackingMilestone) {
+  return stage.manualReferenceDate !== (stage.referenceSource === 'MANUAL' ? stage.referenceDate : null)
+}
+
+function referenceMeta(stage: TrackingMilestone) {
+  const late = referenceTargetDelay(stage)
+  if (stage.referenceSource === 'MANUAL' && !stage.manualReferenceDate) return '待恢复'
+  if (referenceDraft(stage)) return late ? `晚${late}天` : '待保存'
+  if (late) return `晚${late}天`
+  if (stageOverdue(stage)) return `超${stage.referenceOverdueDays}天`
+  return stage.referenceSource === 'MANUAL' ? '人工' : ''
+}
+
+function referenceDetail(stage: TrackingMilestone) {
+  const parts = [stage.manualReferenceDate || stage.referenceSource === 'MANUAL' ? '人工预计' : '系统参考']
+  if (stage.systemReferenceDate && (stage.manualReferenceDate || stage.referenceSource === 'MANUAL')) parts.push(`系统原参考 ${stage.systemReferenceDate}`)
+  if (referenceTargetDelay(stage)) parts.push(`晚于倒排目标 ${referenceTargetDelay(stage)} 天`)
+  if (stageOverdue(stage)) parts.push(`超过参考日期 ${stage.referenceOverdueDays} 天`)
+  return parts.join(' · ')
+}
+
 const referencePressure = computed(() => {
   if (!detail.value?.order.scheduleTime || !detail.value.schedule.deadline) return null
   const stage = milestones.value.find(item => item.code === 'WAREHOUSE')
@@ -413,48 +429,48 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .manual-reason { margin-top: 8px; }
 .manual-hint { display: block; margin: 0 0 8px; color: var(--color-text-secondary, #64748b); font-size: 12px; line-height: 1.5; }
 .tracking-detail-host { display: contents; }
-.muted { color: #667085; font-size: 13px; }
-.detail-content { display: grid; gap: 14px; padding-bottom: 8px; }
+.muted { color: #667085; font-size: 12.5px; }
+.detail-content { display: grid; gap: 14px; padding-bottom: 8px; color: #344054; font-size: 13px; line-height: 1.5; }
 .detail-content section { padding-top: 0; }
-.detail-content h3 { margin: 0; font-size: 15px; }
+.detail-content h3 { margin: 0; color: #101828; font-size: 15px; font-weight: 600; line-height: 1.4; }
 .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .stage-quick-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pending-change-count { color: #b54708; font-weight: 600; }
 .attention-list { display: flex; gap: 8px; flex-wrap: wrap; }
-.attention-item { display: flex; align-items: baseline; gap: 6px; padding: 6px 9px; border-radius: 6px; background: #fffaeb; font-size: 12px; color: #78551d; }
+.attention-item { display: flex; align-items: baseline; gap: 6px; padding: 7px 10px; border-radius: 6px; background: #fffaeb; font-size: 12.5px; line-height: 1.5; color: #78551d; }
 .attention-item strong { flex: none; color: #b54708; }
 .attention-item--urgent { background: #fff6f5; color: #912018; }
 .attention-item--urgent strong { color: #b42318; }
 .source-order-remark { border: none; }
 .source-order-remark p { margin: 0 0 8px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
-.source-order-remark :deep(.el-collapse-item__header) { height: 36px; border-bottom: none; font-size: 12px; color: #667085; }
+.source-order-remark :deep(.el-collapse-item__header) { height: 36px; border-bottom: none; font-size: 12.5px; color: #667085; }
 .source-order-remark :deep(.el-collapse-item__wrap) { border-bottom: none; }
 .summary-block { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .summary-title { display: flex; align-items: center; gap: 8px; }
-.summary-title strong { font-size: 17px; }
-.summary-spec { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 8px; }
-.summary-tags { display: flex; align-items: center; gap: 4px 0; flex-wrap: wrap; color: #667085; font-size: 12px; }
+.summary-title strong { color: #101828; font-size: 18px; font-weight: 600; line-height: 1.4; }
+.summary-spec { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 5px 0 7px; font-size: 13px; }
+.summary-tags { display: flex; align-items: center; gap: 4px 0; flex-wrap: wrap; color: #667085; font-size: 12.5px; }
 .summary-tags > span + span::before { content: '·'; color: #c0c4cc; padding: 0 9px; }
 .summary-last-followup { color: #98a2b3; }
 .summary-progress { display: grid; justify-items: center; gap: 4px; }
-.progress-num { font-size: 13px; font-weight: 700; }
+.progress-num { font-size: 14px; font-weight: 600; }
 .key-dates { padding-top: 0; }
 .key-dates .section-head { margin-bottom: 8px; align-items: center; }
 .key-dates-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid #e4e7ec; border-radius: 9px; overflow: hidden; background: #fff; }
 .key-dates-grid > div { display: flex; align-items: baseline; gap: 3px 8px; flex-wrap: wrap; min-width: 0; padding: 10px 13px; border-right: 1px solid #e4e7ec; }
 .key-dates-grid > div:last-child { border-right: none; }
-.key-dates-grid span { flex-basis: 100%; color: #667085; font-size: 11px; }
-.key-dates-grid strong { color: #101828; font-size: 14px; white-space: nowrap; }
-.key-dates-grid small { color: #667085; font-size: 11px; }
+.key-dates-grid span { flex-basis: 100%; color: #667085; font-size: 12px; }
+.key-dates-grid strong { color: #101828; font-size: 15px; font-weight: 600; white-space: nowrap; line-height: 1.4; }
+.key-dates-grid small { color: #667085; font-size: 12px; }
 .key-dates-grid .el-button { margin: -5px 0; }
-.metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .secondary-toggle { justify-self: start; margin: -8px 0 0; }
 .metric { background: #f9fafb; border: 1px solid #eef0f3; border-radius: 8px; padding: 9px 12px; display: grid; gap: 3px; min-width: 0; }
-.metric span { color: #667085; font-size: 12px; }
+.metric span { color: #667085; font-size: 12.5px; }
 .metric-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .metric-heading .el-button { margin: -5px -6px -5px 0; }
 .metric-delay { color: #b54708; font-weight: 600; overflow-wrap: anywhere; }
-.metric strong { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.metric strong { color: #101828; font-size: 15px; font-weight: 600; overflow-wrap: anywhere; }
 .metric strong.is-danger { color: #d92d20; }
 .metric-link { width: 100%; text-align: left; font: inherit; cursor: pointer; }
 /* 原为 Element Plus 默认蓝 #409eff / #f0f7ff 硬编码，与项目主色（--color-primary #0f766e）不一致，
@@ -478,37 +494,36 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .metric small.lead-delta-late { color: #b42318; font-weight: 600; }
 .metric small.lead-delta-early { color: #067647; font-weight: 600; }
 .stage-list {
-  --stage-cols: minmax(130px, 1fr) 112px 150px 90px 132px minmax(180px, 1.5fr) auto;
+  --stage-cols: minmax(130px, 1fr) 112px 168px 90px 132px minmax(160px, 1.5fr) auto;
   display: grid; gap: 8px;
 }
-.stage-head { display: grid; grid-template-columns: var(--stage-cols); gap: 12px; align-items: center; padding: 0 14px; font-size: 12px; font-weight: 600; color: #667085; }
+.stage-head { display: grid; grid-template-columns: var(--stage-cols); gap: 12px; align-items: center; padding: 0 14px; font-size: 12.5px; font-weight: 600; color: #667085; }
 .target-heading { cursor: help; white-space: nowrap; }
 .target-heading:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 2px; }
 .stage-item { display: grid; gap: 6px; background: #fff; border: 1px solid #e5e7eb; border-radius: 9px; padding: 8px 14px; }
 .stage-item.current { box-shadow: 0 0 0 2px rgba(15, 118, 110, .18); border-color: var(--color-primary, #0f766e); }
 .stage-grid { display: grid; grid-template-columns: var(--stage-cols); gap: 12px; align-items: center; }
+.stage-list :deep(.el-input__inner), .stage-list :deep(.el-select__selected-item), .stage-list :deep(.el-button) { font-size: 12.5px; }
 .cell-node { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .row-dot { width: 10px; height: 10px; border-radius: 50%; background: #d0d5dd; flex: none; }
 .row-dot.in_progress { background: #f59e0b; }
 .row-dot.done { background: #12b76a; }
-.row-name { font-size: 13px; font-weight: 600; color: #101828; overflow-wrap: anywhere; }
+.row-name { font-size: 13.5px; font-weight: 600; color: #101828; overflow-wrap: anywhere; }
 .cell-status { width: 112px; }
 .cell-date { width: 132px; }
-.cell-reference { font-size: 12px; color: #475467; display: flex; flex-direction: column; gap: 2px; line-height: 1.35; min-width: 0; }
-.reference-pressure { display: flex; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; padding: 8px 11px; border: 1px solid #fecdca; border-radius: 7px; background: #fff6f5; color: #912018; font-size: 12px; }
+.cell-reference { font-size: 13px; color: #475467; display: flex; flex-direction: column; gap: 2px; line-height: 1.4; min-width: 0; }
+.reference-pressure { display: flex; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; padding: 9px 11px; border: 1px solid #fecdca; border-radius: 7px; background: #fff6f5; color: #912018; font-size: 12.5px; line-height: 1.5; }
 .reference-pressure strong { color: #b42318; }
-.cell-reference.is-late-target .reference-date, .cell-reference .target-delay-note { color: #b42318; }
-.cell-reference .target-delay-note { font-weight: 600; font-size: 11px; }
-.cell-target { font-size: 12px; color: #475467; white-space: nowrap; }
-.reference-main { display: flex; align-items: center; gap: 6px; min-height: 25px; }
-.reference-date { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.cell-reference.is-late-target .reference-date, .cell-reference .reference-meta.is-late { color: #b42318; }
+.cell-target { font-size: 13px; color: #475467; white-space: nowrap; }
+.reference-main { display: flex; align-items: center; gap: 4px; min-height: 25px; white-space: nowrap; }
+.reference-date { font-size: 13px; font-weight: 600; white-space: nowrap; }
 .reference-empty { color: #98a2b3; }
 .reference-edit { width: 24px; height: 24px; flex: none; color: var(--color-primary, #0f766e); }
 .reference-set { margin: 0; }
-.cell-reference .reference-source { font-size: 11px; color: #98a2b3; }
-.cell-reference .reference-source.draft { color: #b54708; }
-.cell-reference small { color: var(--color-text-secondary, #64748b); }
-.cell-reference .overdue-note { color: #d92d20; font-weight: 600; }
+.cell-reference .reference-meta { flex: none; color: #667085; font-size: 11px; line-height: 1.25; white-space: nowrap; }
+.cell-reference .reference-meta.is-draft:not(.is-late) { color: #b54708; }
+.cell-reference .reference-meta.is-late { font-weight: 600; }
 .cell-reference.is-overdue { color: #d92d20; font-weight: 600; }
 .cell-history { justify-self: end; }
 .stage-item.na { border-style: dashed; background: #fcfcfd; }
