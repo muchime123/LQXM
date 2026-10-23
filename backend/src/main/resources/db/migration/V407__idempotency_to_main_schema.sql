@@ -9,11 +9,11 @@
 --   2) 若遗留 erp.idem_request 仍存在（本次为存量库），把历史请求键一并搬入，
 --      使旧请求的重试仍能命中（防重复提交不回退）；若不存在（全新部署），则跳过搬数。
 --
--- 原则：历史 Flyway 不回删（erp-migration/V1 保留至备份后删除 erp schema），只用本迁移做承接。
+-- 原则：存量 ERP 幂等数据先迁入主库；确认迁移与备份后再删除 erp schema。
 -- =====================================================================
 CREATE TABLE IF NOT EXISTS request_idempotency (
     id            BIGINT       NOT NULL AUTO_INCREMENT,
-    request_key   VARCHAR(100) NOT NULL COMMENT '调用方请求键（X-Request-Key 或 body.requestKey）',
+    request_key   VARCHAR(100) COLLATE utf8mb4_bin NOT NULL COMMENT '调用方请求键（X-Request-Key 或 body.requestKey，大小写敏感）',
     action        VARCHAR(64)  NOT NULL COMMENT '动作标识，如 tracking.enroll',
     payload_hash  CHAR(64)     NOT NULL COMMENT '请求载荷 sha256（十六进制），用于识别同键不同内容',
     result_ref    VARCHAR(200) NULL COMMENT '首次执行的结果引用（单据 id / 单号），供重试原样返回',
