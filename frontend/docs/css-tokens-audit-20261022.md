@@ -149,3 +149,77 @@
 - **回退（C 类）**：`CertDetailModal.vue` 的 `.btn-icon:hover` 保持 `--color-surface`。理由见上：内容为文本字形 `x`，两种取值均未达 4.5，改动无改善。
 - **回退**：`utilities.css` 三处（A 类改白会劣化；其中 `.btn-primary`、`a.shop-link` 为 0 使用死代码，宜在 C10 删除而非改色）。
 - **遗留 P1**：深色"填充主色/状态色面 + 白字"体系不达标（EP 主按钮白字压 `#14b8a6` 实测 2.49 ✗，全站性）。需引入 `--color-primary-solid` / `--color-danger-solid` 等填充色阶并与 Element Plus 填充色统一后再一并处理。
+
+---
+
+## C4 引用未定义令牌（2026-10-23）
+
+### 扫描口径
+
+工具 `frontend/scripts/audit/token-usage.mjs`（新增，可作后续回归）。定义来源必须同时认三类，否则误报：
+CSS 声明 `--x:`、JS/内联对象键 `'--x':`、运行时 `setProperty('--x')`。
+
+扫描 438 文件 / 引用令牌 323 个 / 定义 481 个 → **缺失 48 个**：
+
+| 类别 | 数量 | 后果 |
+|---|---|---|
+| 无 fallback | 23 个变量 / 41 处 | `var()` 无法替换 → **整条声明被丢弃**，浏览器不报错 |
+| 有 fallback | 25 个变量 | 实际渲染的是 fallback 硬编码值，令牌形同虚设 |
+| 动态注入 | 3 个（`--metric-grid-columns`、`--metric-grid-min`、`--ov-color`） | `:style` 运行时写入，**不整改**，仅在扫描器中识别避免误报 |
+
+### C4-A 已修：23 个变量 / 41 处 / 16 文件
+
+渲染实测（`_audit_shots/c4a-verify.mjs`，浅深双主题各 23 项对照）：把修复前后的声明分别套到探测元素上读计算值，确认旧声明的计算值均为"失效签名"。
+
+| 变量 | 处 | 实测失效表现 | 改为 |
+|---|---|---|---|
+| `--space-1/2/4` | 10 | 间距声明丢弃 → 卡片 gap/padding、工具栏间距塌成 0 | tokens.css 补 4px 步长别名（4/8/16px）→ `--space-xs`/`--space-sm-md`/`--space-lg-xl`，与已有 `--space-3`(12px)/`--space-5`(20px) 成系列 |
+| `--color-bg-subtle` | 6 | 背景 `rgba(0,0,0,0)`：chip、提示块、图片占位无底色 | `--color-surface-alt` |
+| `--color-fill` | 3 | 背景透明：H3 指标卡、批量条、进度条轨道 | `--color-surface-alt` |
+| `--color-primary-soft` | 3 | 底色透明（角色卡选中态无高亮）；边框回落 `currentColor` | 底色 `--color-primary-bg`；边框 `--color-primary-border` |
+| `--color-bg-surface` | 2 | 背景透明：官网横幅筛选栏、表格无白底 | `--color-surface` |
+| `--color-text-quaternary` | 2 | 回落继承正文色，弱化层级消失 | `--color-text-muted`（白底 4.76:1 ✓） |
+| `--color-success-300/-50`、`--color-warning-300`、`--color-danger-300/-50/-400` | 6 | 质检三态边框回落 `currentColor`、底色透明 → **颜色编码全丢** | 规范色阶 `--color-{success,warning,danger}-border` / `-bg-soft` / `--color-danger`（保留原 color-mix 透明度意图） |
+| `--color-accent` | 1 | `linear-gradient` 整条丢弃 → 资产库角标无底色 | `--color-purple`（与该块 `box-shadow: rgba(124,58,237,.28)` 一致） |
+| `--color-bg` | 1 | 透明 → 品牌资产吸顶栏失效，滚动内容穿透 | `--color-page-bg` |
+| `--color-border-2`、`--color-border-default` | 2 | 边框回落 `currentColor`（用上深色文字色） | `--color-border` |
+| `--color-surface-2`、`--color-surface-muted` | 2 | 背景透明 | `--color-surface-alt` / `--color-surface-disabled` |
+| `--lh-base`、`--fw-regular` | 2 | 行高回落 `normal`；字重回落 400（视觉无差，仍属失效） | `--lh-normal` / `--fw-normal` |
+| `--lq-text-secondary` | 1 | 内联样式失效，回落继承色 | `--color-text-secondary` |
+
+复核：修复后 `无 fallback = 0`；16 文件 lint exit 0；全量 `70 files / 524 tests` 通过。
+
+### C4-B 待定：25 个有 fallback 变量（本轮不改代码）
+
+| 变量 | 引用 | fallback 分布 | 建议 |
+|---|---|---|---|
+| `--space-s` | 52 | 8px×49, 6px×3 | 主流 8px = `--space-sm-md`；6px = `--space-sm`。不新增 `--space-s`，按场景改用命名令牌（控件间距优先 `--space-control-gap`） |
+| `--space-m` | 43 | 12px×31, 16px×7, 10px×5 | 三档分散，说明意图不同：12→`--space-md-lg`、16→`--space-lg-xl`、10→`--space-md`。需逐处判断，不做全局替换 |
+| `--radius-card` | 13 | 10px×7, 8px×5, 6px×1 | 10→`--radius-xl`、8→`--card-radius`（=radius-lg）、6→`--radius-md` |
+| `--color-bg-elevated` | 5 | #f9fafb×3, #f3f4f6×2 | `--color-surface-raised`（语义即"抬升面"） |
+| `--color-surface-subtle` | 4 | #f1f5f9×2, #f8fafc×2 | 按用途 `--color-surface-hover` / `--color-surface-alt` |
+| `--color-bg-surface` | 4 | #fff×4 | `--color-surface`（**同值，零视觉变化**） |
+| `--color-bg` | 3 | #f6f7f9×2, #f8fafc×1 | `--color-page-bg`（#f4f6f8，近似） |
+| `--color-warning-600` | 3 | #d97706×3 | `--color-warning`（**同值**） |
+| `--color-text-body` | 3 | #334155×3 | `--color-text-strong`（#475569，最接近） |
+| `--color-fill` / `--color-fill-hover` | 2 / 1 | #f8fafc、#f1f5f9 / #f1f5f9 | `--color-surface-alt` / `--color-surface-hover`（**同值**） |
+| `--color-danger-50` | 2 | #fef2f2×2 | `--color-danger-bg-soft`（#fff1f2，近似） |
+| `--color-surface-soft` | 2 | #f8fafc×2 | `--color-surface-alt`（**同值**） |
+| `--color-danger-600` / `--color-danger-500` | 2 / 1 | #dc2626 | `--color-danger`（**同值**） |
+| `--color-bg-input` | 2 | #f9fafb×2 | `--color-surface-alt`（需确认是否为输入框底） |
+| `--space-2xs` | 2 | 4px×1, 2px×1 | 4px → `--space-xs`；2px 现无令牌（最小 4px），需单独决策 |
+| `--space-l` | 2 | 16px×2 | `--space-lg-xl`（**同值**） |
+| `--color-bg-subtle` | 2 | #fafafa、`var(--color-surface)` | `--color-surface-alt` |
+| `--color-surface-muted` | 1 | #f1f5f9 | `--color-surface-disabled` 或 `--color-surface-hover` |
+| `--color-bg-secondary` | 1 | #f8fafc | `--color-surface-alt`（**同值**） |
+| `--color-sidebar-active-text` | 1 | `var(--color-sidebar-text-strong)` | 直接写 `--color-sidebar-text-strong` |
+| `--border-color` | 1 | #e5e7eb | `--color-border-light`（**同值**，EP 旧变量名） |
+| `--color-danger-300` | 1 | #fca5a5 | `--ep-danger-5`（**同值**） |
+| `--color-danger-700` | 1 | #b91c1c | `--color-danger-text`（#be123c，近似） |
+| `--color-success-600` | 1 | #059669 | `--color-success`（#16a34a，近似） |
+| `--color-success-bg-light` / `--color-warning-bg-light` | 1 / 1 | #f0f9eb / #fdf6ec | `--color-{success,warning}-bg-soft`（近似） |
+| `--color-primary-600` / `--color-primary-soft` | 1 / 1 | #2563eb / `rgba(59,130,246,.12)`（**蓝色**） | 与项目主色（teal）冲突**必须逐处判断**：属"信息/链接"用 `--color-info`，属主色用 `--color-primary` |
+| `--app-header-height` | 1 | 58px | 布局常量，建议定义为语义令牌而非散落硬编码 |
+| `--el-dialog-width` | 1 | `var(--dialog-width-workspace)` | 直接写 `--dialog-width-workspace` |
+
+> 标注「同值」的 12 个变量（合计约 25 处）替换后**零视觉变化**，可作为 C4-B 第一批；`--space-s`/`--space-m`/`--radius-card` 因取值分散，须逐处按场景映射，不做批量正则替换。
