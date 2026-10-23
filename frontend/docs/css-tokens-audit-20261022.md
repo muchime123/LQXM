@@ -219,7 +219,71 @@ CSS 声明 `--x:`、JS/内联对象键 `'--x':`、运行时 `setProperty('--x')`
 | `--color-success-600` | 1 | #059669 | `--color-success`（#16a34a，近似） |
 | `--color-success-bg-light` / `--color-warning-bg-light` | 1 / 1 | #f0f9eb / #fdf6ec | `--color-{success,warning}-bg-soft`（近似） |
 | `--color-primary-600` / `--color-primary-soft` | 1 / 1 | #2563eb / `rgba(59,130,246,.12)`（**蓝色**） | 与项目主色（teal）冲突**必须逐处判断**：属"信息/链接"用 `--color-info`，属主色用 `--color-primary` |
-| `--app-header-height` | 1 | 58px | 布局常量，建议定义为语义令牌而非散落硬编码 |
-| `--el-dialog-width` | 1 | `var(--dialog-width-workspace)` | 直接写 `--dialog-width-workspace` |
+| `--app-header-height` | 1 | 58px | 实测 topbar 仅 38px，58px 实为「topbar + 页面留白」合计，名实不符；但当前 `.visual-editor` 无溢出（顶部偏移 70、高 918、viewport 1000），改动需重设该页高度算式 → 不新增令牌 |
+| `--el-dialog-width` | 1 | `var(--dialog-width-workspace)` | **保留**。这是 Element Plus 由 `width` prop 透传的真实变量（见 `LqDialog.vue:219` 注释），本处写 `var(--el-dialog-width, var(--dialog-width-workspace))` 正是让 prop 优先、令牌兜底，属正确用法，不是无效命名 |
 
-> 标注「同值」的 12 个变量（合计约 25 处）替换后**零视觉变化**，可作为 C4-B 第一批；`--space-s`/`--space-m`/`--radius-card` 因取值分散，须逐处按场景映射，不做批量正则替换。
+### C4-B1 已修：同值同语义 18 处 / 11 文件（`cac7c62`）
+
+**同值只保证浅色**：fallback 是写死的字面量、不跟随主题，深色下会沿用浅色值。故 B1 逐项做浅/深双主题计算值对照后才替换。
+
+| 变量 | 处 | 浅色 | 深色（原 → 新） | 语义核实 |
+|---|---|---|---|---|
+| `--color-bg-surface` | 4 | 同值 #fff | `#fff` → `#1e293b` | 卡片/面板底（`.accessory-card`、`.q-item`、`.history-item`、`.score-inner`） |
+| `--color-warning-600` | 3 | 同值 #d97706 | `#d97706` → `#f59e0b`（文字对比度 5.6 → **8.31**） | 状态文字/指示点 |
+| `--color-danger-600` / `-500` | 3 | 同值 #dc2626 | `#dc2626` → `#ef4444`（3.7 → **4.74**） | 状态文字/指示点 |
+| `--color-surface-soft` / `--color-bg-secondary` | 3 | 同值 #f8fafc | `#f8fafc` → `#1a2332` | 空态块、代码块底 |
+| `--color-fill` + `--color-fill-hover` | 2 | 同值 #f8fafc / #f1f5f9 | → `#1a2332` / `#293548` | **必须成对**：base 与 hover 同属一个折叠头，只改 hover 会变成「浅底 + 深 hover」 |
+| `--border-color` | 1 | 同值 #e5e7eb | `#e5e7eb` → `#2d3748` | 表单容器边框 |
+| `--color-sidebar-active-text` | 1 | 同值 #fff | 无差异 | 本就是 `--color-sidebar-text-strong` 的别名 |
+| `--space-l` | 2 | 16px | 无差异 | 纯间距 |
+
+### C4-B2 已修：间距/圆角 108 处 / 9 文件（`5d0c283`）
+
+范围全在 mold/packaging 这一套组件里，是一套独立写法。映射按**每处 fallback 的实际取值**决定，不按变量名：
+
+| 原 | fallback | 目标令牌 | 处数 |
+|---|---|---|---|
+| `--space-s` | 8px | `--space-sm-md` | 48 |
+| `--space-s` | 8px（`.detail-actions` 操作按钮行） | `--space-control-gap`（语义别名，同值） | 1 |
+| `--space-s` | 6px | `--space-sm` | 3 |
+| `--space-m` | 12px / 16px / 10px | `--space-md-lg` / `--space-lg-xl` / `--space-md` | 31 / 7 / 5 |
+| `--radius-card` | 10px / 8px / 6px | `--radius-xl` / `--card-radius` / `--radius-md` | 7 / 5 / 1 |
+
+「布局不变」是证明出来的，不是靠肉眼：浏览器实测 9 个目标令牌取值与各自 fallback **逐一相等**（8/6/12/16/10/10/8/6/8px，浅深双主题一致），故每个声明的计算值完全相同；替换处数按 8 组预期值逐组校验（108/108）。
+
+### C4-B3 只分析：剩余 20 个变量的三类决策
+
+**① 保留（不改，均附理由）**
+
+| 变量 | 处 | 理由 |
+|---|---|---|
+| `--el-dialog-width` | 1 | Element Plus 由 `width` prop 透传的真实变量，`var(--el-dialog-width, …)` 是「prop 优先、令牌兜底」的正确写法 |
+| `--color-primary-600` | 1 | fallback #2563eb 是 EP 蓝，与项目主色 teal 语义冲突；需先判断原意是「信息色」还是「主色」，不能按名替换 |
+| `--color-primary-soft` | 1 | 同上（`rgba(59,130,246,.12)` 为蓝） |
+| `--color-primary-bg-strong` | 1（`CertificationFormDialog:471`） | 该处 hover 底色是 EP 蓝 tint、边框却是 teal `--color-primary-border`，属旧蓝色主题残留；改绿是**可见变化**，需单独确认 |
+| `--color-text-body` | 3 | #334155 无等值令牌（primary #1d252f 明显更深、strong #475569 更浅），替换必然改变浅色正文观感 |
+| `--app-header-height` | 1 | 名实不符（实测 topbar 38px），但当前渲染正确；属布局算式问题，归 C6 处理 |
+| `--space-2xs`（2px 站点） | 1 | 项目最小间距令牌是 4px，2px 是真实需求（`.tab-header-actions` 的 `padding: 0 2px`），不能为了复用改成 4px |
+| `--color-surface-muted` | 1 | 取值 #f1f5f9 与 `--color-surface-hover` 完全相同，但用途是静态面板底，「hover」语义不成立；需在「同值错语义」与「正确语义差 1 档」之间决策 |
+
+**② 可修改（待批准；同值组浅色零变化，近似组需接受色差）**
+
+| 组 | 变量 | 处 | 目标 |
+|---|---|---|---|
+| 同值 | `--color-surface-subtle` | 4 | 按值：#f1f5f9 → `--color-surface-hover`、#f8fafc → `--color-surface-alt` |
+| 同值 | `--color-fill` | 1 | #f1f5f9 → `--color-surface-hover` |
+| 同值 | `--color-bg-subtle` | 1 | `var(--color-surface)` → `--color-surface`（纯别名展开） |
+| 同值 | `--space-2xs` | 1 | 4px → `--space-xs` |
+| 近似 | `--color-bg-elevated` | 5 | #f9fafb → `--color-surface-raised`；#f3f4f6 → `--color-surface-hover` |
+| 近似 | `--color-bg` | 3 | #f6f7f9 → `--color-page-bg`；#f8fafc → `--color-surface-alt` |
+| 近似 | `--color-bg-input` | 2 | #f9fafb → `--color-surface-alt`（实际用于面板底，不是输入框） |
+| 近似 | `--color-danger-50` / `--color-danger-700` | 2 / 1 | → `--color-danger-bg-soft` / `--color-danger-text` |
+| 近似 | `--color-success-600` / `--color-success-bg-light` / `--color-warning-bg-light` | 1 / 1 / 1 | → `--color-success` / `--color-{success,warning}-bg-soft` |
+| 近似 | `--color-bg-subtle`（`PackagingVariantCards:460`） | 1 | #fafafa → `--color-surface-alt` |
+| 待定 | `--color-danger-300` | 1 | 二选一：`--ep-danger-5`（同值 #fca5a5 但语义是 EP 组件色阶）/ `--color-danger-border`（语义正确，浅色差 1 档、深色为半透明） |
+
+**③ 新增令牌：本轮为 0**
+
+不新增任何别名。`--app-header-height` 经实测确认名实不符，正确做法是重设该页高度算式（C6），而不是把 58px 固化成令牌；`--space-2xs` 的 2px 需求若后续反复出现，再单独评估是否引入 `--space-3xs`。
+
+**收敛进度**：缺失变量 48 → 33（C4-A）→ 23（B1）→ **20**（B2）；无 fallback 恒为 **0**。
