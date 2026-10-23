@@ -134,7 +134,14 @@ export const archiveRoutes: RouteRecordRaw[] = [
     path: '/cashflow-journal',
     name: 'cashflowJournal',
     component: () => import('@/apps/archive/views/settlement/CashflowJournalView.vue'),
-    meta: { title: '资金日记账', layout: 'list', permission: 'integration.h3', group: 'h3' }
+    meta: { title: '资金日记账', layout: 'list', permission: 'cashflow.read', group: 'h3' }
+  },
+  // P2-A：资金主体管理（归属认领 + 账户停用；读 cashflow.read / 管 cashflow.manage）
+  {
+    path: '/cashflow-entities',
+    name: 'cashflowEntities',
+    component: () => import('@/apps/archive/views/settlement/CashflowEntitiesView.vue'),
+    meta: { title: '资金主体管理', layout: 'list', permission: 'cashflow.read', group: 'h3' }
   },
   {
     path: '/h3-sales-products',
@@ -165,24 +172,14 @@ export const archiveRoutes: RouteRecordRaw[] = [
     name: 'productionTrackingAnalytics',
     redirect: { path: '/production-tracking', query: { analysis: '1' } }
   },
-  // 生产主数据：车间 / 工序库 / 制程模板。2026-09-30 曾随「聚合页下线」一并摘除，
-  // 2026-10-06 恢复——页面组件、API（/api/manufacturing/master/*）与后端服务从未删除，
-  // 缺的只是路由与侧栏入口；e2e（product-configuration-rule-fields）与新建任务单抽屉
-  // 的文案至今仍指向这两条路径，长期处于跳错页状态。
-  {
-    path: '/manufacturing-process-management',
-    name: 'manufacturingProcessManagement',
-    component: () => import('@/apps/archive/views/production/ManufacturingProcessManagementView.vue'),
-    meta: { title: '制程与工序管理', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
-  },
-  // 「生产产品与工期管理」原为制程管理页内的抽屉，2026-09-24 独立成页：
-  // 它是新建任务单的联动数据源，也是产品身份（可售库存口径）的锚点，需要独立演进。
-  // 2026-10-22 更名并接管原生产跟单页的「基准设置」（通用参考）；路由保持不变，避免影响已有跳转。
+  // 「生产参考工期」（2026-10-23 重定位，原「生产产品与工期管理」）：
+  // 维护「产品 + 车间」的节点参考工期与兜底通用参考，是生产跟单参考日期的取数底座，
+  // 也是产品身份（可售库存口径）的锚点。不再与制程/工序概念绑定，也不再有工序库/制程模板。
   {
     path: '/manufacturing-task-configs',
     name: 'manufacturingTaskConfigs',
     component: () => import('@/apps/archive/views/production/ManufacturingTaskConfigView.vue'),
-    meta: { title: '生产产品与工期管理', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
+    meta: { title: '生产参考工期', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
   },
   // 月度提成核算（现行简化口径，独立只读视图）：本月实际回款 − 上月运杂费，不依赖旧提成体系
   {

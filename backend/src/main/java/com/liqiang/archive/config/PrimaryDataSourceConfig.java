@@ -15,22 +15,11 @@ import org.springframework.transaction.PlatformTransactionManager;
 import javax.sql.DataSource;
 
 /**
- * 主库（{@code product_archive}）装配——**显式接管**，因为 ERP 引入了第二个数据源。
+ * 主库（{@code product_archive}）装配——显式接管，统一主数据源、JdbcTemplate 与事务管理器。
  *
- * <p><b>为什么必须在这里显式定义</b>（Spring Boot 3.3 的条件语义）：
- * <ul>
- *   <li>{@code DataSourceAutoConfiguration} 带 {@code @ConditionalOnMissingBean(DataSource.class)}：
- *       ERP 侧注册了 {@code erpDataSource} 后该条件不再成立，主库数据源不会被自动创建。</li>
- *   <li>{@code DataSourceTransactionManagerAutoConfiguration} 带
- *       {@code @ConditionalOnMissingBean(TransactionManager.class)}：ERP 侧 {@code erpTransactionManager}
- *       会把主库事务管理器顶掉。</li>
- *   <li>{@code JdbcTemplateAutoConfiguration} 带 {@code @ConditionalOnMissingBean(JdbcOperations.class)}：
- *       同理，若不显式提供主库 JdbcTemplate，容器里只剩 ERP 的 {@code erpJdbcTemplate}，
- *       现有 300+ 处注入会**静默连到 erp 库**（比启动失败更危险）。</li>
- * </ul>
- *
- * <p>三者都以 {@code @Primary} 补齐，ERP 侧对应 bean 用 {@code @Qualifier} 取名注入，互不误用。
- * 这是「同实例双数据源」（技术方案映射 DA1）的接入代价，全部集中在本类，便于审查与回滚。
+ * <p><b>为什么仍然显式定义</b>：虽然 2026-10-23 已随 ERP 独立 schema 下线移除第二数据源，
+ * 但显式声明可让「主库连接池名、JPA 事务管理器、JdbcTemplate」三者的绑定关系一目了然，
+ * 且 {@code spring.datasource.hikari.*} 不再自动绑定，池参数仍需经 {@link DataSourceProperties} 配置。
  *
  * <p><b>已知副作用</b>：{@code spring.datasource.hikari.*} 不再自动绑定（本类经
  * {@link DataSourceProperties} 构建池）。需要调池参数请改本类，只改 yml 不生效。
@@ -49,7 +38,7 @@ public class PrimaryDataSourceConfig {
         return new DataSourceProperties();
     }
 
-    /** 主库连接池；池名固定，与 ERP 池 {@code erp-pool} 在监控中可区分（DA1）。 */
+    /** 主库连接池；池名固定为 {@code archive-pool}，便于监控中识别。 */
     @Bean(name = "dataSource")
     @Primary
     public DataSource dataSource(@Qualifier("dataSourceProperties") DataSourceProperties properties) {

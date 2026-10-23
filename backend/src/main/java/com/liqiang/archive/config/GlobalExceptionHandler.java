@@ -1,7 +1,7 @@
 package com.liqiang.archive.config;
 
 import com.liqiang.archive.dto.ApiResponse;
-import com.liqiang.archive.erp.ErpBusinessException;
+import com.liqiang.archive.infra.ApiException;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -182,14 +182,14 @@ public class GlobalExceptionHandler {
     }
 
     /**
-     * ERP 业务异常（技术方案映射 §5.1 / DA7）。
+     * 通用业务异常（幂等冲突 / 参数校验）。
      *
      * <p>HTTP 状态码仍放在 {@code code}（前端现有判断不变），业务码、字段定位与可修正数据
      * 放在 {@code data} 里，前端如需区分「同一个 422」的具体原因读 {@code data.errorCode}。
      */
-    @ExceptionHandler(ErpBusinessException.class)
-    public ResponseEntity<ApiResponse<Map<String, Object>>> handleErpBusiness(ErpBusinessException ex) {
-        log.warn("ERP 业务校验失败 [{}]: {}", ex.errorCode().name(), ex.getMessage());
+    @ExceptionHandler(ApiException.class)
+    public ResponseEntity<ApiResponse<Map<String, Object>>> handleApiException(ApiException ex) {
+        log.warn("业务校验失败 [{}]: {}", ex.errorCode().name(), ex.getMessage());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("errorCode", ex.errorCode().name());
         if (ex.field() != null) {

@@ -1,7 +1,5 @@
 package com.liqiang.archive.controller;
 
-import com.liqiang.archive.erp.ErpActorResolver;
-import com.liqiang.archive.erp.ErpChangeLogWriter;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -40,9 +38,7 @@ import static org.mockito.Mockito.*;
  */
 class ManufacturingTaskConfigControllerTest {
     private final JdbcTemplate jdbc=mock(JdbcTemplate.class);
-    private final ErpChangeLogWriter changeLog=mock(ErpChangeLogWriter.class);
-    private final ErpActorResolver actors=mock(ErpActorResolver.class);
-    private final ManufacturingTaskConfigController controller=new ManufacturingTaskConfigController(jdbc,changeLog,actors);
+    private final ManufacturingTaskConfigController controller=new ManufacturingTaskConfigController(jdbc);
 
     private static Map<String,Object> row(Object... kv) {
         var m=new LinkedHashMap<String,Object>();
@@ -194,7 +190,6 @@ class ManufacturingTaskConfigControllerTest {
         assertDoesNotThrow(()->controller.deleteConfig(9L));
 
         verify(jdbc).update(contains("DELETE FROM manufacturing_task_config_items WHERE id=?"),eq(9L));
-        verify(changeLog).write(any());
     }
 
     /** 可选配置：历史上真被用过 → 拒绝（2026-10-21 实测 70 条里 67 条属于这一类）。 */
@@ -236,7 +231,6 @@ class ManufacturingTaskConfigControllerTest {
         assertTrue(String.valueOf(ex.getReason()).contains("氚云"),
                 "拒绝理由必须点明来源是氚云字典镜像："+ex.getReason());
         verify(jdbc,never()).update(contains("DELETE FROM manufacturing_task_config_items"),any(Object[].class));
-        verify(changeLog,never()).write(any());
     }
 
     @Test

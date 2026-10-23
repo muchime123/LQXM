@@ -29,10 +29,18 @@ export const archiveNavItems: NavItem[] = [
       },
       {
         to: '/cashflow-journal',
-        permission: 'integration.h3',
+        permission: 'cashflow.read',
         label: '资金日记账',
         description: '按期间查看各账户收入、支出、期初、期末及流水明细。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>',
+        group: 'h3'
+      },
+      {
+        to: '/cashflow-entities',
+        permission: 'cashflow.read',
+        label: '资金主体管理',
+        description: '资金归属主体字典与账户认领（企业/个人/其他），财务人工维护。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"/></svg>',
         group: 'h3'
       },
       {
@@ -70,22 +78,14 @@ export const archiveNavItems: NavItem[] = [
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
         group: 'h3'
       },
-      // 生产主数据（2026-10-06 恢复）：09-30 那次「聚合页下线」把它们一并摘了，但它们不是
-      // ERP 交易页，而是生产任务单的取数底座（后端 /api/manufacturing/master/* 从未删），
-      // 属「入口丢」而非功能下线。ERP 前端下线不涉及这两页。
-      {
-        to: '/manufacturing-process-management',
-        permission: 'manufacturing.template.manage',
-        label: '制程与工序管理',
-        description: '维护车间工序主数据与制程模板（生产任务单的联动数据源）；模板修改不影响已下达任务，任务工序为快照。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M19 5l-3 3M8 16l-3 3"/></svg>',
-        group: 'h3'
-      },
+      // 「生产参考工期」：维护产品 + 车间的节点参考工期（生产任务单的取数底座）。
+      // 2026-10-23 重定位：原「生产产品与工期管理」改名，不再与制程/工序概念绑定；
+      // 工序库、制程模板、产品制程推荐已随制造主数据清理整体下线。
       {
         to: '/manufacturing-task-configs',
         permission: 'manufacturing.template.manage',
-        label: '生产产品与工期管理',
-        description: '维护氚云产品字典镜像与各产品的节点参考工期，并在右上角「通用参考设置」统一维护兜底用的通用节点参考工期（产品优先、通用兜底）。',
+        label: '生产参考工期',
+        description: '维护「产品 + 车间」的节点参考工期，并在右上角「通用参考设置」统一维护兜底用的通用节点参考工期（产品优先、通用兜底）；车间基础数据在本页「车间管理」维护。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="15" width="18" height="5" rx="1.5"/><circle cx="8" cy="7.5" r="1.2"/></svg>',
         group: 'h3'
       },

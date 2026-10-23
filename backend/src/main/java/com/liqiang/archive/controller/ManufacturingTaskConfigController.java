@@ -1,9 +1,6 @@
 package com.liqiang.archive.controller;
 
-import com.liqiang.archive.erp.ErpActorResolver;
-import com.liqiang.archive.erp.ErpChangeLogWriter;
 import com.liqiang.archive.security.RequirePermission;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -14,29 +11,20 @@ import java.util.*;
 /**
  * 制造域主数据维护（生产车间 / 任务单配置）。
  *
- * <p><b>本类不写 {@code audit_logs}</b>：审计身份走 {@code row_change_log.target_table}
- * （schema 限定表名，物理唯一），不再依赖自由字符串 {@code entity_type}——
- * 后者一个字段要同时表达「哪张表」和「什么业务对象」，两个模块对同名概念用同一个词就会撞。
- * 见 {@code docs/审计实体身份治理与撞名防治-20260921.md}。
+ * <p><b>审计</b>：2026-10-23 随 ERP 独立 schema 下线，本类不再写 {@code erp.row_change_log}
+ * 专用审计；车间/配置变更的审计如后续需要，统一走系统 {@code audit_logs}（见清理说明）。
  *
- * <p>⚠️ 构造器必须显式书写并带 {@code @Qualifier("archiveAuditWriter")}：
- * 容器里有 {@code archiveAuditWriter} / {@code erpAuditWriter} 两个同类型 bean，
- * 靠 Lombok 生成构造器会丢掉 {@code @Qualifier}（默认不复制到构造参数）→ 注入歧义。
+ * <p><b>制程概念已移除</b>：工序库、制程模板、产品制程推荐（{@code manufacturing_process_*}
+ * 表）随制造主数据清理整体下线，本类只保留「产品 + 车间 + 历史任务 + 参考工期」这一条真实业务。
  */
 @RestController
 @RequestMapping("/api/manufacturing/master")
 @RequirePermission("manufacturing.template.manage")
 public class ManufacturingTaskConfigController {
     private final JdbcTemplate jdbc;
-    private final ErpChangeLogWriter changeLog;
-    private final ErpActorResolver actors;
 
-    public ManufacturingTaskConfigController(JdbcTemplate jdbc,
-                                             @Qualifier("archiveAuditWriter") ErpChangeLogWriter changeLog,
-                                             ErpActorResolver actors) {
+    public ManufacturingTaskConfigController(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        this.changeLog = changeLog;
-        this.actors = actors;
     }
 
     /**
@@ -129,13 +117,14 @@ public class ManufacturingTaskConfigController {
                 +"ORDER BY orders DESC,p.production_line,p.product_name");
     }
 
+    /** 车间列表。2026-10-23：移除 default_process_template_id（制程关联已下线）。 */
     @GetMapping("/workshops")
     public List<Map<String,Object>> workshops() {
-        return jdbc.queryForList("SELECT id,workshop_name AS workshopName,enabled,order_receiver_name AS orderReceiverName,warehouse_clerk_name AS warehouseClerkName,default_process_template_id AS defaultProcessTemplateId FROM manufacturing_workshops ORDER BY enabled DESC,id");
+        return jdbc.queryForList("SELECT id,workshop_name AS workshopName,enabled,order_receiver_name AS orderReceiverName,warehouse_clerk_name AS warehouseClerkName FROM manufacturing_workshops ORDER BY enabled DESC,id");
     }
 
     public record WorkshopUpdate(String workshopName, Boolean enabled, String orderReceiverName,
-                                 String warehouseClerkName, Long defaultProcessTemplateId) {}
+                                 String warehouseClerkName) {}
 
     @PostMapping("/workshops")
     @Transactional
@@ -146,13 +135,7 @@ public class ManufacturingTaskConfigController {
         String externalId="MANUAL-"+UUID.randomUUID();
         jdbc.update("INSERT INTO manufacturing_workshops(external_source,external_id,workshop_name,enabled,order_receiver_name,warehouse_clerk_name) VALUES('MANUAL',?,?,?,?,?)",
                 externalId,name,request.enabled()==null||request.enabled(),clean(request.orderReceiverName()),clean(request.warehouseClerkName()));
-        long id=jdbc.queryForObject("SELECT id FROM manufacturing_workshops WHERE external_source='MANUAL' AND external_id=?",Long.class,externalId);
-        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_workshops",id,"INSERT",
-                ErpChangeLogWriter.changes("workshopName",name,"enabled",request.enabled(),
-                        "orderReceiverName",clean(request.orderReceiverName()),
-                        "warehouseClerkName",clean(request.warehouseClerkName())),
-                null,"新增生产车间",null,null));
-        return id;
+        return jdbc.queryForObject("SELECT id FROM manufacturing_workshops WHERE external_source='MANUAL' AND external_id=?",Long.class,externalId);
     }
 
     @PutMapping("/workshops/{id}")
@@ -168,24 +151,7 @@ public class ManufacturingTaskConfigController {
                 name,request.enabled()==null||request.enabled(),clean(request.orderReceiverName()),clean(request.warehouseClerkName()),id);
         // 不再需要把新名字级联写回 manufacturing_task_config_items：V398 已删掉那儿的 workshop_name 副本，
         // 产品归属车间只有 workshop_id 一个真相，改名自动跟随，漏级联导致静默错配的可能性从根上消除。
-        jdbc.update("UPDATE manufacturing_process_templates SET workshop_type=? WHERE workshop_type=?",name,oldName);
-        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_workshops",id,"UPDATE",
-                ErpChangeLogWriter.changes("workshopName",name,"oldWorkshopName",oldName,"enabled",request.enabled(),
-                        "orderReceiverName",clean(request.orderReceiverName()),
-                        "warehouseClerkName",clean(request.warehouseClerkName())),
-                null,"维护生产车间主数据",null,null));
-    }
-
-    @PutMapping("/workshops/{id}/default-template")
-    @Transactional
-    public void updateWorkshop(@PathVariable long id, @RequestBody WorkshopUpdate request) {
-        if(request.defaultProcessTemplateId()!=null && jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_process_templates WHERE id=? AND active=1",Integer.class,request.defaultProcessTemplateId())==0)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"请选择启用的制程模板");
-        if(jdbc.update("UPDATE manufacturing_workshops SET default_process_template_id=? WHERE id=?",request.defaultProcessTemplateId(),id)==0)
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND,"车间不存在");
-        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_workshops",id,"UPDATE",
-                ErpChangeLogWriter.changes("defaultProcessTemplateId",request.defaultProcessTemplateId()),
-                null,"修改车间默认制程",null,null));
+        // （2026-10-23：不再级联写 manufacturing_process_templates——该表已随制造主数据清理下线。）
     }
 
     /**
@@ -215,12 +181,7 @@ public class ManufacturingTaskConfigController {
         jdbc.update("INSERT INTO manufacturing_task_config_items(external_source,external_id,config_name,workshop_id,config_type) "
                 +"VALUES('MANUAL',?,?,?,?)",
                 externalId,name,request.workshopId(),request.configType());
-        long id=jdbc.queryForObject("SELECT id FROM manufacturing_task_config_items WHERE external_source='MANUAL' AND external_id=?",Long.class,externalId);
-        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_task_config_items",id,"INSERT",
-                ErpChangeLogWriter.changes("configName",name,"workshopId",request.workshopId(),
-                        "configType",request.configType()),
-                null,"新增任务单配置",null,null));
-        return id;
+        return jdbc.queryForObject("SELECT id FROM manufacturing_task_config_items WHERE external_source='MANUAL' AND external_id=?",Long.class,externalId);
     }
 
     /*
@@ -284,9 +245,6 @@ public class ManufacturingTaskConfigController {
                 throw new ResponseStatusException(HttpStatus.CONFLICT,"该可选配置已出现在 "+used+" 张历史任务单的「可选配置」里，是氚云在用的真实选项，不能删除");
         }
         jdbc.update("DELETE FROM manufacturing_task_config_items WHERE id=?",id);
-        changeLog.write(ErpChangeLogWriter.of(actors.current(),"product_archive.manufacturing_task_config_items",id,"DELETE",
-                ErpChangeLogWriter.changes("configName",name,"configType",row.get("config_type"),"workshopId",workshopId),
-                null,"删除本地补录的配置（无历史使用、无参考间隔）",null,null));
     }
     private String requiredName(String value,String label) {
         if(value==null||value.isBlank()||value.trim().length()>200) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"请填写有效"+label);
