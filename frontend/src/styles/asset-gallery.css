@@ -291,7 +291,7 @@
   padding: 0 6px;
   border-radius: var(--radius-sm);
   background: rgba(15, 23, 42, 0.62);
-  color: var(--color-surface);
+  color: var(--color-text-on-overlay);
   font-size: var(--fs-3xs);
   font-weight: var(--fw-extrabold);
   letter-spacing: 0.03em;
@@ -322,7 +322,7 @@
   left: 8px;
   top: 8px;
   background: var(--color-text-tertiary, #999);
-  color: var(--color-surface);
+  color: var(--color-text-on-overlay);
   box-shadow: 0 4px 10px rgba(120, 120, 120, 0.22);
 }
 /* 默认 + 文件库共存时，文件库靠下；重复 + 文件库共存时，重复靠左 */
@@ -457,7 +457,7 @@
 }
 .htb-btn:hover {
   background: rgba(255, 255, 255, 0.14);
-  color: var(--color-surface);
+  color: var(--color-text-on-overlay);
 }
 .htb-btn.active {
   color: var(--color-primary-light);

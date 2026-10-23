@@ -230,7 +230,7 @@ function onDragEnd() {
   right: 10px;
   padding: 3px 8px;
   background: var(--color-overlay-image);
-  color: var(--color-surface);
+  color: var(--color-text-on-overlay);
   font-size: var(--fs-xxs);
   border-radius: var(--radius-xl);
   cursor: pointer;

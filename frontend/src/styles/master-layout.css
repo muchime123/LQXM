@@ -86,8 +86,8 @@
   position: absolute;
   inset: auto 0 0 0;
   padding: 2px 0;
-  background: rgba(15, 23, 42, 0.55);
-  color: var(--color-surface);
+  background: rgba(15, 23, 42, 0.62);
+  color: var(--color-text-on-overlay);
   font-size: var(--fs-xxs);
   font-style: normal;
   text-align: center;

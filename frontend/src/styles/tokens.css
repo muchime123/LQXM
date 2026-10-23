@@ -56,6 +56,9 @@
   --color-text-heading-alt: #1e293b;
   --color-text-link: #0f766e;
   --color-text-on-primary: #ffffff;
+  /* 遮罩/图片/半透明暗底之上的文字色：深浅两主题同为白色，故不在 dark.css 覆盖。
+     与 --color-overlay-image / --color-overlay-image-strong 等遮罩背景配对使用。 */
+  --color-text-on-overlay: #ffffff;
 
   /* Colors - Status */
   --color-success: #16a34a;
