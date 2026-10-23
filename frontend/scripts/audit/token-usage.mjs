@@ -81,6 +81,8 @@ const missing = [...used.entries()]
     noFb: rec.noFb,
     fallbacks: [...rec.fallbacks.entries()].sort((a, b) => b[1] - a[1]).map(([v, n]) => ({ value: v, n })),
     noFbSites: rec.sites.filter(s => s.fallback === null).map(s => `${s.file}:${s.line}`),
+    // 有 fallback 时给出全部点位与各自取值，供逐处映射（B2/B3）使用
+    sites: rec.sites.map(s => `${s.file}:${s.line}${s.fallback === null ? '' : `  fb=${s.fallback}`}`),
     files: [...new Set(rec.sites.map(s => s.file))]
   }))
   .sort((a, b) => b.noFb - a.noFb || b.count - a.count)
