@@ -132,5 +132,8 @@ for (const target of TARGETS) {
     const slotUse = importers.filter(c => r.classes.some(cl => new RegExp(`class="[^"]*\\b${cl}(?![-\\w])`).test(c.tpl)))
     console.log(`     ${r.sel.slice(0, 46).padEnd(46)} 被引入者当子组件渲染：${renderedBy.join(',') || '否'}  引入者用 :deep 引用：${deepUse.length ? '是' : '否'}  引入者模板直接使用：${slotUse.length ? '是' : '否'}`)
   }
-  fs.writeFileSync(`_audit_shots/c8-ledger-${path.basename(target.file, '.css')}.json`, JSON.stringify(rows.map(r => ({ sel: r.sel, line: r.line, cat: r.cat, users: r.users, elsewhere: r.elsewhere })), null, 2))
+  fs.writeFileSync(`_audit_shots/c8-ledger-${path.basename(target.file, '.css')}.json`, JSON.stringify(rows.map(r => ({
+    sel: r.sel, line: r.line, cat: r.cat, users: r.users, elsewhere: r.elsewhere,
+    consumers: bMap.get(r.sel) || []
+  })), null, 2))
 }
