@@ -747,6 +747,116 @@ C6 为只读审计，本轮**未修改任何代码**。核实结果改变了初�
 
 **未改动**：`ImportUpdatePreviewModal` 保持独立实现；`platform-badge` 等局部样式保留；没有新建组件或 CSS 文件，也没有扩大共享样式的作用域。
 
+### C7-3 只读审计（2026-10-23，未修改任何业务代码）
+
+审计工具：`scripts/audit/c7-c3-usage.mjs`（引入关系与使用率）、`scripts/audit/c7-c3-builddup.mjs`（生产构建重复）、`scripts/audit/c7-c3-groups.mjs`（职责归属）。
+
+#### 交付一：真实引入关系表
+
+| 样式文件 | 引入组件 | 位置 | 作用域 | 使用场景 |
+|---|---|---|---|---|
+| `media-account-view.css` | `MediaAccountView.vue` | 1345 | scoped | 列表页面（表格、筛选、行操作、工具栏） |
+| | `ImportUpdatePreviewModal.vue` | 251 | scoped | 导入更新预览弹窗 |
+| | `MediaAccountDetailModal.vue` | 124 | scoped | 账号详情弹窗 |
+| | `MediaAccountEditorModal.vue` | 252 | scoped | 账号编辑弹窗 |
+| | `MediaAccountStats.vue` | 73 | scoped | 平台统计卡片 |
+| | `MediaAnalyticsPanel.vue` | 499 | scoped | 数据分析面板 |
+| | `MediaPlatformConfigModal.vue` | 314 | scoped | 平台配置弹窗 |
+| | `UpdateRecordFormDialog.vue` | 76 | scoped | 更新记录表单弹窗 |
+| `packaging-detail-drawer.css` | `PackagingDetailDrawer.vue` | 803 | scoped | 包装详情抽屉 |
+| | `PackagingSpecDetailPanel.vue` | 278 | scoped | 规格明细面板 |
+| | `PackagingVariantCards.vue` | 451 | scoped | 变体卡片 |
+
+**引入点共 11 处，全部为 `<style scoped>`，没有任何非 scoped 或全局引入**——因此这些规则每份都带独立的 `data-v` 作用域号，组件之间互不影响。
+
+#### 交付二：每个组件实际使用多少 CSS
+
+统计口径：把每个 CSS 文件解析成规则，逐条检查其类名是否出现在该组件的模板或脚本文本中（含所有 `v-if` 分支与 `:class` 表达式，因此覆盖各种弹窗状态与动态 class）。**只要类名出现过即计为命中，所以下表的使用率是"上限"，真实使用率只会更低。**
+
+`media-account-view.css`（270 条规则）：
+
+| 引入组件 | 总规则 | 命中 | 未命中 | 使用率 |
+|---|---|---|---|---|
+| `MediaAccountView.vue` | 270 | 56 | 214 | 21% |
+| `ImportUpdatePreviewModal.vue` | 270 | 56 | 214 | 21% |
+| `MediaAnalyticsPanel.vue` | 270 | 54 | 216 | 20% |
+| `MediaPlatformConfigModal.vue` | 270 | 37 | 233 | 14% |
+| `MediaAccountStats.vue` | 270 | 29 | 241 | 11% |
+| `MediaAccountEditorModal.vue` | 270 | 24 | 246 | 9% |
+| `MediaAccountDetailModal.vue` | 270 | 21 | 249 | 8% |
+| `UpdateRecordFormDialog.vue` | 270 | 14 | 256 | 5% |
+
+`packaging-detail-drawer.css`（315 条规则）：
+
+| 引入组件 | 总规则 | 命中 | 未命中 | 使用率 |
+|---|---|---|---|---|
+| `PackagingDetailDrawer.vue` | 315 | 117 | 198 | 37% |
+| `PackagingVariantCards.vue` | 315 | 105 | 210 | 33% |
+| `PackagingSpecDetailPanel.vue` | 315 | 79 | 236 | 25% |
+
+结论：**每个组件都完整编译了整个文件，却只用到 5%–37%**，与用户关注的"200 条规则只用 10 条"是同一类问题，且 media 侧更严重。
+
+#### 交付三：生产构建影响（真的输出了多份）
+
+构建方式：`npx vite build --outDir dist/_c7c3`（产物落在已忽略的 `dist/` 下，审计后清理）。产物共 58 个 CSS 文件、合计 **1403.9 KB**。
+
+统计方法：先找出"承载该文件的 `data-v` 作用域号"（引入者会拿到文件的绝大多数规则，据此与自带同名选择器的其他组件区分开），再只统计这些作用域号带来的重复。
+
+| 样式文件 | 规则数 | 引入者作用域数 | 落入产物 | 占用字节 | 其中重复 | 占全部 CSS |
+|---|---|---|---|---|---|---|
+| `media-account-view.css` | 270 | **8** | `MediaAccountView-*.css`（304 KB） | 262.1 KB | **229.3 KB** | 16.33% |
+| `packaging-detail-drawer.css` | 315 | **3** | `PackagingView-*.css`（186.3 KB） | 123.4 KB | **82.3 KB** | 5.86% |
+
+- 两份文件合计重复约 **311.6 KB**，占全部产物 CSS 的 **22.2%**
+- 重复**确实进入最终 CSS**，不是只存在于开发环境：8 份副本全部落在 `MediaAccountView` 路由块内，占该块 304 KB 的约 75%；3 份副本占 `PackagingView` 块的约 44%
+- 这两块是路由懒加载块，影响的是访问对应页面时的下载体积
+
+**关于优先级冲突**：这 11 处引入都是 scoped，每份副本只作用于自己的组件，**组件之间不存在优先级冲突**；唯一可能的冲突是与全局规则之间（C7-2 中已遇到并处理过一次）。
+
+#### 交付四：职责与作用域边界
+
+`media-account-view.css` 按类名前缀归并后：
+
+| 分组 | 规则数 | 使用者 |
+|---|---|---|
+| `platform-stat` | 13 | 4 个组件 |
+| `row-btn` | 11 | 6 个组件 |
+| `import-tab` | 9 | 4 个组件 |
+| `update-import` | 8 | 3 个组件 |
+| `update-type` | 6 | 4 个组件 |
+| `platform-chip` | 4 | 5 个组件 |
+| `analytics-list` / `platform-table` / `psc-item` / `editor-platform` | 各 4–7 | 各 1 个组件 |
+| `platform-config` / `heatmap-cell` / `media-form` | 各 4–9 | **无人使用** |
+
+分组小计：**多组件共用 25 组、单组件专用 69 组、无人使用 35 组**；按规则计：被 2 个及以上引入者共用 50 条、仅被 1 个使用 128 条、无人使用 91 条。
+
+→ **职责确实过大**：同一文件同时承担列表页面、导入预览、账号详情、账号编辑、平台统计、数据分析、平台配置、更新记录表单八个职责，其中 `row-btn` 等被 6 个组件共用，而近半数的规则只服务于单个组件、还有 35 组无人使用。
+
+`packaging-detail-drawer.css`：共用 60 条、单组件专用 156 条、无人使用 98 条；分组上 `spec-card`（32 条）、`film-row`（30 条）、`asset-meta`（8 条）被 3 个组件共用，`variant-form`、`exchange-rate`、`tag-editor` 等 24 组无人使用。
+
+**作用域边界**：
+
+| 类别 | media | packaging | 处置方向 |
+|---|---|---|---|
+| 多组件共用 | 50 条 | 60 条 | 可评估迁入模块级共享样式 |
+| 仅单组件使用 | 128 条 | 156 条 | 应迁回各自组件的 scoped，作用域不变 |
+| 所有引入者都不用、但在别处出现（归属可能错位） | 12 条 | 53 条 | 先核实归属，如 `.carousel-*` 实际属于 `VariantCarousel.vue` |
+| 全仓都找不到 | 79 条 | 45 条 | 转 C8 核实 |
+
+#### 最小处置建议（仅建议，本轮未实施）
+
+按决策标准表，两份文件都属于"构建重复明显 + 组件只使用少量规则 + 职责混杂"，但**不建议直接做文件大搬迁**，而是分三步走，且只在能保持作用域的前提下推进：
+
+1. **第一步（最低风险，属于 C8）**：清理无人使用的规则。media 79 条、packaging 45 条在全仓都找不到引用，先由 C8 核实；另外 12 / 53 条归属错位（如 `.carousel-*` 属于 `VariantCarousel.vue`）需先确认是搬迁还是删除。
+2. **第二步（作用域不变）**：把仅单组件使用的规则（media 128 条、packaging 156 条）迁回各自组件的 `<style scoped>`。作用域完全一致，风险最低，且能直接让每份副本变薄。
+3. **第三步（需验证优先级）**：把真正多组件共用的规则（media 50 条、packaging 60 条）评估迁入模块级共享样式。media 侧已有 `modules/media-dialog-shared.css`（全局 import + `.media-*` 模块前缀），优先复用它；packaging 侧目前**没有**对应的模块级共享文件，若要新建需另行评估，本轮不主张。
+
+**预期收益（按实测每条约 0.12–0.13 KB 估算）**：media 侧 262.1 KB → 约 21.6 KB，packaging 侧 123.4 KB → 约 28.2 KB，合计可省约 **335 KB（约全部 CSS 的 24%）**。这只是供决策的量级参考，实际以实施后的构建结果为准。
+
+**验证方式（沿用 C7-2）**：每步独立提交；每步前后读取真实元素的 `getComputedStyle()` 并逐项比对；检查真实元素命中的规则来源是否按预期改变；浅色与深色、多个主要宽度都要覆盖；全量测试通过。
+
+**未做之事**：本轮只读，未修改任何业务代码；未把 scoped 引入改成全局引入；未拆分任何 CSS 文件。
+
 ### C7 收口
 
 C7-1 已关闭，C7-2 已完成（三批独立提交）。C7-3（`media-account-view.css` 与 `packaging-detail-drawer.css` 的重复引入）与 C7-4（视觉漂移）保留待办，按既定顺序推进，随后进入 C8。
