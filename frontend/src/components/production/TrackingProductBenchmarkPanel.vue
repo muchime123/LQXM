@@ -21,31 +21,34 @@
         <el-button :disabled="!peers.length" @click="openCopy">复制其它产品</el-button>
       </div>
     </header>
-    <el-table v-if="stageRows.length" :data="stageRows" stripe size="small">
-      <el-table-column label="跟单节点" min-width="110">
+    <el-table v-if="stageRows.length" :data="stageRows" stripe size="small" class="benchmark-table">
+      <el-table-column label="跟单节点" min-width="150">
         <template #default="{ row }">
-          <div class="stage-name">{{ row.stageLabel }}</div>
+          <div class="stage-name">{{ row.stageLabel }}<el-tag v-if="row.optionalStage" size="small" type="info" class="optional-tag">按需</el-tag></div>
           <small class="stage-interval">{{ row.intervalLabel }}</small>
         </template>
       </el-table-column>
-      <el-table-column label="通用参考" width="86" align="center">
-        <template #default="{ row }">{{ row.workshopDays ?? '未设' }} 天</template>
-      </el-table-column>
-      <el-table-column label="产品参考天数" min-width="150">
+      <el-table-column label="通用参考" width="92" align="center">
         <template #default="{ row }">
-          <el-input-number v-model="row.typicalDays" :min="0" :max="60" :precision="1" :step="0.5" controls-position="right" size="small" placeholder="沿用通用" />
+          <span v-if="row.workshopDays != null" class="days-value">{{ row.workshopDays }} 天</span>
+          <span v-else class="days-unset">未设</span>
+        </template>
+      </el-table-column>
+      <el-table-column label="产品参考天数" width="186">
+        <template #default="{ row }">
+          <el-input-number v-model="row.typicalDays" :min="0" :max="60" :precision="1" :step="0.5" controls-position="right" size="small" placeholder="沿用通用" class="days-input" />
           <small v-if="row.publishedSource" class="publish-note">{{ publishText(row) }}</small>
         </template>
       </el-table-column>
-      <el-table-column label="历史候选" min-width="170">
+      <el-table-column label="历史候选" min-width="200">
         <template #default="{ row }">
-          <div>{{ row.sampleCount ? `P50 ${row.p50Days} / P75 ${row.p75Days} · ${row.sampleCount} 段` : '暂无可信候选' }}</div>
-          <small v-if="row.applicationAnchorCount">申请日兜底 {{ row.applicationAnchorCount }} 段</small>
-          <small v-if="row.zeroDayCount"> · 零天 {{ row.zeroDayCount }}</small>
-          <small v-if="row.excludedCount"> · 排除 {{ row.excludedCount }}</small>
+          <div class="candidate-main">{{ row.sampleCount ? `P50 ${row.p50Days} / P75 ${row.p75Days} · ${row.sampleCount} 段` : '暂无可信候选' }}</div>
+          <small v-if="row.applicationAnchorCount || row.zeroDayCount || row.excludedCount" class="candidate-sub">
+            {{ [row.applicationAnchorCount && `申请日兜底 ${row.applicationAnchorCount} 段`, row.zeroDayCount && `零天 ${row.zeroDayCount}`, row.excludedCount && `排除 ${row.excludedCount}`].filter(Boolean).join(' · ') }}
+          </small>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="116">
+      <el-table-column label="操作" width="104" align="center" class-name="col-op">
         <template #default="{ row }">
           <el-button link type="primary" :loading="saving === row.stageCode" @click="save(row)">保存</el-button>
           <el-button v-if="row.publishedSource" link type="danger" :loading="revoking === row.stageCode" @click="revoke(row)">撤销</el-button>
@@ -292,9 +295,21 @@ async function applyP50() {
 .total-row b { font-size: 18px; color: var(--color-primary, #0f766e); font-variant-numeric: tabular-nums; }
 .total-note { font-size: 12px; color: var(--color-text-secondary, #94a3b8); }
 .total-warn { font-size: 12px; color: var(--color-warning, #d97706); }
-.stage-name { font-weight: 600; color: var(--color-text-heading, #0f172a); }
+.stage-name { font-weight: 600; color: var(--color-text-heading, #0f172a); display: flex; align-items: center; gap: 6px; }
+.optional-tag { flex: none; transform: scale(0.9); }
 .stage-interval { display: block; color: var(--color-text-secondary, #94a3b8); font-size: 11px; }
 .publish-note { display: block; color: var(--color-text-secondary, #94a3b8); font-size: 11px; }
+/* 列宽契约：表头一律不换行（「通用参考」曾被挤成两行）；窄屏交给横向滚动而不是挤压。 */
+.benchmark-table :deep(th .cell) { white-space: nowrap; }
+.days-input { width: 138px; }
+.days-input :deep(.el-input__inner) { font-variant-numeric: tabular-nums; }
+.days-value { font-variant-numeric: tabular-nums; color: var(--color-text-secondary, #64748b); }
+.days-unset { color: var(--color-text-placeholder, #cbd5e1); font-size: 12px; }
+.candidate-main { font-variant-numeric: tabular-nums; }
+.candidate-sub { display: block; color: var(--color-text-secondary, #94a3b8); font-size: 11px; }
+/* 保存/撤销并排：单元格里默认可换行，列窄时会竖排成两行。 */
+.benchmark-table :deep(.col-op .cell) { white-space: nowrap; }
+.benchmark-table :deep(.col-op .el-button + .el-button) { margin-left: 10px; }
 .copy-hint { margin: 0 0 12px; font-size: 12px; line-height: 1.6; color: var(--color-text-secondary, #5f6f82); }
 .dialog-full { width: 100%; }
 </style>

@@ -98,15 +98,24 @@
                 </el-select>
                 <span v-if="stage.optional && !stage.applicable" class="cell-reference muted">—</span>
                 <span v-else :class="['cell-reference', { 'is-overdue': stageOverdue(stage) }]">
-                  <template v-if="stage.referenceDate">{{ stage.referenceDate }}<small>{{ stage.referenceSource === 'MANUAL' ? '人工预计' : '系统参考' }}</small><small v-if="stageOverdue(stage)" class="overdue-note">超 {{ stage.referenceOverdueDays }} 天</small></template>
-                  <template v-else><span class="muted">无参考</span></template>
+                  <span class="reference-main">
+                    <strong v-if="stage.manualReferenceDate || stage.referenceDate" class="reference-date">{{ stage.manualReferenceDate || stage.referenceDate }}</strong>
+                    <span v-else-if="!canEditManualReference(index, stage)" class="reference-empty">未设置</span>
                   <el-popover v-if="canEditManualReference(index, stage)" placement="bottom" :width="310" trigger="click">
-                    <template #reference><el-button link type="primary" size="small">{{ stage.manualReferenceDate ? '修改预计' : '填写预计' }}</el-button></template>
+                    <template #reference>
+                      <el-button v-if="stage.manualReferenceDate || stage.referenceDate" class="reference-edit" circle size="small" aria-label="修改节点预计日期" title="修改节点预计日期"><el-icon><EditPen /></el-icon></el-button>
+                      <el-button v-else class="reference-set" size="small" type="primary" plain>设置预计日期</el-button>
+                    </template>
                     <p class="manual-hint">仅本任务单的节点预计日期；不修改产品工期或整单交付日期。</p>
                     <el-date-picker v-model="stage.manualReferenceDate" type="date" value-format="YYYY-MM-DD" clearable placeholder="节点预计完成日期" class="manual-date" @change="onManualDateChange(stage)" />
                     <el-input v-if="stage.manualReferenceDate" v-model="stage.manualReferenceReason" type="textarea" :rows="2" maxlength="300" show-word-limit placeholder="填写预计依据或调整原因（必填）" class="manual-reason" />
                     <small class="manual-hint">修改后点击底部“保存跟单”；清空日期可恢复系统参考。</small>
                   </el-popover>
+                  </span>
+                  <small v-if="stage.manualReferenceDate && stage.manualReferenceDate !== stage.referenceDate" class="reference-source draft">待保存 · 人工预计</small>
+                  <small v-else-if="stage.referenceSource === 'MANUAL' && !stage.manualReferenceDate" class="reference-source draft">恢复系统参考待保存</small>
+                  <small v-else-if="stage.referenceDate" class="reference-source">{{ stage.referenceSource === 'MANUAL' ? '人工预计' : '系统参考' }}</small>
+                  <small v-if="stageOverdue(stage)" class="overdue-note">超 {{ stage.referenceOverdueDays }} 天</small>
                 </span>
                 <el-date-picker v-model="stage.completedDate" type="date" value-format="YYYY-MM-DD" size="small" clearable placeholder="完成日期" :disabled="!canFollowup || Boolean(detail.order.stoppedAt) || stage.status !== 'DONE'" class="cell-date" />
                 <el-input v-model="stage.note" size="small" maxlength="500" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" :placeholder="stageOverdue(stage) ? '超参考日期，建议记录原因（可选）' : '节点备注（可选）'" class="cell-note" />
@@ -296,6 +305,7 @@
  * 产品页没有列表顺序，不传即可。
  */
 import { computed, ref, watch } from 'vue'
+import { EditPen } from '@element-plus/icons-vue'
 import type { TrackingMilestone, TrackingOrder } from '@/api/productionTracking'
 import TrackingSourceDetailDrawer from '@/components/production/TrackingSourceDetailDrawer.vue'
 import LqDialog from '@/components/common/LqDialog.vue'
@@ -426,7 +436,7 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .metric small.lead-delta-late { color: #b42318; font-weight: 600; }
 .metric small.lead-delta-early { color: #067647; font-weight: 600; }
 .stage-list {
-  --stage-cols: minmax(140px, 1fr) 112px 108px 132px minmax(200px, 1.6fr) auto;
+  --stage-cols: minmax(140px, 1fr) 112px 150px 132px minmax(200px, 1.6fr) auto;
   display: grid; gap: 8px;
 }
 .stage-head { display: grid; grid-template-columns: var(--stage-cols); gap: 12px; align-items: center; padding: 0 14px; font-size: 12px; font-weight: 600; color: #667085; }
@@ -440,7 +450,14 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .row-name { font-size: 13px; font-weight: 600; color: #101828; overflow-wrap: anywhere; }
 .cell-status { width: 112px; }
 .cell-date { width: 132px; }
-.cell-reference { font-size: 12px; color: #475467; display: flex; flex-direction: column; line-height: 1.35; }
+.cell-reference { font-size: 12px; color: #475467; display: flex; flex-direction: column; gap: 2px; line-height: 1.35; min-width: 0; }
+.reference-main { display: flex; align-items: center; gap: 6px; min-height: 25px; }
+.reference-date { font-size: 12px; font-weight: 600; white-space: nowrap; }
+.reference-empty { color: #98a2b3; }
+.reference-edit { width: 24px; height: 24px; flex: none; color: var(--color-primary, #0f766e); }
+.reference-set { margin: 0; }
+.cell-reference .reference-source { font-size: 11px; color: #98a2b3; }
+.cell-reference .reference-source.draft { color: #b54708; }
 .cell-reference small { color: var(--color-text-secondary, #64748b); }
 .cell-reference .overdue-note { color: #d92d20; font-weight: 600; }
 .cell-reference.is-overdue { color: #d92d20; font-weight: 600; }

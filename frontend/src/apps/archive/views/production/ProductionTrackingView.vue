@@ -73,6 +73,7 @@
 
     <div class="tracking-quick-filters" aria-label="常用筛选">
       <el-button v-for="preset in quickFilterPresets" :key="preset.key" size="small" :type="quickFilterActive(preset.key) ? 'primary' : 'default'" :plain="!quickFilterActive(preset.key)" @click="applyQuickFilter(preset.key)">{{ preset.label }}</el-button>
+      <div v-if="activeFilterChips.length" class="tracking-active-filters" aria-label="当前筛选条件"><span>已筛选：</span><el-tag v-for="chip in activeFilterChips" :key="chip.key" closable type="info" @close="clearFilterChip(chip.key)">{{ chip.label }}</el-tag><el-button link type="primary" @click="resetTrackingFilters">清除全部</el-button></div>
     </div>
     <div v-if="advancedFiltersVisible" class="tracking-extra-filters" aria-label="更多生产跟单筛选条件">
       <!-- 2026-10-21 精简：删除「任务单状态」（与跟单状态同一件事）与「跟单员」（与车间同一刀），
@@ -106,7 +107,6 @@
         </el-option-group>
       </el-select></div>
     </div>
-    <div v-if="activeFilterChips.length" class="tracking-active-filters" aria-label="当前筛选条件"><span>已筛选：</span><el-tag v-for="chip in activeFilterChips" :key="chip.key" closable type="info" @close="clearFilterChip(chip.key)">{{ chip.label }}</el-tag><el-button link type="primary" @click="resetTrackingFilters">清除全部</el-button></div>
     </div>
 
     <p v-if="visibility !== 'ALL'" class="muted">当前为跟单员视图：仅显示按车间分配给本人的生产任务（生产跟单主管可见全部）。</p>
@@ -115,7 +115,8 @@
       <span>已选 {{ selectedTrackingRows.length }} 单</span>
       <el-button @click="openExport">导出选中</el-button>
       <el-button v-if="canFollowup" type="primary" :disabled="!selectedTrackingRows.some(canQuickComplete)" @click="openListCompletion(selectedTrackingRows)">批量完成当前节点</el-button>
-      <span class="muted">{{ canFollowup ? '勾选当前页工单可导出；批量完成仅处理尚有未完成节点的工单。' : '勾选当前页工单可导出。' }}</span>
+      <el-button v-if="canFollowup" :disabled="!selectedTrackingRows.some(row => !row.stoppedAt && !row.closedAt)" @click="openBatchClosure(selectedTrackingRows)">批量确认结案</el-button>
+      <span class="muted">{{ canFollowup ? '批量操作仅处理当前页已勾选工单；结案不补录节点。' : '勾选当前页工单可导出。' }}</span>
     </div>
 
     <el-table v-loading="loading" :data="items" row-key="id" class="tracking-table" :style="stickyHeaderStyle" @row-click="openOrderDetail" @selection-change="onTrackingSelectionChange">
@@ -225,6 +226,28 @@
         <el-table-column prop="orderNo" label="工单编号" min-width="155" />
         <el-table-column prop="productNameSnapshot" label="产品" min-width="170" show-overflow-tooltip />
         <el-table-column label="本次完成节点" min-width="115"><template #default="{ row }">{{ listCompletionTarget(row, listCompletionStageCode)?.label }}</template></el-table-column>
+      </el-table>
+    </LqDialog>
+    <LqDialog
+      v-model="batchClosureVisible"
+      title="批量确认结案"
+      width="min(760px, 94vw)"
+      mode="detail"
+      :show-footer="true"
+      confirm-text="确认结案"
+      :loading="batchClosureSaving"
+      :confirm-disabled="batchClosureNote.trim().length < 6 || !batchClosureRemaining"
+      @confirm="confirmBatchClosure"
+    >
+      <p>确认以下任务已完成跟单。结案后状态显示为“跟单已完成”；未登记的节点保持原样，每单分别留下结案记录。</p>
+      <el-form-item label="结案说明" required>
+        <el-input v-model="batchClosureNote" type="textarea" :rows="2" maxlength="500" show-word-limit placeholder="请填写核实后的结案说明（至少 6 字）" />
+      </el-form-item>
+      <el-table :data="batchClosureRows" max-height="340">
+        <el-table-column prop="orderNo" label="工单编号" min-width="155" />
+        <el-table-column prop="productNameSnapshot" label="产品" min-width="170" show-overflow-tooltip />
+        <el-table-column label="节点" width="85"><template #default="{ row }">{{ row.stageDoneCount ?? 0 }}/{{ row.stageTotal ?? 0 }}</template></el-table-column>
+        <el-table-column label="结果" min-width="145"><template #default="{ row }"><span v-if="row.result === 'success'" class="is-success">已结案</span><span v-else-if="row.result === 'failed'" class="is-danger">{{ row.error }}</span><span v-else class="muted">待确认</span></template></el-table-column>
       </el-table>
     </LqDialog>
     <div class="pager">
@@ -547,6 +570,7 @@ import { useTrackingListColumns } from '@/composables/tracking/useTrackingListCo
 import { useTrackingWorkbook } from '@/composables/tracking/useTrackingWorkbook'
 import { useTrackingRoundTrip } from '@/composables/tracking/useTrackingRoundTrip'
 import { useTrackingListCompletion } from '@/composables/tracking/useTrackingListCompletion'
+import { useTrackingBatchClosure } from '@/composables/tracking/useTrackingBatchClosure'
 import { useListPagination } from '@/composables/list/useListPagination'
 import LqPagination from '@/components/common/LqPagination.vue'
 import LqDialog from '@/components/common/LqDialog.vue'
@@ -626,6 +650,11 @@ const {
   listCompletionVisible, listCompletionRows, listCompletionDate, listCompletionSaving,
   listCompletionStageCode, listCompletionNote, openListCompletion, confirmListCompletion
 } = useTrackingListCompletion({ reload: () => load() })
+const {
+  visible: batchClosureVisible, rows: batchClosureRows, note: batchClosureNote,
+  saving: batchClosureSaving, remaining: batchClosureRemaining,
+  open: openBatchClosure, confirm: confirmBatchClosure
+} = useTrackingBatchClosure({ reload: () => load() })
 function onTrackingSelectionChange(rows: TrackingOrder[]) {
   selectedTrackingRows.value = rows
 }
@@ -814,9 +843,9 @@ await Promise.all([loadColumnDefaults(), load()])
 .tracking-filter-bottom { display: flex; align-items: center; gap: 16px; margin-left: auto; flex-wrap: wrap; }
 .tracking-filter-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .tracking-filter-actions :deep(.el-button + .el-button) { margin-left: 0; }
-.tracking-quick-filters, .tracking-active-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-top: 1px solid #e9eeec; }
+.tracking-quick-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 10px 16px; border-top: 1px solid #e9eeec; }
 .tracking-quick-filters :deep(.el-button + .el-button) { margin-left: 0; }
-.tracking-active-filters { background: #f7faf9; font-size: 12px; color: #475467; }
+.tracking-active-filters { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding-left: 12px; border-left: 1px solid #dbe4e0; font-size: 12px; color: #475467; }
 .tracking-active-filters :deep(.el-tag) { max-width: 100%; }
 .tracking-extra-filters { display: grid; grid-template-columns: repeat(auto-fill, 180px); gap: 10px 12px; align-items: start; padding: 12px 16px 14px; border-top: 1px solid #e9eeec; background: #fff; }
 .tracking-extra-filter { display: flex; align-items: center; min-width: 0; min-height: 32px; }
@@ -827,7 +856,7 @@ await Promise.all([loadColumnDefaults(), load()])
 .tracking-extra-date-inputs :deep(.el-date-editor) { flex: 1 1 0; width: 0; min-width: 0; }
 .tracking-extra-date-inputs > span { color: #667085; font-size: 12px; flex: none; }
 @media (max-width: 960px) { .tracking-filter-bottom { margin-left: 0; width: 100%; justify-content: space-between; } .tracking-extra-filters { grid-template-columns: repeat(auto-fill, minmax(145px, 1fr)); } }
-@media (max-width: 600px) { .toolbar { padding: 12px; } .tracking-filter-fields { width: 100%; } .tracking-filter-fields .tracking-keyword, .tracking-common-date { flex: 1 1 100%; width: 100%; } .tracking-filter-fields > :deep(.el-select) { flex: 1 1 calc(50% - 4px); width: calc(50% - 4px); } .tracking-filter-bottom { align-items: stretch; } .tracking-filter-actions { width: 100%; } .tracking-filter-actions :deep(.el-button) { flex: 1 1 auto; } .tracking-quick-filters, .tracking-active-filters { padding: 10px 12px; } .tracking-extra-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; } }
+@media (max-width: 600px) { .toolbar { padding: 12px; } .tracking-filter-fields { width: 100%; } .tracking-filter-fields .tracking-keyword, .tracking-common-date { flex: 1 1 100%; width: 100%; } .tracking-filter-fields > :deep(.el-select) { flex: 1 1 calc(50% - 4px); width: calc(50% - 4px); } .tracking-filter-bottom { align-items: stretch; } .tracking-filter-actions { width: 100%; } .tracking-filter-actions :deep(.el-button) { flex: 1 1 auto; } .tracking-quick-filters { padding: 10px 12px; } .tracking-active-filters { flex-basis: 100%; padding-left: 0; border-left: 0; } .tracking-extra-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 12px; } }
 .list-batch-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .tracking-table { width: 100%; }
 /* 表头吸顶（10-15）：

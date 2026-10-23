@@ -220,7 +220,12 @@ async function batchCalculateAndFill() {
   else ElMessage.success(summary)
 }
 
-/** 车间卡片只显示产品与配置数量。 */
+/** 左侧车间导航：封口机置顶、称重机置底，其余保留原有顺序。 */
+function workshopCardRank(name: string) {
+  if (name === '封口机车间') return -1
+  if (name === '称重机车间') return 1
+  return 0
+}
 const workshopCards = computed<WorkshopCard[]>(() => workshops.value.map(w => {
   const mine = configs.value.filter(c => c.workshopId === w.id)
   return {
@@ -230,7 +235,7 @@ const workshopCards = computed<WorkshopCard[]>(() => workshops.value.map(w => {
     productCount: mine.filter(c => c.configType === 'PRODUCT_NAME').length,
     configCount: mine.filter(c => c.configType !== 'PRODUCT_NAME').length
   }
-}))
+}).sort((a, b) => workshopCardRank(a.workshopName) - workshopCardRank(b.workshopName)))
 
 const currentWorkshop = computed(() => workshopCards.value.find(w => w.id === selectedWorkshopId.value) ?? null)
 const configsInCurrentWorkshop = computed(() => configs.value.filter(c => c.workshopId === selectedWorkshopId.value))
