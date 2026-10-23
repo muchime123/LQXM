@@ -325,7 +325,6 @@ button.el-button.lq-row-danger-action:active {
 }
 
 [data-theme='dark'] .el-alert--error {
-  --el-alert-text-color: var(--color-danger-text);
   color: var(--color-danger-text);
 }
 
