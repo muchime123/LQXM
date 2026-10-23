@@ -216,7 +216,7 @@ function openPreview() {
   padding: 9px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  background: var(--color-bg-subtle, var(--color-surface));
+  background: var(--color-surface);
 }
 
 .sw-featured-note.active {

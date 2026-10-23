@@ -2028,7 +2028,7 @@ await reload()
 .version-detail-total { margin-top: 14px; padding: 12px 14px; background: var(--color-surface-subtle, #f1f5f9); border-radius: 10px; font-size: 14px; color: var(--color-text-muted, #64748b); }
 .version-detail-total strong { font-size: 18px; margin: 0 4px; font-variant-numeric: tabular-nums; }
 
-.settle-tip { margin-bottom: 16px; padding: 12px 14px; background: var(--color-surface-subtle, #f8fafc); border-radius: 8px; font-size: 13px; color: var(--color-text, #334155); line-height: 1.7; }
+.settle-tip { margin-bottom: 16px; padding: 12px 14px; background: var(--color-surface-alt); border-radius: 8px; font-size: 13px; color: var(--color-text, #334155); line-height: 1.7; }
 
 /* P3 结账前检查：阻断（红，强制清零）/ 警告（黄，可展开） */
 .settle-checks { margin-bottom: 14px; }
@@ -2104,7 +2104,7 @@ await reload()
 .section-head h3 { margin: 0; font-size: 14px; font-weight: 700; color: var(--color-text, #1e293b); }
 .section-total { font-weight: 700; color: var(--color-primary, #409eff); font-variant-numeric: tabular-nums; }
 .section-total.warn { color: var(--color-warning, #e6a23c); }
-.detail-note { margin: 4px 0 0; padding: 10px 12px; font-size: 12px; color: var(--color-text-muted, #64748b); line-height: 1.6; background: var(--color-surface-subtle, #f8fafc); border-radius: 8px; }
+.detail-note { margin: 4px 0 0; padding: 10px 12px; font-size: 12px; color: var(--color-text-muted, #64748b); line-height: 1.6; background: var(--color-surface-alt); border-radius: 8px; }
 
 .rates-tip { margin-bottom: 12px; font-size: 12px; color: var(--color-text-muted, #64748b); line-height: 1.6; }
 .default-rate-name { font-weight: 700; }

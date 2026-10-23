@@ -1777,7 +1777,7 @@ defineExpose({
 .header-right {
   display: flex;
   align-items: center;
-  gap: var(--space-2xs, 4px);
+  gap: var(--space-control-gap-tight);
   flex-shrink: 0;
 }
 
