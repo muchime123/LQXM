@@ -11,19 +11,26 @@ import java.util.Map;
 /**
  * 资金日记账核对口径（只读派生，不写库、不改原始结存）。
  *
- * <p>两类核对必须分开，不能互相代表：
+ * <p>三类结论必须分开，不能互相代表：
  * <ul>
- *   <li><b>期间余额核对</b>（{@link closingStatusOf}）：期初 + 期间收入 − 期间支出 = 期间期末。
- *       这是财务可信的账户级结论，与流水行内先后顺序无关。</li>
+ *   <li><b>期间余额核对</b>（{@link #closingStatusOf}）：期初 + 期间收入 − 期间支出 = 期间期末。
+ *       这是财务可信的账户级结论，<b>与流水行内先后顺序无关</b>，是 P1 的核心验收项。</li>
  *   <li><b>来源结存核对</b>（{@link SourceBalanceReview#exceptions()}）：逐条流水的「来源结存」能否与
- *       「上一行来源结存 + 本行收支」接上。只用于提示历史明细待核实，不得用于否定期间余额，
- *       也不得据此推断交易先后顺序。</li>
+ *       「上一行来源结存 + 本行收支」接上。只在<b>展示顺序</b>下回答「行与行能否接上」，
+ *       <b>不得</b>用作期间期末的断言，<b>不得</b>据此推断交易先后。</li>
  *   <li><b>人工对账</b>（{@link #MANUAL_NOT_STARTED}）：财务已与银行流水/实际账户余额确认。
- *       P1 不提供人工对账操作，页面上必须显式标注「未人工对账」——「可计算」不等于「已核对」。</li>
+ *       P1 不提供人工对账操作，页面必须显式标注「未人工对账」——「可计算」不等于「已核对」。
+ *       P2/P3 引入真实对账记录后，该状态必须从记录派生，不再固定返回。</li>
  * </ul>
  *
- * <p>⚠️ 本类刻意不提供「按余额单调性切流水段」之类的推断：账户余额本就随收支上下波动，
- * 结存下降既不能证明断段，也不能证明连续。断点只按「行与行之间能否接上」这一确定性事实列出。
+ * <p>⚠️⚠️ <b>交易顺序不可得</b>（2026-10-23 实测确认）：流水来自氚云导出件，<b>没有银行交易序号</b>；
+ * 同日多笔占全年约 90% 的行，同日内部结存来回穿越（浙江利强工商银行 2026-01-03：按 id 排 0 断点，
+ * 但结存 937651.99→931319.57→…→863997.55→863997.55 反复上下）。因此
+ * <b>任何表单行序（id / created_at / 导出序号）都不是交易顺序的证据</b>，逐笔链零断点也不等于顺序被证实。
+ *
+ * <p>唯一的顺序证据是「<b>逐日路径唯一</b>」，由 {@link CashflowOrderEvidence} 负责：
+ * 只有当让当日每笔结存都接得上的排列恰好只有一种时，才承认该日顺序。
+ * 判不出来时记「缺少可靠来源顺序」并说明缺的是哪类证据，<b>不</b>笼统写「无法核对」。
  */
 public final class CashflowReviewRules {
     /** 期间余额核对状态。 */
@@ -37,6 +44,15 @@ public final class CashflowReviewRules {
      * P3 才引入 {@code CONFIRMED} / {@code DISPUTED}。**「可计算」永远不等于「已人工核对」。**
      */
     public static final String MANUAL_NOT_STARTED = "NOT_STARTED";
+
+    /**
+     * 来源结存辅助对拍的跳过原因（文案单一来源见 {@link CashflowOrderEvidence#skipLabel}）。
+     *
+     * <p>⚠️ 必须写成「缺少可靠来源顺序」这类<b>具体缺哪种证据</b>的说法，
+     * 不得写成笼统的「无法核对」——后者会让操作者无从判断该去补什么。
+     */
+    public static final String SKIP_NO_RELIABLE_ORDER = CashflowOrderEvidence.NO_RELIABLE_ORDER;
+    public static final String SKIP_CHAIN_BROKEN = CashflowOrderEvidence.CHAIN_BROKEN;
 
     private CashflowReviewRules() {}
 

@@ -23,6 +23,17 @@ export interface CashflowAccount {
   /** 人工对账维度：P1 恒为 NOT_STARTED（未人工对账），与上面两个计算维度互相独立。 */
   manualReconcileStatus: 'NOT_STARTED' | string
   manualReconcileStatusLabel: string
+  /**
+   * 【辅助】来源末行比对是否成立。只有「同日各笔顺序被结存数据唯一锁定」时才可比；
+   * 节假日/同日多笔多半不可比，此时不给结论，只说明缺哪类证据。
+   */
+  sourceClosingComparable: boolean
+  /** 可比时才有：被锁定的期间末日与来源末行结存。 */
+  sourceClosingDate: string | null
+  sourceClosingBalance: number | null
+  /** 不可比时才有：NO_RELIABLE_SOURCE_ORDER / SOURCE_CHAIN_BROKEN / NO_BALANCE_ROWS / NOT_ENOUGH_ROWS */
+  sourceClosingSkipCode: string | null
+  sourceClosingSkipLabel: string | null
   /** 结论陈述：只说「能否计算 / 是否衔接」，不代表财务已核对。 */
   reconcileSummary: string
 }
@@ -35,8 +46,23 @@ export interface CashflowReportSummary {
   sourceBalanceAffectedAccounts: number
   /** 已完成人工对账的账户数。P1 恒为 0。 */
   manualReconciledCount: number
-  /** 尚未人工对账的账户数。 */
+  /** 未人工对账的账户数。 */
   manualReconcilePendingCount: number
+  /**
+   * 【辅助】来源末行比对可成立的账户数（顺序被数据唯一锁定）。
+   *
+   * <p>以下三项是后端契约的一部分，但页面<b>不消费</b>——证据区从 `reconcileScope`
+   * （已受账户筛选影响）现场统计，避免「卡片 1 个账户、证据区 13 个可比」的错位。
+   * 因此声明为可选：真实接口会给，本地 reactive 初始化器不必编造默认值。
+   */
+  sourceClosingComparableCount?: number
+  /** 【辅助】来源末行比对被跳过的账户数（缺可靠顺序等）。 */
+  sourceClosingSkippedCount?: number
+  /**
+   * 跳过原因分布，形如 [{ reason: '缺少可靠来源顺序（…）', count: 23 }]。
+   * 后端按 label 分组（人话文案），不是 code。
+   */
+  sourceClosingSkipBreakdown?: Array<{ reason: string; count: number }>
 }
 
 export interface CashflowReport {

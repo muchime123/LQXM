@@ -166,6 +166,45 @@ public class CashflowJournalReviewService {
     }
 
     /**
+     * 单账户在期间内的来源末行证据（P1 辅助对拍专用，只读）。
+     *
+     * <p>⚠️ 这里<b>不再</b>用「逐笔链零断点」当可靠性判据。逐笔链仍然计算（它回答的是
+     * 「展示顺序下行与行之间能不能接上」），但末行能不能代表期末<b>只由</b>
+     * {@link CashflowOrderEvidence#resolveClosingEvidence} 的「逐日路径唯一」决定：
+     * 顺序没有被数据唯一确定时，一律记「缺少可靠来源顺序」，不宣称可比。
+     *
+     * <p>行序仍按 {@code entry_date, id} 取，仅为给 {@link CashflowReviewRules#reviewSourceBalance}
+     * 一个确定性展示顺序；该顺序<b>不</b>被当作交易顺序。
+     */
+    public CashflowSourceEvidence sourceClosingEvidence(Long accountId, LocalDate start, LocalDate end) {
+        List<CashflowReviewRules.SourceBalanceRow> rows = jdbc.query("""
+                SELECT e.id,e.entry_date,e.income,e.expense,e.balance
+                  FROM h3_cashflow_entries e JOIN h3_cash_accounts a ON a.id=?
+                 WHERE e.external_source='H3YUN' AND e.account_name=a.account_name
+                   AND e.entry_date BETWEEN ? AND ?
+                 ORDER BY e.entry_date,e.id
+                """, (rs, ignored) -> {
+            java.sql.Date date = rs.getDate("entry_date");
+            return new CashflowReviewRules.SourceBalanceRow(rs.getLong("id"),
+                    date == null ? null : date.toLocalDate(), rs.getBigDecimal("income"),
+                    rs.getBigDecimal("expense"), rs.getBigDecimal("balance"));
+        }, accountId, start, end);
+        CashflowReviewRules.SourceBalanceReview display = CashflowReviewRules.reviewSourceBalance(rows, null);
+        CashflowOrderEvidence.Evidence evidence = CashflowOrderEvidence.resolveClosingEvidence(rows, null);
+        return new CashflowSourceEvidence(evidence, display.checkedLinks(), display.exceptionCount());
+    }
+
+    /**
+     * 来源末行证据 + 该账户在「展示顺序」下的逐笔链统计。
+     *
+     * @param evidence      末行是否可作为期间期末的证据
+     * @param checkedLinks  展示顺序下参与核对的行间链接数（只作明细提示，不作期末断言）
+     * @param exceptionCount 展示顺序下的断点数量
+     */
+    public record CashflowSourceEvidence(CashflowOrderEvidence.Evidence evidence,
+                                         int checkedLinks, int exceptionCount) {}
+
+    /**
      * 期间内**全部**有流水的账户的核对结果（含 0 断点的账户）。
      *
      * <p>含干净账户是刻意的：账户行需要显示自己真实的「已衔接链接数」，汇总卡片也需要按筛选后的账户集求和。

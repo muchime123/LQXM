@@ -75,6 +75,18 @@
         </el-tooltip>
       </template>
     </el-table-column>
+    <!-- 辅助维度：只有在「同日各笔顺序被结存数据唯一锁定」时才给结论，否则说明缺哪类证据 -->
+    <el-table-column label="来源末行（辅助）" width="170">
+      <template #default="{ row }">
+        <el-tooltip placement="top" :content="evidenceTooltip(row)">
+          <StatusTag
+            :type="row.sourceClosingComparable ? 'ok' : 'neutral'"
+            :label="row.sourceClosingComparable ? '顺序已锁定，末行一致' : '不可比'"
+            size="sm"
+          />
+        </el-tooltip>
+      </template>
+    </el-table-column>
     <el-table-column label="人工对账" width="125">
       <template #default="{ row }">
         <el-tooltip placement="top" content="财务与银行流水/实际账户余额的确认。P1 尚未开放人工对账操作，一律未对账。">
@@ -132,10 +144,23 @@ function onRowClick(row: CashflowAccount) {
 
 function detailTooltip(row: CashflowAccount): string {
   if (row.sourceBalanceStatus !== 'DETAIL_EXCEPTIONS') {
-    return `期间内 ${row.sourceBalanceCheckedLinks} 条相邻链接全部衔接。系统结论：${row.reconcileSummary}`
+    return `期间内 ${row.sourceBalanceCheckedLinks} 条相邻链接全部衔接（按导入时的行序）。系统结论：${row.reconcileSummary}`
   }
   const range = `${row.sourceBalanceReviewStart || '—'} 至 ${row.sourceBalanceReviewEnd || '—'}`
   return `断点 ${row.sourceBalanceExceptionCount} 处，未核实区间 ${range}。仅提示历史明细，不影响期间期末。系统结论：${row.reconcileSummary}`
+}
+
+/**
+ * 来源末行比对是辅助核对：本库没有银行交易序号，同日多笔的层内顺序大多不可证实。
+ * 只有「使每行结存首尾相接的排列恰好唯一」时，来源末行的结存才算被数据锁定，才拿它与期间期末比。
+ */
+function evidenceTooltip(row: CashflowAccount): string {
+  if (row.sourceClosingComparable) {
+    return `同日各笔顺序已被结存数据唯一锁定；${row.sourceClosingDate || '期间末日'} 来源末行结存 `
+      + `${openingAmount(row.sourceClosingBalance)}，与期间期末一致。`
+  }
+  return `不做来源末行比对：${row.sourceClosingSkipLabel || '缺少可靠来源顺序'}。`
+    + '本库无银行交易序号，同日多笔的顺序无法由数据唯一确定，此时与来源末行比对会得出假结论。'
 }
 
 function exportMonthly(account: CashflowAccount) {

@@ -58,8 +58,9 @@
           description="期间期末 = 期间期初 + 期间收入 − 期间支出。缺期初时不做任何兜底填充，也不以 0 代替。"
         />
         <p class="cf-legend">
-          <strong>三个维度互不代表：</strong>
+          <strong>各维度互不代表：</strong>
           <em>期间余额核对</em>只说明期末能否计算；<em>逐笔结存核对</em>只说明明细能否衔接；
+          <em>来源末行比对</em>是辅助项，仅在当日顺序被数据唯一锁定时才给结论；
           <em>人工对账</em>才是财务与银行确认的结果（P1 尚未开放，一律显示未对账）。
           系统算出的数与财务确认过的数是两件事。
         </p>
@@ -172,6 +173,8 @@
           <el-option label="缺期初，期末不可计算" value="CLOSING_BLOCKED" />
           <el-option label="明细全部衔接" value="DETAIL_OK" />
           <el-option label="明细有断点待核实" value="DETAIL_EXCEPTIONS" />
+          <el-option label="来源末行可比（顺序已锁定）" value="EVIDENCE_COMPARABLE" />
+          <el-option label="来源末行不可比" value="EVIDENCE_SKIPPED" />
           <el-option label="未人工对账" value="MANUAL_NOT_STARTED" />
         </el-select>
         <el-button :disabled="!visibleAccounts.length" @click="exportAccountReport">导出账户报表</el-button>
@@ -246,6 +249,28 @@
           hint="P1 未开放人工对账；上三项均为系统计算，不代表财务已确认"
         />
       </MetricGrid>
+
+      <!-- 辅助核对：来源末行能不能比，缺的是哪类证据。刻意不并入上面的「对账通过/失败」口径。 -->
+      <div class="cf-evidence">
+        <div class="cf-evidence__head">
+          <strong>来源末行比对（辅助）</strong>
+          <span>
+            {{ reconcileScope.evidenceComparable }} 个账户顺序已被结存数据唯一锁定，可比对；
+            {{ reconcileScope.evidenceSkipped }} 个不可比。
+          </span>
+        </div>
+        <p class="cf-evidence__note">
+          本库流水来自氚云导出，<strong>没有银行交易序号</strong>，同日多笔的层内顺序
+          无法由数据唯一确定。只有在「使每行结存首尾相接的排列恰好唯一」时，来源末行的结存才算被数据锁定，
+          才拿它与期间期末比；否则不予比对，并列出缺的是哪类证据。
+        </p>
+        <ul v-if="reconcileScope.evidenceReasons.length" class="cf-evidence__list">
+          <li v-for="item in reconcileScope.evidenceReasons" :key="item.reason">
+            <span class="cf-evidence__count">{{ item.count }}</span>
+            <span>{{ item.reason }}</span>
+          </li>
+        </ul>
+      </div>
 
       <DataState
         :state="issuesState"
@@ -369,6 +394,8 @@ const visibleAccounts = computed(() =>
     if (status === 'CLOSING_BLOCKED' && account.closingStatus === 'OK') return false
     if (status === 'DETAIL_OK' && account.sourceBalanceStatus !== 'DETAIL_OK') return false
     if (status === 'DETAIL_EXCEPTIONS' && account.sourceBalanceStatus !== 'DETAIL_EXCEPTIONS') return false
+    if (status === 'EVIDENCE_COMPARABLE' && !account.sourceClosingComparable) return false
+    if (status === 'EVIDENCE_SKIPPED' && account.sourceClosingComparable) return false
     if (status === 'MANUAL_NOT_STARTED' && account.manualReconcileStatus !== 'NOT_STARTED') return false
     return true
   })
@@ -384,7 +411,20 @@ const reconcileScope = computed(() => {
     closingBlocked: scope.filter(account => account.closingStatus !== 'OK').length,
     checkedLinks: scope.reduce((sum, account) => sum + Number(account.sourceBalanceCheckedLinks || 0), 0),
     exceptionCount: scope.reduce((sum, account) => sum + Number(account.sourceBalanceExceptionCount || 0), 0),
-    affectedAccounts: scope.filter(account => account.sourceBalanceStatus === 'DETAIL_EXCEPTIONS').length
+    affectedAccounts: scope.filter(account => account.sourceBalanceStatus === 'DETAIL_EXCEPTIONS').length,
+    // 证据区必须与上面四张卡片同口径（只受 accountId 影响），否则选完账户会出现
+    // 「卡片 1 个账户、说明区 13 个可比」这种自相矛盾的数字。
+    evidenceComparable: scope.filter(account => account.sourceClosingComparable).length,
+    evidenceSkipped: scope.filter(account => !account.sourceClosingComparable).length,
+    evidenceReasons: (() => {
+      const map = new Map<string, number>()
+      scope.forEach(account => {
+        if (account.sourceClosingComparable) return
+        const label = account.sourceClosingSkipLabel || '未给出原因'
+        map.set(label, (map.get(label) || 0) + 1)
+      })
+      return [...map.entries()].map(([reason, count]) => ({ reason, count }))
+    })()
   }
 })
 
@@ -454,6 +494,21 @@ const issuesState = computed<DataStateStatus>(() => {
 const reviewOpen = ref(false)
 
 // ==================== 已应用条件 ====================
+/** 核对状态的中文名，与下拉选项同源。用原始 code 显示给财务等于没翻译。 */
+const RECONCILE_FILTER_LABELS: Record<string, string> = {
+  CLOSING_OK: '期末可计算',
+  CLOSING_BLOCKED: '缺期初，期末不可计算',
+  DETAIL_OK: '明细全部衔接',
+  DETAIL_EXCEPTIONS: '明细有断点待核实',
+  EVIDENCE_COMPARABLE: '来源末行可比（顺序已锁定）',
+  EVIDENCE_SKIPPED: '来源末行不可比',
+  MANUAL_NOT_STARTED: '未人工对账'
+}
+
+function reconcileFilterLabel(code: string): string {
+  return RECONCILE_FILTER_LABELS[code] || code
+}
+
 const activeChips = computed<ActiveFilter[]>(() => {
   const chips: ActiveFilter[] = [{ key: 'period', label: '期间', valueLabel: `${start.value} 至 ${end.value}` }]
   if (activeTab.value === 'entries' && entryKeyword.value.trim()) {
@@ -465,7 +520,13 @@ const activeChips = computed<ActiveFilter[]>(() => {
   }
   if (activeTab.value === 'accounts') {
     if (currencyFilter.value) chips.push({ key: 'currency', label: '币种', valueLabel: currencyFilter.value })
-    if (reconcileFilter.value) chips.push({ key: 'reconcile', label: '核对状态', valueLabel: reconcileFilter.value })
+    if (reconcileFilter.value) {
+      chips.push({
+        key: 'reconcile',
+        label: '核对状态',
+        valueLabel: reconcileFilterLabel(reconcileFilter.value)
+      })
+    }
   }
   return chips
 })
@@ -647,7 +708,9 @@ function exportAccountReport() {
   if (!visibleAccounts.value.length) return
   const rows: unknown[][] = [
     ['期间起', '期间止', '账户', '币种', '期间期初', '收入', '支出', '净流量', '期间期末', '笔数',
-      '期间余额核对', '逐笔结存核对', '断点处数', '已衔接链接', '人工对账', '系统结论'],
+      '期间余额核对', '逐笔结存核对', '断点处数', '已衔接链接',
+      '来源末行比对（辅助）', '末行日期', '末行结存', '不可比原因',
+      '人工对账', '系统结论'],
     ...visibleAccounts.value.map(account => [
       start.value,
       end.value,
@@ -663,6 +726,10 @@ function exportAccountReport() {
       account.sourceBalanceStatus === 'DETAIL_OK' ? '全部衔接' : '待核实',
       account.sourceBalanceExceptionCount,
       account.sourceBalanceCheckedLinks,
+      account.sourceClosingComparable ? '顺序已锁定，末行一致' : '不可比',
+      account.sourceClosingComparable ? account.sourceClosingDate : '',
+      account.sourceClosingComparable ? account.sourceClosingBalance : '',
+      account.sourceClosingComparable ? '' : (account.sourceClosingSkipLabel || ''),
       account.manualReconcileStatusLabel,
       account.reconcileSummary
     ])
@@ -781,6 +848,60 @@ await loadEntries()
 
 .cf-reconcile-metrics {
   margin-top: var(--space-control-gap);
+}
+
+.cf-evidence {
+  display: grid;
+  gap: 6px;
+  margin-top: var(--space-control-gap);
+  padding: var(--space-control-gap) var(--space-control-gap-wide);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-alt);
+}
+
+.cf-evidence__head {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-control-gap);
+  color: var(--color-text-heading);
+  font-size: var(--fs-md);
+}
+
+.cf-evidence__head span {
+  color: var(--color-text-secondary);
+  font-size: var(--fs-sm);
+}
+
+.cf-evidence__note {
+  max-width: 96ch;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-loose);
+}
+
+.cf-evidence__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px var(--space-control-gap-wide);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--fs-sm);
+}
+
+.cf-evidence__list li {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--color-text-secondary);
+}
+
+.cf-evidence__count {
+  color: var(--color-text-heading);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--fw-semibold);
 }
 
 @media (max-width: 767px) {

@@ -2,6 +2,7 @@ package com.liqiang.archive.controller;
 
 import com.liqiang.archive.security.RequirePermission;
 import com.liqiang.archive.service.CashflowJournalReviewService;
+import com.liqiang.archive.service.CashflowOrderEvidence;
 import com.liqiang.archive.service.CashflowReviewRules;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -99,6 +100,40 @@ public class CashflowJournalController {
         summary.put("sourceBalanceExceptionCount", totalExceptions);
         summary.put("sourceBalanceCheckedLinks", totalLinks);
         summary.put("sourceBalanceAffectedAccounts", affectedAccounts);
+        // 来源末行「顺序证据」统计（P1 辅助对拍用）。
+        // ⚠️ 这里刻意不叫「核对通过/失败」：本库没有银行交易序号，同日多笔的层内顺序大多不可证实，
+        // 只有被数据唯一锁定顺序的账户才谈得上「来源末行可比」。不可比时要告诉财务缺的是哪类证据。
+        Map<String, Long> evidenceBreakdown = new LinkedHashMap<>();
+        long evidenceComparable = 0;
+        for (Map<String, Object> item : items) {
+            Long id = item.get("id") == null ? null : ((Number) item.get("id")).longValue();
+            String accountName = (String) item.get("accountName");
+            if (id == null || accountName == null) continue;
+            // ⚠️ 不要在这里跳过「本期零流水」的账户（10-23 修）：
+            // 跳过会让这批账户既没有 sourceClosingComparable 字段、也不计入 skippedCount，
+            // 结果是「可比 13 + 不可比 4 ≠ 35 个账户」，且前端悬停时拿不到任何跳过原因。
+            // resolveClosingEvidence 对空行集本就返回 NO_BALANCE_ROWS /「期间内无流水」，交给它判。
+            CashflowOrderEvidence.Evidence evidence =
+                    reviewService.sourceClosingEvidence(id, start, end).evidence();
+            if (evidence.comparable()) {
+                evidenceComparable++;
+            } else {
+                evidenceBreakdown.merge(evidence.skipLabel(), 1L, Long::sum);
+                item.put("sourceClosingComparable", false);
+                item.put("sourceClosingSkipCode", evidence.skipCode());
+                item.put("sourceClosingSkipLabel", evidence.skipLabel());
+                continue;
+            }
+            item.put("sourceClosingComparable", true);
+            item.put("sourceClosingDate", evidence.date() == null ? null : evidence.date().toString());
+            item.put("sourceClosingBalance", evidence.balance());
+        }
+        summary.put("sourceClosingComparableCount", evidenceComparable);
+        summary.put("sourceClosingSkippedCount", evidenceBreakdown.values().stream().mapToLong(Long::longValue).sum());
+        summary.put("sourceClosingSkipBreakdown",
+                evidenceBreakdown.entrySet().stream()
+                        .map(entry -> Map.of("reason", entry.getKey(), "count", entry.getValue()))
+                        .toList());
         // 人工对账维度单独计数：P1 恒为 0，前端不能用它冒充「已核对」。
         summary.put("manualReconciledCount",
                 items.stream().filter(item -> !CashflowReviewRules.MANUAL_NOT_STARTED
