@@ -182,6 +182,37 @@
 | 2440 | `.batch-progress-modal` | 无（全仓 .vue/.ts/.js 均未出现） | 无（无元素可命中） | 低 | C8-A 小批量删除 | 静态全仓检索 + 运行时 0 元素 |
 | 2452 | `.batch-progress-modal h4` | 无（全仓 .vue/.ts/.js 均未出现） | 无（无元素可命中） | 低 | C8-A 小批量删除 | 静态全仓检索 + 运行时 0 元素 |
 
+### C8-A 第一批实施记录（2026-10-23，packaging-detail-drawer.css）
+
+**删除单位核查（先于删除）**：台账「A 类 44 条」按台账口径是 **44 条完整规则**（含全部选择器分支），全部为顶层规则（无 @media 嵌套、无共享声明块混入）。其中 41 条单选择器 + 1 条双分支（`.film-note-panel strong, .film-note-panel p`，两分支同属死前缀 `.film-note-panel`）→ **实际删除 42 条完整规则（43 个选择器分支）**；排除 2 条：
+
+- `.slide-up-enter-active, .slide-up-leave-active` 与 `.slide-up-enter-from, .slide-up-leave-to`：Vue transition 动态生成类。全仓无 `slide-up` 字符串、无 `<transition name="slide-up">`，静态上可删，但按「动态依赖先排除」原则本批保留（约 11 行），留待单独确认。
+
+**语义边界核查**：`batch-progress-*` / `tag-editor-*` / `exchange-rate-*` 存在同名前缀的**活跃兄弟类**（`batch-progress-bar/fill/meta/status`、`tag-editor-field`、`exchange-rate-inline`），本次只删精确类名，兄弟类全部未动；`.zone-heading` 与 `.spec-detail-card header` 的共享声明块、`.zone-heading h3, .spec-detail-card h3, .series-card h3` 组合块均保留，只删了独立 `.zone-heading` 规则。
+
+**验证结果**（脚本存于 `frontend/_audit_shots/c8a-*.mjs`）：
+
+- 静态：全仓 2910 个源文件按精确类名检索 0 引用（前端 src + corporate-website + backend + docs）。
+- 运行时（删除前）：`/#/packaging` 列表、规格（301 变体卡）、包材概览、模具（54）、素材（71）× 双主题 × 1600/1024 共 28 状态，44 条规则及全部分支 querySelectorAll 均 0 命中，DOM 类名对 14 个候选词 0 子串匹配。
+- 计算样式：删除前后同路径 28 状态、每状态 ≤1500 个带类元素 × 32 个属性，**0 差异**。
+- 截图：双主题 1600px 像素级比对；用「同版本连跑两次」建立噪声基线后，删除前后确定性对照为 **0 像素差异**（dark 主题与素材管理 tab 的少量差异与噪声基线同量级，属异步图片/动画帧抖动；`light-05-tab-1` 一轮 5% 差异经 before vs before2 复现排除，与 CSS 版本无关）。
+- lint 通过；vitest 70 文件 / 527 用例全通过。
+
+**构建体积（同一 HEAD，仅该 CSS 一个文件不同，可归因）**：
+
+| 指标 | 删除前 | 删除后 | 差值 |
+|---|---|---|---|
+| 源文件字节 | 50988 | 44396 | -6592 |
+| 源规则数（含 @media 内规则口径） | 315 | 273 | -42 |
+| PackagingView 路由产物 CSS 文件数 | 1 | 1 | 0 |
+| PackagingView CSS raw | 190766 | 172034 | -18732 |
+| PackagingView CSS gzip | 24843 | 22828 | -2015 |
+| PackagingView CSS brotli | 13067 | 12261 | -806 |
+
+> 该文件被 3 个组件以 scoped 方式内联（运行时承载作用域号 3 个；删除前产物中 `folder-quality-btn` 出现 9 次 = 3 规则 × 3 副本），故产物缩减 ≈ 源缩减 × 3，属真实收益。全站产物 CSS 文件数 58 不变。首轮前后构建之间发生了并行提交（13d2e86 → fcb5186），已用「同 HEAD 临时还原删除前版本重建」方式归因，PackagingView chunk 数字与 13d2e86 基线完全一致。注意：本批代码改动被并行会话的提交 fcb5186 一并带入仓库历史，未单独形成 `refactor(css)` 提交（不做历史改写）。
+
+**遗留发现（下一批候选，本批未动）**：`.manager-item.active`、`.manager-actions button.danger`、`.manager-actions button.danger:hover`、`.quality-filter-bar button:hover, .quality-filter-bar button.active` —— 因通用词 `active`/`danger` 在其他组件出现而被扫描器归为 C/D，实际其宿主类（`.manager-item` / `.manager-actions` / `.quality-filter-bar`）已删，这 4 条也是死规则。属于扫描器对「通用词尾部 token」的盲点，建议下一批连同 B 类核查一起修正分类方法。
+
 ### B 类：归属错位（不等于死代码，需逐个核实）
 
 | 行号 | 选择器 | 实际消费者（是否自带同选择器） | 运行时元素 | 本文件副本是否生效 | 风险 | 建议 | 验证方式 |

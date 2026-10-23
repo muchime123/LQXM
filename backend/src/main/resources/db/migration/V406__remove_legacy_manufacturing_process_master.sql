@@ -20,7 +20,8 @@
 -- =====================================================================
 SET FOREIGN_KEY_CHECKS = 0;
 
--- 1) 车间：删除制程关联列（连带其指向 process_templates 的外键）
+-- 1) 车间：先显式删除外键，再删除制程关联列（MySQL 不允许直接删除被外键引用的列）
+ALTER TABLE manufacturing_workshops DROP FOREIGN KEY fk_workshop_default_template;
 ALTER TABLE manufacturing_workshops DROP COLUMN default_process_template_id;
 
 -- 2) 本地 MES 执行域（按子表先删）
