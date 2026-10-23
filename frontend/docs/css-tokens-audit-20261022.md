@@ -471,14 +471,68 @@ C5 标记为治理完成，未决项（EP 深色变体、`--color-primary-border
 
 240 个同名类里，**绝大多数不构成冲突**：`.active` / `.primary` / `.danger` / `.muted` 等通用状态名被各组件 scoped 各自定义，scoped 隔离有效。真正需要留意的是 `.el-select`（8 个组件）与 `.el-table__cell`（6 个组件）这类 **EP 结构类被业务组件各自改写**，组件库的改动分散在业务代码里，改 EP 版本时排查面会很大。
 
-### C6 结论（本轮不修改代码）
+### C6-4 引用核查：`btn-danger` / `btn-success` / `btn-sm.danger`（决定是否值得修）
 
-| 项 | 类型 | 处理建议 |
+先看这两个类是否真的没人用——如果没人用，把它改成令牌只是让一段死代码变规范。
+
+| 类 | 源码命中 | 结论 |
 |---|---|---|
-| `.btn-sm` 4 种写法漂移 | **重复实现 + 可见不一致** | 建议立项：抽取统一的次要按钮（公共类或复用既有按钮组件），9 个文件逐一收敛。风险中，需专项视觉确认 |
-| `utilities.css` `.btn-danger` / `.btn-sm.danger` | **令牌体系外绕过 + 潜在外溢** | 改为引用 `--color-danger*` 令牌并去掉不必要的 `!important`；`.btn-danger` / `.btn-success` 零引用，可连同确认后清理。风险低 |
-| 纯副本类（`.batch-count-pill`、`.btn-cancel/save`、`.form-dialog-header` 等） | 重复实现（无漂移） | 暂不处理，待上述统一工作时一并提取 |
-| EP 结构类分散改写（`.el-select`、`.el-table__cell`） | 归属分散 | 记录为准，不重构；后续 EP 升级时按此清单排查 |
-| `:deep()` / `!important` 现状 | 写法，非缺陷 | 保持现状，仅在出现真实冲突时处理 |
+| `.btn-danger` | 仅 `utilities.css:76/82/88` 自身定义；其余命中全部落在 `_build_check` / `_build_verify` 的**构建产物** CSS | **零引用**：不仅静态 class 没有，动态 `:class`、数组/对象绑定、JS/TS 字符串拼接也没有 |
+| `.btn-success` | 仅 `utilities.css:95/101` 自身定义，其余同为构建产物 | **零引用** |
+| `.btn-sm.danger` | 实际使用 **2 处**：`PackagingDetailDrawer.vue:13`「删除」、`:148`「批量删除」 | 有真实消费，见下 |
 
-**下一步**：C6 为只读审计，本轮不改动代码。上面前两项建议要么单列专项（`.btn-sm` 统一），要么随下一次相关改动顺手处理（`utilities.css` 硬编码）。
+核查范围覆盖仓库全部包（`frontend` 之外也扫），扩展名含 vue/ts/tsx/js/jsx/mjs/html/css/scss/less，排除 `node_modules`、`dist`、产物目录。
+
+### C6-5 运行时取证：同一个 `.btn-sm` 到底编译出多少份
+
+在 `/#/packaging` 页面直接读 `<style>` 原文，`.btn-sm` 相关规则共 **60 条，来自 10 个来源**：
+
+| 来源 | 条数 | 性质 |
+|---|---|---|
+| `src/styles/index.css`（`utilities.css` + `master-layout.css`） | 14 | 全局公共层 |
+| `FilePreviewBody.vue` / `PackagingTagEditor.vue` / `PackagingBatchEditModal.vue` / `PackagingBatchFillModal.vue` / `PackagingBatchMoveModal.vue` / `PackagingVariantEditor.vue` | 2–3 | 组件 scoped 副本 |
+| `PackagingDetailDrawer.vue` / `PackagingSpecDetailPanel.vue` / `PackagingVariantCards.vue` | 10 各 | 由 `@import '../../styles/packaging-detail-drawer.css'` 引入后再被 scoped 化，**同一份文件编译了 3 份** |
+
+**是否泄漏到全局**：否。注入同一个 `.btn-sm.danger` 按钮，在 `/#/customers`（未加载包材模块）与 `/#/packaging`（已加载）两个页面读取计算值，**结果逐字节一致**（浅深均为 `bg=rgb(255,255,255) color=rgb(190,18,60) border=rgb(254,202,202)`）。即 `@import` 进 `<style scoped>` 的规则被 Vue 加上了 `data-v`，不会外溢。
+
+**实际业务是否有暗色异常**：没有。`PackagingDetailDrawer` 的两个危险按钮吃到的是 `packaging-detail-drawer.css` 的 scoped 副本，该文件提供了正确的深色分支（`[data-theme='dark'] … .btn-sm.danger { background: transparent; color: #fca5a5 }`）。真正没有深色适配的是 `utilities.css:154-169` 那份**全局**规则（`#ffffff` 硬编码，浅深同值），而它当前**没有任何业务消费**——属于惯例风险而非现存缺陷。
+
+按既定规则（实际页面已被局部样式正确覆盖 → 记录为所有权冲突，不急于修改），本轮不改代码。
+
+### C6-6 `.btn-sm` 用途分类（28 处 / 11 文件）
+
+同名不代表同职责，先按用途分层：
+
+| 用途 | 组件 | 元素 | 特征 |
+|---|---|---|---|
+| **A 面板/抽屉头部操作组** | `PackagingDetailDrawer`（编辑/删除/批量管理/回收站/批量复制/移动到系列/批量补膜/批量编辑/批量删除/导出选中，10 处）、`ProductDetailPanel`（编辑 / ghost「更多」）、`FeeRecordsPanel`（＋新增缴费记录）、`PackagingBatchFillModal`、`PackagingBatchMoveModal`、`PackagingSpecDetailPanel` | `<button>` | 依赖字尾修饰符（`primary` / `danger` / `ghost`）区分语义，同一容器内成组出现 |
+| **B 文件预览操作** | `FilePreviewBody`（新窗口打开 / 下载文件，×2） | `<a>` | 是链接不是按钮，语义上应按链接处理 |
+| **C 上传触发器** | `CertDetailModal`、 `CertificationFormDialog`（均为 `.btn-sm.btn-upload`） | `<button>`/`<label>` | 与 `btn-upload` 组合使用，`btn-sm` 只提供尺寸 |
+| **D 工具栏内联操作** | `OfficeAssetView`（恢复推荐设置）、`VariantImageManager`（primary） | `<button>` | 单个、非成组 |
+
+**另有 3 处失效定义**（定义了 `.btn-sm` 但自身 template 并未使用）：`PackagingBatchEditModal.vue`、 `PackagingTagEditor.vue`、`PackagingVariantEditor.vue`。
+
+结论：真正同构的是 **A 组**（成套出现、共用修饰符），B/C/D 只是用了同一个尺寸类名，不应合并进同一套按钮。即使 A 组内部，`ProductDetailPanel` 还有独有的 `ghost` 变体。因此**不新建统一次要按钮组件**，也暂不收敛 `.btn-sm` 类名本身。
+
+### C6-7 样式所有权清单
+
+| 样式类型 | 建议归属 | 现状偏差 |
+|---|---|---|
+| 颜色 / 字号 / 间距 / 圆角等设计令牌 | `tokens.css` | 符合（`utilities.css` 的 `.btn-sm` 基础与 `.primary` 已全部走令牌） |
+| Element Plus 基础控件外观 | `element-plus.css` | 基本符合；改 EP 内部结构的规则另有 39 个组件在 scoped 里书写（C6-3） |
+| 真正跨页面复用的通用工具类 | `utilities.css` | **偏差**：混入 `.btn-danger` / `.btn-success` 两个零引用的类；`.btn-sm.danger` 用硬编码而非 danger 令牌，且缺深色分支 |
+| `LqDialog`、`LqTable` 等公共组件自身样式 | 对应组件及其专属样式文件 | 基本符合 |
+| 包材详情抽屉、生产跟单等专用样式 | 对应业务模块 | **偏差**：`packaging-detail-drawer.css` 被 3 个组件 `@import` 后又各自 scoped 编译，实际存在 3 份；其中的 `.btn-sm.danger` / `.primary` 看似全局裸选择器，实则靠 scoped 生效，源码可读性差 |
+| 业务页面独有布局 | 页面 scoped 样式 | 偏差见 C6-1（`.btn-sm` 在 9 个文件重复定义） |
+
+### C6-8 三分类结论
+
+| 分类 | 项目 | 下一步 |
+|---|---|---|
+| **可直接清理** | `utilities.css` 的 `.btn-danger`(3 条) / `.btn-success`(2 条)；`PackagingBatchEditModal` / `PackagingTagEditor` / `PackagingVariantEditor` 中未使用的 scoped `.btn-sm` 定义（8 条） | 转入 **C8**，届时连同其他无引用历史 CSS 一并处理 |
+| **需视觉整改** | `.btn-sm.danger` 的三份重复硬编码（`utilities.css:154`、`packaging-detail-drawer.css:16`、同文件 `:1984`）+ A 组 6 个组件的 base/primary 重复定义 | 转入 **C7**（跨文件重复实现专项）；整改时应让 `utilities.css` 走 `--color-danger*` 令牌并补深色分支，业务侧按上下文分层，不新建按钮组件 |
+| **合理保留** | `master-layout.css` 的 `.drawer-actions .btn-sm`（上下文限定的布局层，属正确分层）；`FilePreviewBody` 的 `<a>` 变体（链接而非按钮）；`ProductDetailPanel` 的 `ghost` 变体（独立语义）；`:deep()` 与带上下文限定的 `!important` | 保持现状 |
+
+### C6 收口
+
+C6 为只读审计，本轮**未修改任何代码**。核实结果改变了初期的判断：`.btn-sm` 不抽统一按钮组件，`utilities.css` 的 `btn-danger` / `btn-success` 归入 C8 删除候选而非在中途改颜色，真正动手的重复实现留给 C7。下一步进入 **C7：跨文件重复实现专项**。
