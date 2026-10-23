@@ -608,6 +608,50 @@ C6 为只读审计，本轮**未修改任何代码**。核实结果改变了初�
 
 **实施顺序（按收益/风险，而非重复行数）**：① 删除未使用的复制块（低风险、无视觉影响，转 C8）→ ② `form-dialog-header` / `batch-count-pill` 收敛进已有 `media-dialog-shared.css`（中风险、收益明确）→ ③ 重复引入文件的单一入口评估（高风险，需专项验证作用域）→ ④ 漂移类统一（中风险，依赖视觉确认）。
 
+### C7-1 已执行：删除确认无引用的复制块（`6941762`）
+
+删除 `.dialog-actions` / `.form-dialog-footer` / `.btn-cancel` / `.btn-save` 四个类及其 `:hover`、`:disabled` 子规则，仅限 `AssignOwnerDialog`、`BatchPublishTaskDialog`、`BatchUpdateRecordDialog`、`UpdateRecordFormDialog` 四个已证明无引用的对话框。**4 文件 × 56 行 = 224 行，纯删除，0 行新增**，未改 `<template>` / `<script>` 与任何有效 CSS。
+
+删除前复核：`git status` 确认这 4 个文件工作区干净、最近提交仍是仓库初始提交，无并行会话改动。
+
+**无引用的证明链**（三条互证）：
+
+1. 静态：各文件里这 4 个类的 9 处命中全部分布在 `<style>` 块内；
+2. 全仓：对 `*.vue` 模板与 `*.ts`（含父组件插槽内容）检索这四个类名，**零命中**——不是"暂时没渲染"，而是没有任何元素会带上它们；
+3. 运行时：在同一路由逐个打开这四个对话框，统计这四种选择器的 DOM 元素数，**均为 0**。
+
+**删除前后对比**：同一探针逐个打开四个对话框，读取 `form-dialog-header`（含 `h3` / `p`）、`batch-count-pill`、`dialog-form-body`、`batch-summary-box`、`lq-dialog__foot` 及其按钮等 **48 个选择器的计算样式并截图，比对零差异**。
+
+**边界确认**：保留仍在使用的 `.form-dialog-header` 与 `.batch-count-pill`（经核对 `UpdateRecordFormDialog` 模板本就未使用 `batch-count-pill`、该文件也从未定义它，不存在误删）。
+
+> 格式说明：这 4 个文件在 HEAD 版本即未通过 prettier 检查，属既有问题，本次**未做无关重排**；用 prettier 格式化后再比对，差异恰好是被删的 56 行加一个空行，没有任何新增格式改动。测试 70 文件 / 525 用例通过。
+>
+> 附带发现（本次范围外，留给 C8）：`ImportUpdatePreviewModal.vue` 里的 `.form-dialog-footer` 同样定义了但模板未使用。
+
+### C7-2 只核查：共享样式的归属与作用域（不改代码）
+
+**问题一：组件里的重复声明真的完全相同吗？**
+
+| 类 | 定义处 | 是否完全一致 |
+|---|---|---|
+| `.batch-count-pill` | 5 处（4 个对话框 + `media-account-view.css`，另有 scopod 副本在 `ImportUpdatePreviewModal`） | **是**，5 处属性逐项一致 → 真 C7-A 完全重复 |
+| `.form-dialog-header` | 22 处 → 9 种写法 | **否**。多数是不同选择器（`h3` / `p` / `> div` / `> span`）而非漂移；真正的漂移只有 `padding`：`0` vs `media-account-view.css:436` 的 `14px 42px 12px 18px` |
+
+**问题二：共享样式现在通过什么方式生效？**
+
+`modules/media-dialog-shared.css` 由 `index.css:21` **全局导入**，且**没有任何组件 scoped 引入**（无重复编译问题）。其 15 条顶层选择器**全部带模块前缀**——`.media-form-dialog` / `.media-platform-dialog` / `.media-detail-dialog`——本身就已是"模块限定的全局样式"，符合期望的归属方式。它已承载 `.form-dialog-header`（含 `> div` / `> span` / `h3` / `p`），但未承载 `.batch-count-pill`。
+
+**问题三：收敛后能否保持原来的作用域？**
+
+四个对话框的根节点**都已带** `class="media-form-dialog …"`（`UpdateRecordFormDialog`、`BatchUpdateRecordDialog`、`BatchPublishTaskDialog`、`AssignOwnerDialog` 逐一确认），因此沿用该前缀收敛后仍能命中，且不会外溢到其他模块——**作用域可保持**。
+
+但有两个必须先解决的前提，否则不能直接收敛：
+
+1. **共享文件里的定义并不完整**：`.media-form-dialog .form-dialog-header` 只写了 `flex` / `min-width` / `padding`，**缺 `display` / `gap` / `align-items` / `justify-content`**（这些目前写在组件 scoped 里）。直接删组件副本而不同步补齐，视觉会变。
+2. **`ImportUpdatePreviewModal` 是例外**：它**确实用了** `.batch-count-pill`（模板第 5 行），但根节点**没有** `media-form-dialog` 类。若按该前缀收敛，这个组件的徽标会失去样式 → 需先给它加合适的容器类，或保留其副本。
+
+结论：**第 2 项暂不修改**。收敛方案可行且作用域安全，但要先把上述两点处理掉（补齐基属性 + 处理例外组件），届时再提改动方案。
+
 ### C7 收口
 
-本轮**未修改任何代码**，未新建组件，未把业务 CSS 搬进 `utilities.css`。结论按「可直接去重 / 需视觉确认 / 合理重复应保留 / 转 C8」四类归档，下一步按上述顺序推动。
+本轮 C7 完成了第 1 项删除（`6941762`，4 文件 224 行）并完成了第 2 项的归属与作用域核查（未改代码），未新建组件，未把业务 CSS 搬进 `utilities.css`。剩余项：第 2 项待上述两个前提处理后再动；第 3 项重复引入、第 4 项漂移等待你的下一步指示，其中包括已澄清的两点——`media-account-view.css` 重复编译次数多**不等于**必须迁移到全局 CSS；生产跟单等页面裸用 `el-table` **不自动认定为错误**，需先验证能否直接使用 `LqTable` 而不损失动态列、滚动等特殊功能。
