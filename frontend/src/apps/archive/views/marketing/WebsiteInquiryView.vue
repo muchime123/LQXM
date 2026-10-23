@@ -588,7 +588,7 @@ loadInquiries()
 
 .detail-description {
   padding: 12px 16px;
-  background: var(--color-bg-subtle);
+  background: var(--color-surface-alt);
   border-radius: var(--radius-md);
   font-size: var(--fs-sm);
   line-height: 1.6;
@@ -599,7 +599,7 @@ loadInquiries()
 
 .detail-followup-history {
   padding: 12px 16px;
-  background: var(--color-bg-subtle);
+  background: var(--color-surface-alt);
   border-radius: var(--radius-md);
   font-size: var(--fs-xs);
   line-height: 1.6;

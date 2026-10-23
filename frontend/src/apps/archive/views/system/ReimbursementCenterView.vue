@@ -128,7 +128,7 @@ function switchTab(tab: ReimbursementTab) {
   color: var(--color-text-secondary);
   font-size: var(--fs-sm);
   font-weight: var(--fw-medium);
-  line-height: var(--lh-base);
+  line-height: var(--lh-normal);
   cursor: pointer;
   transition:
     color var(--transition-base),

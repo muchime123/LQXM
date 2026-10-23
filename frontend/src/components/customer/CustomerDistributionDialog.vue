@@ -371,7 +371,7 @@
       错误 <b>{{ importPreview?.errors ?? 0 }}</b> 行
     </div>
     <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px">
-      <span style="color: var(--lq-text-secondary); font-size: 13px">结果筛选</span>
+      <span style="color: var(--color-text-secondary); font-size: 13px">结果筛选</span>
       <el-radio-group v-model="importStatusFilter" size="small">
         <el-radio-button value="ALL">全部 {{ importPreview?.total ?? 0 }}</el-radio-button>
         <el-radio-button value="VALID">可更新 {{ importPreview?.valid ?? 0 }}</el-radio-button>

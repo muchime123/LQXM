@@ -768,7 +768,7 @@ watch(
 .remark-block {
   margin-top: 4px;
   padding: 12px 16px;
-  background: var(--color-surface-2);
+  background: var(--color-surface-alt);
   border-radius: var(--radius-sm);
 }
 .remark-block h4 {
@@ -795,7 +795,7 @@ watch(
   line-height: 1.6;
 }
 .mappings-table {
-  border: 1px solid var(--color-border-2);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
 }
 
@@ -814,7 +814,7 @@ watch(
 }
 .role-card.is-selected {
   border-color: var(--color-primary);
-  background: var(--color-primary-soft);
+  background: var(--color-primary-bg);
 }
 .role-card p {
   margin: var(--space-sm) 0 0;

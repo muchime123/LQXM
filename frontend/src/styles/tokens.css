@@ -410,7 +410,12 @@
   --color-amber-700: var(--color-warning-text);
   --color-danger-light: var(--color-danger-bg);
   --radius-full: var(--radius-pill);
-  --space-3: var(--space-md-lg);
-  --space-5: var(--space-xl-2xl);
+  /* 4px 步长数字刻度补全：此前只映射了 3/5，导致 --space-1/2/4 引用为空、
+     声明被整条丢弃（部门管理卡片内间距、质检卡 padding、车间工具栏间距失效）。 */
+  --space-1: var(--space-xs); /* 4px */
+  --space-2: var(--space-sm-md); /* 8px */
+  --space-3: var(--space-md-lg); /* 12px */
+  --space-4: var(--space-lg-xl); /* 16px */
+  --space-5: var(--space-xl-2xl); /* 20px */
   --fs-2xs: var(--fs-xxs);
 }

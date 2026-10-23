@@ -323,7 +323,7 @@ await loadData()
 }
 
 .issue-sample--link { border: 0; cursor: pointer; font-family: inherit; }
-.issue-sample--link:hover, .issue-sample--link:focus-visible { background: var(--color-primary-soft); color: var(--color-primary); outline: none; }
+.issue-sample--link:hover, .issue-sample--link:focus-visible { background: var(--color-primary-bg); color: var(--color-primary); outline: none; }
 
 /* ==================== Responsive ==================== */
 @media (max-width: 767px) {

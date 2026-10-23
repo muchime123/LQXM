@@ -364,8 +364,8 @@ function scoreBg(score: number): string {
 }
 
 .q-item--ok {
-  border-color: color-mix(in srgb, var(--color-success-300) 60%, transparent);
-  background: color-mix(in srgb, var(--color-success-50) 70%, transparent);
+  border-color: color-mix(in srgb, var(--color-success-border) 60%, transparent);
+  background: color-mix(in srgb, var(--color-success-bg-soft) 70%, transparent);
 }
 
 .q-item--ok .q-indicator {
@@ -373,7 +373,7 @@ function scoreBg(score: number): string {
 }
 
 .q-item--warn {
-  border-color: color-mix(in srgb, var(--color-warning-300) 60%, transparent);
+  border-color: color-mix(in srgb, var(--color-warning-border) 60%, transparent);
   background: color-mix(in srgb, var(--color-warning-50) 70%, transparent);
 }
 
@@ -382,8 +382,8 @@ function scoreBg(score: number): string {
 }
 
 .q-item--missing {
-  border-color: color-mix(in srgb, var(--color-danger-300) 60%, transparent);
-  background: color-mix(in srgb, var(--color-danger-50) 70%, transparent);
+  border-color: color-mix(in srgb, var(--color-danger-border) 60%, transparent);
+  background: color-mix(in srgb, var(--color-danger-bg-soft) 70%, transparent);
 }
 
 .q-item--missing .q-indicator {
@@ -462,7 +462,7 @@ function scoreBg(score: number): string {
 .diff-old {
   color: var(--color-text-tertiary, #9ca3af);
   text-decoration: line-through;
-  text-decoration-color: color-mix(in srgb, var(--color-danger-400) 70%, transparent);
+  text-decoration-color: color-mix(in srgb, var(--color-danger) 70%, transparent);
 }
 
 .diff-arrow {

@@ -299,7 +299,7 @@ await loadData()
   gap: 12px;
   margin-bottom: 16px;
   padding: 12px 16px;
-  background: var(--color-bg-surface);
+  background: var(--color-surface);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
 }
@@ -309,7 +309,7 @@ await loadData()
 }
 
 .banner-table {
-  background: var(--color-bg-surface);
+  background: var(--color-surface);
   border-radius: var(--radius-md);
   border: 1px solid var(--color-border);
   overflow: hidden;

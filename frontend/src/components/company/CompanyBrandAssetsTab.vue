@@ -998,7 +998,7 @@ onBeforeUnmount(() => {
   position: sticky;
   top: 0;
   z-index: 10;
-  background: var(--color-bg);
+  background: var(--color-page-bg);
   padding-bottom: 12px;
   margin-bottom: 4px;
 }

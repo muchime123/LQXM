@@ -376,18 +376,18 @@ watch(() => props.modelValue, (src) => {
 .chip {
   display: inline-flex; align-items: center;
   padding: 3px 12px; border-radius: 999px;
-  background: var(--color-bg-subtle);
+  background: var(--color-surface-alt);
   color: var(--color-text-secondary);
   font-size: 12px;
   border: 1px solid var(--color-border-light);
 }
-.chip--primary { background: var(--color-primary-bg); color: var(--color-primary); border-color: var(--color-primary-soft); }
+.chip--primary { background: var(--color-primary-bg); color: var(--color-primary); border-color: var(--color-primary-border); }
 .chip--ok { background: #e6f4ea; color: #1b7a3a; border-color: #b8dfc3; }
 .chip--warn { background: #fff6e5; color: #b26a00; border-color: #f1d59a; }
 .image-cropper__actions { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
 .image-cropper__hint {
   margin: 0; padding: 10px 14px;
-  background: var(--color-bg-subtle);
+  background: var(--color-surface-alt);
   border-radius: var(--radius-md);
   color: var(--color-text-secondary);
   font-size: 12px;

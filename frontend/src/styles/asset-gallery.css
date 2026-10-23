@@ -314,7 +314,7 @@
 .asset-library-badge {
   right: 8px;
   top: 8px;
-  background: linear-gradient(135deg, var(--color-accent), var(--color-primary));
+  background: linear-gradient(135deg, var(--color-purple), var(--color-primary));
   color: var(--color-surface);
   box-shadow: 0 4px 10px rgba(124, 58, 237, 0.28);
 }

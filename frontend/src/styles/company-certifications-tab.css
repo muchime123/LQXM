@@ -168,7 +168,7 @@
 
 .muted-suffix {
   font-size: var(--fs-xs);
-  color: var(--color-text-quaternary);
+  color: var(--color-text-muted);
   font-style: italic;
 }
 
@@ -194,7 +194,7 @@
 
 .file-upload-hint {
   margin: 6px 0 0 0;
-  color: var(--color-text-quaternary);
+  color: var(--color-text-muted);
   font-size: var(--fs-xs);
 }
 

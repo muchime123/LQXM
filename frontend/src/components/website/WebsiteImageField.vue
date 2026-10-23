@@ -356,7 +356,7 @@ function choose(asset: CompanyAsset) {
 
 <style scoped>
 .website-image-field { display: grid; width: 100%; gap: 10px; position: relative; }
-.website-image-field__preview { width: min(100%, 480px); overflow: hidden; border: 1px solid var(--color-border-light); border-radius: var(--radius-md); background: var(--color-bg-subtle); position: relative; }
+.website-image-field__preview { width: min(100%, 480px); overflow: hidden; border: 1px solid var(--color-border-light); border-radius: var(--radius-md); background: var(--color-surface-alt); position: relative; }
 .website-image-field__preview img { width: 100%; height: 100%; object-fit: contain; display: block; }
 .website-image-field__empty { height: 100%; min-height: 150px; display: grid; place-content: center; justify-items: center; gap: 8px; color: var(--color-text-faint); }
 .website-image-field__badge { position: absolute; bottom: 8px; right: 8px; padding: 2px 8px; background: rgba(0,0,0,0.65); color: #fff; border-radius: 4px; font-size: 11px; pointer-events: none; }
@@ -370,7 +370,7 @@ function choose(asset: CompanyAsset) {
 .website-image-library__item { position: relative; padding: 0; overflow: hidden; border: 2px solid var(--color-border-light); border-radius: var(--radius-md); background: var(--color-surface); color: var(--color-text-secondary); cursor: pointer; text-align: left; transition: border-color .15s; }
 .website-image-library__item:hover { border-color: var(--color-primary); }
 .website-image-library__item.is-selected { border-color: var(--color-primary); box-shadow: 0 0 0 1px var(--color-primary); }
-.website-image-library__item img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: var(--color-bg-subtle); display: block; }
+.website-image-library__item img { width: 100%; aspect-ratio: 4 / 3; object-fit: contain; background: var(--color-surface-alt); display: block; }
 .website-image-library__name { display: block; padding: 8px; overflow: hidden; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .website-image-library__check { position: absolute; top: 4px; right: 4px; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; background: var(--color-primary); color: #fff; font-size: 12px; }
 @media(max-width:760px){.website-image-library{grid-template-columns:repeat(2,minmax(0,1fr));}}

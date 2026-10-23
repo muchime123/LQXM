@@ -1341,7 +1341,7 @@ onUnmounted(() => {
 .confidence {
   width: 130px;
   height: 4px;
-  background: var(--color-fill);
+  background: var(--color-surface-alt);
   border-radius: 4px;
   margin: 7px 0 3px;
 }
@@ -1464,7 +1464,7 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 4px;
   padding: 10px 14px;
-  background: var(--color-fill);
+  background: var(--color-surface-alt);
   border-radius: 10px;
 }
 .metric small {
@@ -1488,7 +1488,7 @@ onUnmounted(() => {
   gap: 10px;
   padding: 8px 12px;
   margin-bottom: 12px;
-  background: var(--color-fill);
+  background: var(--color-surface-alt);
   border-radius: 10px;
 }
 .batch-count {

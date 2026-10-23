@@ -682,7 +682,7 @@ watch(
 .nav-item--child {
   padding: 6px 14px;
   font-size: var(--fs-sm);
-  font-weight: var(--fw-regular);
+  font-weight: var(--fw-normal);
   color: var(--color-sidebar-text);
   opacity: 0.85;
 }

@@ -646,8 +646,8 @@ async function onThumbDrop(model: MasterListModel, event: DragEvent) {
   outline-offset: 1px;
 }
 .master-list-row__badges i.badge-website.is-disabled {
-  border-color: var(--color-border-default);
-  background: var(--color-surface-muted);
+  border-color: var(--color-border);
+  background: var(--color-surface-disabled);
   color: var(--color-text-faint);
 }
 
