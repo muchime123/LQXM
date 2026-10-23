@@ -1651,7 +1651,7 @@ function statusTagType(v: any): 'success' | 'warning' | 'info' | 'primary' {
   padding: 12px;
   font-size: 12px;
   color: var(--color-text-muted, #94a3b8);
-  background: var(--color-surface-soft, #f8fafc);
+  background: var(--color-surface-alt);
   border: 1px dashed var(--color-border, #dbe4ee);
   border-radius: 8px;
   line-height: 1.6;
@@ -1682,7 +1682,7 @@ function statusTagType(v: any): 'success' | 'warning' | 'info' | 'primary' {
   padding: 8px 12px;
   border: 1px solid var(--color-border-lighter, #eef2f6);
   border-radius: 8px;
-  background: var(--color-surface-soft, #f8fafc);
+  background: var(--color-surface-alt);
 }
 .history-item__head {
   display: flex;

@@ -279,7 +279,7 @@ async function doDelete(id: number) {
   gap: 18px;
 }
 .region-alias__form {
-  border: 1px solid var(--border-color, #e5e7eb);
+  border: 1px solid var(--color-border-light);
   border-radius: 10px;
   padding: 14px;
 }

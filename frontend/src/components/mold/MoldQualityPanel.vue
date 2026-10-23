@@ -268,7 +268,7 @@ function scoreBg(score: number): string {
 .score-circle .score-inner {
   width: 100%;
   height: 100%;
-  background: var(--color-bg-surface, #fff);
+  background: var(--color-surface);
   border-radius: 50%;
   display: flex;
   flex-direction: column;
@@ -311,7 +311,7 @@ function scoreBg(score: number): string {
   align-items: flex-start;
   gap: var(--space-xs, 4px);
   font-size: 13px;
-  color: var(--color-warning-600, #d97706);
+  color: var(--color-warning);
   background: color-mix(in srgb, var(--color-warning-100) 70%, transparent);
   padding: var(--space-s, 8px) var(--space-m, 12px);
   border-radius: var(--radius-card, 8px);
@@ -351,7 +351,7 @@ function scoreBg(score: number): string {
   border-radius: var(--radius-card, 8px);
   font-size: 13px;
   line-height: 1.5;
-  background: var(--color-bg-surface, #fff);
+  background: var(--color-surface);
   border: 1px solid var(--color-border-subtle, #e5e7eb);
 }
 
@@ -378,7 +378,7 @@ function scoreBg(score: number): string {
 }
 
 .q-item--warn .q-indicator {
-  background: var(--color-warning-600, #d97706);
+  background: var(--color-warning);
 }
 
 .q-item--missing {
@@ -387,7 +387,7 @@ function scoreBg(score: number): string {
 }
 
 .q-item--missing .q-indicator {
-  background: var(--color-danger-600, #dc2626);
+  background: var(--color-danger);
 }
 
 .q-item--info {
@@ -434,7 +434,7 @@ function scoreBg(score: number): string {
   flex-direction: column;
   gap: 4px;
   padding: var(--space-s, 8px) var(--space-m, 12px);
-  background: var(--color-bg-surface, #fff);
+  background: var(--color-surface);
   border: 1px solid var(--color-border-subtle, #e5e7eb);
   border-radius: var(--radius-card, 8px);
 }

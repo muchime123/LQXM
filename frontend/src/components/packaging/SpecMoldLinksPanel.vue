@@ -420,6 +420,6 @@ async function onAdd() {
 .sml-option-stopped {
   margin-left: auto;
   font-size: 11px;
-  color: var(--color-danger-500, #dc2626);
+  color: var(--color-danger);
 }
 </style>

@@ -224,7 +224,7 @@ loadList()
   padding: 12px 14px;
   max-height: 320px;
   overflow: auto;
-  background: var(--color-bg-secondary, #f8fafc);
+  background: var(--color-surface-alt);
   border: 1px solid var(--color-border-light, #e2e8f0);
   border-radius: 8px;
   font-size: 12px;

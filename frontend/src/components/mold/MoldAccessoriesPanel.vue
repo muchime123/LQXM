@@ -276,7 +276,7 @@ onMounted(() => {
   padding: var(--space-m, 16px);
   border: 1px solid var(--color-border-subtle, #e5e7eb);
   border-radius: var(--radius-card, 10px);
-  background: var(--color-bg-surface, #fff);
+  background: var(--color-surface);
   transition: box-shadow 0.15s;
 }
 

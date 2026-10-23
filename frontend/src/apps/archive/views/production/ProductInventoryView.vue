@@ -839,9 +839,9 @@ loadSnap()
 .category-group { margin-bottom: 12px; border: 1px solid var(--color-border, #e2e8f0); border-radius: 10px; overflow: hidden; }
 .category-group__head {
   display: flex; align-items: center; gap: 8px; padding: 10px 14px; cursor: pointer;
-  background: var(--color-fill, #f8fafc); user-select: none; font-size: 14px;
+  background: var(--color-surface-alt); user-select: none; font-size: 14px;
 }
-.category-group__head:hover { background: var(--color-fill-hover, #f1f5f9); }
+.category-group__head:hover { background: var(--color-surface-hover); }
 .collapse-icon { transition: transform .2s; }
 .collapse-icon.is-collapsed { transform: rotate(-90deg); }
 .category-group__name { font-weight: 600; }

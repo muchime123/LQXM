@@ -2284,7 +2284,7 @@ defineExpose({
   background: var(--color-surface, #fff);
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: var(--radius-xl, 10px);
-  padding: var(--space-m, 12px) var(--space-l, 16px) var(--space-l, 16px);
+  padding: var(--space-m, 12px) var(--space-lg-xl) var(--space-lg-xl);
   display: flex;
   flex-direction: column;
   gap: var(--space-s, 8px);

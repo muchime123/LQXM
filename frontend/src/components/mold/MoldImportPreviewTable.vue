@@ -512,7 +512,7 @@ const {
 }
 
 .mold-code-cell.has-issue {
-  color: var(--color-danger-600, #dc2626);
+  color: var(--color-danger);
 }
 
 .caliber-cell {

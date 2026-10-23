@@ -394,7 +394,7 @@ function resetState() {
   color: var(--color-danger-700, #b91c1c);
 }
 .summary-card.missed .card-value {
-  color: var(--color-warning-600, #d97706);
+  color: var(--color-warning);
 }
 .summary-card.error.active,
 .summary-card.missed.active {

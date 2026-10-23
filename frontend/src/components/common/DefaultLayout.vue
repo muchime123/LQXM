@@ -641,7 +641,7 @@ watch(
 
 .nav-item-wrap--parent.active .nav-item--parent-arrow {
   background: color-mix(in srgb, var(--color-sidebar-active, #0ea5e9) 8%, transparent);
-  color: var(--color-sidebar-active-text, var(--color-sidebar-text-strong));
+  color: var(--color-sidebar-text-strong);
   opacity: 0.95;
 }
 
