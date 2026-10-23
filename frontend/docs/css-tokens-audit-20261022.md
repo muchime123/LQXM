@@ -321,4 +321,51 @@ CSS 声明 `--x:`、JS/内联对象键 `'--x':`、运行时 `setProperty('--x')`
 
 扫描器新增 `FRAMEWORK_VARS` 例外表，用于登记"由组件库或运行时注入、引用属正确用法"的变量（须写明注入方与本项目用法出处），避免其长期作为普通缺失报警并诱导错误替换。
 
-**C4 治理完成**，剩余特殊项按上表转入专项：静态填充与状态配色体系 → 专项视觉评估；`--app-header-height` → C6；蓝色遗留 → 组件配色确认。后续按既有编号推进 C5（重复令牌与主题覆盖关系）→ C6 → C7 → C8。
+**C4 治理完成**，剩余特殊项按上表转入专项：静态填充与状态配色体系 → 专项视觉评估；`--app-header-height` → C6；蓝色遗留 → 组件配色确认。
+
+---
+
+## C5 重复令牌与主题覆盖关系（2026-10-23，只读审计）
+
+工具 `frontend/scripts/audit/token-graph.mjs`。解析 209 个样式单元（CSS 文件 + `.vue` 的 `<style>` 块），得到 632 条令牌定义、13,965 处 `var()` 引用；输出「定义位置 → 生效值 → 被哪些令牌引用 → 影响哪些文件」。
+
+**三类排除规则**（否则全是误报）：① `@media` 内的重定义是响应式设计，不是重复定义错误；② `--el-*` 由 Element Plus 自身 CSS 消费（在 node_modules），零引用不算死代码；③ `var()` 也会以字符串出现在 `.vue` 的 `<script>` 与 `.ts`（如 `LqDialog` 的 `sizeWidthMap`），引用统计必须覆盖这些位置。
+
+### C5-A 重复定义：**0 组**
+
+同名多值共 9 组，逐组核实后全部是断点覆盖：`--page-inline-padding`、`--page-block-padding`、`--card-padding`、`--space-section-gap(-wide)`、`--space-card-gap`、`--sidebar-width`、`--toolbar-min-height`（`responsive.css`）与 `--stage-cols`（`TrackingDetailDrawer.vue`）。**无同一作用域内的重复声明**。
+
+### C5-B 主题覆盖：base 403 / dark 135（131 正常覆盖 + 4 深色孤儿）
+
+深色未覆盖 35 个（实测计算值确认，非推断），分两类：
+
+- **正常，不需要改（11 个）**：侧栏 7 个（`--color-sidebar-text/-strong/-muted`、`--color-sidebar-overlay-*`，侧栏在深浅两主题下都是深色底，恒定正确）；浮层与提示 3 个（`--color-tooltip-bg/-text`、`--color-text-on-overlay`，浮层恒为深色面 + 白字）；`--color-brand-cyan`（品牌色不随主题）。
+- **覆盖不对称，需专项评估（24 个）**：`--ep-success-3/5/7/8/9/-dark`、`--ep-warning-3/5/7/8/9/-dark`、`--ep-danger-3/5/7/-dark`、`--ep-info(-3/5/7/8/9/-dark)`、`--ep-primary-dark`。`dark.css` 只覆盖了 8 个 EP 令牌（primary 的 filled/3/5/7/8/9 与 danger 的 8/9），success / warning / info 一档未覆盖 → 深色下 EP 组件的 light 变体（el-tag、el-alert、plain 按钮）仍渲染浅色面。
+
+### C5-C 语义重叠
+
+- **同值但语义不同 → 保留**：`--color-text-faint`(54 文件) / `-disabled`(3) / `-placeholder`(5) 浅色同为 #94a3b8，深色已分别覆盖为 #8493a7 / #64748b / #64748b，属有意区分。
+- **跨色系重合 → 需核实**：`--color-primary-border` 浅色为 `#a7f3d0`，与 `--color-success-border` **完全相同**；而深色下两者分别是 `rgba(20,184,166,.25)`（teal）与 `rgba(22,163,74,.3)`（green）。即浅色的主色边框用了绿色系值，深色才是 teal，两侧不一致 → 浅色值疑似从 success 复制而来。影响 38 个文件。
+- **零引用的同值别名 → 可清理**：见 C5-D。
+
+### C5-D 零引用令牌：78 个（项目自有）
+
+- **真死代码候选（与主流令牌同值的另一套命名，零引用）**：`--color-text-regular`（=`--color-text`）、`--color-bg-page` / `--color-background`（=`--color-page-bg`）、`--color-success-bright`（=`--color-success`）、`--color-surface-elevated`（=`--color-surface-raised`）、`--color-overlay-bg`（=`--color-overlay`）、`--color-primary-50`（=`--color-primary-bg`）、`--color-warning-light` / `--color-amber-100/50/600/700`、`--color-danger-light` / `--color-success-100` / `--color-success-border-light`、`--color-hover`、`--space-list-row-gap`（=`--space-control-gap`）、`--color-border-dark/focus/selected`、`--color-primary-dark/text`、`--color-text-inverse`、`--color-completion-*`、`--shadow-color-gray` / `--shadow-drawer`、`--opacity-*`、`--space-5`（已由 `--space-1..4` 系列覆盖）。
+- **预留规范，保留**：排版体系 `--text-h1..h4` / `--text-body(-sm)` / `--text-caption` / `--text-display` / `--text-overline` / `--text-placeholder` / `--fs-2xs`；层级 `--z-*`；动效 `--duration-*` / `--ease-*` / `--transition-*`；字形 `--tracking-*` / `--lh-wider`；断点 `--bp-*`；边框宽度 `--border-width-*`；对话框宽度 `--dialog-width-*`（由 `LqDialog.vue` 的 `sizeWidthMap` 在 `<script>` 中引用，静态只扫 `<style>` 会误判）；`--content-max-width`、`--color-glass-border`。
+- **无效覆盖（深色孤儿，且 EP 不消费）**：`--el-alert-text-color`（`element-plus.css:328`）。已在 Element Plus 全部 123 个 CSS 文件中确认**未使用该变量**，且同一规则内已直接写 `color: var(--color-danger-text)`，该行是冗余的。另 3 个深色孤儿 `--el-radio-button-checked-bg/text/border-color` 经确认**被 EP 消费**，属正常覆盖。
+
+### C5 结论表
+
+| 变量 | 问题类型 | 当前生效值（浅 / 深） | 影响范围 | 建议 | 风险 |
+|---|---|---|---|---|---|
+| `--color-border-light` | C5-B **正常**主题覆盖 | #e5e7eb / #2d3748 | 被 6 个 EP 变量依赖（`--el-border-color`、`--el-border-color-light`、`--el-disabled-border-color`、`--el-table-border-color`、`--el-table-border`、`--el-message-border-color`）+ 64 个文件 | 保留现状；改动须联动验证 EP 控件 | 高：一处改动波及全站边框与表格 |
+| `--color-sidebar-text-strong` | C5-B **正常**（侧栏恒深色） | #ffffff / #ffffff | 无令牌依赖，仅 `DefaultLayout.vue` | 保留，建议补注释说明「侧栏深浅均为深色底，故不需要深色覆盖」 | 无 |
+| `--color-sidebar-text/-muted`、`--color-sidebar-overlay-*`（7 个） | C5-B 正常 | 见实测 | 侧栏相关 | 保留 | 无 |
+| `--color-tooltip-bg/-text`、`--color-text-on-overlay`、`--color-brand-cyan` | C5-B 正常 | 恒定值 | 浮层/品牌 | 保留 | 无 |
+| `--ep-success/warning/info/danger` 浅色阶（24 个） | C5-B **覆盖不对称** | 深色沿用浅色值（如 `--ep-success-9` 深浅均 #dcfce7） | EP light 变体（el-tag / el-alert / plain 按钮等） | 专项评估：与已覆盖的 primary(6) / danger(2) 对齐 | 中：深色下多处浅色面会变深 |
+| `--color-primary-border` | C5-C **跨色系重合** | 浅 #a7f3d0（= success 边框）；深 `rgba(20,184,166,.25)`（teal） | 38 个文件 | 核实浅色是否应为 teal 系（如 #99f6e4） | 中：浅色可见变化，需专项评估 |
+| `--color-text-regular`、`--color-bg-page`、`--color-background`、`--color-success-bright`、`--color-surface-elevated`、`--color-overlay-bg`、`--color-primary-50`、`--space-list-row-gap` 等 | C5-D 真死代码候选 | 与主流令牌同值 | 0 引用 | 可删除，逐个确认无 TS 引用后清理 | 低 |
+| `--el-alert-text-color` | C5-D 无效覆盖 | 仅在深色块定义 | EP 全量 CSS 未消费 | 删除该行（同规则内 `color:` 已生效） | 低 |
+| `--text-h*`、`--z-*`、`--duration-*`、`--ease-*`、`--dialog-width-*` 等 | C5-D 预留规范 | — | 0 引用但成体系 | 保留 | 无 |
+
+**C5 未修改任何代码。** 唯一建议立即处理的是 `--el-alert-text-color`（无效覆盖）；其余要么属正常机制，要么需专项视觉评估。
