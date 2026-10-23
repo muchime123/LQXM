@@ -652,6 +652,85 @@ C6 为只读审计，本轮**未修改任何代码**。核实结果改变了初�
 
 结论：**第 2 项暂不修改**。收敛方案可行且作用域安全，但要先把上述两点处理掉（补齐基属性 + 处理例外组件），届时再提改动方案。
 
+### C7-2 详细设计方案（2026-10-23，仅设计，未修改代码）
+
+#### 步骤一：样式归属对照表
+
+**关键事实**：逐字节比对了 5 个标准成员的 `.form-dialog-header` 及 `h3` / `p` 声明，**完全相同**；DOM 也完全同形：`<div class="form-dialog-header"><div><h3>…</h3><p>…</p></div><span>…</span></div>`。
+
+但第三个子元素**并非都是徽标**——只有 3 个是 `.batch-count-pill`，另 2 个是不同的 `.platform-badge`：
+
+| 组件 | 根节点类 | 表头结构 | 第三个子元素 | `.batch-count-pill` | `.form-dialog-header` | 分类 |
+|---|---|---|---|---|---|---|
+| `AssignOwnerDialog` | `media-form-dialog` | 同形 | 徽标 | 定义 + 使用 | 定义 + 使用 | 标准成员 |
+| `BatchPublishTaskDialog` | `media-form-dialog` | 同形 | 徽标 | 定义 + 使用 | 定义 + 使用 | 标准成员 |
+| `BatchUpdateRecordDialog` | `media-form-dialog` | 同形 | 徽标 | 定义 + 使用 | 定义 + 使用 | 标准成员 |
+| `UpdateRecordFormDialog` | `media-form-dialog` | 同形 | `platform-badge` | 无 | 定义 + 使用 | 标准成员（仅表头） |
+| `MediaAccountEditorModal` | `media-form-dialog` | 同形 | `platform-badge` | 无 | 定义 + 使用 | 标准成员（仅表头） |
+| `ImportUpdatePreviewModal` | 无 | 无表头 | 徽标放在 `#actions` 插槽 | 定义 + 使用 | 无 | **例外组件，保留独立实现** |
+
+另有 `media-account-view.css` 也定义了这两个类，其中 `.form-dialog-header` 的 `padding` 是唯一的差异值（`14px 42px 12px 18px`），其 `h3` / `p` 与标准成员相同。
+
+**约束校验**：media 之外**没有任何文件**在模板中使用这两个类（`src` 全量检索确认）→ 收敛不会影响其他模块。
+
+#### 步骤二：明确迁入 `media-dialog-shared.css` 的声明
+
+沿用该文件现有的 `.media-form-dialog` 前缀（不新增全局裸选择器）：
+
+| 目标选择器 | 动作 | 声明内容 |
+|---|---|---|
+| `.media-form-dialog .batch-count-pill` | **新增** | `align-items:center; background:var(--color-primary-bg); border:1px solid var(--color-primary-border-light); border-radius:var(--radius-pill); color:var(--color-success-text); display:inline-flex; font-size:var(--fs-xs); font-weight:var(--fw-extrabold); padding:5px 10px; white-space:nowrap`（10 条，与现有 5 处定义逐字一致） |
+| `.media-form-dialog .form-dialog-header` | **扩充** | 保留现有 `flex:1 1 auto; min-width:0; padding:0`，补入 `display:flex; align-items:center; gap:var(--space-control-gap-wide); justify-content:space-between` |
+| `.media-form-dialog .form-dialog-header h3` | **合并** | 现有 `overflow/text-overflow/white-space`（截断）与待迁入的 `color:var(--color-text-heading); font-size:var(--fs-xl); font-weight:var(--fw-extrabold); line-height:var(--lh-tight); margin:0` **合并为同一规则块**，不出现重复选择器 |
+| `.media-form-dialog .form-dialog-header p` | **合并** | 同上：截断三条 + `color:var(--color-text-muted); font-size:var(--fs-xs); font-weight:var(--fw-bold); margin:5px 0 0` |
+| `> div` / `> span` | **不动** | 现有两条保持不变 |
+
+全部使用令牌（无硬编码色值）→ 浅深双主题跟随令牌，不需要额外的深色适配。
+
+#### 步骤三：明确哪些 scoped 声明删除、哪些必须保留
+
+| 文件 | 删除 | 保留 |
+|---|---|---|
+| `AssignOwnerDialog` / `BatchPublishTaskDialog` / `BatchUpdateRecordDialog` | `.batch-count-pill`、`.form-dialog-header` 及 `h3` / `p` | 其余全部 |
+| `UpdateRecordFormDialog` / `MediaAccountEditorModal` | `.form-dialog-header` 及 `h3` / `p` | 其余全部（含各自的 `platform-badge` 局部规则） |
+| `ImportUpdatePreviewModal` | **不删** | `.batch-count-pill` 保留独立实现（它未使用模块前缀，且徽标位于 `#actions` 插槽，DOM 结构不同） |
+| `media-dialog-shared.css` | 不改现有规则 | 全部保留，仅按步骤二新增/扩写 |
+| `media-account-view.css` | **待决，见步骤四** | — |
+
+#### 步骤四：加载顺序与优先级 —— 唯一真实风险点
+
+**现状**：`media-dialog-shared.css` 由 `index.css:21` 全局导入（早期加载）；组件 scoped 样式在组件模块执行时注入（更晚）。同特异性（两边都是 0,2,0）时**后注入者胜**，这正是今天表头实际的着色来源。
+
+**实测佐证**：`UpdateRecordFormDialog` 同时具备三份来源（自身 scoped `padding:0`、`@import` 来的 `padding:14px…`、全局 `.media-form-dialog …` 的 `padding:0`），**实测计算值为 `0px`** —— 说明组件自身的声明排在 `@import` 内容之后，胜出。
+
+**收敛后的风险**：一旦删除这 5 个组件的 scoped 副本，竞争者变成「全局 shared（早、0,2,0）」对「`media-account-view.css` 经 `@import` 进入 `UpdateRecordFormDialog` 与 `MediaAccountEditorModal` 的 scoped 副本（晚、0,2,0）」→ **后者可能反超，导致这两个弹窗的表头 `padding` 由 `0` 变为 `14px 42px 12px 18px`，出现视觉回归。** 这正是不能把 `padding` 简单替换成 `0` 的原因。
+
+两个备选（**需你定夺**，未决前不动手）：
+
+- **方案 A（推荐）**：先作为独立前置项，核实 `media-account-view.css` 那份 `.form-dialog-header` 是否对所有引入者都无实际视觉效果。已知只有 `UpdateRecordFormDialog` 与 `MediaAccountEditorModal` 会用表头类，且两者实测均为 `0px` → 说明该块当前不产生任何视觉效果，属可被 C8 吸收的无效声明。先处理它（独立验证 + 独立提交），风险即消除，再执行收敛。
+- **方案 B（保守）**：不动 `media-account-view.css`，则 `.form-dialog-header` **不迁入全局**，保留各组件 scoped 副本，本次只收敛确定无冲突的 `.batch-count-pill`。代价：表头仍有 5 份副本，收益减半。
+
+**`.batch-count-pill` 不受此风险影响**：3 个使用它的标准成员**都不引入** `media-account-view.css`（引入者是另外 4 个组件），迁入后无同级竞争者。
+
+#### 步骤五：浅 / 深双主题前后对比方案
+
+扩展 C7-1 已用的探针（复用 `_audit_shots/c7-dialog-baseline.mjs` 的思路），实施前后各跑一次并逐项比对：
+
+- **覆盖对象**：5 个标准对话框 + 例外组件 `ImportUpdatePreviewModal`（确认它不受影响）
+- **双主题**：浅色 / 深色（实施游标按双主题各跑一遍）
+- **读取选择器**：`.form-dialog-header`、`h3`、`p`、`.batch-count-pill`、`.platform-badge`、`.lq-dialog__head`、`.lq-dialog__body`
+- **读取属性**：`display` / `gap` / `align-items` / `justify-content` / `padding` / `height` / `background-color` / `color` / `font-size` / `font-weight` / `line-height` / `border-radius` / `border-top-color`
+- **验收标准**：上述属性逐项一致；每个对话框浅深各留一份截图；全量测试 525 用例通过；prettier 检查不新增问题（这几个文件 HEAD 版本本身不符合 prettier，不对其做无关重排）
+
+#### 步骤六：最小修改实施顺序（待批准后执行）
+
+1. **前置**：处理 `media-account-view.css` 的 14px 变体（按上述方案 A，独立核验 + 独立提交）
+2. **第一批**：迁入 `.batch-count-pill` → 删除 3 个标准成员的副本 → 对比 + 测试 + 独立提交
+3. **第二批**：迁入 `.form-dialog-header` 基础（含 h3 / p 合并）→ 删除 5 个标准成员的副本 → 对比 + 测试 + 独立提交
+4. **例外**：`ImportUpdatePreviewModal` 全程不动，仅在实施后确认其徽标样式未变
+
+分两批是为了让"无冲突项"先落地验证，把有优先级风险的表头收敛放在前置项处理完之后。
+
 ### C7 收口
 
 本轮 C7 完成了第 1 项删除（`6941762`，4 文件 224 行）并完成了第 2 项的归属与作用域核查（未改代码），未新建组件，未把业务 CSS 搬进 `utilities.css`。剩余项：第 2 项待上述两个前提处理后再动；第 3 项重复引入、第 4 项漂移等待你的下一步指示，其中包括已澄清的两点——`media-account-view.css` 重复编译次数多**不等于**必须迁移到全局 CSS；生产跟单等页面裸用 `el-table` **不自动认定为错误**，需先验证能否直接使用 `LqTable` 而不损失动态列、滚动等特殊功能。
