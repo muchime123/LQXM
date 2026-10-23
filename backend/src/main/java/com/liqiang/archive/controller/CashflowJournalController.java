@@ -23,7 +23,9 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 2026 年流水日记账期间报表；来源分录保持只读。 */
+/** 2026 年流水日记账期间报表；来源分录保持只读。
+ *  A-0（2026-10-23）：全部端点由 integration.h3 收口为 cashflow.read——
+ *  资金数据走独立财务读取权限，不再凭「氚云集成」权限查看（LQ P2-A 修订 5）。 */
 @RestController
 @RequestMapping("/api/cashflow-journal")
 @RequiredArgsConstructor
@@ -32,13 +34,13 @@ public class CashflowJournalController {
     private final CashflowJournalReviewService reviewService;
 
     @GetMapping("/review-batches")
-    @RequirePermission("integration.h3")
+    @RequirePermission("cashflow.read")
     public Map<String, Object> reviewBatches() {
         return reviewService.pendingBatches();
     }
 
     @GetMapping("/review-batches/{batchId}/diff")
-    @RequirePermission("integration.h3")
+    @RequirePermission("cashflow.read")
     public Map<String, Object> reviewDiff(@PathVariable long batchId,
                                           @RequestParam(required = false) String account,
                                           @RequestParam(defaultValue = "1") int page,
@@ -47,19 +49,21 @@ public class CashflowJournalController {
     }
 
     @GetMapping("/accounts")
-    @RequirePermission("integration.h3")
+    @RequirePermission("cashflow.read")
     public Map<String, Object> accounts(@RequestParam LocalDate start, @RequestParam LocalDate end) {
         validatePeriod(start, end);
         List<Map<String, Object>> items = jdbc.query("""
                 SELECT a.id, a.account_name, a.currency, a.opening_balance,
-                       COALESCE(SUM(CASE WHEN e.entry_date >= '2026-01-01' AND e.entry_date < ? THEN COALESCE(e.income,0)-COALESCE(e.expense,0) ELSE 0 END),0) AS before_net,
-                       COALESCE(SUM(CASE WHEN e.entry_date BETWEEN ? AND ? THEN e.income ELSE 0 END),0) AS income,
-                       COALESCE(SUM(CASE WHEN e.entry_date BETWEEN ? AND ? THEN e.expense ELSE 0 END),0) AS expense,
-                       COUNT(CASE WHEN e.entry_date BETWEEN ? AND ? THEN 1 END) AS entry_count
+                       a.entity_id, a.status, e.name AS entity_name,
+                       COALESCE(SUM(CASE WHEN e2.entry_date >= '2026-01-01' AND e2.entry_date < ? THEN COALESCE(e2.income,0)-COALESCE(e2.expense,0) ELSE 0 END),0) AS before_net,
+                       COALESCE(SUM(CASE WHEN e2.entry_date BETWEEN ? AND ? THEN e2.income ELSE 0 END),0) AS income,
+                       COALESCE(SUM(CASE WHEN e2.entry_date BETWEEN ? AND ? THEN e2.expense ELSE 0 END),0) AS expense,
+                       COUNT(CASE WHEN e2.entry_date BETWEEN ? AND ? THEN 1 END) AS entry_count
                   FROM h3_cash_accounts a
-                  LEFT JOIN h3_cashflow_entries e ON e.external_source='H3YUN' AND e.account_name=a.account_name
+                  LEFT JOIN cashflow_entities e ON e.id = a.entity_id
+                  LEFT JOIN h3_cashflow_entries e2 ON e2.external_source='H3YUN' AND e2.account_name=a.account_name
                  WHERE a.external_source='H3YUN'
-                 GROUP BY a.id,a.account_name,a.currency,a.opening_balance
+                 GROUP BY a.id,a.account_name,a.currency,a.opening_balance,a.entity_id,a.status,e.name
                  ORDER BY entry_count DESC, a.account_name ASC
                 """, (rs, ignored) -> accountRow(rs), start, start, end, start, end, start, end);
         Map<String, CurrencyTotal> byCurrency = new LinkedHashMap<>();
@@ -145,7 +149,7 @@ public class CashflowJournalController {
     }
 
     @GetMapping("/accounts/{accountId}/monthly")
-    @RequirePermission("integration.h3")
+    @RequirePermission("cashflow.read")
     public Map<String, Object> monthly(@PathVariable long accountId) {
         List<Map<String, Object>> accountRows = jdbc.query("""
                 SELECT account_name,currency,opening_balance FROM h3_cash_accounts
@@ -197,7 +201,7 @@ public class CashflowJournalController {
     }
 
     @GetMapping("/entries")
-    @RequirePermission("integration.h3")
+    @RequirePermission("cashflow.read")
     public Map<String, Object> entries(@RequestParam(required = false) Long accountId, @RequestParam LocalDate start,
                                        @RequestParam LocalDate end, @RequestParam(required = false) String keyword,
                                        @RequestParam(defaultValue = "1") int page,
@@ -238,7 +242,7 @@ public class CashflowJournalController {
 
     /** 不依赖来源行序的确定性异常；逐笔余额差额需先保存 Excel 原行号。 */
     @GetMapping("/issues")
-    @RequirePermission("integration.h3")
+    @RequirePermission("cashflow.read")
     public Map<String, Object> issues(@RequestParam LocalDate start, @RequestParam LocalDate end,
                                       @RequestParam(required = false) Long accountId) {
         validatePeriod(start, end);
@@ -399,6 +403,12 @@ public class CashflowJournalController {
         row.put("netFlow", income.subtract(expense));
         row.put("closingBalance", opening == null ? null : opening.add(income).subtract(expense));
         row.put("entryCount", rs.getLong("entry_count"));
+        // P2-A（A-2）：账户主体与状态随行返回；历史统计 SQL 不按 status 过滤（LQ 修订 2：
+        // 停用只影响未来操作，绝不改变历史统计结果）。
+        long entityId = rs.getLong("entity_id");
+        row.put("entityId", rs.wasNull() ? null : entityId);
+        row.put("entityName", rs.getString("entity_name"));
+        row.put("status", rs.getString("status"));
         return row;
     }
 

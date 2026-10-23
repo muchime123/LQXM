@@ -10,6 +10,11 @@ export interface CashflowAccount {
   netFlow: number
   closingBalance: number | null
   entryCount: number
+  /** P2-A（A-2）：所属资金归属主体；null=待认领。 */
+  entityId: number | null
+  entityName: string | null
+  /** ACTIVE / INACTIVE——历史统计不受停用影响，此字段仅作展示。 */
+  status: 'ACTIVE' | 'INACTIVE'
   /** 期间余额核对：只回答「期初+收支」能否算出可信期末，是账户级结论。 */
   closingStatus: 'OK' | 'OPENING_MISSING'
   closingStatusLabel: string

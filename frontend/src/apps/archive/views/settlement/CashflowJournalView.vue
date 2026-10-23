@@ -165,6 +165,14 @@
     <!-- ========== 视图二：账户汇总 ========== -->
     <template v-else-if="activeTab === 'accounts'">
       <div class="cf-account-tools">
+        <el-select v-model="entityFilter" clearable placeholder="全部主体" class="cf-account-tools__currency">
+          <el-option
+            v-for="entity in availableEntities"
+            :key="entity.key"
+            :label="entity.label"
+            :value="entity.key"
+          />
+        </el-select>
         <el-select v-model="currencyFilter" clearable placeholder="全部币种" class="cf-account-tools__currency">
           <el-option v-for="currency in availableCurrencies" :key="currency" :label="currency" :value="currency" />
         </el-select>
@@ -385,10 +393,25 @@ const currencyFilter = ref('')
 const reconcileFilter = ref('')
 const availableCurrencies = computed(() => [...new Set(accounts.value.map(account => account.currency))].sort())
 
+/** P2-A（A-2）：按资金归属主体筛选（前端本地过滤，/accounts 恒返回全量）。待认领账户单独一项。 */
+const entityFilter = ref<string>('')
+const availableEntities = computed(() => {
+  const map = new Map<string, string>()
+  for (const account of accounts.value) {
+    const key = account.entityId != null ? `E${account.entityId}` : 'UNASSIGNED'
+    if (!map.has(key)) map.set(key, account.entityId != null ? (account.entityName ?? `主体#${account.entityId}`) : '待认领')
+  }
+  return [...map.entries()].sort((a, b) => a[1].localeCompare(b[1], 'zh')).map(([key, label]) => ({ key, label }))
+})
+
 const visibleAccounts = computed(() =>
   accounts.value.filter(account => {
     if (accountFilter.value != null && account.id !== accountFilter.value) return false
     if (currencyFilter.value && account.currency !== currencyFilter.value) return false
+    if (entityFilter.value) {
+      const key = account.entityId != null ? `E${account.entityId}` : 'UNASSIGNED'
+      if (key !== entityFilter.value) return false
+    }
     const status = reconcileFilter.value
     if (status === 'CLOSING_OK' && account.closingStatus !== 'OK') return false
     if (status === 'CLOSING_BLOCKED' && account.closingStatus === 'OK') return false
@@ -558,6 +581,7 @@ function clearAllFilters() {
 function clearAccountFilters() {
   currencyFilter.value = ''
   reconcileFilter.value = ''
+  entityFilter.value = ''
 }
 
 // ==================== 加载 ====================
