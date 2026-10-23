@@ -79,6 +79,7 @@
       <!-- 2026-10-21 精简：删除「任务单状态」（与跟单状态同一件事）与「跟单员」（与车间同一刀），
            「交付结果」从常用行移入本区；本区只剩切历史/全部视图才用得到的条件。 -->
       <div class="tracking-extra-filter"><el-select v-model="trackingStatus" aria-label="跟单状态" @change="search"><el-option label="全部跟单状态" value="all" /><el-option label="待处理（未交付）" value="open" title="未停工、未结案、且还没有入库的任务。入库口径：跟单员填写的入库日期优先，没填则看采购入库；两者都没有＝未入库" /><el-option label="待跟单" value="pending" /><el-option label="跟单中" value="in_progress" /><el-option label="跟单已完成" value="completed" /><el-option label="停止生产跟单" value="stopped" /><el-option-group label="完成方式"><el-option label="人工结案" value="closed" /></el-option-group></el-select></div>
+      <div class="tracking-extra-filter"><el-select v-model="actionFilter" aria-label="跟单待办" @change="search"><el-option label="全部跟单待办" value="all" /><el-option label="有提醒" value="any" /><el-option v-for="code in TRACKING_ACTION_CODES" :key="code" :label="actionLabel(code)" :value="code" /></el-select></div>
       <div class="tracking-extra-filter"><el-select v-model="deliveryFilter" multiple collapse-tags clearable placeholder="生产交付结果（全部）" aria-label="生产交付结果" @change="search"><el-option v-for="option in DELIVERY_FILTER_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select></div>
       <div class="tracking-extra-filter"><el-select v-model="workshop" clearable filterable placeholder="车间（全部）" aria-label="车间" @change="search"><el-option v-for="line in filterOptions.workshops" :key="line" :label="shortWorkshop(line)" :value="line" /></el-select></div>
       <div class="tracking-extra-filter tracking-extra-filter-check"><el-checkbox v-model="mine" @change="search">我的跟单</el-checkbox></div>
@@ -556,7 +557,7 @@ import ProductionTrackingAnalyticsDrawer from './ProductionTrackingAnalyticsDraw
 import ProductionTrackingWeeklyReviewDrawer from './ProductionTrackingWeeklyReviewDrawer.vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { isSourceUrgent } from '@/utils/trackingUrgency'
-import { trackingActionHint as actionHint, trackingActionLabel as actionLabel, trackingActionTone as actionTone } from '@/utils/trackingAction'
+import { TRACKING_ACTION_CODES, trackingActionHint as actionHint, trackingActionLabel as actionLabel, trackingActionTone as actionTone } from '@/utils/trackingAction'
 // 源工单日期判据与「业务员要求工期」的口径唯一来源（列表 / 详情 / 导出共用，见该模块头注释）。
 import { leadDaysCellClass, leadDaysTooltipHtml } from '@/utils/tracking/leadDaysDisplay'
 import { effectiveLeadDaysText, invalidApplicationDate, invalidRequiredDate, leadDaysKindText, otherLeadDaysText } from '@/utils/trackingDateGuard'
@@ -581,7 +582,7 @@ import LqDialog from '@/components/common/LqDialog.vue'
  */
 const {
   keyword, advancedFiltersVisible, dateFilters, countdownFilter, deliveryFilter, optionalStageFilter,
-  moldStageFilter, salespersonFilter, workshop, trackingStatus, timeFilter, urgentOnly, mine,
+  moldStageFilter, salespersonFilter, workshop, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
   filterOptions, COUNTDOWN_FILTER_OPTIONS, DELIVERY_FILTER_OPTIONS, optionalStageOptions, MOLD_STAGE_OPTIONS,
   quickFilterPresets, quickFilterActive, applyQuickFilter, activeAdvancedFilterCount,
   activeFilterChips, clearFilterChip, resetTrackingFilters, onCreatedDateChange, onExpectedDateChange,

@@ -21,8 +21,7 @@ import {
  * ⚠️ 起算日**并不相同**（要求从申请日、计划/实际从车间排产日）——有意分叉：
  * ① 申请日常被填早（先申请后建单）；② 业务员提交后车间不一定马上接单（真库 6030 单提交→排产
  * 平均滞后 1.5 天、最长 83 天），把「等车间接单」算进车间工期，就不是车间的问题却记在车间头上。
- * 未排产（真库 44 单）**不回落**提交日，主数值直接「未排产」；只有「已交付但没登记排产」（1 单）
- * 才回落提交日，并标注。
+ * 未排产（包括已交付但没登记排产）均不回落提交日，只展示独立的业务员要求工期。
  */
 const base = { applicationDate: '2026-09-01', sourceCreatedAt: '2026-09-03 09:30:00', scheduleTime: '2026-09-05 08:00:00', dueDate: '2026-09-11' }
 const planned = { ...base, expectedFinishDate: '2026-09-15' }
@@ -30,7 +29,7 @@ const delayed = { ...planned, forecastFinishDate: '2026-09-20' }
 const finished = { ...delayed, deliveredDate: '2026-09-25' }
 /** 车间还没接单排产的单：只有业务员要求日期，车间预计完成日已给（车间已报价但没排产）。 */
 const unscheduled = { ...planned, scheduleTime: null }
-/** 车间没登记排产，但已经交付了（真库 1 单）：起算日必须兜底，否则既成事实会被整条藏掉。 */
+/** 车间没登记排产，但已经交付了：仍不能编造生产起点。 */
 const deliveredWithoutSchedule = { ...finished, scheduleTime: null }
 
 describe('trackingDateGuard · 源工单日期判据', () => {
@@ -166,17 +165,15 @@ describe('trackingDateGuard · 未排产（车间还没接单，只给要求工�
     expect(leadDaysAwaitingScheduleNote(planned)).toBe('')
   })
 
-  it('已交付但没登记排产：起算日兜底到任务单提交日，实际工期照给（既成事实不能藏）', () => {
-    expect(leadDaysStartFallback(deliveredWithoutSchedule)).toBe(true)
-    expect(leadDaysHasPlan(deliveredWithoutSchedule)).toBe(true)
-    expect(leadDaysHasActual(deliveredWithoutSchedule)).toBe(true)
-    expect(leadDaysStart(deliveredWithoutSchedule)).toBe('2026-09-03 09:30:00')
-    expect(effectiveLeadDays(deliveredWithoutSchedule)).toBe(22)
-    expect(effectiveLeadDaysText(deliveredWithoutSchedule)).toBe('22 天')
-    expect(effectiveLeadDaysBasisText(deliveredWithoutSchedule)).toContain('排产日缺失')
-    expect(leadDaysBreakdown(deliveredWithoutSchedule).map(item => item.key)).toEqual(['REQUIRED', 'PLANNED', 'ACTUAL'])
-    // 已交付的单不该再说「等车间接单」
-    expect(leadDaysAwaitingSchedule(deliveredWithoutSchedule)).toBe(false)
+  it('已交付但没登记排产：生产工期保持未知，不回落到提交日', () => {
+    expect(leadDaysStartFallback(deliveredWithoutSchedule)).toBe(false)
+    expect(leadDaysHasPlan(deliveredWithoutSchedule)).toBe(false)
+    expect(leadDaysHasActual(deliveredWithoutSchedule)).toBe(false)
+    expect(leadDaysStart(deliveredWithoutSchedule)).toBeNull()
+    expect(effectiveLeadDays(deliveredWithoutSchedule)).toBe(10)
+    expect(effectiveLeadDaysText(deliveredWithoutSchedule)).toBe('10 天')
+    expect(leadDaysBreakdown(deliveredWithoutSchedule).map(item => item.key)).toEqual(['REQUIRED'])
+    expect(leadDaysAwaitingSchedule(deliveredWithoutSchedule)).toBe(true)
   })
 
   it('未排产且未填车间预计完成日：同样只有要求工期', () => {
@@ -243,9 +240,9 @@ describe('trackingDateGuard · 负数工期（数据可疑，标红但不藏）'
     expect(effectiveLeadDaysText(badRequired)).toBe('日期待核实')
   })
 
-  it('兜底起算时，负数原因说的是「任务单提交日」而不是排产日', () => {
+  it('排产缺失时不凭交付日和提交日计算负工期', () => {
     const badActual = { ...deliveredWithoutSchedule, deliveredDate: '2026-09-02' }
-    expect(negativeLeadReason(badActual)).toContain('实际入库日早于任务单提交日')
+    expect(negativeLeadDays(badActual)).toBe(false)
   })
 })
 

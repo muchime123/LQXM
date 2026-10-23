@@ -20,7 +20,7 @@ import {
   fetchTrackingDetail, fetchTrackingPurchaseReceiptDetail, fetchTrackingPurchaseReceipts
 } from '@/api/productionTracking'
 import type {
-  TrackingEntry, TrackingMilestone, TrackingOperation, TrackingOrder, TrackingPurchaseReceipt,
+  TrackingEntry, TrackingMilestone, TrackingOrder, TrackingPurchaseReceipt,
   TrackingTimeReview, TrackingTimeReviewKind, TrackingTimeReviewStatus
 } from '@/api/productionTracking'
 import type { LedgerDetailResult } from '@/types/h3Import'
@@ -117,7 +117,7 @@ export function useTrackingDetail(options: {
   const purchaseDetailData = ref<LedgerDetailResult | null>(null)
   const purchaseDetailError = ref('')
   const purchaseDetailId = ref<number | null>(null)
-  const detail = ref<{ order: TrackingOrder; milestones: TrackingMilestone[]; operations: TrackingOperation[]; entries: TrackingEntry[]; timeReviews: TrackingTimeReview[]; timeReviewHistory: TrackingTimeReview[]; stageTotal?: number } | null>(null)
+  const detail = ref<Awaited<ReturnType<typeof fetchTrackingDetail>> | null>(null)
   /** 抽屉里的**可编辑副本**：打开详情时从后端节点表深拷一份，保存时才提交回去。 */
   const milestones = ref<TrackingMilestone[]>([])
   const previousStageStatuses = ref<Record<string, TrackingMilestone['status']>>({})

@@ -2,8 +2,8 @@ package com.liqiang.archive.service;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.liqiang.archive.erp.ErpActorResolver;
-import com.liqiang.archive.erp.ErpIdempotencyService;
+import com.liqiang.archive.infra.ActorResolver;
+import com.liqiang.archive.infra.IdempotencyService;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DateUtil;
@@ -43,12 +43,12 @@ public class ProductionTrackingWorkbookImportService {
     private final ObjectMapper json;
     private final ProductionTrackingService tracking;
     private final ProductionTrackingWorkbookReviewService review;
-    private final ErpActorResolver actors;
-    private final ErpIdempotencyService idem;
+    private final ActorResolver actors;
+    private final IdempotencyService idem;
 
     public ProductionTrackingWorkbookImportService(JdbcTemplate jdbc,ObjectMapper json,ProductionTrackingService tracking,
             ProductionTrackingWorkbookReviewService review,
-            ErpActorResolver actors,@Qualifier("archiveIdempotencyService") ErpIdempotencyService idem) {
+            ActorResolver actors,@Qualifier("idempotencyService") IdempotencyService idem) {
         this.jdbc=jdbc;this.json=json;this.tracking=tracking;this.review=review;this.actors=actors;this.idem=idem;
     }
 

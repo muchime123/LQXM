@@ -15,6 +15,17 @@ const SAMPLE: TrackingHtmlSheet[] = [
 ]
 
 describe('生产跟单导出：网页(HTML)组装', () => {
+  it('工具条容器必须闭合：正文(.paper)不得嵌进 .screen-bar（否则打印随 .no-print 一起隐藏，整页空白）', () => {
+    const html = buildTrackingHtml({ sheets: SAMPLE })
+    // 2026-10-23 实测回归：screen-bar 少一个 </div> 时，<div class="paper"> 会被浏览器
+    // 解析进 .screen-bar.no-print 里——屏幕一切正常，打印预览全白。
+    expect(html).toContain('</div>\n<div class="paper" id="paper">')
+    // div 开闭数量守恒（防止同类嵌套错再犯）
+    const opens = (html.match(/<div[\s>]/g) || []).length
+    const closes = (html.match(/<\/div>/g) || []).length
+    expect(closes).toBe(opens)
+  })
+
   it('每个车间一块，块内表头与每行单元格按顺序落位', () => {
     const html = buildTrackingHtml({ sheets: SAMPLE })
     const sections = html.split('<section class="sheet">').slice(1)
@@ -123,8 +134,8 @@ describe('生产跟单导出：网页(HTML)组装', () => {
     const html = buildTrackingHtml({
       sheets: [{ name: 'A', headers: ['产品'], body: [['AAAAAAAAAAAA\nBBBB']] }]
     })
-    // 最长行 12 个半角单位 → 12*7+22 = 106px；若按整格（含 \n）估会到 127px。
-    expect(html).toContain('<col style="width:106px">')
+    // 最长行 12 个半角单位 → 12*7+30 = 114px；若按整格（含 \n）估会到 135px。
+    expect(html).toContain('<col style="width:114px">')
   })
 
   it('结构化单元格：主值 + 行内徽标 + 下一行副信息（省列用），空徽标/空副行不留空壳', () => {
@@ -152,16 +163,16 @@ describe('生产跟单导出：网页(HTML)组装', () => {
   })
 
   it('结构化单元格的列宽：徽标与主值同行累加，副行单独估宽不被拉宽', () => {
-    // 主值 4 个半角 + 徽标「1张」(3) + 间距 3 = 10 单位 → 10*7+22 = 92px；副行更短不参与
+    // 主值 4 个半角 + 徽标「1张」(3) + 间距 3 = 10 单位 → 10*7+30 = 100px；副行更短不参与
     const badge = buildTrackingHtml({
       sheets: [{ name: 'A', headers: ['产品'], body: [[{ text: 'abcd', badge: '1张', sub: 'x' }]] }]
     })
-    expect(badge).toContain('<col style="width:92px">')
-    // 副行更长时按副行估：6 个半角 → 64px（下限）
+    expect(badge).toContain('<col style="width:100px">')
+    // 副行更长时按副行估：6 个半角 → 6*7+30 = 72px
     const sub = buildTrackingHtml({
       sheets: [{ name: 'A', headers: ['产品'], body: [[{ text: 'a', sub: 'abcdef' }]] }]
     })
-    expect(sub).toContain('<col style="width:64px">')
+    expect(sub).toContain('<col style="width:72px">')
   })
 
   it('自包含：样式内联、没有任何外部资源引用（离线可打开）', () => {
@@ -244,8 +255,8 @@ describe('生产跟单导出：网页(HTML)组装', () => {
     const cols = [...html.matchAll(/<col style="width:(\d+)px">/g)].map(match => match[1])
     expect(cols[0]).toBe('60')
     expect(cols[2]).toBe('90')
-    // 备注列没指默认宽：「一段较长的跟单备注内容」11 个全角 = 22 单位 → 22*7+22 = 176px
-    expect(cols[1]).toBe('176')
+    // 备注列没指默认宽：「一段较长的跟单备注内容」11 个全角 = 22 单位 → 22*7+30 = 184px
+    expect(cols[1]).toBe('184')
     // 列宽数字框的 defaultValue 同步为指定值 ⇒ 「恢复默认 / 双击把手」回到这里给的宽度
     expect(html).toContain('value="60" aria-label="生产任务单创建时间列宽度"')
     expect(html).toContain('value="90" aria-label="备料列宽度"')

@@ -39,7 +39,7 @@ class ProductionTrackingDurationMysqlTest {
     @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
     void referenceDaysIsTheSumOfEffectiveStagesAndMatchesTheNodeChain() throws Exception {
         var jdbc = jdbc();
-        var service = new ProductionTrackingService(jdbc, null, null, null, new ObjectMapper(), null);
+        var service = new ProductionTrackingService(jdbc, null, null, new ObjectMapper(), null);
         var products = jdbc.queryForList("SELECT c.id AS id FROM manufacturing_task_config_items c "
                 + "JOIN manufacturing_workshops w ON w.id=c.workshop_id "
                 + "WHERE c.config_type='PRODUCT_NAME' AND w.workshop_name LIKE '%封口%' ORDER BY c.id LIMIT 5");
@@ -107,7 +107,7 @@ class ProductionTrackingDurationMysqlTest {
     @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
     void actualDurationCountsOnlyScheduleAnchoredOrdersThatFinished() throws Exception {
         var jdbc = jdbc();
-        var service = new ProductionTrackingService(jdbc, null, null, null, new ObjectMapper(), null);
+        var service = new ProductionTrackingService(jdbc, null, null, new ObjectMapper(), null);
         var products = jdbc.queryForList("SELECT c.id AS id FROM manufacturing_task_config_items c "
                 + "JOIN manufacturing_workshops w ON w.id=c.workshop_id "
                 + "WHERE c.config_type='PRODUCT_NAME' AND w.workshop_name LIKE '%封口%' ORDER BY c.id LIMIT 5");

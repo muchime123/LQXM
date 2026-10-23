@@ -8,7 +8,7 @@
 import type { TrackingOrder } from '@/api/productionTracking'
 import {
   invalidApplicationDate, invalidRequiredDate, leadDaysAlarm, leadDaysAwaitingScheduleNote,
-  leadDaysBreakdown, leadDaysDeltaText, leadDaysDeltaTone, leadDaysStartFallback,
+  leadDaysBreakdown, leadDaysDeltaText, leadDaysDeltaTone,
   negativeLeadDays, negativeLeadReason
 } from '@/utils/trackingDateGuard'
 import { shortDate } from '@/utils/tracking/rules'
@@ -32,8 +32,7 @@ export function leadDaysCellClass(row: TrackingOrder) {
 export function leadDaysTooltip(row: TrackingOrder) {
   const notes: string[] = []
   if (negativeLeadDays(row)) notes.push(negativeLeadReason(row))
-  if (leadDaysStartFallback(row)) notes.push('排产时间未登记，实际工期按任务单提交日起算')
-  else if (leadDaysAwaitingScheduleNote(row)) notes.push(leadDaysAwaitingScheduleNote(row))
+  if (leadDaysAwaitingScheduleNote(row)) notes.push(leadDaysAwaitingScheduleNote(row))
   if (invalidApplicationDate(row)) notes.push('申请日期早于任务单提交日期，要求工期仍按申请日起算，天数偏长')
   if (invalidRequiredDate(row)) notes.push('业务员要求日期早于申请/提交日期，要求工期无法计算')
   else {

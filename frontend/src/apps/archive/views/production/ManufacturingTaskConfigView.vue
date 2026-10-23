@@ -1,7 +1,7 @@
 <template>
   <div class="task-config-page">
     <header class="page-head">
-      <h1>生产产品与工期管理</h1>
+      <h1>生产参考工期</h1>
       <div class="head-actions">
         <el-popover placement="bottom-end" :width="520" trigger="click">
           <template #reference><el-button text size="small">口径说明</el-button></template>
@@ -80,6 +80,10 @@
       </section>
     </div>
 
+    <!-- 车间基础数据：2026-10-23 随制造主数据清理从「制程与工序管理」页迁入（该页已下线）。
+         车间保留，默认制程等制程关联概念已移除。 -->
+    <section class="workshop-section"><ManufacturingWorkshopPanel /></section>
+
     <ProductOrderHistoryDrawer v-model="orderDrawerVisible" :task-config-id="selectedProduct?.id ?? null"
       :product-name="selectedProduct?.configName ?? ''" @open-order="openTrackingOrder" />
     <CoverageBreakdownDrawer v-model="coverageDrawerVisible" :initial-filter="coverageFilter" @pick="pickCoverageRow" />
@@ -96,6 +100,7 @@ import { Refresh } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { http } from '@/api/http'
 import WorkshopSelector, { type WorkshopCard } from '@/components/production/WorkshopSelector.vue'
+import ManufacturingWorkshopPanel from '@/components/production/ManufacturingWorkshopPanel.vue'
 import ManufacturingTaskConfigPanel from '@/components/production/ManufacturingTaskConfigPanel.vue'
 import TrackingProductBenchmarkPanel from '@/components/production/TrackingProductBenchmarkPanel.vue'
 import ProductOrderHistoryDrawer from '@/components/production/ProductOrderHistoryDrawer.vue'
@@ -357,6 +362,7 @@ button.stat:hover b { color: var(--color-primary, #0f766e); }
 .duration-panel { position: sticky; top: 16px; display: grid; gap: 12px; min-width: 0; }
 
 .duration-panel { position: static; }
+.workshop-section { background: var(--color-surface, #fff); border: 1px solid var(--color-border, #e2e8f0); border-radius: var(--radius-2xl, 12px); padding: 12px; box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.04)); }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   .layout > :nth-child(2), .duration-panel { grid-column: 1; }

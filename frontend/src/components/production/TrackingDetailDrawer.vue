@@ -14,14 +14,11 @@
               <el-tag v-if="detail.order.moldLayout?.trim()" size="small" type="info" effect="plain">{{ detail.order.moldLayout }}</el-tag>
             </div>
             <div class="summary-tags">
-              <el-tag size="small" type="info" effect="plain">{{ shortWorkshop(detail.order.workshopType) || '车间未提供' }}</el-tag>
-              <el-tag size="small" type="info" effect="plain">{{ detail.order.externalSource === 'H3YUN' ? '氚云工单' : '本地工单' }}</el-tag>
-              <el-tag size="small" type="info" effect="plain">任务单：{{ detail.order.sourceStatus || '状态未提供' }}</el-tag>
-              <el-tag size="small" type="info" effect="plain">跟单责任人：{{ detail.order.assigneeName || '未指定' }}</el-tag>
-              <el-tag size="small" type="info" effect="plain">客户：{{ detail.order.customerNameSnapshot || '未提供' }}<template v-if="detail.order.salespersonNameSnapshot"> · {{ detail.order.salespersonNameSnapshot }}</template></el-tag>
-              <el-tag v-if="detail.order.riskCategory" size="small" type="warning" effect="plain">风险：{{ riskText(detail.order.riskCategory) }}</el-tag>
-              <el-tag v-if="isSourceUrgent(detail.order.sourceOrderRemark)" size="small" type="danger" effect="dark">任务单备注加急</el-tag>
-              <span class="muted">最近跟进 {{ formatTime(detail.order.lastFollowupAt) || '暂无' }}</span>
+              <span>{{ shortWorkshop(detail.order.workshopType) || '车间未提供' }}</span>
+              <span>跟单 {{ detail.order.assigneeName || '未指定' }}</span>
+              <span>客户 {{ detail.order.customerNameSnapshot || '未提供' }}</span>
+              <span v-if="detail.order.riskCategory">{{ riskText(detail.order.riskCategory) }}</span>
+              <span class="summary-last-followup">最近跟进 {{ formatTime(detail.order.lastFollowupAt) || '暂无' }}</span>
             </div>
           </div>
           <div class="summary-progress">
@@ -32,7 +29,10 @@
           </div>
         </section>
 
-        <el-alert v-if="!detail.order.stoppedAt && isSourceUrgent(detail.order.sourceOrderRemark)" class="urgent-detail-alert" type="error" :closable="false" show-icon title="氚云生产任务单标注加急" :description="detail.order.sourceOrderRemark || ''" />
+        <div v-if="!detail.order.stoppedAt && (isSourceUrgent(detail.order.sourceOrderRemark) || detail.order.trackingAction)" class="attention-list">
+          <div v-if="isSourceUrgent(detail.order.sourceOrderRemark)" class="attention-item attention-item--urgent"><strong>加急任务</strong><span>任务单备注已标注加急，请优先核实当前生产进度。</span></div>
+          <div v-if="detail.order.trackingAction" class="attention-item"><strong>{{ actionLabel(detail.order.trackingAction) }}</strong><span>{{ actionHint(detail.order) }}</span></div>
+        </div>
 
         <el-alert v-if="detail.order.stoppedAt" type="info" :closable="false" show-icon title="已停止生产跟单"
           :description="`${detail.order.stoppedByName || '跟单员'} · ${formatTime(detail.order.stoppedAt)} · 原因：${detail.order.stoppedReason || '见跟单历史'}。仅本地跟单停止，氚云任务单保持原状。`" />
@@ -40,15 +40,19 @@
         <el-alert v-if="!detail.order.stoppedAt && detail.order.closedAt" type="success" :closable="false" show-icon title="跟单已结案（人工确认）"
           :description="`${detail.order.closedByName || '跟单员'} · ${formatTime(detail.order.closedAt)} · 说明：${detail.order.closedNote || '见跟单历史'}。状态按「结案优先」展示为「跟单已完成」，节点未补齐无需补充。`" />
 
-        <el-alert v-if="detail.order.trackingAction" type="warning" :closable="false" show-icon
-          :title="`跟单待办 · ${actionLabel(detail.order.trackingAction)}`"
-          :description="actionHint(detail.order)" />
-
-        <div class="metric-grid" :class="{ 'show-secondary': showSecondaryMetrics }">
+        <section class="key-dates">
+          <header class="section-head"><h3>交期与开工</h3><el-button link type="primary" size="small" @click="showSecondaryMetrics = !showSecondaryMetrics">{{ showSecondaryMetrics ? '收起时间明细' : '展开时间明细与核实' }}</el-button></header>
+          <div class="key-dates-grid">
+            <div><span>业务员要求</span><strong>{{ detail.order.dueDate || '未定' }}</strong></div>
+            <div><span>排产开工</span><strong>{{ detail.order.scheduleTime ? formatMinute(detail.order.scheduleTime) : '未排产' }}</strong><small v-if="!detail.order.scheduleTime && detail.schedule.latestStartDate">建议最晚 {{ detail.schedule.latestStartDate }}</small></div>
+            <div><span>当前车间交期</span><strong>{{ detail.schedule.deadline || '未定' }}</strong><el-button v-if="canFollowup && !detail.order.stoppedAt" link type="primary" size="small" @click="openDelayDialog">{{ detail.order.forecastFinishDate ? '修改延期' : '登记延期' }}</el-button></div>
+          </div>
+        </section>
+        <div v-if="showSecondaryMetrics" class="metric-grid show-secondary">
           <div :class="['metric', { 'metric-exception': invalidApplicationDate(detail.order) }]"><span>生产工单申请时间</span><strong>{{ detail.order.applicationDate || '未填写' }}</strong><small v-if="detail.order.sourceCreatedAt" class="muted">任务单提交 {{ formatMinute(detail.order.sourceCreatedAt) }}</small><small v-if="invalidApplicationDate(detail.order)" class="metric-exception-text">申请日期早于任务单提交日期，疑似填写错误</small><el-button v-if="invalidApplicationDate(detail.order) && needsTimeReason(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE')">记录日期核实</el-button><span v-else-if="invalidApplicationDate(detail.order)" class="metric-reviewed">已记录核实：{{ reviewOf(detail.order, 'SOURCE_DATE')?.reason }}<el-button v-if="reviewOf(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE', reviewOf(detail.order, 'SOURCE_DATE'))">修改</el-button></span></div>
           <div :class="['metric', { 'metric-exception': invalidRequiredDate(detail.order) }]"><span>订单要求完成（业务员）</span><strong :class="{ 'is-danger': invalidRequiredDate(detail.order) }">{{ detail.order.dueDate || '未定' }}</strong><small v-if="invalidRequiredDate(detail.order)" class="metric-exception-text">早于申请日期或任务单提交日期，疑似填写错误；请核对源工单日期</small><el-button v-if="invalidRequiredDate(detail.order) && !invalidApplicationDate(detail.order) && needsTimeReason(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE')">记录日期核实</el-button><span v-else-if="invalidRequiredDate(detail.order) && !invalidApplicationDate(detail.order)" class="metric-reviewed">已记录核实：{{ reviewOf(detail.order, 'SOURCE_DATE')?.reason }}<el-button v-if="reviewOf(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE', reviewOf(detail.order, 'SOURCE_DATE'))">修改</el-button></span></div>
           <div class="metric"><el-tooltip placement="top" raw-content :content="leadDaysTooltipHtml(detail.order)"><span class="lead-detail-heading">工期（当前） ⓘ</span></el-tooltip><strong :class="{ 'is-danger': leadDaysAlarm(detail.order) }">{{ effectiveLeadDaysText(detail.order) }}<small class="lead-kind">{{ leadDaysKindText(detail.order) }}</small></strong><small v-if="otherLeadDaysText(detail.order)" class="muted">{{ otherLeadDaysText(detail.order) }}</small><small v-if="leadDaysDeltaText(detail.order)" :class="leadDeltaClass(detail.order)">{{ leadDaysDeltaText(detail.order) }}</small><small v-if="negativeLeadDays(detail.order)" class="metric-exception-text">{{ negativeLeadReason(detail.order) }}</small></div>
-          <div :class="['metric', { 'metric-exception': timeException(detail.order, 'ACCEPTANCE') }]"><span>排产时间（确认是否开工）</span><strong>{{ formatMinute(detail.order.scheduleTime) || '未排产' }}</strong><small v-if="scheduleLagDays(detail.order) != null" class="muted">提交后 {{ scheduleLagDays(detail.order) }} 天排产</small><small class="muted">计划/实际工期自排产日起算</small><small v-if="timeException(detail.order, 'ACCEPTANCE')" class="metric-exception-text">{{ timeException(detail.order, 'ACCEPTANCE') }}</small><el-button v-if="needsTimeReason(detail.order, 'ACCEPTANCE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('ACCEPTANCE')">注明接单原因</el-button><span v-else-if="timeException(detail.order, 'ACCEPTANCE')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'ACCEPTANCE')?.reason }}<el-button v-if="reviewOf(detail.order, 'ACCEPTANCE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('ACCEPTANCE', reviewOf(detail.order, 'ACCEPTANCE'))">修改</el-button></span></div>
+          <div :class="['metric', { 'metric-exception': timeException(detail.order, 'ACCEPTANCE') }]"><span>排产时间（确认是否开工）</span><strong>{{ formatMinute(detail.order.scheduleTime) || '未排产' }}</strong><small v-if="scheduleLagDays(detail.order) != null" class="muted">提交后 {{ scheduleLagDays(detail.order) }} 天排产</small><small class="muted">计划/实际工期自排产日起算</small><small v-if="!detail.order.scheduleTime && detail.schedule.latestStartDate" :class="detail.schedule.risk === 'SCHEDULE_LATE' ? 'metric-exception-text' : 'muted'">建议最晚排产：{{ detail.schedule.latestStartDate }}{{ detail.schedule.risk === 'SCHEDULE_LATE' ? ' · 已滞后' : detail.schedule.risk === 'SCHEDULE_DUE' ? ' · 请尽快排产' : '' }}</small><small v-else-if="!detail.order.scheduleTime" class="muted">产品节点工期或车间交期不完整，暂无法倒排</small><small v-if="timeException(detail.order, 'ACCEPTANCE')" class="metric-exception-text">{{ timeException(detail.order, 'ACCEPTANCE') }}</small><el-button v-if="needsTimeReason(detail.order, 'ACCEPTANCE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('ACCEPTANCE')">注明接单原因</el-button><span v-else-if="timeException(detail.order, 'ACCEPTANCE')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'ACCEPTANCE')?.reason }}<el-button v-if="reviewOf(detail.order, 'ACCEPTANCE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('ACCEPTANCE', reviewOf(detail.order, 'ACCEPTANCE'))">修改</el-button></span></div>
           <div :class="['metric', { 'metric-exception': timeException(detail.order, 'COMMITMENT') }]"><div class="metric-heading"><span>车间预计完成</span><el-button link type="primary" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openDelayDialog">{{ detail.order.forecastFinishDate ? '修改延期' : '延期' }}</el-button></div><strong>{{ currentCompletionDate(detail.order) || '未定' }}</strong><small class="muted">{{ detail.order.forecastFinishDate ? '原车间预计：' : '' }}{{ expectedCompareText(detail.order) }}</small><small v-if="detail.order.forecastFinishDate" class="metric-delay">{{ forecastAdjustText(detail.order) }}<template v-if="deadlineOf(detail.order)"> · 原预计 {{ deadlineOf(detail.order) }}</template><template v-if="detail.order.delayReason"> · {{ detail.order.delayReason }}</template></small><small v-else-if="detail.order.delayReason" class="muted">原有延期 / 风险说明：{{ detail.order.delayReason }}</small><small v-if="timeException(detail.order, 'COMMITMENT')" class="metric-exception-text">{{ timeException(detail.order, 'COMMITMENT') }}</small><el-button v-if="needsTimeReason(detail.order, 'COMMITMENT')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('COMMITMENT')">注明协商原因</el-button><span v-else-if="timeException(detail.order, 'COMMITMENT')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'COMMITMENT')?.reason }}<el-button v-if="reviewOf(detail.order, 'COMMITMENT')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('COMMITMENT', reviewOf(detail.order, 'COMMITMENT'))">修改</el-button></span></div>
           <div :class="['metric', { 'metric-exception': timeException(detail.order, 'OVERDUE') }]"><span>生产交付结果</span><strong :class="{ 'is-danger': detail.order.deliveryOutcome === 'OVERDUE' }">{{ deliveryOutcomeText(detail.order) }}</strong><small v-if="detail.order.deliveryBaseline" class="muted">基准：车间预计完成 {{ detail.order.deliveryBaseline }}</small><el-button v-if="needsTimeReason(detail.order, 'OVERDUE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('OVERDUE')">记录逾期原因</el-button><span v-else-if="timeException(detail.order, 'OVERDUE')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'OVERDUE')?.reason }}<el-button v-if="reviewOf(detail.order, 'OVERDUE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('OVERDUE', reviewOf(detail.order, 'OVERDUE'))">修改</el-button></span></div>          <div :class="['metric', { 'metric-exception': timeException(detail.order, 'REPORTING') }]"><span>氚云报工完工（仅供对照）</span><strong>{{ detail.order.actualFinishDate || '源工单未填' }}</strong><small v-if="!detail.order.expectedFinishDate" class="muted">车间预计未填，暂无法比较报工日期</small><small v-else-if="!timeException(detail.order, 'REPORTING') && detail.order.actualFinishDate" class="muted">{{ reportCompareText(detail.order) }}</small><small v-if="timeException(detail.order, 'REPORTING')" class="metric-exception-text">{{ timeException(detail.order, 'REPORTING') }}</small><el-button v-if="needsTimeReason(detail.order, 'REPORTING')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('REPORTING')">核实并注明原因</el-button><span v-else-if="timeException(detail.order, 'REPORTING')" class="metric-reviewed">已记录原因：{{ reviewOf(detail.order, 'REPORTING')?.reason }}<el-button v-if="reviewOf(detail.order, 'REPORTING')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('REPORTING', reviewOf(detail.order, 'REPORTING'))">修改</el-button></span></div>
           <button v-if="detail.order.inboundCount" type="button" :class="['metric', 'metric-link', { 'metric-exception': inboundBeforeReporting(detail.order) }]" :disabled="purchaseLinksLoading" @click="openPurchaseReceipts">
@@ -61,29 +65,31 @@
           </button>
           <div v-else class="metric"><span>采购入库时间（仅供对照）</span><strong>尚无采购入库</strong><small v-if="detail.order.actualFinishDate" class="muted">报工后尚未入库，不据此判定未完工</small><el-button v-if="detail.order.actualFinishDate" link type="info" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('WAREHOUSING', reviewOf(detail.order, 'WAREHOUSING'))">{{ reviewOf(detail.order, 'WAREHOUSING') ? '修改暂缓入库安排' : '记录暂缓入库安排（可选）' }}</el-button></div>
         </div>
-        <el-button class="secondary-toggle" link type="primary" size="small" @click="showSecondaryMetrics = !showSecondaryMetrics">
-          {{ showSecondaryMetrics ? '收起对照信息' : '展开交付、报工与采购入库信息' }}
-        </el-button>
-        <section v-if="detail.order.sourceOptionalConfiguration?.trim() || detail.order.sourceOrderRemark?.trim()" class="source-order-remark">
-          <header class="section-head"><h3>生产任务单配置与备注</h3><span class="muted">氚云原文 · 与本地跟单备注分开</span></header>
-          <p v-if="detail.order.sourceOptionalConfiguration?.trim()"><strong>可选配置：</strong>{{ detail.order.sourceOptionalConfiguration }}</p>
-          <p v-if="detail.order.sourceOrderRemark?.trim()"><strong>备注：</strong>{{ detail.order.sourceOrderRemark }}</p>
-        </section>
+        <el-collapse v-if="detail.order.sourceOptionalConfiguration?.trim() || detail.order.sourceOrderRemark?.trim()" class="source-order-remark">
+          <el-collapse-item title="任务单配置与原始备注" name="source">
+            <p v-if="detail.order.sourceOptionalConfiguration?.trim()"><strong>可选配置：</strong>{{ detail.order.sourceOptionalConfiguration }}</p>
+            <p v-if="detail.order.sourceOrderRemark?.trim()"><strong>备注：</strong>{{ detail.order.sourceOrderRemark }}</p>
+          </el-collapse-item>
+        </el-collapse>
         <section>
           <header class="section-head">
-            <h3>节点进度</h3>
+            <h3>节点进度 <el-tooltip placement="top" content="目标完成是按当前车间交期，扣除后续节点参考工期倒排出的建议最晚日期。仅供跟单协调，需与车间确认，不会修改节点人工预计或车间交期。"><span class="target-heading" tabindex="0" aria-label="目标完成日期说明">ⓘ</span></el-tooltip></h3>
             <div class="stage-quick-actions">
               <span class="muted">{{ detail.order.stoppedAt ? '已停止跟单，节点记录只读' : '快捷操作只填写当前节点，核对后点底部“保存跟单”' }}</span>
               <el-button v-if="canFollowup && !detail.order.stoppedAt && currentStage && currentStage.status === 'PENDING'" size="small" @click="quickStartCurrentStage">开始{{ currentStage.label }}</el-button>
               <el-button v-if="canFollowup && !detail.order.stoppedAt && currentStage" size="small" type="primary" plain @click="quickCompleteCurrentStage">今天完成{{ currentStage.label }}</el-button>
             </div>
           </header>
+          <div v-if="referencePressure && !detail.order.stoppedAt && !detail.order.closedAt && !detail.order.deliveredDate" class="reference-pressure" role="status">
+            <strong>参考进度晚于车间交期 {{ referencePressure.days }} 天</strong>
+            <span>{{ referencePressure.stageLabel }}节点参考完成 {{ referencePressure.referenceDate }}，当前车间交期 {{ detail.schedule.deadline }}。请与车间核实能否提前关键节点；目标完成日期仅供协调。</span>
+          </div>
           <el-alert v-if="!detail.order.stoppedAt && stageGapLabels.length" type="warning" :closable="false" show-icon
             :title="`后续节点已完成，前面的 ${stageGapLabels.join('、')} 尚未完成或未核实顺序。`"
             description="确实完成的节点请补完成日期；未按常规顺序经过的节点可逐项记录原因并保存，保存后不再重复提醒。" />
           <div class="stage-list">
-            <div class="stage-head" aria-hidden="true">
-              <span>节点</span><span>阶段状态</span><span>参考完成</span><span>完成时间</span><span>节点备注</span><span>节点记录</span>
+            <div class="stage-head">
+              <span>节点</span><span>阶段状态</span><span>参考完成</span><span>目标完成</span><span>完成时间</span><span>节点备注</span><span>节点记录</span>
             </div>
             <div v-for="(stage, index) in milestones" :key="stage.code" :class="['stage-item', stage.optional && !stage.applicable ? 'na' : '', { current: index === currentStageIndex }]">
               <div class="stage-grid">
@@ -97,11 +103,11 @@
                   <el-option value="DONE" label="已完成" />
                 </el-select>
                 <span v-if="stage.optional && !stage.applicable" class="cell-reference muted">—</span>
-                <span v-else :class="['cell-reference', { 'is-overdue': stageOverdue(stage) }]">
+                <span v-else :class="['cell-reference', { 'is-overdue': stageOverdue(stage), 'is-late-target': referenceTargetDelay(stage) > 0 }]">
                   <span class="reference-main">
-                    <strong v-if="stage.manualReferenceDate || stage.referenceDate" class="reference-date">{{ stage.manualReferenceDate || stage.referenceDate }}</strong>
-                    <span v-else-if="!canEditManualReference(index, stage)" class="reference-empty">未设置</span>
-                  <el-popover v-if="canEditManualReference(index, stage)" placement="bottom" :width="310" trigger="click">
+                    <strong v-if="detail.order.scheduleTime && (stage.manualReferenceDate || stage.referenceDate)" class="reference-date">{{ stage.manualReferenceDate || stage.referenceDate }}</strong>
+                    <span v-else-if="!canEditManualReference(stage)" class="reference-empty">未设置</span>
+                  <el-popover v-if="canEditManualReference(stage)" placement="bottom" :width="310" trigger="click">
                     <template #reference>
                       <el-button v-if="stage.manualReferenceDate || stage.referenceDate" class="reference-edit" circle size="small" aria-label="修改节点预计日期" title="修改节点预计日期"><el-icon><EditPen /></el-icon></el-button>
                       <el-button v-else class="reference-set" size="small" type="primary" plain>设置预计日期</el-button>
@@ -115,8 +121,11 @@
                   <small v-if="stage.manualReferenceDate && stage.manualReferenceDate !== stage.referenceDate" class="reference-source draft">待保存 · 人工预计</small>
                   <small v-else-if="stage.referenceSource === 'MANUAL' && !stage.manualReferenceDate" class="reference-source draft">恢复系统参考待保存</small>
                   <small v-else-if="stage.referenceDate" class="reference-source">{{ stage.referenceSource === 'MANUAL' ? '人工预计' : '系统参考' }}</small>
+                  <small v-if="stage.manualReferenceDate && stage.systemReferenceDate && stage.manualReferenceDate !== stage.systemReferenceDate" class="reference-source">系统原参考 {{ stage.systemReferenceDate }}</small>
+                  <small v-if="referenceTargetDelay(stage) > 0" class="target-delay-note">晚于目标 {{ referenceTargetDelay(stage) }} 天</small>
                   <small v-if="stageOverdue(stage)" class="overdue-note">超 {{ stage.referenceOverdueDays }} 天</small>
                 </span>
+                <span class="cell-target">{{ stage.status === 'DONE' ? '已完成' : stage.targetDate || '—' }}</span>
                 <el-date-picker v-model="stage.completedDate" type="date" value-format="YYYY-MM-DD" size="small" clearable placeholder="完成日期" :disabled="!canFollowup || Boolean(detail.order.stoppedAt) || stage.status !== 'DONE'" class="cell-date" />
                 <el-input v-model="stage.note" size="small" maxlength="500" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" :placeholder="stageOverdue(stage) ? '超参考日期，建议记录原因（可选）' : '节点备注（可选）'" class="cell-note" />
                 <div class="cell-history">
@@ -339,11 +348,9 @@ const emit = defineEmits<{ 'update:modelValue': [boolean]; saved: [] }>()
 const auth = useCurrentUser()
 const canFollowup = computed(() => auth.can('manufacturing.followup'))
 const showSecondaryMetrics = ref(false)
-function canEditManualReference(index: number, stage: TrackingMilestone) {
-  if (!canFollowup.value || detail.value?.order.stoppedAt || stage.status === 'DONE' || (stage.optional && !stage.applicable)) return false
-  const open = milestones.value.map((item, position) => ({ item, position }))
-    .filter(({ item }) => item.status !== 'DONE' && (!item.optional || item.applicable))
-  return open.slice(0, 2).some(({ position }) => position === index)
+function canEditManualReference(stage: TrackingMilestone) {
+  return canFollowup.value && Boolean(detail.value?.order.scheduleTime) && !detail.value?.order.stoppedAt
+    && stage.status !== 'DONE' && (!stage.optional || stage.applicable)
 }
 function onManualDateChange(stage: TrackingMilestone) {
   if (!stage.manualReferenceDate) stage.manualReferenceReason = null
@@ -365,8 +372,26 @@ const {
   openTimeReview, saveTimeReview, openDisposition, saveDisposition, openClosure, saveClosure, onStageStatusChange
 } = useTrackingDetail({ items: () => props.items, reload: async () => { emit('saved') } })
 
+function referenceTargetDelay(stage: TrackingMilestone) {
+  if (stage.status === 'DONE' || (stage.optional && !stage.applicable) || !detail.value?.order.scheduleTime) return 0
+  const difference = daysBetween(stage.targetDate, stage.manualReferenceDate || stage.referenceDate)
+  return difference != null && difference > 0 ? difference : 0
+}
+
+const referencePressure = computed(() => {
+  if (!detail.value?.order.scheduleTime || !detail.value.schedule.deadline) return null
+  const stage = milestones.value.find(item => item.code === 'WAREHOUSE')
+    || [...milestones.value].reverse().find(item => !item.optional || item.applicable)
+  const referenceDate = stage?.manualReferenceDate || stage?.referenceDate
+  const days = daysBetween(detail.value.schedule.deadline, referenceDate)
+  return stage && stage.status !== 'DONE' && referenceDate && days != null && days > 0
+    ? { days, stageLabel: stage.label, referenceDate }
+    : null
+})
+
 function loadOrder(id: number) {
   if (!Number.isInteger(id) || id <= 0) return
+  showSecondaryMetrics.value = false
   void openDetail({ id } as TrackingOrder)
 }
 /** 打开时拉详情；打开状态下 orderId 变化（例如又点了另一行）也要重新拉。 */
@@ -389,23 +414,40 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .manual-hint { display: block; margin: 0 0 8px; color: var(--color-text-secondary, #64748b); font-size: 12px; line-height: 1.5; }
 .tracking-detail-host { display: contents; }
 .muted { color: #667085; font-size: 13px; }
-.detail-content { display: grid; gap: 18px; padding-bottom: 8px; }
-.detail-content section { border-top: 1px solid #e5e7eb; padding-top: 14px; }
+.detail-content { display: grid; gap: 14px; padding-bottom: 8px; }
+.detail-content section { padding-top: 0; }
 .detail-content h3 { margin: 0; font-size: 15px; }
 .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .stage-quick-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .pending-change-count { color: #b54708; font-weight: 600; }
-.urgent-detail-alert { margin: 0 0 12px; }
-.source-order-remark p { margin: 0; padding: 14px 16px; border: 1px solid #e4e7ed; border-radius: 8px; background: #f8fafc; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; }
-.summary-block { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-top: none !important; padding-top: 0 !important; }
+.attention-list { display: flex; gap: 8px; flex-wrap: wrap; }
+.attention-item { display: flex; align-items: baseline; gap: 6px; padding: 6px 9px; border-radius: 6px; background: #fffaeb; font-size: 12px; color: #78551d; }
+.attention-item strong { flex: none; color: #b54708; }
+.attention-item--urgent { background: #fff6f5; color: #912018; }
+.attention-item--urgent strong { color: #b42318; }
+.source-order-remark { border: none; }
+.source-order-remark p { margin: 0 0 8px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.source-order-remark :deep(.el-collapse-item__header) { height: 36px; border-bottom: none; font-size: 12px; color: #667085; }
+.source-order-remark :deep(.el-collapse-item__wrap) { border-bottom: none; }
+.summary-block { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
 .summary-title { display: flex; align-items: center; gap: 8px; }
 .summary-title strong { font-size: 17px; }
 .summary-spec { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 6px 0 8px; }
-.summary-tags { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.summary-tags { display: flex; align-items: center; gap: 4px 0; flex-wrap: wrap; color: #667085; font-size: 12px; }
+.summary-tags > span + span::before { content: '·'; color: #c0c4cc; padding: 0 9px; }
+.summary-last-followup { color: #98a2b3; }
 .summary-progress { display: grid; justify-items: center; gap: 4px; }
 .progress-num { font-size: 13px; font-weight: 700; }
+.key-dates { padding-top: 0; }
+.key-dates .section-head { margin-bottom: 8px; align-items: center; }
+.key-dates-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 1px solid #e4e7ec; border-radius: 9px; overflow: hidden; background: #fff; }
+.key-dates-grid > div { display: flex; align-items: baseline; gap: 3px 8px; flex-wrap: wrap; min-width: 0; padding: 10px 13px; border-right: 1px solid #e4e7ec; }
+.key-dates-grid > div:last-child { border-right: none; }
+.key-dates-grid span { flex-basis: 100%; color: #667085; font-size: 11px; }
+.key-dates-grid strong { color: #101828; font-size: 14px; white-space: nowrap; }
+.key-dates-grid small { color: #667085; font-size: 11px; }
+.key-dates-grid .el-button { margin: -5px 0; }
 .metric-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-.metric-grid:not(.show-secondary) > :nth-child(n+6) { display: none; }
 .secondary-toggle { justify-self: start; margin: -8px 0 0; }
 .metric { background: #f9fafb; border: 1px solid #eef0f3; border-radius: 8px; padding: 9px 12px; display: grid; gap: 3px; min-width: 0; }
 .metric span { color: #667085; font-size: 12px; }
@@ -436,10 +478,12 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .metric small.lead-delta-late { color: #b42318; font-weight: 600; }
 .metric small.lead-delta-early { color: #067647; font-weight: 600; }
 .stage-list {
-  --stage-cols: minmax(140px, 1fr) 112px 150px 132px minmax(200px, 1.6fr) auto;
+  --stage-cols: minmax(130px, 1fr) 112px 150px 90px 132px minmax(180px, 1.5fr) auto;
   display: grid; gap: 8px;
 }
 .stage-head { display: grid; grid-template-columns: var(--stage-cols); gap: 12px; align-items: center; padding: 0 14px; font-size: 12px; font-weight: 600; color: #667085; }
+.target-heading { cursor: help; white-space: nowrap; }
+.target-heading:focus-visible { outline: 2px solid var(--color-primary); outline-offset: 2px; border-radius: 2px; }
 .stage-item { display: grid; gap: 6px; background: #fff; border: 1px solid #e5e7eb; border-radius: 9px; padding: 8px 14px; }
 .stage-item.current { box-shadow: 0 0 0 2px rgba(15, 118, 110, .18); border-color: var(--color-primary, #0f766e); }
 .stage-grid { display: grid; grid-template-columns: var(--stage-cols); gap: 12px; align-items: center; }
@@ -451,6 +495,11 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .cell-status { width: 112px; }
 .cell-date { width: 132px; }
 .cell-reference { font-size: 12px; color: #475467; display: flex; flex-direction: column; gap: 2px; line-height: 1.35; min-width: 0; }
+.reference-pressure { display: flex; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; padding: 8px 11px; border: 1px solid #fecdca; border-radius: 7px; background: #fff6f5; color: #912018; font-size: 12px; }
+.reference-pressure strong { color: #b42318; }
+.cell-reference.is-late-target .reference-date, .cell-reference .target-delay-note { color: #b42318; }
+.cell-reference .target-delay-note { font-weight: 600; font-size: 11px; }
+.cell-target { font-size: 12px; color: #475467; white-space: nowrap; }
 .reference-main { display: flex; align-items: center; gap: 6px; min-height: 25px; }
 .reference-date { font-size: 12px; font-weight: 600; white-space: nowrap; }
 .reference-empty { color: #98a2b3; }
@@ -470,7 +519,8 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .row-history .muted { font-size: 12px; margin-right: 6px; }
 .row-history .pending { color: #b54708; background: #fffaeb; border-radius: 6px; padding: 4px 8px; }
 .optional-mark { font-style: normal; margin-left: 6px; padding: 1px 5px; border-radius: 4px; background: #f2f4f7; color: #667085; font-size: 11px; font-weight: 600; }
-.reference-panel { border-top: none; margin-top: 4px; }
+.reference-panel { border: none; margin-top: 4px; }
+.reference-panel :deep(.el-collapse-item__header), .reference-panel :deep(.el-collapse-item__wrap) { border-bottom: none; }
 .more-title { font-size: 13px; font-weight: 600; color: #344054; }
 .reference-panel :deep(.el-collapse-item__header) { height: auto; min-height: 40px; line-height: 1.5; font-size: 13px; }
 .entry { display: grid; gap: 6px; }
@@ -487,5 +537,5 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
   .stage-list { --stage-cols: 1fr; }
   .cell-history { justify-self: start; }
 }
-@media (max-width: 760px) { .metric-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .summary-block { flex-direction: column; } .summary-progress { justify-items: flex-start; } }
+@media (max-width: 760px) { .metric-grid, .key-dates-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .key-dates-grid > div:nth-child(2) { border-right: none; } .key-dates-grid > div:nth-child(-n+2) { border-bottom: 1px solid #e4e7ec; } .key-dates-grid > div:last-child { grid-column: 1 / -1; } .summary-block { flex-direction: column; } .summary-progress { justify-items: flex-start; } }
 </style>

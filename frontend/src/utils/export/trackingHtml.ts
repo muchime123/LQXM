@@ -90,9 +90,11 @@ const COL_MAX_PX = 260
  */
 const COL_FIXED_MIN_PX = 48
 const COL_FIXED_MAX_PX = 500
-/** 估算系数：12.5px 字号下，1 个半角字符 ≈ 7px，1 个全角/CJK 字符 ≈ 14px。 */
+/** 估算系数：12.5px 字号下，1 个半角字符 ≈ 7px，1 个全角/CJK 字符 ≈ 14px。
+ *  余量取 30px：除单元格自身 padding 外，还要容纳语义色标签（.tag）左右的内边距——
+ *  少算这 16px 时「按期完工」这类四字标签会在默认列宽下折成两行（2026-10-23 实测）。 */
 const PX_PER_UNIT = 7
-const CELL_PADDING_PX = 22
+const CELL_PADDING_PX = 30
 
 /** 字符串显示宽度估算：全角（code point > 0xFF）算 2 个半角单位。 */
 function textUnits(text: string): number {
@@ -285,6 +287,11 @@ export function buildTrackingHtml(options: TrackingHtmlOptions): string {
     + '<b>调版</b>：拖表头右侧竖线调列宽；红竖线＝可打印边界（线右侧打印会被切掉），红横线＝分页位置。'
     + '<b>落盘</b>：改动要点「保存修改副本」才进文件（浏览器 Ctrl+S 存不到页面上的编辑）。'
     + '</span>')
+  parts.push('</div>')
+  // ⚠️ 这里必须再闭合一层：print-toolbar 与 screen-bar 各需要一个 </div>。
+  // 少写一个时 screen-bar 永不闭合，整份正文（.paper）都会被浏览器嵌进这个
+  // .no-print 容器里——屏幕上一切正常，一打印就随工具条一起 display:none，
+  // 打印预览全白（2026-10-23 实测，Playwright page.pdf 复现为 1163 字节空白 PDF）。
   parts.push('</div>')
   parts.push('<div class="paper" id="paper">')
   // 边界预警层：右侧 10mm 页边距打斜线阴影 + 红色竖虚线标出「可打印边界」；
@@ -728,6 +735,8 @@ footer.note{margin-top:4px;color:#6b7280;font-size:12px}
 @page{size:A4 landscape;margin:10mm}
 @media print{
   body{background:#fff;padding:0}
+  /* 状态标签底色、表头来源底色是纸上的关键信息，打印一律按原色出（不受「背景图形」开关影响） */
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .no-print{display:none!important}
   /* 打印时纸框退化成普通留白：真正的页边距由 @page margin 给，纸框只服务屏幕预览 */
   .paper{width:auto;min-height:0;border:none;border-radius:0;box-shadow:none;margin:0}
@@ -739,8 +748,14 @@ footer.note{margin-top:4px;color:#6b7280;font-size:12px}
   .table-wrap{overflow:visible;max-height:none;border-radius:0}
   table{zoom:var(--print-zoom,1)}
   thead{display:table-header-group}
+  /* 逐页重复表头交给 table-header-group；sticky 在打印里会压住下一页内容，退回 static */
+  thead th{position:static}
   tr{page-break-inside:avoid}
-  /* 编辑痕迹不上纸：改过的格子打印时退回白底（内容已在，颜色标记只服务屏幕核对） */
+  /* 编辑痕迹不上纸：导出默认即编辑态，没点「完成编辑」直接打印也必须干净
+     （2026-10-23 实测：虚线框会原样印到纸上） */
+  body.is-editing tbody td{outline:none;cursor:auto}
+  body.is-editing tbody td:focus{outline:none}
+  /* 编辑过的格子打印时退回白底（内容已在，颜色标记只服务屏幕核对） */
   td.edited{background:transparent!important;box-shadow:none}
 }
 `.trim()

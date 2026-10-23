@@ -1,7 +1,7 @@
 package com.liqiang.archive.service;
 
-import com.liqiang.archive.erp.ErpActorResolver;
-import com.liqiang.archive.erp.ErpIdempotencyService;
+import com.liqiang.archive.infra.ActorResolver;
+import com.liqiang.archive.infra.IdempotencyService;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellType;
 import org.apache.poi.ss.usermodel.DateUtil;
@@ -75,11 +75,11 @@ public class ProductionTrackingRoundTripService {
 
     private final JdbcTemplate jdbc;
     private final ProductionTrackingService tracking;
-    private final ErpActorResolver actors;
-    private final ErpIdempotencyService idem;
+    private final ActorResolver actors;
+    private final IdempotencyService idem;
 
     public ProductionTrackingRoundTripService(JdbcTemplate jdbc,ProductionTrackingService tracking,
-            ErpActorResolver actors,@Qualifier("archiveIdempotencyService") ErpIdempotencyService idem) {
+            ActorResolver actors,@Qualifier("idempotencyService") IdempotencyService idem) {
         this.jdbc=jdbc;this.tracking=tracking;this.actors=actors;this.idem=idem;
     }
 

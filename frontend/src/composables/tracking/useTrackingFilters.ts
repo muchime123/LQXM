@@ -100,8 +100,7 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   const timeFilter = ref('all')
   /**
    * 跟单待办筛选：all＝不限 / 具体代码见 TRACKING_ACTION_CODES。
-   * 2026-10-21 精简：下拉整体从常用行撤掉——它真正指向的「节点走完、货没入库」（INBOUND_PENDING）
-   * 升成快捷标签「已报工待入库」，其余动作码靠列表徽标即可看清，不再单独设框。
+   * 下拉放在更多筛选，常用行继续保持紧凑；排产和交期条件也从这里筛选。
    */
   const actionFilter = ref('all')
   const urgentOnly = ref(false)

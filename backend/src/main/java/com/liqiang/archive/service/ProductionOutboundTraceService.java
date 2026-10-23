@@ -1,6 +1,6 @@
 package com.liqiang.archive.service;
 
-import com.liqiang.archive.erp.ErpActorResolver;
+import com.liqiang.archive.infra.ActorResolver;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,7 +35,7 @@ public class ProductionOutboundTraceService {
 
     private final JdbcTemplate jdbc;
     private final ProductionTrackingService tracking;
-    private final ErpActorResolver actors;
+    private final ActorResolver actors;
 
     public record Confirmation(long receiptItemId,long saleItemId,BigDecimal quantity,String reason) {}
     public record Revocation(String reason) {}

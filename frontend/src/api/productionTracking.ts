@@ -15,6 +15,8 @@ export type TrackingActionCode =
   | 'SCHEDULED_PENDING'
   | 'INBOUND_UNLOGGED'
   | 'STALE_FOLLOWUP'
+  | 'SCHEDULE_DUE'
+  | 'DELIVERY_PRESSURE'
 
 export interface TrackingStageProgress {
   code: string
@@ -62,6 +64,9 @@ export interface TrackingOrder {
    * 用于回答「这单现在该我做什么、为什么轮到我了」，筛选入参同名 `action`。
    */
   trackingAction?: TrackingActionCode | null
+  latestStartDate?: string | null
+  predictedFinishDate?: string | null
+  scheduleRisk?: string | null
   /** ⚠️ 前端已不再展示/筛选（字段设计有问题，2026-10-10 从跟单列表整列移除）；后端仍计算，保留契约。 */
   reminder?: 'none' | 'overdue' | 'due' | 'delayed' | 'near'
   externalSource?: string | null
@@ -186,6 +191,10 @@ export interface TrackingMilestone {
    * 该结果不落库，人工预计日期单独保存在 manualReferenceDate。
    */
   referenceDate?: string | null
+  /** 人工预计应用前的系统推算值；只读对照。 */
+  systemReferenceDate?: string | null
+  /** 为赶上本单车间交期倒排出的最晚建议日期；不写库。 */
+  targetDate?: string | null
   /** 超参考未完成的天数（今天 > 参考完成日期且状态非已完成）；已完成或未超时为 null。 */
   referenceOverdueDays?: number | null
 }
@@ -546,6 +555,13 @@ export const fetchTrackingSummary = async () =>
 export const fetchTrackingDetail = async (id: number) =>
   (await http.get<{
     order: TrackingOrder
+    schedule: {
+      latestStartDate: string | null
+      predictedFinishDate: string | null
+      slackDays: number | null
+      risk: 'NO_BASELINE' | 'SCHEDULE_LATE' | 'SCHEDULE_DUE' | 'SCHEDULE_NORMAL' | 'UNKNOWN' | 'PRESSURE' | 'NO_BUFFER' | 'ON_TRACK'
+      deadline: string | null
+    }
     milestones: TrackingMilestone[]
     operations: TrackingOperation[]
     entries: TrackingEntry[]

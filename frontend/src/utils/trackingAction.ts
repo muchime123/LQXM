@@ -5,11 +5,11 @@ import type { TrackingActionCode } from '@/api/productionTracking'
  * 文案、配色与「为什么轮到我」的说明全部在这里，列表列 / 下拉 / 详情抽屉三处共用，
  * 禁止各写一套 —— 否则同一个代码在三处会显示成三种说法。
  *
- * 顺序＝后端 TRACKING_ACTION_CODES 的顺序＝严重度降序（后端按此顺序取第一条命中）：
- * 业务事实越靠后（已完工 > 已入库 > 已排产 > 入库节点漏登记 > 长期未更新），越该先处理。
+ * 新增的排产与交期提醒由后端实时计算，筛选按各自条件匹配，不依赖主提醒代码。
  */
 export const TRACKING_ACTION_CODES: TrackingActionCode[] = [
-  'FINISHED_PENDING', 'INBOUND_PENDING', 'SCHEDULED_PENDING', 'INBOUND_UNLOGGED', 'STALE_FOLLOWUP'
+  'FINISHED_PENDING', 'INBOUND_PENDING', 'SCHEDULED_PENDING', 'INBOUND_UNLOGGED',
+  'SCHEDULE_DUE', 'DELIVERY_PRESSURE', 'STALE_FOLLOWUP'
 ]
 
 /** ⚠️ 必须与后端 ProductionTrackingService.STALE_FOLLOWUP_DAYS 一致，否则提示与筛选口径会打架。 */
@@ -20,6 +20,8 @@ export const TRACKING_ACTION_LABELS: Record<TrackingActionCode, string> = {
   INBOUND_PENDING: '已入库待跟单',
   SCHEDULED_PENDING: '已排产待跟单',
   INBOUND_UNLOGGED: '已入库待登记',
+  SCHEDULE_DUE: '待排产提醒',
+  DELIVERY_PRESSURE: '交期风险待核实',
   STALE_FOLLOWUP: '7 天未更新'
 }
 
@@ -34,6 +36,7 @@ export interface TrackingActionFacts {
   scheduleTime?: string | null
   /** 最近一次跟单写入时间。 */
   lastFollowupAt?: string | null
+  latestStartDate?: string | null
 }
 
 export function trackingActionLabel(code?: TrackingActionCode | null) {
@@ -42,7 +45,8 @@ export function trackingActionLabel(code?: TrackingActionCode | null) {
 
 /** 提醒配色：事实已发生却一点没记的用最重的红，已在跟单只是漏一步的用蓝。 */
 export function trackingActionTone(code: TrackingActionCode): 'danger' | 'warning' | 'info' {
-  return code === 'FINISHED_PENDING' ? 'danger' : code === 'INBOUND_PENDING' ? 'warning' : 'info'
+  return code === 'FINISHED_PENDING' ? 'danger'
+    : ['INBOUND_PENDING', 'SCHEDULE_DUE', 'DELIVERY_PRESSURE'].includes(code) ? 'warning' : 'info'
 }
 
 /**
@@ -57,6 +61,8 @@ export function trackingActionHint(row: TrackingActionFacts) {
     case 'SCHEDULED_PENDING': return `车间已于 ${day(row.scheduleTime)} 排产，但跟单尚未开始；请尽快登记进度。`
     case 'INBOUND_UNLOGGED': return `采购已于 ${day(row.inboundDate)} 入库，但「入库」节点还没登记完成日期；请补登节点。`
     case 'STALE_FOLLOWUP': return `最近一次跟进 ${row.lastFollowupAt ? row.lastFollowupAt.slice(0, 10) : '（无记录）'}，已超过 ${STALE_FOLLOWUP_DAYS} 天没有更新且尚未跟完；请确认现场进度。`
+    case 'SCHEDULE_DUE': return `尚未排产，建议最晚 ${day(row.latestStartDate)} 排产；请联系车间确认开工。`
+    case 'DELIVERY_PRESSURE': return '按当前节点参考进度，可能赶不上车间交期；请核实关键节点能否提前完成。'
     default: return ''
   }
 }

@@ -12,8 +12,7 @@ describe('生产跟单：跟单待办提醒的文案与配色', () => {
       expect(TRACKING_ACTION_LABELS[code], code).toBeTruthy()
       expect(trackingActionLabel(code)).toBe(TRACKING_ACTION_LABELS[code])
     }
-    // 顺序＝严重度降序：后端按这个顺序取第一条命中，前端下拉也按这个顺序排。
-    expect(TRACKING_ACTION_CODES).toEqual(['FINISHED_PENDING', 'INBOUND_PENDING', 'SCHEDULED_PENDING', 'INBOUND_UNLOGGED', 'STALE_FOLLOWUP'])
+    expect(TRACKING_ACTION_CODES).toEqual(['FINISHED_PENDING', 'INBOUND_PENDING', 'SCHEDULED_PENDING', 'INBOUND_UNLOGGED', 'SCHEDULE_DUE', 'DELIVERY_PRESSURE', 'STALE_FOLLOWUP'])
   })
 
   it('没有提醒时不显示文字、也不给配色', () => {
@@ -25,6 +24,8 @@ describe('生产跟单：跟单待办提醒的文案与配色', () => {
   it('越严重越红：已完工红、已入库橙、其余蓝', () => {
     expect(trackingActionTone('FINISHED_PENDING')).toBe('danger')
     expect(trackingActionTone('INBOUND_PENDING')).toBe('warning')
+    expect(trackingActionTone('SCHEDULE_DUE')).toBe('warning')
+    expect(trackingActionTone('DELIVERY_PRESSURE')).toBe('warning')
     expect(trackingActionTone('SCHEDULED_PENDING')).toBe('info')
     expect(trackingActionTone('INBOUND_UNLOGGED')).toBe('info')
     expect(trackingActionTone('STALE_FOLLOWUP')).toBe('info')
@@ -57,7 +58,7 @@ describe('生产跟单：跟单待办提醒的文案与配色', () => {
   })
 
   it('标签即枚举值本身，不能被悄悄改名（改了后端筛选就匹配不上）', () => {
-    const codes: TrackingActionCode[] = ['FINISHED_PENDING', 'INBOUND_PENDING', 'SCHEDULED_PENDING', 'INBOUND_UNLOGGED', 'STALE_FOLLOWUP']
+    const codes: TrackingActionCode[] = ['FINISHED_PENDING', 'INBOUND_PENDING', 'SCHEDULED_PENDING', 'INBOUND_UNLOGGED', 'SCHEDULE_DUE', 'DELIVERY_PRESSURE', 'STALE_FOLLOWUP']
     expect(Object.keys(TRACKING_ACTION_LABELS).sort()).toEqual([...codes].sort())
   })
 })

@@ -2,9 +2,8 @@ package com.liqiang.archive.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.liqiang.archive.erp.ErpActorResolver;
-import com.liqiang.archive.erp.ErpChangeLogWriter;
-import com.liqiang.archive.erp.ErpIdempotencyService;
+import com.liqiang.archive.infra.ActorResolver;
+import com.liqiang.archive.infra.IdempotencyService;
 import com.liqiang.archive.security.CurrentUserService;
 import com.liqiang.archive.security.FeatureCode;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -39,15 +38,14 @@ public class ProductionTrackingWorkbookReviewService {
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper json;
-    private final ErpActorResolver actors;
-    private final ErpIdempotencyService idem;
-    private final ErpChangeLogWriter audit;
+    private final ActorResolver actors;
+    private final IdempotencyService idem;
     private final CurrentUserService users;
 
-    public ProductionTrackingWorkbookReviewService(JdbcTemplate jdbc,ObjectMapper json,ErpActorResolver actors,
-            @Qualifier("archiveIdempotencyService") ErpIdempotencyService idem,
-            @Qualifier("archiveAuditWriter") ErpChangeLogWriter audit,CurrentUserService users) {
-        this.jdbc=jdbc;this.json=json;this.actors=actors;this.idem=idem;this.audit=audit;this.users=users;
+    public ProductionTrackingWorkbookReviewService(JdbcTemplate jdbc,ObjectMapper json,ActorResolver actors,
+            @Qualifier("idempotencyService") IdempotencyService idem,
+            CurrentUserService users) {
+        this.jdbc=jdbc;this.json=json;this.actors=actors;this.idem=idem;this.users=users;
     }
 
     private void requireSupervisor() {
@@ -142,10 +140,7 @@ public class ProductionTrackingWorkbookReviewService {
             long entryId=Objects.requireNonNull(jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class));
             jdbc.update("UPDATE production_tracking_workbook_rows SET match_status='REVIEWED',reviewed_at=NOW(),"
                     +"reviewed_by_employee_id=?,match_note=? WHERE id=?",actor.employeeId(),content,rowId);
-            audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_entries",entryId,"INSERT",
-                    ErpChangeLogWriter.changes("orderId",orderId,"version",version+1,"appliedFields",selectedKeys,
-                            "retainedFields",proposed.stream().filter(d->!selected.contains(d.key())).map(Difference::key).toList()),
-                    "FOLLOW_UP",content,key,null));
+
             return String.valueOf(rowId);
         }));
     }
@@ -157,8 +152,7 @@ public class ProductionTrackingWorkbookReviewService {
             workbookRow(rowId,true);
             jdbc.update("UPDATE production_tracking_workbook_rows SET match_status='REVIEW_IGNORED',reviewed_at=NOW(),"
                     +"reviewed_by_employee_id=?,match_note='主管确认保留现有跟单记录' WHERE id=?",actor.employeeId(),rowId);
-            audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_workbook_rows",rowId,"UPDATE",
-                    ErpChangeLogWriter.changes("matchStatus","REVIEW_IGNORED"),"FOLLOW_UP","忽略表格差异",key,null));
+
             return String.valueOf(rowId);
         }));
     }

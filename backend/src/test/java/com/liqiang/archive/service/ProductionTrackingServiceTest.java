@@ -1,8 +1,8 @@
 package com.liqiang.archive.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.liqiang.archive.erp.ErpActor;
-import com.liqiang.archive.erp.ErpActorResolver;
+import com.liqiang.archive.infra.Actor;
+import com.liqiang.archive.infra.ActorResolver;
 import com.liqiang.archive.security.CurrentUserService;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -35,7 +35,7 @@ class ProductionTrackingServiceTest {
 
     @Test
     void septemberOrdersAndPreviouslyTrackedOrdersAreVisible() {
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope());
         var params=new ArrayList<>();
 
         String where=service.visible(params).toString();
@@ -77,7 +77,7 @@ class ProductionTrackingServiceTest {
     @Test
     void openTrackingStatusMeansNotYetDelivered() {
         var jdbc=mock(JdbcTemplate.class);
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         var filtered=ProductionTrackingService.filterForTest(service,"open");
         String openWhere=(String)filtered.get("where");
@@ -127,7 +127,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         doReturn(List.of("封口机")).when(jdbc).query(contains("SELECT production_line"),any(RowMapper.class),eq(7L));
         doReturn(List.of()).when(jdbc).query(contains("FROM employees"),any(RowMapper.class),eq("陈苏平"));
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         assertTrue(service.defaultAssignee(7L).isEmpty(),
                 "默认跟单员改名或停用时必须软降级为未分配，不能抛出 500");
@@ -137,7 +137,7 @@ class ProductionTrackingServiceTest {
     void candidatesSearchCustomerAndStayInTrackingScope() {
         var jdbc=mock(JdbcTemplate.class);
         doReturn(List.of()).when(jdbc).query(anyString(),any(RowMapper.class),any(),any(),any());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.candidates("客户",null);
 
@@ -157,7 +157,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var sqls=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(sqls.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list(null,null,"active",false,null,1,30);
         try { service.detail(7L); } catch (IllegalArgumentException expected) { /* 详情在无数据时抛错，SQL 仍需核对 */ }
@@ -190,7 +190,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list(null,null,"active",false,null,1,30);
         service.list(null,null,"complete",false,null,1,30);
@@ -216,7 +216,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list(null,null,"pending","overdue","已生效",false,null,1,30);
         var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
@@ -233,7 +233,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list(null,null,"all","time_attention","",false,"","2026-09",1,30);
 
@@ -268,7 +268,7 @@ class ProductionTrackingServiceTest {
             var jdbc=mock(JdbcTemplate.class);
             when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
             when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-            var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
             service.list(null,null,"all",entry.getKey(),"",false,"",1,30);
             var sql=org.mockito.ArgumentCaptor.forClass(String.class);
             verify(jdbc).queryForObject(sql.capture(),eq(Long.class),any(Object[].class));
@@ -284,7 +284,7 @@ class ProductionTrackingServiceTest {
         var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.summary();
         var summarySql=org.mockito.ArgumentCaptor.forClass(String.class);
@@ -427,7 +427,7 @@ class ProductionTrackingServiceTest {
 
     @Test
     void supervisorScopeSeesAllFollowupsWithoutExtraFilter() {
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope());
         var params=new ArrayList<>();
 
         String where=service.visible(params).toString();
@@ -439,7 +439,7 @@ class ProductionTrackingServiceTest {
 
     @Test
     void trackerScopeSeesOnlyWorkshopsAssignedToThem() {
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,null,new ObjectMapper(),tracker(160L));
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),tracker(160L));
         var params=new ArrayList<>();
 
         String where=service.visible(params).toString();
@@ -462,7 +462,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list(null,null,"all","all","",false,"",1,30);
 
@@ -506,9 +506,9 @@ class ProductionTrackingServiceTest {
     /** 保存校验：车间类别、节点归属、天数范围必须在写库前拦下，否则脏配置会污染所有在制单的参考日期。 */
     @Test
     void savingBenchmarksRejectsInvalidWorkshopStageAndRange() {
-        var actors=mock(ErpActorResolver.class);
-        when(actors.current()).thenReturn(new ErpActor(1L,"测试管理员"));
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),actors,null,null,new ObjectMapper(),allScope());
+        var actors=mock(ActorResolver.class);
+        when(actors.current()).thenReturn(new Actor(1L,"测试管理员"));
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),actors,null,new ObjectMapper(),allScope());
 
         assertTrue(assertThrows(IllegalArgumentException.class,()->service.saveNodeBenchmarks(List.of()))
                 .getMessage().contains("没有要保存"));
@@ -545,7 +545,7 @@ class ProductionTrackingServiceTest {
             return null;
         }).when(jdbc).query(anyString(),any(org.springframework.jdbc.core.RowCallbackHandler.class));
 
-        var service=new ProductionTrackingService(jdbc,mock(ErpActorResolver.class),null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,mock(ActorResolver.class),null,new ObjectMapper(),allScope());
         var matrix=service.columnDefaultMatrix();
 
         @SuppressWarnings("unchecked")
@@ -569,9 +569,9 @@ class ProductionTrackingServiceTest {
     /** 保存校验：列标识非法 / 重复 / 缺显示状态必须在写库前拦下。 */
     @Test
     void savingColumnDefaultsRejectsInvalidDuplicateAndMissingVisibility() {
-        var actors=mock(ErpActorResolver.class);
-        when(actors.current()).thenReturn(new ErpActor(1L,"测试管理员"));
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),actors,null,null,new ObjectMapper(),allScope());
+        var actors=mock(ActorResolver.class);
+        when(actors.current()).thenReturn(new Actor(1L,"测试管理员"));
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),actors,null,new ObjectMapper(),allScope());
 
         assertTrue(assertThrows(IllegalArgumentException.class,()->service.saveColumnDefaults(List.of()))
                 .getMessage().contains("没有要保存"));
@@ -594,8 +594,8 @@ class ProductionTrackingServiceTest {
      */
     @Test
     void savingColumnDefaultsRemovesExplicitConfigForOmittedColumns() {
-        var actors=mock(ErpActorResolver.class);
-        when(actors.current()).thenReturn(new ErpActor(1L,"测试管理员"));
+        var actors=mock(ActorResolver.class);
+        when(actors.current()).thenReturn(new Actor(1L,"测试管理员"));
         var jdbc=mock(JdbcTemplate.class);
         doAnswer(inv->{
             org.springframework.jdbc.core.RowCallbackHandler handler=inv.getArgument(1);
@@ -608,8 +608,7 @@ class ProductionTrackingServiceTest {
             return null;
         }).when(jdbc).query(anyString(),any(org.springframework.jdbc.core.RowCallbackHandler.class));
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of(7L));
-        var audit=mock(com.liqiang.archive.erp.ErpChangeLogWriter.class);
-        var service=new ProductionTrackingService(jdbc,actors,null,audit,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,actors,null, new ObjectMapper(),allScope());
 
         var result=service.saveColumnDefaults(
                 List.of(new ProductionTrackingService.ColumnDefaultSave("assignee",true)));
@@ -622,7 +621,7 @@ class ProductionTrackingServiceTest {
         assertEquals(1,sqls.stream().filter(sql->sql.startsWith("INSERT INTO production_tracking_column_defaults")).count(),
                 "提交的列要 upsert："+sqls);
         assertEquals(2,((Number)result.get("changed")).intValue(),"删 1 行 + 改 1 行");
-        verify(audit,times(2)).write(any(com.liqiang.archive.erp.ErpChangeLogWriter.Entry.class));
+
     }
 
     /**
@@ -661,7 +660,7 @@ class ProductionTrackingServiceTest {
         row.put("inboundBeforeReport",null);
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         doReturn(List.of(row)).when(jdbc).queryForList(sql.capture(),any(Object[].class));
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         var result=service.dashboard();
 
@@ -751,7 +750,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list(null,null,"active",false,null,1,30);
         try { service.detail(7L); } catch (IllegalArgumentException expected) { /* 详情无数据抛错，SQL 仍需核对 */ }
@@ -868,7 +867,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list(null,null,"all","all","",false,"",1,30);
         try { service.detail(7L); } catch (IllegalArgumentException expected) { /* 详情无数据抛错，SQL 仍需核对 */ }
@@ -935,7 +934,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list(null,null,"all","all","",false,"","","INBOUND_PENDING",1,30);
 
@@ -973,7 +972,7 @@ class ProductionTrackingServiceTest {
         var pageArgs=org.mockito.ArgumentCaptor.forClass(Object[].class);
         var pageSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(pageSql.capture(),any(RowMapper.class),pageArgs.capture())).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list(null,null,"all","all","",false,"","","all","","张三,李四","OVERDUE,ON_TIME",1,30);
 
@@ -1004,7 +1003,7 @@ class ProductionTrackingServiceTest {
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         var args=org.mockito.ArgumentCaptor.forClass(Object[].class);
         when(jdbc.query(sql.capture(),any(RowMapper.class),args.capture())).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
         var created=new ProductionTrackingService.DateRangeFilter("2026-09-01","2026-09-30",false);
         var empty=new ProductionTrackingService.DateRangeFilter("","",false);
 
@@ -1036,7 +1035,7 @@ class ProductionTrackingServiceTest {
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         var args=org.mockito.ArgumentCaptor.forClass(Object[].class);
         when(jdbc.query(sql.capture(),any(RowMapper.class),args.capture())).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
         var empty=new ProductionTrackingService.DateRangeFilter("","",false);
         var expected=new ProductionTrackingService.DateRangeFilter("2026-10-12","2026-10-18",false);
 
@@ -1069,7 +1068,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(sql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
         var empty=new ProductionTrackingService.DateRangeFilter("","",false);
 
         service.list("","","all","all","",false,"","","all","","","",empty,empty,empty,
@@ -1122,7 +1121,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),countArgs.capture())).thenReturn(0L);
         var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list("120×80","","all","all","",false,"","","all","",1,30);
 
@@ -1151,7 +1150,7 @@ class ProductionTrackingServiceTest {
         var scanSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.queryForList(scanSql.capture(),any(Object[].class))).thenReturn(List.of());
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         var options=service.filterOptions();
 
@@ -1172,7 +1171,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list(null,null,"all","all","",false,"",1,30);
         try { service.detail(7L); } catch (IllegalArgumentException expected) { /* 详情无数据抛错，SQL 仍需核对 */ }
@@ -1191,7 +1190,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForList(anyString(),eq(String.class),any(Object[].class))).thenReturn(List.of());
         var querySql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(querySql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.filterOptions();
 
@@ -1216,7 +1215,7 @@ class ProductionTrackingServiceTest {
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         var args=org.mockito.ArgumentCaptor.forClass(Object[].class);
         when(jdbc.query(sql.capture(),any(RowMapper.class),args.capture())).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list("客户","封口机","open","time_overdue","",false,"7","2026-10","any",2,30);
         service.exportRows("客户","封口机","open","time_overdue","",false,"7","2026-10","any");
@@ -1271,7 +1270,7 @@ class ProductionTrackingServiceTest {
             when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
             var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
             when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-            var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
             service.list("","","all","all","",false,"","",/*action*/"all",/*countdown*/"",
                     /*salesperson*/"",/*deliveryResult*/"",created,created,created,
@@ -1289,7 +1288,7 @@ class ProductionTrackingServiceTest {
             var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
             when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
             when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-            var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
             service.list("","","all","all","",false,"","",/*action*/"all",/*countdown*/"",
                     /*salesperson*/"",/*deliveryResult*/"OVERDUE",created,created,created,
@@ -1307,7 +1306,7 @@ class ProductionTrackingServiceTest {
             var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
             when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
             when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-            var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
             service.list("","","all","all","",false,"","",/*action*/"all",/*countdown*/"delivered",
                     /*salesperson*/"",/*deliveryResult*/"",created,created,created,
@@ -1323,7 +1322,7 @@ class ProductionTrackingServiceTest {
             var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
             when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
             when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-            var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
             service.exportRows("","","all","all","",false,"","",/*action*/"all");
 
@@ -1344,7 +1343,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
         var created=new ProductionTrackingService.DateRangeFilter("","",false);
 
         service.list("","","all","all","",false,"","","all","","","",created,created,created,
@@ -1395,7 +1394,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForList(listSql.capture(),any(Object[].class)))
                 .thenReturn(List.<Map<String,Object>>of(nullRow));
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         var options=service.filterOptions();
 
@@ -1421,7 +1420,7 @@ class ProductionTrackingServiceTest {
         long matching=(long)ProductionTrackingService.EXPORT_MAX_ROWS+9;
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(matching);
         stubListRows(jdbc,exportFixtureRows(ProductionTrackingService.EXPORT_MAX_ROWS+1));
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         var result=service.exportRows("","","all","all","",false,"","","all");
 
@@ -1438,7 +1437,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class)))
                 .thenReturn((long)ProductionTrackingService.EXPORT_MAX_ROWS);
         stubListRows(jdbc,exportFixtureRows(ProductionTrackingService.EXPORT_MAX_ROWS));
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         var result=service.exportRows("","","all","all","",false,"","","all");
 
@@ -1479,7 +1478,7 @@ class ProductionTrackingServiceTest {
     void workbookPendingQueueFlagsRowsTheNewerVersionDidNotCover() {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.query(anyString(),any(RowMapper.class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.workbookRows(false);
 
@@ -1497,7 +1496,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForList(anyString())).thenReturn(List.of(
                 Map.of("s","PENDING","c",3),Map.of("s","REVIEW","c",1),
                 Map.of("s","ARCHIVED","c",5),Map.of("s","IMPORTED","c",400)));
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         var summary=service.workbookSummary();
 
@@ -1530,7 +1529,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of(
                 candidate(1L,"WO-5858","LQ750全自动多模具","全自动气调机车间","2026-10-07",2),
                 candidate(2L,"WO-9999","别的产品","封口机车间","2026-11-20",7)));
-        var service=new ProductionTrackingService(jdbc,null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         var scored=service.workbookCandidates(9L);
 
@@ -1543,7 +1542,7 @@ class ProductionTrackingServiceTest {
 
     @Test
     void batchWorkbookRejectsUnknownActionsAndOversizedBatches() {
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope());
 
         assertThrows(IllegalArgumentException.class,()->service.batchResolveWorkbookRows(List.of(),"skip","k"));
         assertThrows(IllegalArgumentException.class,()->service.batchResolveWorkbookRows(List.of(1L),"unknown","k"));
@@ -1553,7 +1552,7 @@ class ProductionTrackingServiceTest {
 
     @Test
     void archiveRequiresAReasonBeforeTouchingTheRow() {
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope());
 
         assertThrows(IllegalArgumentException.class,()->service.archiveWorkbookRow(1L,"   ","k"));
     }
@@ -1576,7 +1575,7 @@ class ProductionTrackingServiceTest {
             doAnswer(inv -> { orderSqls.add(inv.getArgument(0)); return null; })
                     .when(jdbc).query(anyString(), any(org.springframework.jdbc.core.RowCallbackHandler.class), any(Object[].class));
 
-            var service = new ProductionTrackingService(jdbc, mock(ErpActorResolver.class), null, null, new ObjectMapper(), allScope());
+            var service = new ProductionTrackingService(jdbc, mock(ActorResolver.class), null, new ObjectMapper(), allScope());
             var result = service.productOrderHistory(1L, "", 50);
 
             assertEquals(required, result.get("requiredStageCount"),

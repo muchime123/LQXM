@@ -2,10 +2,9 @@ package com.liqiang.archive.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
-import com.liqiang.archive.erp.ErpActor;
-import com.liqiang.archive.erp.ErpActorResolver;
-import com.liqiang.archive.erp.ErpChangeLogWriter;
-import com.liqiang.archive.erp.ErpIdempotencyService;
+import com.liqiang.archive.infra.Actor;
+import com.liqiang.archive.infra.ActorResolver;
+import com.liqiang.archive.infra.IdempotencyService;
 import com.liqiang.archive.security.CurrentUserService;
 import com.liqiang.archive.security.FeatureCode;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -275,6 +274,9 @@ public class ProductionTrackingService {
     /** 提醒筛选白名单（顺序＝下拉顺序，与前端一一对应）；{@code all}＝不筛，{@code any}＝只要有提醒。 */
     static final List<String> TRACKING_ACTION_CODES=List.of("FINISHED_PENDING","INBOUND_PENDING",
             "SCHEDULED_PENDING","INBOUND_UNLOGGED","STALE_FOLLOWUP");
+    private static boolean scheduleAction(String action) {
+        return "SCHEDULE_DUE".equals(action)||"DELIVERY_PRESSURE".equals(action);
+    }
     /** 把提醒筛选值翻成 SQL：{@code all→null}（不加条件）、{@code any→IS NOT NULL}、其余按代码等值。 */
     static String trackingActionPredicate(String action) {
         if("any".equals(action))return TRACKING_ACTION+" IS NOT NULL";
@@ -284,7 +286,7 @@ public class ProductionTrackingService {
             +"(SELECT COUNT(*) FROM production_tracking_entries e WHERE e.production_order_id=t.production_order_id) entries_count "
             +"FROM production_tracking_state t WHERE t.production_order_id=?";
     /** 进度表导入只同步三样：延期至（≠车间预计完成才登记，见 importWorkbookPayload）、延期原因、节点完成日期（milestones 单独写）。
-     *  计划开工/发货状态/交付结果/跟单备注不再从表格写入（2026-10-10 LQ 定）；节点参考锚点因此回退申请日期（attachNodeReferences 已有兜底）。 */
+     *  计划开工/发货状态/交付结果/跟单备注不再从表格写入；节点参考仅从氚云排产时间起算。 */
     static final String IMPORT_STATE_SQL="INSERT INTO production_tracking_state(production_order_id,forecast_finish_date,"
             +"delay_reason,assignee_employee_id,assignee_name,version,last_followup_at) "
             +"VALUES(?,?,?,?,?,1,NOW()) ON DUPLICATE KEY UPDATE "
@@ -454,17 +456,16 @@ public class ProductionTrackingService {
                 +"AND n.source_expected_date<=>p.expected_completion_date "+extra+")";
     }
     private final JdbcTemplate jdbc;
-    private final ErpActorResolver actors;
-    private final ErpIdempotencyService idem;
-    private final ErpChangeLogWriter audit;
+    private final ActorResolver actors;
+    private final IdempotencyService idem;
     private final ObjectMapper json;
     private final CurrentUserService users;
 
-    public ProductionTrackingService(JdbcTemplate jdbc, ErpActorResolver actors,
-            @Qualifier("archiveIdempotencyService") ErpIdempotencyService idem,
-            @Qualifier("archiveAuditWriter") ErpChangeLogWriter audit, ObjectMapper json,
+    public ProductionTrackingService(JdbcTemplate jdbc, ActorResolver actors,
+            @Qualifier("idempotencyService") IdempotencyService idem,
+            ObjectMapper json,
             CurrentUserService users) {
-        this.jdbc=jdbc; this.actors=actors; this.idem=idem; this.audit=audit; this.json=json;
+        this.jdbc=jdbc; this.actors=actors; this.idem=idem; this.json=json;
         this.users=users;
     }
 
@@ -584,8 +585,7 @@ public class ProductionTrackingService {
                         +"assignee_employee_id=COALESCE(assignee_employee_id,VALUES(assignee_employee_id)),"
                         +"assignee_name=COALESCE(assignee_name,VALUES(assignee_name))",
                         id,assignee==null?null:assignee.get("id"),assignee==null?null:assignee.get("name"));
-                audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_enrollments",id,
-                        "INSERT",ErpChangeLogWriter.changes("productionOrderId",id),"FOLLOW_UP","加入生产跟单",key,null));
+
             }
             return String.valueOf(id);
         }));
@@ -689,9 +689,7 @@ public class ProductionTrackingService {
                     changed++;
                 }
             }
-            audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_workbook_rows",0,"UPDATE",
-                    ErpChangeLogWriter.changes("action",action,"rows",rowIds,"changed",changed),
-                    "FOLLOW_UP","批量处理表格待处理行："+action,key,null));
+
             return String.valueOf(changed);
         });
         return Map.of("changed",Integer.parseInt(result));
@@ -720,9 +718,7 @@ public class ProductionTrackingService {
                             +"WHERE id=?",row.get("id"));
                 }
             }
-            audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_workbook_archive_rules",ruleId,"UPDATE",
-                    ErpChangeLogWriter.changes("revoked",true,"restoredRows",restored),"FOLLOW_UP",
-                    "撤销归档规则："+rule.get("product_label"),key,null));
+
             return restored+":"+rule.get("product_key");
         });
         String[] parts=result.split(":",2);
@@ -813,7 +809,7 @@ public class ProductionTrackingService {
         if(!"PENDING".equals(source.get("matchStatus")))throw new IllegalArgumentException("该表格行已处理");
     }
     /** 置为已归档，并按产品名补一条归档规则（无产品名或规则已存在则只归档本行）。 */
-    private void archiveRowAndRule(Map<String,Object> source,long rowId,String note,ErpActor actor,String key) {
+    private void archiveRowAndRule(Map<String,Object> source,long rowId,String note,Actor actor,String key) {
         String label=text(source.get("productName"));
         jdbc.update("UPDATE production_tracking_workbook_rows SET match_status='ARCHIVED',match_note=?,"
                 +"reviewed_at=NOW(),reviewed_by_employee_id=? WHERE id=?",("已归档："+note),actor.employeeId(),rowId);
@@ -826,9 +822,7 @@ public class ProductionTrackingService {
                         +"created_by_employee_id,created_by_name) VALUES(?,?,?,?,?)",
                         productKey,label,note,actor.employeeId(),actor.name());
         }
-        audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_workbook_rows",rowId,"UPDATE",
-                ErpChangeLogWriter.changes("matchStatus","ARCHIVED","reason",note),"FOLLOW_UP",
-                "归档表格行："+(label==null?"":label),key,null));
+
     }
 
     public long resolveWorkbookRow(long rowId,Long productionOrderId,boolean skip,String key) {
@@ -865,14 +859,11 @@ public class ProductionTrackingService {
             if(version>0||entries>0){
                 jdbc.update("UPDATE production_tracking_workbook_rows SET match_status='REVIEW',production_order_id=?,"
                         +"match_note='主管已关联工单，请逐项审核表格差异' WHERE id=?",orderId,rowId);
-                audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_workbook_rows",rowId,
-                        "UPDATE",ErpChangeLogWriter.changes("productionOrderId",orderId,"matchStatus","REVIEW"),
-                        "FOLLOW_UP","关联已有跟单，待审核表格差异",key,null));
+
                 return String.valueOf(rowId);
             }
             importWorkbookPayload(orderId,String.valueOf(source.get("payloadJson")),rowId);
-            audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_workbook_rows",rowId,
-                    "UPDATE",ErpChangeLogWriter.changes("productionOrderId",orderId),"FOLLOW_UP","核对并导入表格记录",key,null));
+
             return String.valueOf(rowId);
         }));
     }
@@ -1050,9 +1041,24 @@ public class ProductionTrackingService {
             DateRangeFilter expected,boolean urgent,String moldLayout,
             DateRangeFilter created,String optionalStage,String moldStage,int page,int size) {
         if(page<1 || size<1 || size>100)throw new IllegalArgumentException("分页范围无效");
-        var f=filter(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,
+        boolean scheduleFilter=scheduleAction(action)||"any".equals(action);
+        var f=filter(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,
+                scheduleFilter?"all":action,countdown,
                 salesperson,deliveryResult,application,schedule,expected,urgent,moldLayout,created,
                 optionalStage,moldStage);
+        if(scheduleFilter){
+            var matched=jdbc.query(LIST_COLUMNS+TRACKING_FROM+INBOUND_JOIN+f.where()+LIST_ORDER,
+                    (r,n)->row(r),f.params().toArray());
+            attachScheduleSignals(matched);
+            matched.removeIf(item->!matchesScheduleAction(item,action));
+            long offset=(long)(page-1)*size;
+            var items=offset>=matched.size()?new ArrayList<Map<String,Object>>()
+                    :new ArrayList<>(matched.subList((int)offset,Math.min(matched.size(),(int)offset+size)));
+            attachStageProgress(items);
+            attachTimeReviews(items);
+            return Map.of("items",items,"total",matched.size(),"page",page,"size",size,
+                    "visibility",users.scopeOf(FeatureCode.MANUFACTURING));
+        }
         // 计数与明细必须挂同一份 JOIN：TIME_OVERDUE 谓词引用交付日（依赖 INBOUND_JOIN 的 ib）。
         // INBOUND_JOIN 是按工单号聚合的 1:1 派生表，挂上不改变行数，COUNT(*) 仍等于工单数。
         // ⚠️ 但「不改变行数」不等于「不花钱」：该派生表要全量聚合 6.5 万行采购明细（实测 +23ms）。
@@ -1066,6 +1072,7 @@ public class ProductionTrackingService {
                 (r,n)->row(r),pageParams.toArray());
         attachStageProgress(items);
         attachTimeReviews(items);
+        attachScheduleSignals(items);
         return Map.of("items",items,"total",total,"page",page,"size",size,
                 "visibility",users.scopeOf(FeatureCode.MANUFACTURING));
     }
@@ -1368,7 +1375,9 @@ public class ProductionTrackingService {
             String salesperson,String deliveryResult,DateRangeFilter application,DateRangeFilter schedule,
             DateRangeFilter expected,boolean urgent,String moldLayout,DateRangeFilter created,
             String optionalStage,String moldStage,String ids) {
-        var f=filter(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,
+        boolean scheduleFilter=scheduleAction(action)||"any".equals(action);
+        var f=filter(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,
+                scheduleFilter?"all":action,countdown,
                 salesperson,deliveryResult,application,schedule,expected,urgent,moldLayout,created,
                 optionalStage,moldStage);
         String where=f.where().toString();
@@ -1385,15 +1394,29 @@ public class ProductionTrackingService {
             params.addAll(selected);
         }
         // total 与列表同口径（同一份 where + 按需挂 INBOUND_JOIN），截断时前端能报出「共多少、导了多少」。
-        long total=Objects.requireNonNull(jdbc.queryForObject(
-                "SELECT COUNT(*)"+TRACKING_FROM+(f.needsInbound()?INBOUND_JOIN:"")+where,
-                Long.class,params.toArray()));
-        var limitParams=new ArrayList<>(params);
-        limitParams.add(EXPORT_MAX_ROWS+1);
-        var rows=jdbc.query(LIST_COLUMNS+TRACKING_FROM+INBOUND_JOIN+where+LIST_ORDER+" LIMIT ?",
-                (r,n)->row(r),limitParams.toArray());
-        boolean truncated=rows.size()>EXPORT_MAX_ROWS;
-        if(truncated)rows=new ArrayList<>(rows.subList(0,EXPORT_MAX_ROWS));
+        long total;
+        List<Map<String,Object>> rows;
+        boolean truncated;
+        if(scheduleFilter){
+            rows=jdbc.query(LIST_COLUMNS+TRACKING_FROM+INBOUND_JOIN+where+LIST_ORDER,
+                    (r,n)->row(r),params.toArray());
+            attachScheduleSignals(rows);
+            rows.removeIf(item->!matchesScheduleAction(item,action));
+            total=rows.size();
+            truncated=rows.size()>EXPORT_MAX_ROWS;
+            if(truncated)rows=new ArrayList<>(rows.subList(0,EXPORT_MAX_ROWS));
+        }else{
+            total=Objects.requireNonNull(jdbc.queryForObject(
+                    "SELECT COUNT(*)"+TRACKING_FROM+(f.needsInbound()?INBOUND_JOIN:"")+where,
+                    Long.class,params.toArray()));
+            var limitParams=new ArrayList<>(params);
+            limitParams.add(EXPORT_MAX_ROWS+1);
+            rows=jdbc.query(LIST_COLUMNS+TRACKING_FROM+INBOUND_JOIN+where+LIST_ORDER+" LIMIT ?",
+                    (r,n)->row(r),limitParams.toArray());
+            truncated=rows.size()>EXPORT_MAX_ROWS;
+            if(truncated)rows=new ArrayList<>(rows.subList(0,EXPORT_MAX_ROWS));
+            attachScheduleSignals(rows);
+        }
         attachStageProgress(rows);
         attachTimeReviews(rows);
         var result=new LinkedHashMap<String,Object>();
@@ -1536,7 +1559,7 @@ public class ProductionTrackingService {
 
     /**
      * 链式推算各节点参考完成日期（负责人 2026-10-10 定：给跟单员一个「一般情况下这道工序何时该完成」的参考）。
-     * <p>锚点＝计划开工（回退申请日）；每往前推一个节点：上游已实际完成用实际完成日接力，未完成用其参考值接力；
+     * <p>锚点＝氚云排产日；未排产时不推参考日期。每往前推一个节点：上游已实际完成用实际完成日接力，未完成用其参考值接力；
      * 按需工序本单不适用则不占链（封口机氧化列绝大多数「无」，与基准中位数的计算口径一致）。
      * 无基准（如机器车间的画图/钣金/调试暂无跟单数据）或无锚点时参考值为空，不强算。</p>
      */
@@ -1589,7 +1612,7 @@ public class ProductionTrackingService {
         String workshop=(String)order.get("workshopType");
         boolean sealer=ProductionTrackingPolicy.isSealer(workshop);
         var values=new HashMap<>(nodeBenchmarks().getOrDefault(sealer?BENCHMARK_SEALER:BENCHMARK_MACHINE,Map.of()));
-        String product=(String)order.get("productName");
+        String product=(String)order.get("productNameSnapshot");
         if(product==null||product.isBlank()||workshop==null)return values;
         var items=jdbc.query("SELECT c.id FROM manufacturing_task_config_items c "
                 +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
@@ -1600,6 +1623,104 @@ public class ProductionTrackingService {
                 +"WHERE task_config_id=? AND typical_days IS NOT NULL",
                 r->{values.put(r.getString(1),r.getBigDecimal(2));},items.getFirst());
         return values;
+    }
+
+    /** 倒排与交期压力只采用本产品已发布的完整节点间隔，通用基准不替代产品数据。 */
+    private Map<String,BigDecimal> publishedProductBenchmarksForOrder(Map<String,Object> order) {
+        String workshop=(String)order.get("workshopType"),product=(String)order.get("productNameSnapshot");
+        if(workshop==null||product==null||product.isBlank())return Map.of();
+        var ids=jdbc.query("SELECT c.id FROM manufacturing_task_config_items c "
+                +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
+                +"WHERE c.config_type='PRODUCT_NAME' AND c.config_name=? AND w.workshop_name=?",
+                (r,n)->r.getLong(1),product,workshop);
+        if(ids.size()!=1)return Map.of();
+        var out=new HashMap<String,BigDecimal>();
+        jdbc.query("SELECT stage_code,typical_days FROM production_tracking_product_benchmarks "
+                +"WHERE task_config_id=? AND typical_days IS NOT NULL",
+                r->{out.put(r.getString(1),r.getBigDecimal(2));},ids.getFirst());
+        return out;
+    }
+
+    /** 列表批量派生排产与交期风险；一次读取产品基准及每批节点，不对每行查详情。 */
+    private void attachScheduleSignals(List<Map<String,Object>> items) {
+        if(items.isEmpty())return;
+        var configIds=new HashMap<String,List<Long>>();
+        var productDays=new HashMap<Long,Map<String,BigDecimal>>();
+        jdbc.query("SELECT w.workshop_name,c.config_name,c.id,b.stage_code,b.typical_days "
+                +"FROM manufacturing_task_config_items c JOIN manufacturing_workshops w ON w.id=c.workshop_id "
+                +"LEFT JOIN production_tracking_product_benchmarks b ON b.task_config_id=c.id "
+                +"WHERE c.config_type='PRODUCT_NAME'",r->{
+            String key=r.getString(1)+"\u001f"+r.getString(2);
+            long id=r.getLong(3);
+            var ids=configIds.computeIfAbsent(key,k->new ArrayList<>());
+            if(!ids.contains(id))ids.add(id);
+            if(r.getString(4)!=null&&r.getBigDecimal(5)!=null)
+                productDays.computeIfAbsent(id,k->new HashMap<>()).put(r.getString(4),r.getBigDecimal(5));
+        });
+        var saved=new HashMap<Long,Map<String,Map<String,Object>>>();
+        for(int start=0;start<items.size();start+=500){
+            var slice=items.subList(start,Math.min(items.size(),start+500));
+            String marks=String.join(",",Collections.nCopies(slice.size(),"?"));
+            Object[] ids=slice.stream().map(item->item.get("id")).toArray();
+            jdbc.query("SELECT production_order_id,stage_code,stage_status,completed_date,manual_reference_date "
+                    +"FROM production_tracking_milestones WHERE production_order_id IN ("+marks+")",r->{
+                long id=r.getLong(1);
+                var stage=new HashMap<String,Object>();
+                stage.put("status",r.getString(3));
+                java.sql.Date done=r.getDate(4),manual=r.getDate(5);
+                if(done!=null)stage.put("completed",done.toLocalDate());
+                if(manual!=null)stage.put("manual",manual.toLocalDate());
+                saved.computeIfAbsent(id,k->new HashMap<>()).put(r.getString(2),stage);
+            },ids);
+        }
+        for(var item:items){
+            String workshop=(String)item.get("workshopType"),product=(String)item.get("productNameSnapshot");
+            var ids=configIds.getOrDefault(workshop+"\u001f"+product,List.of());
+            var days=ids.size()==1?productDays.getOrDefault(ids.getFirst(),Map.<String,BigDecimal>of()):Map.<String,BigDecimal>of();
+            long id=((Number)item.get("id")).longValue();
+            var milestones=saved.getOrDefault(id,Map.<String,Map<String,Object>>of());
+            var applicable=new HashMap<String,Boolean>();
+            var statuses=new HashMap<String,String>();
+            var completed=new HashMap<String,LocalDate>();
+            var manual=new HashMap<String,LocalDate>();
+            var codes=stageCodes(workshop);
+            for(String code:codes){
+                var stage=milestones.get(code);
+                applicable.put(code,!ProductionTrackingPolicy.isOptionalStage(code)||stage!=null
+                        ||ProductionTrackingPolicy.configuredOptionalStage(code,
+                                (String)item.get("sourceOptionalConfiguration")));
+                if(stage!=null){
+                    statuses.put(code,(String)stage.get("status"));
+                    if(stage.get("completed") instanceof LocalDate d)completed.put(code,d);
+                    if(stage.get("manual") instanceof LocalDate d)manual.put(code,d);
+                }
+            }
+            LocalDate scheduled=item.get("scheduleTime") instanceof java.time.LocalDateTime d?d.toLocalDate():null;
+            LocalDate deadline=item.get("forecastFinishDate") instanceof LocalDate d?d
+                    :item.get("expectedFinishDate") instanceof LocalDate d?d:null;
+            var result=ProductionTrackingSchedulePolicy.calculate(codes,days,applicable,statuses,
+                    completed,manual,scheduled,deadline,LocalDate.now());
+            item.put("latestStartDate",result.latestStartDate());
+            item.put("predictedFinishDate",result.predictedFinishDate());
+            item.put("scheduleRisk",result.risk());
+            if(item.get("stoppedAt")!=null||item.get("closedAt")!=null||item.get("deliveredDate")!=null)continue;
+            String primary=(String)item.get("trackingAction");
+            boolean stronger="FINISHED_PENDING".equals(primary)||"INBOUND_PENDING".equals(primary)
+                    ||"INBOUND_UNLOGGED".equals(primary);
+            if(!stronger){
+                if("SCHEDULE_DUE".equals(result.risk())||"SCHEDULE_LATE".equals(result.risk()))
+                    item.put("trackingAction","SCHEDULE_DUE");
+                else if("PRESSURE".equals(result.risk()))item.put("trackingAction","DELIVERY_PRESSURE");
+            }
+        }
+    }
+
+    private static boolean matchesScheduleAction(Map<String,Object> item,String action) {
+        if("any".equals(action))return item.get("trackingAction")!=null;
+        if(item.get("stoppedAt")!=null||item.get("closedAt")!=null||item.get("deliveredDate")!=null)return false;
+        String risk=(String)item.get("scheduleRisk");
+        return "SCHEDULE_DUE".equals(action)?"SCHEDULE_DUE".equals(risk)||"SCHEDULE_LATE".equals(risk)
+                :"PRESSURE".equals(risk);
     }
 
     private static final String BENCHMARK_SEALER="SEALER";
@@ -1683,9 +1804,7 @@ public class ProductionTrackingService {
                 Long existing=benchmarkId(row.workshopKind(),row.stageCode());
                 if(existing==null)continue;
                 jdbc.update("DELETE FROM production_tracking_node_benchmarks WHERE id=?",existing);
-                audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_node_benchmarks",existing,
-                        "DELETE",ErpChangeLogWriter.changes("workshopKind",row.workshopKind(),"stageCode",row.stageCode()),
-                        "FOLLOW_UP","删除节点参考基准",null,null));
+
                 changed++;
                 continue;
             }
@@ -1696,10 +1815,7 @@ public class ProductionTrackingService {
                     +"ON DUPLICATE KEY UPDATE typical_days=VALUES(typical_days),sample_count=0,"
                     +"baseline_note='管理员手工配置',computed_at=CURDATE()",
                     row.workshopKind(),row.stageCode(),days);
-            Long saved=benchmarkId(row.workshopKind(),row.stageCode());
-            if(saved!=null)audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_node_benchmarks",
-                    saved,"UPDATE",ErpChangeLogWriter.changes("workshopKind",row.workshopKind(),"stageCode",
-                            row.stageCode(),"typicalDays",days),"FOLLOW_UP","配置节点参考基准天数",null,null));
+
             changed++;
         }
         return Map.of("changed",changed);
@@ -1749,10 +1865,8 @@ public class ProductionTrackingService {
         var planned=new java.util.HashSet<Long>();
         var dates=new HashMap<Long,Map<String,LocalDate>>();
         var meta=new LinkedHashMap<Long,Object[]>();
-        // 锚点优先级（2026-10-21 LQ 定：跟单开始时间一般从排产时间起算）：
-        // 本地计划开工 t.planned_start_date → 氚云排产时间 p.schedule_time（99% 有值）→ 申请日兜底。
-        // 前两者都算「排产锚点」（plannedAnchor=true，首段进正式候选）；只有申请日兜底不计入正式候选。
-        jdbc.query("SELECT p.id,p.work_order_no,DATE(p.source_created_at),t.planned_start_date,p.schedule_time,p.application_date,"
+        // 生产周期只从氚云排产日起算；未排产的样本不推首段工期。
+        jdbc.query("SELECT p.id,p.work_order_no,DATE(p.source_created_at),p.schedule_time,"
                 +"m.stage_code,m.completed_date "
                 +"FROM production_orders p "
                 +"JOIN production_tracking_state t ON t.production_order_id=p.id "
@@ -1762,15 +1876,13 @@ public class ProductionTrackingService {
                 +"ORDER BY p.source_created_at,p.id",
                 r->{
                     long id=r.getLong(1);
-                    java.sql.Date submitted=r.getDate(3),plan=r.getDate(4),sched=r.getDate(5),application=r.getDate(6),completed=r.getDate(8);
+                    java.sql.Date submitted=r.getDate(3),sched=r.getDate(4),completed=r.getDate(6);
                     meta.putIfAbsent(id,new Object[]{r.getString(2),submitted==null?null:submitted.toLocalDate()});
-                    if(plan!=null||sched!=null)planned.add(id);
-                    LocalDate anchor=plan!=null?plan.toLocalDate()
-                            :sched!=null?sched.toLocalDate()
-                            :application==null?null:application.toLocalDate();
+                    if(sched!=null)planned.add(id);
+                    LocalDate anchor=sched==null?null:sched.toLocalDate();
                     anchors.put(id,anchor);
-                    if(r.getString(7)!=null&&completed!=null)
-                        dates.computeIfAbsent(id,k->new HashMap<>()).put(r.getString(7),completed.toLocalDate());
+                    if(r.getString(5)!=null&&completed!=null)
+                        dates.computeIfAbsent(id,k->new HashMap<>()).put(r.getString(5),completed.toLocalDate());
                 },workshop,product);
         var out=new ArrayList<OrderSample>(meta.size());
         for(var e:meta.entrySet()){
@@ -2118,9 +2230,7 @@ public class ProductionTrackingService {
             jdbc.update("UPDATE production_tracking_product_benchmarks SET typical_days=NULL,published_source=NULL,"
                     +"published_at=NULL,baseline_note='已撤销发布，沿用车间基准' "
                     +"WHERE task_config_id=? AND stage_code=?",row.taskConfigId(),row.stageCode());
-            audit.write(ErpChangeLogWriter.of(actors.current(),"product_archive.production_tracking_product_benchmarks",
-                    row.taskConfigId(),"DELETE",ErpChangeLogWriter.changes("taskConfigId",row.taskConfigId(),
-                            "stageCode",row.stageCode()),"FOLLOW_UP","撤销产品节点参考间隔",null,null));
+
             return;
         }
         jdbc.update("INSERT INTO production_tracking_product_benchmarks(task_config_id,stage_code,typical_days,"
@@ -2129,9 +2239,7 @@ public class ProductionTrackingService {
                 +"ON DUPLICATE KEY UPDATE typical_days=VALUES(typical_days),published_source='MANUAL',"
                 +"published_at=NOW(),baseline_note=VALUES(baseline_note),computed_at=CURDATE()",
                 row.taskConfigId(),row.stageCode(),row.typicalDays());
-        audit.write(ErpChangeLogWriter.of(actors.current(),"product_archive.production_tracking_product_benchmarks",
-                row.taskConfigId(),"UPDATE",ErpChangeLogWriter.changes("taskConfigId",row.taskConfigId(),"stageCode",row.stageCode(),
-                        "typicalDays",row.typicalDays()),"FOLLOW_UP","发布产品节点参考间隔",null,null));
+
     }
 
     /**
@@ -2179,11 +2287,6 @@ public class ProductionTrackingService {
                 copied.add(code);
             }
         }
-        if(!copied.isEmpty())
-            audit.write(ErpChangeLogWriter.of(actors.current(),"product_archive.production_tracking_product_benchmarks",
-                    targetTaskConfigId,"UPDATE",ErpChangeLogWriter.changes("targetTaskConfigId",targetTaskConfigId,
-                            "sourceTaskConfigId",sourceTaskConfigId,"stages",copied),
-                    "FOLLOW_UP","从同车间产品复制节点参考间隔",null,null));
         return Map.of("copied",copied,"sourcePublished",source.size(),"skipped",source.size()-copied.size());
     }
 
@@ -2204,11 +2307,6 @@ public class ProductionTrackingService {
                     +"published_source='P50',published_at=NOW(),"
                     +"baseline_note='按历史样本 P50 批量发布',computed_at=CURDATE() WHERE task_config_id=? AND stage_code=?",
                     row.get("p50Days"),taskConfigId,row.get("stageCode"));
-        if(!rows.isEmpty())
-            audit.write(ErpChangeLogWriter.of(actors.current(),"product_archive.production_tracking_product_benchmarks",
-                    taskConfigId,"UPDATE",ErpChangeLogWriter.changes("taskConfigId",taskConfigId,"stages",
-                            rows.stream().map(row->String.valueOf(row.get("stageCode"))).reduce((a,b)->a+","+b).orElse("")),
-                    "FOLLOW_UP","按历史样本 P50 批量发布产品节点参考间隔",null,null));
         return rows;
     }
 
@@ -2288,23 +2386,19 @@ public class ProductionTrackingService {
                 Long id=columnDefaultId(key);
                 if(id==null)continue;
                 jdbc.update("DELETE FROM production_tracking_column_defaults WHERE id=?",id);
-                audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_column_defaults",id,
-                        "DELETE",ErpChangeLogWriter.changes("columnKey",key,"visible",current.get(key)),
-                        "FOLLOW_UP","移除列表默认列配置（回落代码默认）",null,null));
+
                 changed++;
                 continue;
             }
             Boolean before=current.get(key);
             if(want.equals(before))continue;
             // ⚠️ 列清单/值清单改动后必数「占位符个数 ↔ 传参个数」：3 个 ? 对应 3 个参数。
-            // ⚠️ updated_by 传的是员工 id，不是 ErpActor 本身——传对象 JDBC 不认，运行期才 500。
+            // ⚠️ updated_by 传的是员工 id，不是 Actor 本身——传对象 JDBC 不认，运行期才 500。
             jdbc.update("INSERT INTO production_tracking_column_defaults(column_key,visible,updated_by) VALUES(?,?,?) "
                     +"ON DUPLICATE KEY UPDATE visible=VALUES(visible),updated_by=VALUES(updated_by)",
                     key,want?1:0,actor==null?null:actor.employeeId());
             Long id=columnDefaultId(key);
-            if(id!=null)audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_column_defaults",id,
-                    before==null?"INSERT":"UPDATE",ErpChangeLogWriter.changes("columnKey",key,
-                            "visible",want,"before",before),"FOLLOW_UP","配置列表默认显示列",null,null));
+
             changed++;
         }
         return Map.of("changed",changed);
@@ -2315,8 +2409,8 @@ public class ProductionTrackingService {
                 (r,n)->r.getLong(1),key).stream().findFirst().orElse(null);
     }
 
-    /** 详情里程碑附加生效参考日期：单据人工预计优先，其余按节点间隔链式推算。 */
-    private void attachNodeReferences(Map<String,Object> source,List<Map<String,Object>> milestones,List<String> codes) {
+    /** 详情里程碑附加生效参考日期与只读倒排目标。 */
+    private Map<String,Object> attachNodeReferences(Map<String,Object> source,List<Map<String,Object>> milestones,List<String> codes) {
         boolean sealer=ProductionTrackingPolicy.isSealer((String)source.get("workshopType"));
         var benchmarks=benchmarksForOrder(source);
         var applicable=new HashMap<String,Boolean>();var statuses=new HashMap<String,String>();var dates=new HashMap<String,LocalDate>();
@@ -2326,10 +2420,10 @@ public class ProductionTrackingService {
             statuses.put(code,String.valueOf(item.get("status")));
             if(item.get("completedDate") instanceof LocalDate d)dates.put(code,d);
         }
-        LocalDate anchor=source.get("plannedStartDate") instanceof LocalDate d?d
-                :source.get("applicationDate") instanceof LocalDate a?a:null;
+        LocalDate anchor=source.get("scheduleTime") instanceof java.time.LocalDateTime d?d.toLocalDate():null;
         var refs=computeNodeReferences(codes,anchor,benchmarks,applicable,statuses,dates,LocalDate.now());
         LocalDate cursor=anchor;
+        var manualDates=new HashMap<String,LocalDate>();
         for(var item:milestones){
             String code=String.valueOf(item.get("code"));
             var ref=refs.get(code);
@@ -2342,14 +2436,28 @@ public class ProductionTrackingService {
             LocalDate systemDate=ref.typicalDays()==null||cursor==null?null
                     :cursor.plusDays(Math.round(ref.typicalDays().doubleValue()));
             LocalDate manual=item.get("manualReferenceDate") instanceof LocalDate d?d:null;
-            LocalDate effective=manual!=null?manual:systemDate;
+            if(manual!=null)manualDates.put(code,manual);
+            LocalDate effective=anchor==null?null:manual!=null?manual:systemDate;
+            item.put("systemReferenceDate",systemDate);
             item.put("referenceDate",effective);
-            item.put("referenceSource",manual!=null?"MANUAL":systemDate!=null?"SYSTEM":"NONE");
+            item.put("referenceSource",effective==null?"NONE":manual!=null?"MANUAL":"SYSTEM");
             item.put("referenceOverdueDays",effective!=null&&!"DONE".equals(item.get("status"))&&LocalDate.now().isAfter(effective)
                     ?(int)ChronoUnit.DAYS.between(effective,LocalDate.now()):null);
             if("DONE".equals(item.get("status"))&&item.get("completedDate") instanceof LocalDate done)cursor=done;
             else if(effective!=null)cursor=effective;
         }
+        LocalDate deadline=source.get("forecastFinishDate") instanceof LocalDate d?d
+                :source.get("expectedFinishDate") instanceof LocalDate d?d:null;
+        var schedule=ProductionTrackingSchedulePolicy.calculate(codes,publishedProductBenchmarksForOrder(source),
+                applicable,statuses,dates,manualDates,anchor,deadline,LocalDate.now());
+        for(var item:milestones)item.put("targetDate",schedule.targetDates().get(String.valueOf(item.get("code"))));
+        var out=new LinkedHashMap<String,Object>();
+        out.put("latestStartDate",schedule.latestStartDate());
+        out.put("predictedFinishDate",schedule.predictedFinishDate());
+        out.put("slackDays",schedule.slackDays());
+        out.put("risk",schedule.risk());
+        out.put("deadline",deadline);
+        return out;
     }
 
     private void attachStageProgress(List<Map<String,Object>> items) {
@@ -2482,7 +2590,7 @@ public class ProductionTrackingService {
             });
             milestones.add(item);
         }
-        attachNodeReferences(source,milestones,codes);
+        result.put("schedule",attachNodeReferences(source,milestones,codes));
         result.put("milestones",milestones);
         result.put("stageTotal",stageTotal((String)source.get("workshopType"),milestones));
         result.put("operations",jdbc.query("SELECT c.id,c.sequence_no,c.component_name operation_name_snapshot,"
@@ -2564,9 +2672,7 @@ public class ProductionTrackingService {
                     overdue?source.get("deliveredDate"):source.get("inboundDate"),
                     actor.employeeId(),actor.name());
             long noteId=Objects.requireNonNull(jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class));
-            audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_time_reviews",noteId,
-                    "INSERT",ErpChangeLogWriter.changes("orderId",id,"kind",request.kind(),"status",request.status()),
-                    "FOLLOW_UP",reason,key,null));
+
             return String.valueOf(noteId);
         }));
     }
@@ -2615,12 +2721,7 @@ public class ProductionTrackingService {
                     +"agreed_date=?,next_followup_date=? WHERE id=?",
                     request.status(),reason,contact.isBlank()?null:contact,
                     savedAgreed,request.nextFollowupDate(),noteId);
-            audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_time_reviews",noteId,
-                    "UPDATE",ErpChangeLogWriter.changes(
-                            "orderId",id,"kind",before.get("kind"),
-                            "status",String.valueOf(before.get("status"))+" → "+request.status(),
-                            "reason",String.valueOf(before.get("reason"))+" → "+reason),
-                    "FOLLOW_UP",reason,key,null));
+
             return String.valueOf(noteId);
         }));
     }
@@ -2659,9 +2760,7 @@ public class ProductionTrackingService {
                     write(Map.of("state",before,"milestones",milestones)),
                     write(Map.of("state",after,"milestones",milestones)),actor.employeeId(),actor.name());
             long entryId=Objects.requireNonNull(jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class));
-            audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_entries",entryId,"INSERT",
-                    ErpChangeLogWriter.changes("orderId",id,"version",version+1,"stopped",request.stopped()),
-                    "FOLLOW_UP",content,key,null));
+
             return String.valueOf(version+1);
         }));
     }
@@ -2709,9 +2808,7 @@ public class ProductionTrackingService {
                     write(Map.of("state",before,"milestones",milestones)),
                     write(Map.of("state",after,"milestones",milestones)),actor.employeeId(),actor.name());
             long entryId=Objects.requireNonNull(jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class));
-            audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_entries",entryId,"INSERT",
-                    ErpChangeLogWriter.changes("orderId",id,"version",version+1,"closed",request.closed()),
-                    "FOLLOW_UP",content,key,null));
+
             return String.valueOf(version+1);
         }));
     }
@@ -2771,7 +2868,7 @@ public class ProductionTrackingService {
                 if(ProductionTrackingPolicy.isOptionalStage(code)&&!submittedByCode.containsKey(code)&&!savedByCode.containsKey(code))continue;
                 String status=submittedByCode.containsKey(code)?submittedByCode.get(code).status():
                         savedByCode.containsKey(code)?String.valueOf(savedByCode.get(code).get("stage_status")):"PENDING";
-                if(!"DONE".equals(status)&&editableManualCodes.size()<2)editableManualCodes.add(code);
+                if(!"DONE".equals(status))editableManualCodes.add(code);
             }
             for(var milestone:milestones){
                 var old=savedByCode.get(milestone.code());
@@ -2782,7 +2879,7 @@ public class ProductionTrackingService {
                                 milestone.manualReferenceDate()==null?null:milestone.manualReferenceReason().trim());
                 if(changed&&!editableManualCodes.contains(milestone.code())
                         &&!("DONE".equals(milestone.status())&&milestone.manualReferenceDate()==null))
-                    throw new IllegalArgumentException("只能修改当前及下一未完成节点的人工预计日期");
+                    throw new IllegalArgumentException("只能修改适用且未完成节点的人工预计日期");
             }
             long version=((Number)before.get("version")).longValue();
             if(version!=request.version())throw new ResponseStatusException(HttpStatus.CONFLICT,"该任务已由其他人更新，请刷新后重试");
@@ -2829,9 +2926,7 @@ public class ProductionTrackingService {
                     write(Map.of("state",before,"milestones",beforeMilestones)),write(Map.of("state",after,"milestones",milestoneSnapshot)),
                     actor.employeeId(),actor.name());
             long entryId=Objects.requireNonNull(jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class));
-            audit.write(ErpChangeLogWriter.of(actor,"product_archive.production_tracking_entries",entryId,"INSERT",
-                    ErpChangeLogWriter.changes("orderId",id,"version",version+1,"content",entryContent),
-                    "FOLLOW_UP",entryContent,key,null));
+
             return String.valueOf(version+1);
         }));
     }

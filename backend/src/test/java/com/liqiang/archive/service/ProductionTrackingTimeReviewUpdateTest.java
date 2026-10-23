@@ -1,10 +1,9 @@
 package com.liqiang.archive.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.liqiang.archive.erp.ErpActor;
-import com.liqiang.archive.erp.ErpActorResolver;
-import com.liqiang.archive.erp.ErpChangeLogWriter;
-import com.liqiang.archive.erp.ErpIdempotencyService;
+import com.liqiang.archive.infra.Actor;
+import com.liqiang.archive.infra.ActorResolver;
+import com.liqiang.archive.infra.IdempotencyService;
 import com.liqiang.archive.security.CurrentUserService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,24 +35,22 @@ import static org.mockito.Mockito.*;
 class ProductionTrackingTimeReviewUpdateTest {
 
     private JdbcTemplate jdbc;
-    private ErpIdempotencyService idem;
-    private ErpChangeLogWriter audit;
+    private IdempotencyService idem;
     private ProductionTrackingService service;
 
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
         jdbc = mock(JdbcTemplate.class);
-        idem = mock(ErpIdempotencyService.class);
-        audit = mock(ErpChangeLogWriter.class);
-        var actors = mock(ErpActorResolver.class);
-        when(actors.current()).thenReturn(new ErpActor(160L, "陈苏平"));
+        idem = mock(IdempotencyService.class);
+        var actors = mock(ActorResolver.class);
+        when(actors.current()).thenReturn(new Actor(160L, "陈苏平"));
         // 幂等体直接执行，便于断言 SQL 本身
         when(idem.execute(any(), anyString(), anyString(), any(), any())).thenAnswer(inv -> {
             Supplier<String> work = inv.getArgument(4);
             return work.get();
         });
-        service = new ProductionTrackingService(jdbc, actors, idem, audit, new ObjectMapper(),
+        service = new ProductionTrackingService(jdbc, actors, idem, new ObjectMapper(),
                 currentUser(160L));
         // 可见性校验（order(id)）：返回一行「能定位到工单」的壳，够让 order() 通过
         when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))

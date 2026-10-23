@@ -1,14 +1,13 @@
 <template>
   <section>
     <div class="toolbar">
-      <div><h2>生产车间</h2><p>维护任务下达时可选的生产车间。默认制程请在「制程模板」中设置。</p></div>
+      <div><h2>生产车间</h2><p>维护任务下达时可选的生产车间（车间基础数据）。</p></div>
       <el-button type="primary" @click="openCreate">新增车间</el-button>
     </div>
     <el-table :data="rows" row-key="id">
       <el-table-column prop="workshopName" label="车间名称" min-width="180" />
       <el-table-column prop="orderReceiverName" label="接单员" min-width="120" />
       <el-table-column prop="warehouseClerkName" label="入库员" min-width="120" />
-      <el-table-column label="默认制程" min-width="180"><template #default="{ row }">{{ templateName(row.defaultProcessTemplateId) }}</template></el-table-column>
       <el-table-column label="状态" width="90"><template #default="{ row }"><el-tag :type="row.enabled ? 'success' : 'info'">{{ row.enabled ? '启用' : '停用' }}</el-tag></template></el-table-column>
       <el-table-column label="操作" width="90"><template #default="{ row }"><el-button link type="primary" @click="openEdit(row)">编辑</el-button></template></el-table-column>
     </el-table>
@@ -27,15 +26,13 @@
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import { http } from '@/api/http'
-interface Workshop { id:number; workshopName:string; enabled:boolean; orderReceiverName?:string; warehouseClerkName?:string; defaultProcessTemplateId:number|null }
-interface Template { id:number; templateName:string }
-const rows=ref<Workshop[]>([]),templates=ref<Template[]>([]),dialogOpen=ref(false),saving=ref(false)
+interface Workshop { id:number; workshopName:string; enabled:boolean; orderReceiverName?:string; warehouseClerkName?:string }
+const rows=ref<Workshop[]>([]),dialogOpen=ref(false),saving=ref(false)
 const empty=():Partial<Workshop>&{enabled:boolean}=>({workshopName:'',orderReceiverName:'',warehouseClerkName:'',enabled:true})
 const form=ref(empty())
-const templateName=(id:number|null)=>id ? templates.value.find(t=>t.id===id)?.templateName||'模板不可用' : '未设置'
 function openCreate(){form.value=empty();dialogOpen.value=true}
 function openEdit(row:Workshop){form.value={...row};dialogOpen.value=true}
-async function load(){const [w,t]=await Promise.all([http.get<Workshop[]>('/manufacturing/master/workshops'),http.get<Template[]>('/manufacturing/master/templates')]);rows.value=w.data.map(x=>({...x,enabled:Boolean(x.enabled)}));templates.value=t.data}
+async function load(){const w=await http.get<Workshop[]>('/manufacturing/master/workshops');rows.value=w.data.map(x=>({...x,enabled:Boolean(x.enabled)}))}
 async function save(){if(!form.value.workshopName?.trim()){ElMessage.warning('请填写车间名称');return};saving.value=true;try{if(form.value.id)await http.put(`/manufacturing/master/workshops/${form.value.id}`,form.value);else await http.post('/manufacturing/master/workshops',form.value);dialogOpen.value=false;await load();ElMessage.success('车间已保存')}finally{saving.value=false}}
 await load()
 </script>

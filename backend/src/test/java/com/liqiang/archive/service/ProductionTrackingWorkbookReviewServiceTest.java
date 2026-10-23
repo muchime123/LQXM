@@ -28,7 +28,7 @@ class ProductionTrackingWorkbookReviewServiceTest {
                 .thenReturn(List.of(Map.of("version",2)));
         when(jdbc.queryForObject(contains("created_by_employee_id>0"),eq(Integer.class),eq(orderId)))
                 .thenReturn(1);
-        var review=new ProductionTrackingWorkbookReviewService(jdbc,new ObjectMapper(),null,null,null,null);
+        var review=new ProductionTrackingWorkbookReviewService(jdbc,new ObjectMapper(),null,null,null);
 
         assertThrows(ResponseStatusException.class,()->review.applyWorkbookOnly(orderId,
                 "{\"forecastFinishDate\":\"2026-10-20\"}",5L));
@@ -47,7 +47,7 @@ class ProductionTrackingWorkbookReviewServiceTest {
                         "completed_date",Date.valueOf("2026-09-15"))));
         when(jdbc.queryForObject(contains("SELECT production_line"),org.mockito.ArgumentMatchers.eq(String.class),
                 org.mockito.ArgumentMatchers.eq(orderId))).thenReturn("封口机车间");
-        var review=new ProductionTrackingWorkbookReviewService(jdbc,new ObjectMapper(),null,null,null,null);
+        var review=new ProductionTrackingWorkbookReviewService(jdbc,new ObjectMapper(),null,null,null);
 
         var changes=review.differences(orderId,"""
                 {"milestones":[{"code":"MOLD","completedDate":"2026-09-15"}]}
@@ -67,7 +67,7 @@ class ProductionTrackingWorkbookReviewServiceTest {
                 .thenReturn(List.of(Map.of("stage_code","MOLD","stage_status","DONE","completed_date",Date.valueOf("2026-09-15"))));
         when(jdbc.queryForObject(contains("SELECT production_line"),org.mockito.ArgumentMatchers.eq(String.class),
                 org.mockito.ArgumentMatchers.eq(orderId))).thenReturn("封口机车间");
-        var review=new ProductionTrackingWorkbookReviewService(jdbc,new ObjectMapper(),null,null,null,null);
+        var review=new ProductionTrackingWorkbookReviewService(jdbc,new ObjectMapper(),null,null,null);
 
         var changes=review.differences(orderId,"""
                 {"remark":"","deliveryResult":"已交付","plannedStartDate":"2026-10-01","shipmentStatus":"已发货","milestones":[
