@@ -1703,20 +1703,30 @@ public class ProductionTrackingService {
             item.put("latestStartDate",result.latestStartDate());
             item.put("predictedFinishDate",result.predictedFinishDate());
             item.put("scheduleRisk",result.risk());
-            if(item.get("stoppedAt")!=null||item.get("closedAt")!=null||item.get("deliveredDate")!=null)continue;
-            String primary=(String)item.get("trackingAction");
-            boolean stronger="FINISHED_PENDING".equals(primary)||"INBOUND_PENDING".equals(primary)
-                    ||"INBOUND_UNLOGGED".equals(primary);
+            if(item.get("stoppedAt")!=null||item.get("closedAt")!=null||item.get("deliveredDate")!=null){
+                item.put("primaryAction",item.get("trackingAction"));
+                continue;
+            }
+            // 不覆盖 trackingAction（SQL 原值，用于筛选命中判断）；另算 primaryAction 用于显示。
+            String sqlAction=(String)item.get("trackingAction");
+            boolean stronger="FINISHED_PENDING".equals(sqlAction)||"INBOUND_PENDING".equals(sqlAction)
+                    ||"INBOUND_UNLOGGED".equals(sqlAction);
+            String primary=sqlAction;
             if(!stronger){
                 if("SCHEDULE_DUE".equals(result.risk())||"SCHEDULE_LATE".equals(result.risk()))
-                    item.put("trackingAction","SCHEDULE_DUE");
-                else if("PRESSURE".equals(result.risk()))item.put("trackingAction","DELIVERY_PRESSURE");
+                    primary="SCHEDULE_DUE";
+                else if("PRESSURE".equals(result.risk()))primary="DELIVERY_PRESSURE";
             }
+            item.put("primaryAction",primary);
         }
     }
 
     private static boolean matchesScheduleAction(Map<String,Object> item,String action) {
-        if("any".equals(action))return item.get("trackingAction")!=null;
+        if("any".equals(action)){
+            if(item.get("trackingAction")!=null)return true;
+            String risk=(String)item.get("scheduleRisk");
+            return "SCHEDULE_DUE".equals(risk)||"SCHEDULE_LATE".equals(risk)||"PRESSURE".equals(risk);
+        }
         if(item.get("stoppedAt")!=null||item.get("closedAt")!=null||item.get("deliveredDate")!=null)return false;
         String risk=(String)item.get("scheduleRisk");
         return "SCHEDULE_DUE".equals(action)?"SCHEDULE_DUE".equals(risk)||"SCHEDULE_LATE".equals(risk)
@@ -2567,7 +2577,10 @@ public class ProductionTrackingService {
 
     public Map<String,Object> detail(long id) {
         var result=new LinkedHashMap<String,Object>();
-        var source=order(id);result.put("order",source);
+        var source=order(id);
+        // 详情也补 primaryAction/scheduleRisk：抽屉显示用 primaryAction，与列表同口径。
+        attachScheduleSignals(List.of(source));
+        result.put("order",source);
         var codes=stageCodes((String)source.get("workshopType"));
         var saved=jdbc.query("SELECT stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason FROM production_tracking_milestones WHERE production_order_id=?",
                 (r,n)->row(r),id);

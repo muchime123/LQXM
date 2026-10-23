@@ -134,10 +134,13 @@
       <el-table-column v-if="isListColumnVisible('workshop')" label="车间" min-width="110"><template #default="{ row }">{{ shortWorkshop(row.workshopType) }}</template></el-table-column>
       <el-table-column v-if="isListColumnVisible('sourceStatus')" label="任务单状态" width="112"><template #default="{ row }">{{ row.sourceStatus || '未提供' }}</template></el-table-column>
       <el-table-column v-if="isListColumnVisible('trackingStatus')" label="跟单状态" width="128"><template #default="{ row }"><el-tag :type="trackingStatusTone(row.trackingStatus)">{{ trackingStatusText(row.trackingStatus) }}</el-tag><el-tooltip v-if="row.closedAt" placement="top" :content="`跟单员主动结案：${row.closedByName || ''} · ${formatTime(row.closedAt)}${row.closedNote ? ' · ' + row.closedNote : ''}`"><small class="closure-marker"> 人工结案</small></el-tooltip></template></el-table-column>
-      <el-table-column v-if="isListColumnVisible('trackingAction')" label="跟单待办" width="152">
+      <el-table-column v-if="isListColumnVisible('trackingAction')" label="跟单待办" width="168">
         <template #default="{ row }">
-          <el-tag v-if="row.trackingAction" :type="actionTone(row.trackingAction)" effect="light" :title="actionHint(row)">{{ actionLabel(row.trackingAction) }}</el-tag>
-          <span v-else class="muted">—</span>
+          <el-tag v-if="effectiveAction(row)" :type="actionTone(effectiveAction(row)!)" effect="light" :title="actionHint(row)">{{ actionLabel(effectiveAction(row)) }}</el-tag>
+          <el-tooltip v-if="row.trackingAction && row.primaryAction && row.trackingAction !== row.primaryAction" :content="`筛选命中：${actionLabel(row.trackingAction)}`" placement="top">
+            <small class="filter-match-hint"> ·{{ actionLabel(row.trackingAction) }}</small>
+          </el-tooltip>
+          <span v-if="!effectiveAction(row)" class="muted">—</span>
         </template>
       </el-table-column>
       <el-table-column v-if="isListColumnVisible('sourceCreatedAt')" label="任务单提交" width="142"><template #default="{ row }">{{ formatMinute(row.sourceCreatedAt) || '未提供' }}</template></el-table-column>
@@ -557,7 +560,7 @@ import ProductionTrackingAnalyticsDrawer from './ProductionTrackingAnalyticsDraw
 import ProductionTrackingWeeklyReviewDrawer from './ProductionTrackingWeeklyReviewDrawer.vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { isSourceUrgent } from '@/utils/trackingUrgency'
-import { TRACKING_ACTION_CODES, trackingActionHint as actionHint, trackingActionLabel as actionLabel, trackingActionTone as actionTone } from '@/utils/trackingAction'
+import { TRACKING_ACTION_CODES, effectiveAction, trackingActionHint as actionHint, trackingActionLabel as actionLabel, trackingActionTone as actionTone } from '@/utils/trackingAction'
 // 源工单日期判据与「业务员要求工期」的口径唯一来源（列表 / 详情 / 导出共用，见该模块头注释）。
 import { leadDaysCellClass, leadDaysTooltipHtml } from '@/utils/tracking/leadDaysDisplay'
 import { effectiveLeadDaysText, invalidApplicationDate, invalidRequiredDate, leadDaysKindText, otherLeadDaysText } from '@/utils/trackingDateGuard'
@@ -925,6 +928,7 @@ await Promise.all([loadColumnDefaults(), load()])
 .list-stage-actions :deep(.el-button + .el-button) { margin-left: 0; }
 .list-stage-actions :deep(.el-button) { padding: 5px 7px; height: 26px; }
 .muted { color: #667085; font-size: 13px; }
+.filter-match-hint { color: #98a2b3; font-size: 11px; margin-left: 2px; cursor: help; }
 .metric-delay { color: #b54708; font-weight: 600; overflow-wrap: anywhere; }
 .metric-exception-text { color: #b42318; }
 .time-signal-list { display: flex; gap: 4px; flex-wrap: wrap; }

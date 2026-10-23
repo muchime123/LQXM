@@ -183,3 +183,5 @@ backend/_*.py
 /tools/_*.py
 frontend/_build_c8a_before/
 /val_perler_work/
+frontend/_build_c8a_after/
+frontend/_build_c8a_before2/

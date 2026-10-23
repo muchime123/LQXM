@@ -537,7 +537,7 @@ const { can, user } = useCurrentUser()
 const canManageCompany = computed(() => can('company.manage'))
 
 // ========== Tab 导航 ==========
-/** 仅系统管理员（ADMIN）可见的 Tab：财务账户、知识库 */
+/** 知识库仅 ADMIN 可见；财务账户按 company.manage 权限展示。 */
 const ADMIN_ONLY_TAB_KEYS: CompanyManagementTabKey[] = ['accounts', 'kb']
 const isAdmin = computed(() => !!user.value?.roles?.includes('ADMIN'))
 const tabs = computed(() => COMPANY_MANAGEMENT_TABS.filter(tab => tab.key === 'accounts' ? canManageCompany.value : !ADMIN_ONLY_TAB_KEYS.includes(tab.key) || isAdmin.value))

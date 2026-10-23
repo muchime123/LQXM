@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { STALE_FOLLOWUP_DAYS, TRACKING_ACTION_CODES, TRACKING_ACTION_LABELS, trackingActionHint, trackingActionLabel, trackingActionTone } from './trackingAction'
+import { STALE_FOLLOWUP_DAYS, TRACKING_ACTION_CODES, TRACKING_ACTION_LABELS, effectiveAction, trackingActionHint, trackingActionLabel, trackingActionTone } from './trackingAction'
 import type { TrackingActionCode } from '@/api/productionTracking'
 
 /**
@@ -60,5 +60,23 @@ describe('生产跟单：跟单待办提醒的文案与配色', () => {
   it('标签即枚举值本身，不能被悄悄改名（改了后端筛选就匹配不上）', () => {
     const codes: TrackingActionCode[] = ['FINISHED_PENDING', 'INBOUND_PENDING', 'SCHEDULED_PENDING', 'INBOUND_UNLOGGED', 'SCHEDULE_DUE', 'DELIVERY_PRESSURE', 'STALE_FOLLOWUP']
     expect(Object.keys(TRACKING_ACTION_LABELS).sort()).toEqual([...codes].sort())
+  })
+
+  it('effectiveAction：primaryAction 优先，回退 trackingAction', () => {
+    // primaryAction 存在时优先
+    expect(effectiveAction({ trackingAction: 'STALE_FOLLOWUP', primaryAction: 'DELIVERY_PRESSURE' })).toBe('DELIVERY_PRESSURE')
+    // primaryAction 为空时回退 trackingAction
+    expect(effectiveAction({ trackingAction: 'STALE_FOLLOWUP', primaryAction: null })).toBe('STALE_FOLLOWUP')
+    expect(effectiveAction({ trackingAction: 'STALE_FOLLOWUP' })).toBe('STALE_FOLLOWUP')
+    // 两者都空
+    expect(effectiveAction({ trackingAction: null })).toBeNull()
+    expect(effectiveAction({})).toBeUndefined()
+  })
+
+  it('effectiveAction：hint 用 primaryAction 而非 trackingAction', () => {
+    // primaryAction=DELIVERY_PRESSURE 时 hint 应是交期风险文案
+    const hint = trackingActionHint({ trackingAction: 'STALE_FOLLOWUP', primaryAction: 'DELIVERY_PRESSURE' })
+    expect(hint).toContain('交期')
+    expect(hint).not.toContain('7 天')
   })
 })

@@ -22,7 +22,7 @@ import { fetchTrackingExport } from '@/api/productionTracking'
 import type { TrackingOrder, TrackingStageProgress } from '@/api/productionTracking'
 import { currentCompletionDate, deliveryOutcomeText, deliveryOutcomeTone, formatMinute, productSize, productionCountdown, reviewOtherReasonsText, reviewReasonText, shortDate, shortOrderNo, shortWorkshop, stageNotesText, trackingStatusText } from '@/utils/tracking/rules'
 import { effectiveLeadDaysCellText } from '@/utils/trackingDateGuard'
-import { trackingActionLabel as actionLabel } from '@/utils/trackingAction'
+import { effectiveAction, trackingActionLabel as actionLabel } from '@/utils/trackingAction'
 import { buildTrackingWorkbook, trackingExportFileName, trackingExportGuideSheet } from '@/utils/export/trackingWorkbook'
 import { buildTrackingHtmlBlob, trackingHtmlFileName, type HtmlCell, type Tone } from '@/utils/export/trackingHtml'
 import { groupBySource, type TrackingColumnSource } from '@/utils/export/trackingColumnSources'
@@ -108,7 +108,7 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
   { key: 'sourceStatus', label: '生产任务单状态', source: 'h3', value: row => row.sourceStatus || '' },
   // 跟单状态/待办：系统按节点推进与停止登记自动判定，不是谁手填的 → 系统计算。
   { key: 'trackingStatus', label: '跟单状态', source: 'derived', value: row => trackingStatusText(row.trackingStatus) },
-  { key: 'trackingAction', label: '跟单待办', source: 'derived', value: row => actionLabel(row.trackingAction) },
+  { key: 'trackingAction', label: '跟单待办', source: 'derived', value: row => actionLabel(effectiveAction(row)) },
   // 停止跟单三项：只随「停止跟单」这个人工动作产生 → 跟单登记。
   { key: 'stoppedReason', label: '停止跟单原因', source: 'manual', value: row => row.stoppedReason || '' },
   { key: 'stoppedAt', label: '停止跟单时间', source: 'manual', value: row => formatMinute(row.stoppedAt), htmlValue: row => shortDate(formatMinute(row.stoppedAt)) },

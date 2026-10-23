@@ -29,9 +29,9 @@
           </div>
         </section>
 
-        <div v-if="!detail.order.stoppedAt && (isSourceUrgent(detail.order.sourceOrderRemark) || detail.order.trackingAction)" class="attention-list">
+        <div v-if="!detail.order.stoppedAt && (isSourceUrgent(detail.order.sourceOrderRemark) || effectiveAction(detail.order))" class="attention-list">
           <div v-if="isSourceUrgent(detail.order.sourceOrderRemark)" class="attention-item attention-item--urgent"><strong>加急任务</strong><span>任务单备注已标注加急，请优先核实当前生产进度。</span></div>
-          <div v-if="detail.order.trackingAction" class="attention-item"><strong>{{ actionLabel(detail.order.trackingAction) }}</strong><span>{{ actionHint(detail.order) }}</span></div>
+          <div v-if="effectiveAction(detail.order)" class="attention-item"><strong>{{ actionLabel(effectiveAction(detail.order)) }}</strong><span>{{ actionHint(detail.order) }}</span></div>
         </div>
 
         <el-alert v-if="detail.order.stoppedAt" type="info" :closable="false" show-icon title="已停止生产跟单"
@@ -47,6 +47,8 @@
             <div><span>排产开工</span><strong>{{ detail.order.scheduleTime ? formatMinute(detail.order.scheduleTime) : '未排产' }}</strong><small v-if="!detail.order.scheduleTime && detail.schedule.latestStartDate">建议最晚 {{ detail.schedule.latestStartDate }}</small></div>
             <div><span>当前车间交期</span><strong>{{ detail.schedule.deadline || '未定' }}</strong><el-button v-if="canFollowup && !detail.order.stoppedAt" link type="primary" size="small" @click="openDelayDialog">{{ detail.order.forecastFinishDate ? '修改延期' : '登记延期' }}</el-button></div>
           </div>
+          <el-alert v-if="detail.schedule.risk === 'NO_BASELINE' || detail.schedule.risk === 'UNKNOWN'" type="info" :closable="false" show-icon
+            description="系统参考包含通用基准；本产品节点参考数据不完整，暂无法计算可靠的交期倒排目标。" />
         </section>
         <div v-if="showSecondaryMetrics" class="metric-grid show-secondary">
           <div :class="['metric', { 'metric-exception': invalidApplicationDate(detail.order) }]"><span>生产工单申请时间</span><strong>{{ detail.order.applicationDate || '未填写' }}</strong><small v-if="detail.order.sourceCreatedAt" class="muted">任务单提交 {{ formatMinute(detail.order.sourceCreatedAt) }}</small><small v-if="invalidApplicationDate(detail.order)" class="metric-exception-text">申请日期早于任务单提交日期，疑似填写错误</small><el-button v-if="invalidApplicationDate(detail.order) && needsTimeReason(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE')">记录日期核实</el-button><span v-else-if="invalidApplicationDate(detail.order)" class="metric-reviewed">已记录核实：{{ reviewOf(detail.order, 'SOURCE_DATE')?.reason }}<el-button v-if="reviewOf(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE', reviewOf(detail.order, 'SOURCE_DATE'))">修改</el-button></span></div>
@@ -316,7 +318,7 @@ import LqDialog from '@/components/common/LqDialog.vue'
 import ProductionSalesTracePanel from '@/components/production/ProductionSalesTracePanel.vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { isSourceUrgent } from '@/utils/trackingUrgency'
-import { trackingActionHint as actionHint, trackingActionLabel as actionLabel } from '@/utils/trackingAction'
+import { effectiveAction, trackingActionHint as actionHint, trackingActionLabel as actionLabel } from '@/utils/trackingAction'
 import {
   daysBetween, effectiveLeadDaysText, invalidApplicationDate, invalidRequiredDate, leadDaysAlarm,
   leadDaysDeltaText, leadDaysKindText, negativeLeadDays, negativeLeadReason, otherLeadDaysText

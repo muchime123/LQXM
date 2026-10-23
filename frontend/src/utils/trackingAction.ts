@@ -28,6 +28,8 @@ export const TRACKING_ACTION_LABELS: Record<TrackingActionCode, string> = {
 /** 提醒说得出依据的最少字段（TrackingOrder 直接满足）。 */
 export interface TrackingActionFacts {
   trackingAction?: TrackingActionCode | null
+  /** 显示用最高优先级待办；为空时回退 trackingAction。 */
+  primaryAction?: TrackingActionCode | null
   /** 氚云报工完工日期。 */
   actualFinishDate?: string | null
   /** 采购首次入库日期。 */
@@ -37,6 +39,11 @@ export interface TrackingActionFacts {
   /** 最近一次跟单写入时间。 */
   lastFollowupAt?: string | null
   latestStartDate?: string | null
+}
+
+/** 显示用待办代码：优先 primaryAction（考虑排产/交期风险后取最强），回退 trackingAction（SQL 原值）。 */
+export function effectiveAction(row: TrackingActionFacts): TrackingActionCode | null | undefined {
+  return row.primaryAction ?? row.trackingAction
 }
 
 export function trackingActionLabel(code?: TrackingActionCode | null) {
@@ -54,8 +61,9 @@ export function trackingActionTone(code: TrackingActionCode): 'danger' | 'warnin
  * 日期缺失时显式写「（日期缺失）」而不是留空，避免看起来像排版漏了。
  */
 export function trackingActionHint(row: TrackingActionFacts) {
+  const action = effectiveAction(row)
   const day = (value?: string | null) => (value ? value.slice(0, 10) : '（日期缺失）')
-  switch (row.trackingAction) {
+  switch (action) {
     case 'FINISHED_PENDING': return `氚云已于 ${day(row.actualFinishDate)} 报工完工，但跟单尚未登记任何节点；请尽快补录进度。`
     case 'INBOUND_PENDING': return `采购已于 ${day(row.inboundDate)} 入库，但跟单尚未开始；请尽快登记进度。`
     case 'SCHEDULED_PENDING': return `车间已于 ${day(row.scheduleTime)} 排产，但跟单尚未开始；请尽快登记进度。`

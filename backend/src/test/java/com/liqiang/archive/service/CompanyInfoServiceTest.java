@@ -29,6 +29,7 @@ class CompanyInfoServiceTest {
         existing.setId(1L);
         existing.setCompanyName("Old");
         existing.setPhone("123");
+        existing.setOfficeAddress("Keep this address");
         existing.setLogoFileName("logo.png");
         existing.setLicenseFileName("license.pdf");
         existing.setSealFileName("seal.png");
@@ -40,6 +41,7 @@ class CompanyInfoServiceTest {
         CompanyInfo result = service.updateCompanyInfo(request);
         assertEquals("New", result.getCompanyName());
         assertNull(result.getPhone());
+        assertEquals("Keep this address", result.getOfficeAddress());
         assertEquals("logo.png", result.getLogoFileName());
         assertEquals("license.pdf", result.getLicenseFileName());
         assertEquals("seal.png", result.getSealFileName());

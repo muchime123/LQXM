@@ -64,6 +64,8 @@ export interface TrackingOrder {
    * 用于回答「这单现在该我做什么、为什么轮到我了」，筛选入参同名 `action`。
    */
   trackingAction?: TrackingActionCode | null
+  /** 显示用最高优先级待办（考虑排产/交期风险后取最强）；trackingAction 是 SQL 原值用于筛选命中。 */
+  primaryAction?: TrackingActionCode | null
   latestStartDate?: string | null
   predictedFinishDate?: string | null
   scheduleRisk?: string | null

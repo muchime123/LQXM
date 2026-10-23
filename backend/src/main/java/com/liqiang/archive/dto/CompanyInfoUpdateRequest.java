@@ -4,11 +4,15 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import lombok.Getter;
 import lombok.Setter;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 
 /** Fields owned by the company profile editor. File references are managed separately. */
 @Getter
 @Setter
+@JsonIgnoreProperties(ignoreUnknown = true)
 public class CompanyInfoUpdateRequest {
+    @JsonIgnore
     private final java.util.Set<String> supplied = new java.util.HashSet<>();
     public boolean has(String field) { return supplied.contains(field); }
     private String companyName;
