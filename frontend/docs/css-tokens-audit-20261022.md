@@ -266,14 +266,22 @@ CSS 声明 `--x:`、JS/内联对象键 `'--x':`、运行时 `setProperty('--x')`
 | `--space-2xs`（2px 站点） | 1 | 项目最小间距令牌是 4px，2px 是真实需求（`.tab-header-actions` 的 `padding: 0 2px`），不能为了复用改成 4px |
 | `--color-surface-muted` | 1 | 取值 #f1f5f9 与 `--color-surface-hover` 完全相同，但用途是静态面板底，「hover」语义不成立；需在「同值错语义」与「正确语义差 1 档」之间决策 |
 
-**② 可修改（待批准；同值组浅色零变化，近似组需接受色差）**
+**② 可修改（同值组已执行；近似组待批准）**
+
+同值组执行结果（`51a3c09`，双主题实测后）：
+
+| 变量 | 处 | 双主题实测 | 结果 |
+|---|---|---|---|
+| `--color-surface-subtle`（#f8fafc，`.settle-tip` / `.detail-note`） | 2 | 浅色同值；深色 `#f8fafc` → `#1a2332` | **已收敛** → `--color-surface-alt`（提示块在深色下原本是浅灰块，属主题修复） |
+| `--color-bg-subtle`（fallback 本就是 `var(--color-surface)`） | 1 | 双主题同值 | **已收敛** → `--color-surface` |
+| `--space-2xs`（4px，`.header-right` 内为 el-tag 标签组） | 1 | 双主题同值 | **已收敛** → `--space-control-gap-tight`（按场景语义，不用通用刻度 `--space-xs`） |
+| `--color-surface-subtle`（#f1f5f9，`.version-detail-total` / `.formula-row.total` 合计行） | 2 | 浅色同值；深色 → `#293548` | **否决保留**：值相同的 `--color-surface-hover` 语义是 hover 态 |
+| `--color-fill`（#f1f5f9，`.detail-sec__count` 计数徽标） | 1 | 浅色同值；深色 → `#293548` | **否决保留**：同为静态填充，无等值且语义相符的令牌 |
+
+`#f1f5f9` 的静态填充另有一个同值候选 `--color-surface-readonly`，但其语义是"只读面"且**项目内 0 处引用**，属"颜色相同、语义不同"，按约定不采用。
 
 | 组 | 变量 | 处 | 目标 |
 |---|---|---|---|
-| 同值 | `--color-surface-subtle` | 4 | 按值：#f1f5f9 → `--color-surface-hover`、#f8fafc → `--color-surface-alt` |
-| 同值 | `--color-fill` | 1 | #f1f5f9 → `--color-surface-hover` |
-| 同值 | `--color-bg-subtle` | 1 | `var(--color-surface)` → `--color-surface`（纯别名展开） |
-| 同值 | `--space-2xs` | 1 | 4px → `--space-xs` |
 | 近似 | `--color-bg-elevated` | 5 | #f9fafb → `--color-surface-raised`；#f3f4f6 → `--color-surface-hover` |
 | 近似 | `--color-bg` | 3 | #f6f7f9 → `--color-page-bg`；#f8fafc → `--color-surface-alt` |
 | 近似 | `--color-bg-input` | 2 | #f9fafb → `--color-surface-alt`（实际用于面板底，不是输入框） |
@@ -286,4 +294,31 @@ CSS 声明 `--x:`、JS/内联对象键 `'--x':`、运行时 `setProperty('--x')`
 
 不新增任何别名。`--app-header-height` 经实测确认名实不符，正确做法是重设该页高度算式（C6），而不是把 58px 固化成令牌；`--space-2xs` 的 2px 需求若后续反复出现，再单独评估是否引入 `--space-3xs`。
 
-**收敛进度**：缺失变量 48 → 33（C4-A）→ 23（B1）→ **20**（B2）；无 fallback 恒为 **0**。
+### C4-B3 三分类总表（剩余 19 个变量 / 31 处）
+
+| 分类 | 变量 | 处 | 说明 |
+|---|---|---|---|
+| **可修改** | `--color-bg`（#f8fafc 站点） | 1 | 与 `--color-surface-alt` 同值且语义一致，后续可直接收敛 |
+| **需专项视觉评估** | `--color-bg-elevated` | 5 | 需先分清卡片 / 抬升面 / 悬浮层，再决定 `surface-raised` 还是其他 |
+| | `--color-bg-input` | 2 | 实际是面板底（`.quality-score`、`.history-empty`），不是输入框；需确认映射 `--color-surface-alt` 是否可接受 |
+| | `--color-bg`（#f6f7f9 站点） | 2 | `App.vue` 授权兜底层、`LoginView` 登录层；`--color-page-bg` 为近似值 |
+| | `--color-surface-subtle`（#f1f5f9）/ `--color-fill` / `--color-surface-muted` | 2 / 1 / 1 | 静态填充；同值令牌语义不符（hover / readonly），语义令牌值不同，需专项权衡 |
+| | `--color-danger-50` / `-300` / `-700` | 2 / 1 / 1 | 需连同所在组件的背景、文字、边框一起看状态配色体系 |
+| | `--color-success-600` / `--color-success-bg-light` / `--color-warning-bg-light` | 1 / 1 / 1 | Element Plus 绿/橙旧色阶残留，需确认是否整套替换 |
+| | `--color-text-body` | 3 | 正文层级取舍：无等值令牌，改则浅色观感变化 |
+| | `--color-primary-600` / `--color-primary-soft` / `--color-primary-bg-strong` | 1 / 1 / 1 | 蓝色遗留：需按组件用途判断是信息提示（`--color-info`）还是品牌强调（`--color-primary`）；`--color-primary-bg-strong` 需先看正常/hover/active/selected 是否构成完整配色体系 |
+| **合理保留** | `--space-2xs`（2px 站点） | 1 | 2px 是真实需求（`.tab-header-actions`），项目最小间距令牌为 4px，不为复用改成 4px |
+| | `--app-header-height` | 1 | 名实不符（实测 topbar 38px）但当前渲染正确，属布局算式问题 → 转 C6 重设该页高度 |
+| | `--el-dialog-width` | 1 | Element Plus 由 `width` prop 透传的运行时变量，`var(--el-dialog-width, …)` 是 prop 优先、令牌兜底的正确写法 → 扫描器已加例外，不再报警 |
+
+### C4 收口结论
+
+**验收标准（已调整）**：不追求把剩余变量压到零。标准是——① 所有真实缺失且导致声明失效的变量均已修复；② 其余变量要么完成语义与取值都成立的映射，要么有明确记录的保留原因。
+
+- 无 fallback 缺失：`23 变量 / 41 处` → **0**（C4-A 修完并保持）
+- 有 fallback 命名漂移：初扫 `48` → **19 个变量 / 31 处**；其中 4 处已在 B3 同值组收敛，其余按上表三类处置
+- 框架/运行时变量：1 个（`--el-dialog-width`）已纳入扫描器例外表，不再计入缺失
+
+扫描器新增 `FRAMEWORK_VARS` 例外表，用于登记"由组件库或运行时注入、引用属正确用法"的变量（须写明注入方与本项目用法出处），避免其长期作为普通缺失报警并诱导错误替换。
+
+**C4 治理完成**，剩余特殊项按上表转入专项：静态填充与状态配色体系 → 专项视觉评估；`--app-header-height` → C6；蓝色遗留 → 组件配色确认。后续按既有编号推进 C5（重复令牌与主题覆盖关系）→ C6 → C7 → C8。

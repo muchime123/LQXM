@@ -26,6 +26,17 @@ const ROOT = process.argv.includes('--all') ? '.' : 'src'
 const JSON_OUT = process.argv.includes('--json')
 const EXTS = /\.(css|vue|ts|js|scss|html)$/
 
+/**
+ * 框架/运行时变量例外表。
+ *
+ * 这些变量由组件库在运行时注入，静态扫描扫不到定义，引用它们是**正确用法**
+ * 而不是命名漂移；若当缺失报警，会诱导把它们替换成项目自有令牌，反而破坏
+ * 组件库的覆盖机制。新增条目必须写明依据（注入方 + 本项目用法出处）。
+ */
+const FRAMEWORK_VARS = new Map([
+  ['--el-dialog-width', 'Element Plus：el-dialog 把 width prop 透传为 --el-dialog-width（本项目 LqDialog.vue 按 size 注入，dialog-layout.css 用 var(--el-dialog-width, …) 让 prop 优先、令牌兜底）']
+])
+
 const files = []
 const walk = d => {
   for (const e of fs.readdirSync(d, { withFileTypes: true })) {
@@ -74,7 +85,7 @@ for (const file of files) {
 }
 
 const missing = [...used.entries()]
-  .filter(([k]) => !defined.has(k))
+  .filter(([k]) => !defined.has(k) && !FRAMEWORK_VARS.has(k))
   .map(([name, rec]) => ({
     name,
     count: rec.count,
@@ -89,17 +100,27 @@ const missing = [...used.entries()]
 
 const hard = missing.filter(m => m.noFb > 0)
 const soft = missing.filter(m => m.noFb === 0)
+const framework = [...used.entries()]
+  .filter(([k]) => FRAMEWORK_VARS.has(k))
+  .map(([name, rec]) => ({ name, count: rec.count, reason: FRAMEWORK_VARS.get(name) }))
+
+// 处数比变量数更能反映治理进度：一个变量可能有多处保留（语义不符时不动）
+const softSites = soft.reduce((s, m) => s + m.count, 0)
 
 if (JSON_OUT) {
-  console.log(JSON.stringify({ scanned: files.length, missing, hard, soft }, null, 2))
+  console.log(JSON.stringify({ scanned: files.length, missing, hard, soft, framework }, null, 2))
 } else {
   console.log(`scanned=${files.length} files, usedTokens=${used.size}, definedTokens=${defined.size}`)
-  console.log(`missing=${missing.length}  无fallback=${hard.length}  有fallback=${soft.length}\n`)
+  console.log(`missing=${missing.length}  无fallback=${hard.length}  有fallback=${soft.length}（引用处数 ${softSites}）\n`)
   console.log('=== 无 fallback（声明会失效）===')
   for (const m of hard) console.log(`${m.name}  noFb=${m.noFb}/${m.count}\n    ${m.noFbSites.join('\n    ')}`)
   console.log('\n=== 有 fallback（实际渲染 fallback 值）===')
   for (const m of soft) {
     const dist = m.fallbacks.map(f => `${f.value}×${f.n}`).join(', ')
     console.log(`${m.name}  x${m.count}  fallback: ${dist}`)
+  }
+  if (framework.length) {
+    console.log('\n=== 框架/运行时变量（例外，不计缺失）===')
+    for (const f of framework) console.log(`${f.name}  x${f.count}\n    ${f.reason}`)
   }
 }
