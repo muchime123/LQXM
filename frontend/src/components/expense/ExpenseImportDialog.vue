@@ -335,7 +335,7 @@ function resetState() {
   padding: var(--space-section-gap, 24px) 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
 }
 
 .expense-uploader :deep(.el-upload-dragger) {
@@ -351,7 +351,7 @@ function resetState() {
 .preview-stage {
   display: flex;
   flex-direction: column;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
 }
 
 .summary-cards {
@@ -365,8 +365,8 @@ function resetState() {
   flex-direction: column;
   align-items: center;
   gap: 2px;
-  padding: var(--space-s, 8px) 4px;
-  border-radius: var(--radius-card, 10px);
+  padding: var(--space-sm-md) 4px;
+  border-radius: var(--radius-xl);
   background: var(--color-bg-elevated, #f9fafb);
   border: 1px solid var(--color-border-subtle, #e5e7eb);
 }

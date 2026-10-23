@@ -228,7 +228,7 @@ function scoreBg(score: number): string {
 .panel-title {
   display: flex;
   align-items: baseline;
-  gap: var(--space-s, 8px);
+  gap: var(--space-sm-md);
   margin-bottom: var(--space-section-gap, 24px);
 }
 
@@ -247,9 +247,9 @@ function scoreBg(score: number): string {
 .quality-score {
   display: flex;
   gap: var(--space-section-gap, 24px);
-  padding: var(--space-m, 16px);
+  padding: var(--space-lg-xl);
   background: var(--color-bg-input, #f9fafb);
-  border-radius: var(--radius-card, 10px);
+  border-radius: var(--radius-xl);
   margin-bottom: var(--space-section-gap, 24px);
   align-items: center;
 }
@@ -293,7 +293,7 @@ function scoreBg(score: number): string {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: var(--space-s, 8px);
+  gap: var(--space-sm-md);
   min-width: 0;
 }
 
@@ -313,8 +313,8 @@ function scoreBg(score: number): string {
   font-size: 13px;
   color: var(--color-warning);
   background: color-mix(in srgb, var(--color-warning-100) 70%, transparent);
-  padding: var(--space-s, 8px) var(--space-m, 12px);
-  border-radius: var(--radius-card, 8px);
+  padding: var(--space-sm-md) var(--space-md-lg);
+  border-radius: var(--card-radius);
 }
 
 .warn-dot {
@@ -330,7 +330,7 @@ function scoreBg(score: number): string {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-secondary, #374151);
-  margin: 0 0 var(--space-s, 8px);
+  margin: 0 0 var(--space-sm-md);
 }
 
 .quality-items ul {
@@ -346,9 +346,9 @@ function scoreBg(score: number): string {
 .q-item {
   display: flex;
   align-items: center;
-  gap: var(--space-s, 8px);
-  padding: var(--space-s, 8px) var(--space-m, 12px);
-  border-radius: var(--radius-card, 8px);
+  gap: var(--space-sm-md);
+  padding: var(--space-sm-md) var(--space-md-lg);
+  border-radius: var(--card-radius);
   font-size: 13px;
   line-height: 1.5;
   background: var(--color-surface);
@@ -417,11 +417,11 @@ function scoreBg(score: number): string {
   font-size: 13px;
   font-weight: 600;
   color: var(--color-text-secondary, #374151);
-  margin: 0 0 var(--space-s, 8px);
+  margin: 0 0 var(--space-sm-md);
 }
 
 .history-timeline {
-  padding-left: var(--space-s, 8px);
+  padding-left: var(--space-sm-md);
 }
 
 .history-timeline :deep(.el-timeline-item__timestamp) {
@@ -433,16 +433,16 @@ function scoreBg(score: number): string {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: var(--space-s, 8px) var(--space-m, 12px);
+  padding: var(--space-sm-md) var(--space-md-lg);
   background: var(--color-surface);
   border: 1px solid var(--color-border-subtle, #e5e7eb);
-  border-radius: var(--radius-card, 8px);
+  border-radius: var(--card-radius);
 }
 
 .history-head {
   display: flex;
   align-items: center;
-  gap: var(--space-s, 8px);
+  gap: var(--space-sm-md);
 }
 
 .history-field {
@@ -454,7 +454,7 @@ function scoreBg(score: number): string {
 .history-diff {
   display: flex;
   align-items: center;
-  gap: var(--space-s, 8px);
+  gap: var(--space-sm-md);
   font-size: 13px;
   font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
 }
@@ -479,16 +479,16 @@ function scoreBg(score: number): string {
   font-size: 12px;
   color: var(--color-text-secondary, #374151);
   background: color-mix(in srgb, var(--color-warning-50) 60%, transparent);
-  padding: 2px var(--space-s, 8px);
-  border-radius: var(--radius-card, 6px);
+  padding: 2px var(--space-sm-md);
+  border-radius: var(--radius-md);
 }
 
 .history-empty {
   font-size: 13px;
   color: var(--color-text-tertiary, #9ca3af);
-  padding: var(--space-m, 16px);
+  padding: var(--space-lg-xl);
   text-align: center;
   background: var(--color-bg-input, #f9fafb);
-  border-radius: var(--radius-card, 8px);
+  border-radius: var(--card-radius);
 }
 </style>

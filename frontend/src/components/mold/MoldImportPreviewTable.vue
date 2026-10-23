@@ -238,7 +238,7 @@ const {
 .preview-stage {
   display: flex;
   flex-direction: column;
-  gap: var(--space-s, 8px);
+  gap: var(--space-sm-md);
   max-height: calc(96vh - 140px);
   min-height: 0;
   overflow: hidden;
@@ -247,9 +247,9 @@ const {
 .summary-panel {
   display: flex;
   align-items: center;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
   flex-wrap: wrap;
-  padding: var(--space-s, 8px) var(--space-m, 12px);
+  padding: var(--space-sm-md) var(--space-md-lg);
   background: var(--color-surface-alt, #f8fafc);
   border: 1px solid var(--color-border-light, #e3e8ee);
   border-radius: var(--radius-lg, 8px);
@@ -258,16 +258,16 @@ const {
 .summary-main {
   display: flex;
   align-items: center;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
   flex-wrap: wrap;
 }
 
 .summary-group {
   display: flex;
   align-items: center;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
   flex-wrap: wrap;
-  padding-left: var(--space-m, 12px);
+  padding-left: var(--space-md-lg);
   border-left: 1px solid var(--color-border, #e2e8f0);
 }
 
@@ -383,7 +383,7 @@ const {
   flex: 1;
   min-height: 300px;
   border: 1px solid var(--color-border-subtle, #e5e7eb);
-  border-radius: var(--radius-card, 10px);
+  border-radius: var(--radius-xl);
   overflow: hidden;
 }
 

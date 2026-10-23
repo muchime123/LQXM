@@ -55,7 +55,7 @@ const masterDetailRef = ref<InstanceType<typeof PackagingMoldsMasterDetail> | nu
   min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
 }
 
 .molds-panel-toolbar {

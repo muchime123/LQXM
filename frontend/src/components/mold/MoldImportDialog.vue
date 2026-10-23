@@ -437,14 +437,14 @@ onBeforeUnmount(() => {
   padding: var(--space-section-gap, 24px) 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
 }
 
 .model-selector-section {
   background: var(--color-bg-elevated, #f9fafb);
   border: 1px solid var(--color-border-subtle, #e5e7eb);
-  border-radius: var(--radius-card, 10px);
-  padding: var(--space-m, 12px);
+  border-radius: var(--radius-xl);
+  padding: var(--space-md-lg);
 }
 
 .selector-label {
@@ -453,7 +453,7 @@ onBeforeUnmount(() => {
   gap: 8px;
   font-weight: 600;
   font-size: 13px;
-  margin-bottom: var(--space-s, 8px);
+  margin-bottom: var(--space-sm-md);
 }
 
 .selector-icon {

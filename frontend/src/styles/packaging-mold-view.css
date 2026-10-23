@@ -44,6 +44,6 @@
 
 @media (max-width: 768px) {
   .workspace__body > .mold-view .mold-workspace {
-    gap: var(--space-s, 8px);
+    gap: var(--space-sm-md);
   }
 }

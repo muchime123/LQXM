@@ -300,14 +300,14 @@ async function onAdd() {
 
 <style scoped>
 .spec-mold-links-panel {
-  padding: var(--space-s, 8px) 0;
+  padding: var(--space-sm-md) 0;
 }
 
 .sml-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: var(--space-s, 8px);
+  margin-bottom: var(--space-sm-md);
 }
 
 .sml-header h4 {
@@ -318,11 +318,11 @@ async function onAdd() {
 }
 
 .sml-loading {
-  padding: var(--space-s, 8px) 0;
+  padding: var(--space-sm-md) 0;
 }
 
 .sml-empty {
-  padding: var(--space-m, 12px) 0;
+  padding: var(--space-md-lg) 0;
   text-align: center;
 }
 
@@ -341,8 +341,8 @@ async function onAdd() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--space-s, 8px);
-  padding: 6px var(--space-s, 8px);
+  gap: var(--space-sm-md);
+  padding: 6px var(--space-sm-md);
   border-radius: var(--radius-sm, 6px);
   background: var(--color-surface-alt, #f8fafc);
   border: 1px solid var(--color-border-subtle, #e5e7eb);
@@ -383,7 +383,7 @@ async function onAdd() {
 .sml-add-form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
 }
 
 .sml-form-row {

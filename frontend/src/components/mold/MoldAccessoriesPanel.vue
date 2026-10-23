@@ -221,13 +221,13 @@ onMounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-s, 8px);
+  margin-bottom: var(--space-sm-md);
 }
 
 .panel-title {
   display: flex;
   align-items: baseline;
-  gap: var(--space-s, 8px);
+  gap: var(--space-sm-md);
 }
 
 .panel-title h4 {
@@ -244,11 +244,11 @@ onMounted(() => {
 
 .raw-trace {
   display: flex;
-  gap: var(--space-s, 8px);
-  padding: var(--space-s, 8px) var(--space-m, 12px);
+  gap: var(--space-sm-md);
+  padding: var(--space-sm-md) var(--space-md-lg);
   background: var(--color-bg-elevated, #f9fafb);
-  border-radius: var(--radius-card, 8px);
-  margin-bottom: var(--space-m, 12px);
+  border-radius: var(--card-radius);
+  margin-bottom: var(--space-md-lg);
   font-size: 12px;
   color: var(--color-text-tertiary, #9ca3af);
 }
@@ -266,16 +266,16 @@ onMounted(() => {
 .accessory-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
 }
 
 .accessory-card {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  padding: var(--space-m, 16px);
+  padding: var(--space-lg-xl);
   border: 1px solid var(--color-border-subtle, #e5e7eb);
-  border-radius: var(--radius-card, 10px);
+  border-radius: var(--radius-xl);
   background: var(--color-surface);
   transition: box-shadow 0.15s;
 }
@@ -288,7 +288,7 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: var(--space-xs, 4px);
-  margin-bottom: var(--space-s, 8px);
+  margin-bottom: var(--space-sm-md);
 }
 
 .accessory-type-badge .code-tag {
@@ -313,7 +313,7 @@ onMounted(() => {
 }
 
 .accessory-remark {
-  margin: var(--space-s, 8px) 0 0;
+  margin: var(--space-sm-md) 0 0;
   font-size: 12px;
   color: var(--color-text-secondary, #374151);
   white-space: pre-wrap;

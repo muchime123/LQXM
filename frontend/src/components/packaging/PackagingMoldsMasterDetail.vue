@@ -1544,7 +1544,7 @@ defineExpose({
 .master-detail-layout {
   display: flex;
   flex-direction: column;
-  gap: var(--space-s, 6px);
+  gap: var(--space-sm);
   min-height: 0;
   overflow: hidden;
   flex: 1;
@@ -1558,7 +1558,7 @@ defineExpose({
 /* 主从行：左栏 + 详情 */
 .master-detail-row {
   display: flex;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
   min-height: 0;
   overflow: hidden;
   flex: 1;
@@ -1570,7 +1570,7 @@ defineExpose({
   flex-shrink: 0;
   min-width: 0;
   border: 1px solid var(--color-border-subtle, #e5e7eb);
-  border-radius: var(--radius-card, 10px);
+  border-radius: var(--radius-xl);
   overflow: hidden;
   display: flex;
   flex-direction: column;
@@ -1599,7 +1599,7 @@ defineExpose({
 .master-panel :deep(.data-state-empty),
 .master-panel :deep(.data-state-error),
 .master-panel :deep(.data-state-stale) {
-  padding: var(--space-xl, 24px) var(--space-m, 16px);
+  padding: var(--space-xl, 24px) var(--space-lg-xl);
   flex: none;
 }
 
@@ -1643,8 +1643,8 @@ defineExpose({
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: var(--space-s, 8px);
-  padding: var(--space-xl, 24px) var(--space-m, 16px);
+  gap: var(--space-sm-md);
+  padding: var(--space-xl, 24px) var(--space-lg-xl);
   text-align: center;
 }
 
@@ -1658,8 +1658,8 @@ defineExpose({
 .mold-grouped-list {
   display: flex;
   flex-direction: column;
-  gap: var(--space-m, 12px);
-  padding: var(--space-s, 8px);
+  gap: var(--space-md-lg);
+  padding: var(--space-sm-md);
 }
 
 .mold-group {
@@ -1705,8 +1705,8 @@ defineExpose({
 .mold-card-grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--space-s, 8px);
-  padding: var(--space-s, 8px);
+  gap: var(--space-sm-md);
+  padding: var(--space-sm-md);
 }
 
 .mold-card {
@@ -1765,8 +1765,8 @@ defineExpose({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: var(--space-s, 6px);
-  padding: var(--space-s, 8px) var(--space-m, 10px);
+  gap: var(--space-sm);
+  padding: var(--space-sm-md) var(--space-md);
   border-bottom: 1px solid var(--color-border-lighter, #edf1f5);
 }
 
@@ -1830,7 +1830,7 @@ defineExpose({
 }
 
 .mold-card-product {
-  padding: 6px var(--space-m, 10px);
+  padding: 6px var(--space-md);
   font-size: 12px;
   color: var(--color-text-secondary, #374151);
   overflow: hidden;
@@ -1844,7 +1844,7 @@ defineExpose({
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 6px var(--space-m, 10px);
+  padding: 6px var(--space-md);
   background: linear-gradient(135deg, rgba(15, 118, 110, 0.04) 0%, rgba(15, 118, 110, 0.02) 100%);
   border-bottom: 1px solid var(--color-border-lighter, #edf1f5);
 }
@@ -1886,8 +1886,8 @@ defineExpose({
 .mold-card-stats {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  padding: var(--space-s, 8px) var(--space-m, 10px);
-  gap: var(--space-s, 6px);
+  padding: var(--space-sm-md) var(--space-md);
+  gap: var(--space-sm);
 }
 
 .mold-card-stats .stat {
@@ -1929,7 +1929,7 @@ defineExpose({
   align-items: center;
   gap: 4px;
   flex-wrap: wrap;
-  padding: 0 var(--space-m, 10px) var(--space-s, 8px);
+  padding: 0 var(--space-md) var(--space-sm-md);
 }
 
 .mold-card-footer:empty {
@@ -1953,7 +1953,7 @@ defineExpose({
   min-width: 0;
   min-height: 0;
   border: 1px solid var(--color-border-subtle, #e5e7eb);
-  border-radius: var(--radius-card, 10px);
+  border-radius: var(--radius-xl);
   background: var(--color-surface, #fff);
   display: flex;
   flex-direction: column;
@@ -1964,7 +1964,7 @@ defineExpose({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: var(--space-s, 8px) var(--space-m, 12px);
+  padding: var(--space-sm-md) var(--space-md-lg);
   border-bottom: 1px solid var(--color-border-subtle, #e5e7eb);
   background: var(--color-surface-alt, #f8fafc);
   flex-shrink: 0;
@@ -1973,7 +1973,7 @@ defineExpose({
 .detail-title {
   display: flex;
   align-items: center;
-  gap: var(--space-s, 8px);
+  gap: var(--space-sm-md);
   flex-wrap: wrap;
   min-width: 0;
 }
@@ -1997,7 +1997,7 @@ defineExpose({
 
 .detail-actions {
   display: flex;
-  gap: var(--space-s, 8px);
+  gap: var(--space-control-gap);
   flex-shrink: 0;
 }
 
@@ -2008,12 +2008,12 @@ defineExpose({
 }
 
 .detail-skeleton {
-  padding: var(--space-m, 12px);
+  padding: var(--space-md-lg);
 }
 
 /* Tabs */
 .detail-tabs {
-  padding: 0 var(--space-m, 12px) var(--space-m, 12px);
+  padding: 0 var(--space-md-lg) var(--space-md-lg);
 }
 
 .detail-tabs :deep(.el-tabs__header) {
@@ -2021,7 +2021,7 @@ defineExpose({
   top: 0;
   z-index: 5;
   margin: 0;
-  padding: var(--space-s, 8px) 0;
+  padding: var(--space-sm-md) 0;
   background: var(--color-surface, #fff);
   flex-shrink: 0;
 }
@@ -2070,14 +2070,14 @@ defineExpose({
 }
 
 .detail-tabs :deep(.el-tabs__content) {
-  padding-top: var(--space-s, 8px);
+  padding-top: var(--space-sm-md);
 }
 
 /* ====== 关联规格标准卡片 ====== */
 .variant-standard-card-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
   padding: 2px 0;
 }
 
@@ -2277,17 +2277,17 @@ defineExpose({
 .info-section {
   display: flex;
   flex-direction: column;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
 }
 
 .info-block {
   background: var(--color-surface, #fff);
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: var(--radius-xl, 10px);
-  padding: var(--space-m, 12px) var(--space-lg-xl) var(--space-lg-xl);
+  padding: var(--space-md-lg) var(--space-lg-xl) var(--space-lg-xl);
   display: flex;
   flex-direction: column;
-  gap: var(--space-s, 8px);
+  gap: var(--space-sm-md);
 }
 
 .info-block-header {
@@ -2314,7 +2314,7 @@ defineExpose({
 .info-meta-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--space-s, 8px) var(--space-m, 16px);
+  gap: var(--space-sm-md) var(--space-lg-xl);
 }
 
 .info-meta-item {
@@ -2368,13 +2368,13 @@ defineExpose({
 /* 刻字与备注 —— 堆叠行布局（非网格） */
 .info-block--stacked {
   gap: 6px;
-  padding-bottom: var(--space-m, 12px);
+  padding-bottom: var(--space-md-lg);
 }
 
 .info-stack-row {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
   padding: 6px 10px;
   background: var(--color-surface-alt, #f8fafc);
   border-radius: var(--radius-lg, 8px);
@@ -2397,7 +2397,7 @@ defineExpose({
 .info-meta-footer {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-m, 16px);
+  gap: var(--space-lg-xl);
   font-size: 11.5px;
   color: var(--color-text-tertiary, #9ca3af);
   padding: 0 2px 4px;
@@ -2411,8 +2411,8 @@ defineExpose({
 .info-engraving {
   display: flex;
   align-items: baseline;
-  gap: var(--space-s, 8px);
-  padding: var(--space-s, 8px) var(--space-m, 12px);
+  gap: var(--space-sm-md);
+  padding: var(--space-sm-md) var(--space-md-lg);
   background: var(--color-surface-alt, #f8fafc);
   border-radius: var(--radius-lg, 8px);
 }
@@ -2445,7 +2445,7 @@ defineExpose({
   padding: var(--space-xl, 32px);
   text-align: center;
   color: var(--color-text-tertiary, #9ca3af);
-  gap: var(--space-s, 8px);
+  gap: var(--space-sm-md);
 }
 
 .empty-tab p {
@@ -2465,7 +2465,7 @@ defineExpose({
   justify-content: center;
   height: 100%;
   color: var(--color-text-tertiary, #9ca3af);
-  gap: var(--space-s, 8px);
+  gap: var(--space-sm-md);
   padding: var(--space-2xl, 24px);
 }
 
@@ -2475,7 +2475,7 @@ defineExpose({
   justify-content: center;
   width: 64px;
   height: 64px;
-  margin-bottom: var(--space-s, 8px);
+  margin-bottom: var(--space-sm-md);
   border-radius: var(--radius-3xl, 16px);
   background: var(--color-surface-alt, #f8fafc);
   color: var(--color-text-faint, #94a3b8);
@@ -2497,7 +2497,7 @@ defineExpose({
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: var(--space-s, 8px);
+  margin-bottom: var(--space-sm-md);
   padding: 0 var(--space-2xs, 2px);
 }
 
@@ -2540,7 +2540,7 @@ defineExpose({
 .add-variant-dialog {
   display: flex;
   flex-direction: column;
-  gap: var(--space-m, 12px);
+  gap: var(--space-md-lg);
 }
 
 .field-hints,
@@ -2552,7 +2552,7 @@ defineExpose({
 .variant-option {
   display: flex;
   align-items: center;
-  gap: var(--space-s, 8px);
+  gap: var(--space-sm-md);
   width: 100%;
 }
 
