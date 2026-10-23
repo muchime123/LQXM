@@ -176,4 +176,8 @@ frontend/_build_verify/
 frontend/_audit_shots/
 frontend/dist/_verify_p1/
 frontend/dist/_verify_p1b/
+frontend/dist-p2a/
 /db_backup_*.tsv
+/db_backup_*.json
+backend/_*.py
+/tools/_*.py
