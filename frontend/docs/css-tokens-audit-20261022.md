@@ -368,4 +368,117 @@ CSS 声明 `--x:`、JS/内联对象键 `'--x':`、运行时 `setProperty('--x')`
 | `--el-alert-text-color` | C5-D 无效覆盖 | 仅在深色块定义 | EP 全量 CSS 未消费 | 删除该行（同规则内 `color:` 已生效） | 低 |
 | `--text-h*`、`--z-*`、`--duration-*`、`--ease-*`、`--dialog-width-*` 等 | C5-D 预留规范 | — | 0 引用但成体系 | 保留 | 无 |
 
-**C5 未修改任何代码。** 唯一建议立即处理的是 `--el-alert-text-color`（无效覆盖）；其余要么属正常机制，要么需专项视觉评估。
+### C5 决策与执行（2026-10-23）
+
+**① `--el-alert-text-color`：已删除（`1b262dd`，单文件 1 行）**
+
+判定不靠变量名推断：在 `node_modules/element-plus` 全部 **6,830 个文件**（含 js / mjs / scss / css）中检索该变量名，**命中 0 处**；`src` 内也无 `var()` 引用。项目自身的 Alert 文字色由 `element-plus.css:270` 的 `.el-alert--error .el-alert__title` 与 `dark.css:144/150` 直接声明，早已覆盖，故该变量完全惰性。
+
+最小修改：只删该声明，未动同一规则里的 `color`，也未调整其他 Alert 样式。
+
+删除前后对照（浅/深双主题，注入 error alert 的 `is-light` 与默认变体，读容器与标题计算色）**逐项一致**：
+
+| 主题 | 位置 | 删除前 | 删除后 | 与 `--color-danger-text` 关系 |
+|---|---|---|---|---|
+| 浅色 | `is-light` 标题 | `rgb(190,18,60)` | `rgb(190,18,60)` | = `#be123c` ✓ |
+| 浅色 | `is-light` 容器 / 底色 | `rgb(245,108,108)` / `rgb(254,240,240)` | 同左 | EP 默认 |
+| 深色 | 容器与标题 | `rgb(252,165,165)` | `rgb(252,165,165)` | = `#fca5a5` ✓ |
+
+复核：prettier 格式检查通过，全量 70 文件 / 525 用例通过。
+
+> 验证中另发现一处**不属于本次范围**的现象：深色下非 `is-light` 的 error alert 容器底色仍是 `rgb(255,255,255)`（EP 默认 alert 底色），已并入下方 EP 专项清单。
+
+**② `--ep-*` 深色覆盖不对称：转入「Element Plus 深色变体」视觉专项**
+
+立项但不一次性补齐 24 个变量。**验收标准是 EP 组件在双主题下的实际表现，不是「24 个变量是否都有 dark 定义」。**
+
+验证范围：`el-tag`（success / warning / danger / info）× `el-alert`（各状态）× `el-button`（plain / text / disabled）；每个组件验证默认、hover、active、disabled 四态，以及浅色 / 深色两模式下的实际颜色与文字对比度（正文 ≥ 4.5）。
+
+处置分类：
+
+| 分类 | 处理方式 |
+|---|---|
+| 深色下实际存在低对比度或异常亮底 | 补充对应深色令牌 |
+| 深色下沿用浅色值，但视觉与对比度正常 | 保留 |
+| 当前业务完全未使用、也未发现问题的色阶 | 暂不修改 |
+| 多个色阶存在系统性问题 | 再考虑完整补齐该色系 |
+
+已知待验 Item：深色下默认 `el-alert` 白底（`rgb(255,255,255)`）。
+
+**③ `--color-primary-border`：保留，暂不修改**
+
+「浅色下与 `--color-success-border` 同为 `#a7f3d0`」只能说明当前值相同，**不足以证明是复制错误**；该变量涉及 38 个文件，修改风险较大。后续需核实三件事：① 是否用于品牌强调 / 选中 / 焦点等主色语义；② 浅色下该边框与主色背景、文字是否协调；③ 现有值是否真的影响视觉，还是符合当前青绿色品牌设计。无明确视觉问题则不改。
+
+**④ C5 收口**
+
+| 项 | 结论 |
+|---|---|
+| C5-A 重复定义 | **完成**：同作用域重复定义 0 组，9 组同名多值均为响应式覆盖，属正常设计，继续保留 |
+| C5-B 主题覆盖 | **审计完成**：base 403 / dark 135；深色未覆盖 35 个中 11 个属正常机制、24 个转入 EP 视觉专项 |
+| C5-C 语义重叠 | **审计完成，不做批量合并**：语义不同的变量即使同色也可并存（如主色边框与成功边框）；`--color-primary-border` 按③保留核实 |
+| C5-D 无效令牌 | **删除已确认的 1 处**（`--el-alert-text-color`）；78 个零引用暂不批量清理，后续遗留代码阶段按「无引用、无动态消费、非规范预留」三条件逐项核对；成体系的排版 / 层级 / 动画 / 布局令牌不删 |
+
+C5 标记为治理完成，未决项（EP 深色变体、`--color-primary-border`）移入视觉专项清单。
+
+---
+
+## C6 全局与组件样式职责冲突（2026-10-23，只读审计）
+
+工具 `frontend/scripts/audit/style-scope.mjs`。统计 5,383 条规则（全局表 1,158 / 组件非 scoped 173 / 组件 scoped 4,052），用于发现「谁在改谁」。
+
+**判断前提**：`:deep()`、`!important`、EP 内部选择器本身都不是错误，只有出现**真实优先级冲突或重复实现**才列为整改项。本轮只审计不改动。
+
+### C6-1 `.btn-sm` 重复实现且已漂移（最值得整改）
+
+同一个类名在 **9 个文件**各自 scoped 定义，且已漂移成 **4 种写法**，视觉并不一致：
+
+| 写法 | 出处 | 特征 |
+|---|---|---|
+| A | `CertDetailModal.vue` | `padding: 6px 12px`、圆角 `--radius-sm`、文字 `--color-text-secondary` |
+| B | `FeeRecordsPanel.vue` | `padding: 5px 12px`、字号 `--fs-xs`（其余同 A） |
+| C | `FilePreviewBody.vue` | 圆角 `--radius-md, 6px`、边框 `--color-border-light`、文字 `--color-text-strong`、字重 semibold |
+| D | `PackagingBatchEditModal.vue` / `PackagingBatchFillModal.vue` | `height: 32px`、`padding: 0 14px`、字号 `--fs-xs`、字重 bold、文字 `--color-text-heading` |
+
+`.btn-sm` 在 12+ 个组件、26 处以上真实使用，因此这是**对外可见的不一致**：同一套 UI 里同为次要按钮，高度（32px 固定 vs padding 撑开）、圆角、字号、文字色各不相同。
+
+同类纯副本（逐字节相同，无漂移）：`.batch-count-pill`、`.btn-cancel` / `.btn-save`、`.dialog-actions`、`.form-dialog-header`（各 3–5 个 media 对话框重复）、`.toolbar`（4 个视图）、`.page-head` / `.page-header::before`（4 个视图）。
+
+> 说明：这些都是 scoped 定义，彼此**不构成级联冲突**（scoped 会隔离），属于源码级重复实现，而不是优先级问题。
+
+### C6-2 `utilities.css` 的硬编码 + `!important` 裸选择器（唯一确认的行为偏差）
+
+`utilities.css:76/82/88`（`.btn-danger`）与 `:154/160`（`.btn-sm.danger`）用写死字面量 + `!important`，**完全绕过 danger 令牌体系**。实测双主题：
+
+| 类 | 浅色 | 深色 | 结论 |
+|---|---|---|---|
+| `.btn-danger` | bg `rgb(190,18,60)` | bg `rgb(190,18,60)` | **两主题完全相同**，未跟随主题；而 `--color-danger` 在深色已变为 `#ef4444`、`--color-danger-text` 变为 `#fca5a5` |
+| `.btn-sm.danger` | bg `rgb(255,255,255)` | bg `rgb(255,255,255)` | 深色下**仍是纯白底**（`background: #ffffff !important`），与 C4-B 修过的"写死字面量不跟随主题"是同一类缺陷 |
+| `.btn-success`（对照） | `#f0fdf4` | `rgba(22,163,74,.1)` | 走令牌，双主题正常 ✓ |
+
+当前影响范围有限：`.btn-danger` 与 `.btn-success` 在**模板中零引用**；`PackagingDetailDrawer` 的删除按钮虽用 `class="btn-sm danger"`，但被更具体的 `.drawer-actions .btn-sm.danger`（同为 `!important`）覆盖，故尚未显现问题。属**潜在风险 + 令牌体系外绕过**，建议清理而非紧急修复。
+
+对照之下，`packaging-detail-drawer.css`(30)、`media-account-view.css`(19)、`dialog-layout.css`(17) 中的 `!important` 都带有上下文限定（`.drawer-actions …`、`.row-btn…`、`.lq-dialog__foot …`），不会外溢。
+
+### C6-3 分布统计（本身不是错误，供后续定位）
+
+| 项 | 数量 | 主要分布 |
+|---|---|---|
+| 改写 EP 内部选择器 | 48 个文件 | 全局表 7 / 组件非 scoped 2 / **组件 scoped 39**：`element-plus.css` 45 条、`ProductionTrackingView` 19、`H3ImportCenterView` 12、`LqTable` 11、`LqDescriptions` 10 |
+| `!important` | 274 处 / 26 文件 | `element-plus.css` 55、`LqDescriptions` 32、`CustomerDetailPanel` 32、`packaging-detail-drawer.css` 30、`media-account-view.css` 19 |
+| `:deep()` | 174 条 / 50 文件 | `ProductionTrackingView` 16、`PackagingMoldsMasterDetail` 12、`LqTable` 11、`CustomerDetailPanel` 11、`LqDescriptions` 10 |
+| 同选择器跨文件且有属性重叠 | 351 组 | Top 见 C6-1 |
+| 全局类与组件 scoped 同名 | 240 个类 | Top 多为通用状态名（`.active` 22、`.primary` 12、`.required` 12、`.danger` 11） |
+
+240 个同名类里，**绝大多数不构成冲突**：`.active` / `.primary` / `.danger` / `.muted` 等通用状态名被各组件 scoped 各自定义，scoped 隔离有效。真正需要留意的是 `.el-select`（8 个组件）与 `.el-table__cell`（6 个组件）这类 **EP 结构类被业务组件各自改写**，组件库的改动分散在业务代码里，改 EP 版本时排查面会很大。
+
+### C6 结论（本轮不修改代码）
+
+| 项 | 类型 | 处理建议 |
+|---|---|---|
+| `.btn-sm` 4 种写法漂移 | **重复实现 + 可见不一致** | 建议立项：抽取统一的次要按钮（公共类或复用既有按钮组件），9 个文件逐一收敛。风险中，需专项视觉确认 |
+| `utilities.css` `.btn-danger` / `.btn-sm.danger` | **令牌体系外绕过 + 潜在外溢** | 改为引用 `--color-danger*` 令牌并去掉不必要的 `!important`；`.btn-danger` / `.btn-success` 零引用，可连同确认后清理。风险低 |
+| 纯副本类（`.batch-count-pill`、`.btn-cancel/save`、`.form-dialog-header` 等） | 重复实现（无漂移） | 暂不处理，待上述统一工作时一并提取 |
+| EP 结构类分散改写（`.el-select`、`.el-table__cell`） | 归属分散 | 记录为准，不重构；后续 EP 升级时按此清单排查 |
+| `:deep()` / `!important` 现状 | 写法，非缺陷 | 保持现状，仅在出现真实冲突时处理 |
+
+**下一步**：C6 为只读审计，本轮不改动代码。上面前两项建议要么单列专项（`.btn-sm` 统一），要么随下一次相关改动顺手处理（`utilities.css` 硬编码）。
