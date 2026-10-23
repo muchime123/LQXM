@@ -96,18 +96,6 @@ function handleSave() {
   margin: 5px 0 0;
 }
 
-.batch-count-pill {
-  align-items: center;
-  background: var(--color-primary-bg);
-  border: 1px solid var(--color-primary-border-light);
-  border-radius: var(--radius-pill);
-  color: var(--color-success-text);
-  display: inline-flex;
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-extrabold);
-  padding: 5px 10px;
-  white-space: nowrap;
-}
 
 .dialog-form-body {
   display: grid;

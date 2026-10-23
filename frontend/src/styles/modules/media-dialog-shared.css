@@ -71,6 +71,20 @@
   white-space: nowrap;
 }
 
+/* 批量操作的计数徽标：三个标准对话框原先各自复制了一份，收敛到此处统一维护 */
+.media-form-dialog .batch-count-pill {
+  align-items: center;
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary-border-light);
+  border-radius: var(--radius-pill);
+  color: var(--color-success-text);
+  display: inline-flex;
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-extrabold);
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
 @media (max-width: 768px) {
   .media-form-dialog,
   .media-detail-dialog {
