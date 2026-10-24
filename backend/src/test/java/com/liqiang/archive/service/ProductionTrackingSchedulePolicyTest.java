@@ -97,6 +97,13 @@ class ProductionTrackingSchedulePolicyTest {
         assertEquals("SCHEDULE_LATE",result.risk());
     }
 
+    @Test void productBaselineCompletenessStopsAtWarehouse() {
+        var codes=List.of("MATERIAL","MOLD","ASSEMBLY","WAREHOUSE","WOODEN_CRATE");
+        assertTrue(ProductionTrackingSchedulePolicy.hasCompleteProductBaseline(codes,DAYS,Map.of("WOODEN_CRATE",true)));
+        assertFalse(ProductionTrackingSchedulePolicy.hasCompleteProductBaseline(codes,
+                Map.of("MATERIAL",BigDecimal.ZERO,"MOLD",BigDecimal.ONE),Map.of("WOODEN_CRATE",true)));
+    }
+
     // ---- 节点提前完成 → 预测提前 ----
 
     @Test void earlyNodeCompletionAdvancesPredictedFinishAndRelievesPressure() {

@@ -86,6 +86,7 @@
             <strong>参考进度晚于车间交期 {{ referencePressure.days }} 天</strong>
             <span>{{ referencePressure.stageLabel }}节点参考完成 {{ referencePressure.referenceDate }}，当前车间交期 {{ detail.schedule.deadline }}。请与车间核实能否提前关键节点；目标完成日期仅供协调。</span>
           </div>
+          <p v-if="baselineNotice" class="baseline-notice">系统参考日期可能采用车间通用工期；本产品的节点参考工期尚未配齐，暂无法可靠倒排全部目标日期。</p>
           <el-alert v-if="!detail.order.stoppedAt && stageGapLabels.length" type="warning" :closable="false" show-icon
             :title="`后续节点已完成，前面的 ${stageGapLabels.join('、')} 尚未完成或未核实顺序。`"
             description="确实完成的节点请补完成日期；未按常规顺序经过的节点可逐项记录原因并保存，保存后不再重复提醒。" />
@@ -407,6 +408,9 @@ const referencePressure = computed(() => {
     : null
 })
 
+const baselineNotice = computed(() => Boolean(detail.value?.order.scheduleTime && detail.value.schedule.deadline
+  && !detail.value.schedule.productBaselineComplete && milestones.value.some(stage => stage.referenceDate)))
+
 function loadOrder(id: number) {
   if (!Number.isInteger(id) || id <= 0) return
   showSecondaryMetrics.value = false
@@ -515,6 +519,7 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .cell-date { width: 132px; }
 .cell-reference { font-size: 13px; color: #475467; display: flex; flex-direction: column; gap: 2px; line-height: 1.4; min-width: 0; }
 .reference-pressure { display: flex; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; padding: 9px 11px; border: 1px solid #fecdca; border-radius: 7px; background: #fff6f5; color: #912018; font-size: 12.5px; line-height: 1.5; }
+.baseline-notice { margin: 0 0 10px; padding: 7px 10px; border-radius: 6px; background: #f7f8fa; color: #667085; font-size: 12px; line-height: 1.5; }
 .reference-pressure strong { color: #b42318; }
 .cell-reference.is-late-target .reference-date, .cell-reference .reference-meta.is-late { color: #b42318; }
 .cell-target { font-size: 13px; color: #475467; white-space: nowrap; }

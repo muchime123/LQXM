@@ -277,10 +277,20 @@ public class ProductionTrackingService {
     private static boolean scheduleAction(String action) {
         return "SCHEDULE_DUE".equals(action)||"DELIVERY_PRESSURE".equals(action);
     }
-    /** 把提醒筛选值翻成 SQL：{@code all→null}（不加条件）、{@code any→IS NOT NULL}、其余按代码等值。 */
+    /** 每种传统待办按自己的事实条件筛选；列表主提醒仍由 TRACKING_ACTION 决定。调用前须通过白名单校验。 */
     static String trackingActionPredicate(String action) {
         if("any".equals(action))return TRACKING_ACTION+" IS NOT NULL";
-        return TRACKING_ACTION+"=?";
+        String active="t.stopped_at IS NULL AND t.closed_at IS NULL";
+        String condition=switch(action){
+            case "FINISHED_PENDING" -> NEVER_TRACKED+" AND p.actual_completion_date IS NOT NULL";
+            case "INBOUND_PENDING" -> NEVER_TRACKED+" AND ib.first_in IS NOT NULL";
+            case "SCHEDULED_PENDING" -> NEVER_TRACKED+" AND p.schedule_time IS NOT NULL";
+            case "INBOUND_UNLOGGED" -> "NOT "+NEVER_TRACKED+" AND ib.first_in IS NOT NULL AND ms.warehouse_in_date IS NULL";
+            case "STALE_FOLLOWUP" -> "NOT "+NEVER_TRACKED+" AND NOT "+TRACKING_COMPLETE
+                    +" AND t.last_followup_at<DATE_SUB(CURDATE(),INTERVAL "+STALE_FOLLOWUP_DAYS+" DAY)";
+            default -> throw new IllegalArgumentException("跟单待办筛选无效");
+        };
+        return "("+active+" AND "+condition+")";
     }
     static final String HAS_FOLLOWUP_SQL="SELECT t.version,"
             +"(SELECT COUNT(*) FROM production_tracking_entries e WHERE e.production_order_id=t.production_order_id) entries_count "
@@ -1047,8 +1057,8 @@ public class ProductionTrackingService {
                 salesperson,deliveryResult,application,schedule,expected,urgent,moldLayout,created,
                 optionalStage,moldStage);
         if(scheduleFilter){
-            var matched=jdbc.query(LIST_COLUMNS+TRACKING_FROM+INBOUND_JOIN+f.where()+LIST_ORDER,
-                    (r,n)->row(r),f.params().toArray());
+            var matched=new ArrayList<>(jdbc.query(LIST_COLUMNS+TRACKING_FROM+INBOUND_JOIN+f.where()+LIST_ORDER,
+                    (r,n)->row(r),f.params().toArray()));
             attachScheduleSignals(matched);
             matched.removeIf(item->!matchesScheduleAction(item,action));
             long offset=(long)(page-1)*size;
@@ -1123,7 +1133,8 @@ public class ProductionTrackingService {
         // 因为单测只断言 where 字符串。（2026-10-21 改默认口径时新增）
         boolean needsInbound=(deliveryResult!=null&&!deliveryResult.isBlank())
                 ||(countdown!=null&&!countdown.isBlank())
-                ||"open".equals(trackingStatus);
+                ||"open".equals(trackingStatus)
+                ||"INBOUND_PENDING".equals(action)||"INBOUND_UNLOGGED".equals(action);
         if(!Set.of("open","all","pending","in_progress","completed","closed","stopped").contains(trackingStatus))
             throw new IllegalArgumentException("跟单状态筛选无效");
         if(!Set.of("all","overdue","due","delayed","near","none","time_due","time_attention","time_source","time_production",
@@ -1184,7 +1195,6 @@ public class ProductionTrackingService {
         // 跟单待办与「时间核实」是两条独立的轴，各自一段条件，可叠加。
         if(!"all".equals(action)){
             where.append(" AND ").append(trackingActionPredicate(action));
-            if(!"any".equals(action))params.add(action);
         }
         // 两类「按跟单进度」的状态各自还要排除已停止/已结案的（停止态的状态值本身是 stopped，但
         // pending 的判据「一个节点都没有」对一条已停止的空单同样成立，不排除就会把停掉的单当成待跟单）。
@@ -1398,8 +1408,8 @@ public class ProductionTrackingService {
         List<Map<String,Object>> rows;
         boolean truncated;
         if(scheduleFilter){
-            rows=jdbc.query(LIST_COLUMNS+TRACKING_FROM+INBOUND_JOIN+where+LIST_ORDER,
-                    (r,n)->row(r),params.toArray());
+            rows=new ArrayList<>(jdbc.query(LIST_COLUMNS+TRACKING_FROM+INBOUND_JOIN+where+LIST_ORDER,
+                    (r,n)->row(r),params.toArray()));
             attachScheduleSignals(rows);
             rows.removeIf(item->!matchesScheduleAction(item,action));
             total=rows.size();
@@ -1721,9 +1731,10 @@ public class ProductionTrackingService {
         }
     }
 
-    private static boolean matchesScheduleAction(Map<String,Object> item,String action) {
+    static boolean matchesScheduleAction(Map<String,Object> item,String action) {
         if("any".equals(action)){
             if(item.get("trackingAction")!=null)return true;
+            if(item.get("stoppedAt")!=null||item.get("closedAt")!=null||item.get("deliveredDate")!=null)return false;
             String risk=(String)item.get("scheduleRisk");
             return "SCHEDULE_DUE".equals(risk)||"SCHEDULE_LATE".equals(risk)||"PRESSURE".equals(risk);
         }
@@ -2458,7 +2469,8 @@ public class ProductionTrackingService {
         }
         LocalDate deadline=source.get("forecastFinishDate") instanceof LocalDate d?d
                 :source.get("expectedFinishDate") instanceof LocalDate d?d:null;
-        var schedule=ProductionTrackingSchedulePolicy.calculate(codes,publishedProductBenchmarksForOrder(source),
+        var productBenchmarks=publishedProductBenchmarksForOrder(source);
+        var schedule=ProductionTrackingSchedulePolicy.calculate(codes,productBenchmarks,
                 applicable,statuses,dates,manualDates,anchor,deadline,LocalDate.now());
         for(var item:milestones)item.put("targetDate",schedule.targetDates().get(String.valueOf(item.get("code"))));
         var out=new LinkedHashMap<String,Object>();
@@ -2467,6 +2479,7 @@ public class ProductionTrackingService {
         out.put("slackDays",schedule.slackDays());
         out.put("risk",schedule.risk());
         out.put("deadline",deadline);
+        out.put("productBaselineComplete",ProductionTrackingSchedulePolicy.hasCompleteProductBaseline(codes,productBenchmarks,applicable));
         return out;
     }
 

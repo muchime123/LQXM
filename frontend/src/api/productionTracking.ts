@@ -563,6 +563,7 @@ export const fetchTrackingDetail = async (id: number) =>
       slackDays: number | null
       risk: 'NO_BASELINE' | 'SCHEDULE_LATE' | 'SCHEDULE_DUE' | 'SCHEDULE_NORMAL' | 'UNKNOWN' | 'PRESSURE' | 'NO_BUFFER' | 'ON_TRACK'
       deadline: string | null
+      productBaselineComplete: boolean
     }
     milestones: TrackingMilestone[]
     operations: TrackingOperation[]

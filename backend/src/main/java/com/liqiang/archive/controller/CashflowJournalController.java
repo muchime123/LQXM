@@ -53,17 +53,19 @@ public class CashflowJournalController {
     public Map<String, Object> accounts(@RequestParam LocalDate start, @RequestParam LocalDate end) {
         validatePeriod(start, end);
         List<Map<String, Object>> items = jdbc.query("""
-                SELECT a.id, a.account_name, a.currency, a.opening_balance,
+                SELECT a.id, a.account_name, a.currency, opening.amount AS opening_balance,
                        a.entity_id, a.status, e.name AS entity_name,
                        COALESCE(SUM(CASE WHEN e2.entry_date >= '2026-01-01' AND e2.entry_date < ? THEN COALESCE(e2.income,0)-COALESCE(e2.expense,0) ELSE 0 END),0) AS before_net,
                        COALESCE(SUM(CASE WHEN e2.entry_date BETWEEN ? AND ? THEN e2.income ELSE 0 END),0) AS income,
                        COALESCE(SUM(CASE WHEN e2.entry_date BETWEEN ? AND ? THEN e2.expense ELSE 0 END),0) AS expense,
                        COUNT(CASE WHEN e2.entry_date BETWEEN ? AND ? THEN 1 END) AS entry_count
                   FROM h3_cash_accounts a
+                  LEFT JOIN cashflow_account_opening opening ON opening.account_id=a.id
+                   AND opening.fiscal_year=2026 AND opening.active=1
                   LEFT JOIN cashflow_entities e ON e.id = a.entity_id
                   LEFT JOIN h3_cashflow_entries e2 ON e2.external_source='H3YUN' AND e2.account_name=a.account_name
                  WHERE a.external_source='H3YUN'
-                 GROUP BY a.id,a.account_name,a.currency,a.opening_balance,a.entity_id,a.status,e.name
+                 GROUP BY a.id,a.account_name,a.currency,opening.amount,a.entity_id,a.status,e.name
                  ORDER BY entry_count DESC, a.account_name ASC
                 """, (rs, ignored) -> accountRow(rs), start, start, end, start, end, start, end);
         Map<String, CurrencyTotal> byCurrency = new LinkedHashMap<>();
@@ -152,8 +154,10 @@ public class CashflowJournalController {
     @RequirePermission("cashflow.read")
     public Map<String, Object> monthly(@PathVariable long accountId) {
         List<Map<String, Object>> accountRows = jdbc.query("""
-                SELECT account_name,currency,opening_balance FROM h3_cash_accounts
-                 WHERE id=? AND external_source='H3YUN'
+                SELECT a.account_name,a.currency,opening.amount AS opening_balance FROM h3_cash_accounts a
+                  LEFT JOIN cashflow_account_opening opening ON opening.account_id=a.id
+                   AND opening.fiscal_year=2026 AND opening.active=1
+                 WHERE a.id=? AND a.external_source='H3YUN'
                 """, (rs, ignored) -> {
             Map<String, Object> row = new LinkedHashMap<>();
             row.put("accountName", rs.getString("account_name"));

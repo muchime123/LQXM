@@ -928,12 +928,12 @@ class ProductionTrackingServiceTest {
         assertTrue(ProductionTrackingService.STALE_FOLLOWUP_DAYS>0);
     }
 
-    /** 跟单待办的筛选值必须与列表共用同一段谓词，否则下拉数字与点进去的条数会打架。 */
+    /** 传统待办按独立事实筛选，列表主提醒可以显示更高优先级的另一项。 */
     @Test
     void trackingActionFilterUsesSamePredicateForCountAndPage() {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
-        when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
+        when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(new java.util.ArrayList<>());
         var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
         service.list(null,null,"all","all","",false,"","","INBOUND_PENDING",1,30);
@@ -943,22 +943,45 @@ class ProductionTrackingServiceTest {
         verify(jdbc).queryForObject(countSql.capture(),eq(Long.class),countParams.capture());
         var pageSql=org.mockito.ArgumentCaptor.forClass(String.class);
         verify(jdbc).query(pageSql.capture(),any(RowMapper.class),any(Object[].class));
-        assertTrue(countSql.getValue().contains(ProductionTrackingService.TRACKING_ACTION+"=?"),
+        String independentCondition=ProductionTrackingService.trackingActionPredicate("INBOUND_PENDING");
+        assertTrue(countSql.getValue().contains(independentCondition),
                 "计数查询必须带同一段的跟单待办条件："+countSql.getValue());
-        assertTrue(pageSql.getValue().contains(ProductionTrackingService.TRACKING_ACTION+"=?"),
+        assertTrue(countSql.getValue().contains(ProductionTrackingService.INBOUND_JOIN),
+                "入库类待办的计数查询必须关联入库事实："+countSql.getValue());
+        assertTrue(pageSql.getValue().contains(independentCondition),
                 "明细查询必须带同一段的跟单待办条件："+pageSql.getValue());
-        assertEquals(List.of("INBOUND_PENDING"),List.of(countParams.getValue()),
-                "提醒代码必须作为参数传入，不能拼进 SQL 字符串："+List.of(countParams.getValue()));
+        assertTrue(independentCondition.contains("ib.first_in IS NOT NULL"));
+        assertFalse(independentCondition.contains("TRACKING_ACTION"));
+        assertEquals(0,countParams.getValue().length);
 
-        // any＝只要有提醒；all＝完全不加条件。
-        var anyParams=org.mockito.ArgumentCaptor.forClass(Object[].class);
+        // any 包含实时计算的排产/交期提醒，需先取数再筛；不复用传统提醒的 SQL COUNT。
         service.list(null,null,"all","all","",false,"","","any",1,30);
-        verify(jdbc,times(2)).queryForObject(anyString(),eq(Long.class),anyParams.capture());
-        assertEquals(List.of(),List.of(anyParams.getAllValues().get(1)));
+        verify(jdbc,times(1)).queryForObject(anyString(),eq(Long.class),any(Object[].class));
 
         assertThrows(IllegalArgumentException.class,
                 ()->service.list(null,null,"all","all","",false,"","","NOT_A_ACTION",1,30),
                 "白名单外的跟单待办必须报错，不能静默返回全量");
+    }
+
+    @Test void traditionalActionPredicatesMatchFactsIndependentlyOfPrimaryAction() {
+        assertTrue(ProductionTrackingService.trackingActionPredicate("STALE_FOLLOWUP")
+                .contains("last_followup_at<DATE_SUB"));
+        assertTrue(ProductionTrackingService.trackingActionPredicate("SCHEDULED_PENDING")
+                .contains("p.schedule_time IS NOT NULL"));
+        assertTrue(ProductionTrackingService.trackingActionPredicate("INBOUND_UNLOGGED")
+                .contains("ms.warehouse_in_date IS NULL"));
+    }
+
+    @Test void inboundUnloggedCountIncludesInboundJoin() {
+        var jdbc=mock(JdbcTemplate.class);
+        when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
+        when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
+        var service=new ProductionTrackingService(jdbc,null,null,new ObjectMapper(),allScope());
+        service.list(null,null,"all","all","",false,"","","INBOUND_UNLOGGED",1,30);
+        var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc).queryForObject(countSql.capture(),eq(Long.class),any(Object[].class));
+        assertTrue(countSql.getValue().contains(ProductionTrackingService.INBOUND_JOIN));
+        assertTrue(countSql.getValue().contains(ProductionTrackingService.trackingActionPredicate("INBOUND_UNLOGGED")));
     }
 
     /**
@@ -1217,8 +1240,8 @@ class ProductionTrackingServiceTest {
         when(jdbc.query(sql.capture(),any(RowMapper.class),args.capture())).thenReturn(List.of());
         var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
 
-        service.list("客户","封口机","open","time_overdue","",false,"7","2026-10","any",2,30);
-        service.exportRows("客户","封口机","open","time_overdue","",false,"7","2026-10","any");
+        service.list("客户","封口机","open","time_overdue","",false,"7","2026-10","STALE_FOLLOWUP",2,30);
+        service.exportRows("客户","封口机","open","time_overdue","",false,"7","2026-10","STALE_FOLLOWUP");
 
         // 取数为空时 attach* 会直接返回，故恰好两条取数 SQL。
         var queries=sql.getAllValues();
@@ -1243,6 +1266,35 @@ class ProductionTrackingServiceTest {
         assertThrows(IllegalArgumentException.class,
                 ()->service.exportRows("","","all","all","",false,"","","nope"),
                 "导出不得绕过跟单待办白名单校验");
+    }
+
+    @Test
+    void derivedActionListAndExportScanTheSameFilteredRows() {
+        var jdbc=mock(JdbcTemplate.class);
+        var sql=org.mockito.ArgumentCaptor.forClass(String.class);
+        var args=org.mockito.ArgumentCaptor.forClass(Object[].class);
+        when(jdbc.query(sql.capture(),any(RowMapper.class),args.capture())).thenReturn(List.of());
+        var service=new ProductionTrackingService(jdbc,null,null,new ObjectMapper(),allScope());
+
+        var listed=service.list("客户","封口机","all","all","",false,"","2026-10","any",1,30);
+        var exported=service.exportRows("客户","封口机","all","all","",false,"","2026-10","any");
+
+        assertEquals(sql.getAllValues().get(0),sql.getAllValues().get(1));
+        assertArrayEquals(args.getAllValues().get(0),args.getAllValues().get(1));
+        assertEquals(((Number)listed.get("total")).longValue(),((Number)exported.get("total")).longValue());
+        verify(jdbc,never()).queryForObject(anyString(),eq(Long.class),any(Object[].class));
+    }
+
+    @Test void anyActionExcludesDeliveredSchedulePressure() {
+        var delivered=new java.util.HashMap<String,Object>();
+        delivered.put("scheduleRisk","PRESSURE");
+        delivered.put("deliveredDate",java.time.LocalDate.of(2026,10,20));
+        assertFalse(ProductionTrackingService.matchesScheduleAction(delivered,"any"));
+        delivered.put("trackingAction","INBOUND_PENDING");
+        assertTrue(ProductionTrackingService.matchesScheduleAction(delivered,"any"));
+        delivered.remove("trackingAction");
+        delivered.remove("deliveredDate");
+        assertTrue(ProductionTrackingService.matchesScheduleAction(delivered,"any"));
     }
 
     /**

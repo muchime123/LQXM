@@ -18,12 +18,7 @@ final class ProductionTrackingSchedulePolicy {
                             Map<String,Boolean> applicable, Map<String,String> statuses,
                             Map<String,LocalDate> completed, Map<String,LocalDate> manual,
                             LocalDate scheduled, LocalDate deadline, LocalDate today) {
-        var filtered=codes.stream().filter(code->!ProductionTrackingPolicy.isOptionalStage(code)
-                ||Boolean.TRUE.equals(applicable.get(code))).toList();
-        // #39: 交期口径终点＝入库（WAREHOUSE）；入库后的节点（如木箱）不参与交期倒排与预测完成。
-        int warehouseIdx=filtered.indexOf("WAREHOUSE");
-        var active=warehouseIdx>=0&&warehouseIdx<filtered.size()-1
-                ?filtered.subList(0,warehouseIdx+1):filtered;
+        var active=deliveryStages(codes,applicable);
         var targets=new LinkedHashMap<String,LocalDate>();
         LocalDate target=deadline;
         for(int i=active.size()-1;i>=0;i--){
@@ -50,5 +45,20 @@ final class ProductionTrackingSchedulePolicy {
         Long slack=deadline!=null&&cursor!=null?ChronoUnit.DAYS.between(cursor,deadline):null;
         String risk=slack==null?"UNKNOWN":slack<0?"PRESSURE":slack==0?"NO_BUFFER":"ON_TRACK";
         return new Result(latestStart,cursor,slack,risk,targets);
+    }
+
+    static boolean hasCompleteProductBaseline(List<String> codes,Map<String,BigDecimal> intervals,
+                                               Map<String,Boolean> applicable){
+        var active=deliveryStages(codes,applicable);
+        return !active.isEmpty()&&active.contains("WAREHOUSE")&&active.stream().allMatch(code->intervals.get(code)!=null);
+    }
+
+    private static List<String> deliveryStages(List<String> codes,Map<String,Boolean> applicable){
+        var filtered=codes.stream().filter(code->!ProductionTrackingPolicy.isOptionalStage(code)
+                ||Boolean.TRUE.equals(applicable.get(code))).toList();
+        // #39: 交期口径终点＝入库（WAREHOUSE）；入库后的节点（如木箱）不参与交期倒排与预测完成。
+        int warehouseIdx=filtered.indexOf("WAREHOUSE");
+        return warehouseIdx>=0&&warehouseIdx<filtered.size()-1
+                ?filtered.subList(0,warehouseIdx+1):filtered;
     }
 }

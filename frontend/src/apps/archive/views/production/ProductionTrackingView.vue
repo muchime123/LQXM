@@ -137,8 +137,8 @@
       <el-table-column v-if="isListColumnVisible('trackingAction')" label="跟单待办" width="168">
         <template #default="{ row }">
           <el-tag v-if="effectiveAction(row)" :type="actionTone(effectiveAction(row)!)" effect="light" :title="actionHint(row)">{{ actionLabel(effectiveAction(row)) }}</el-tag>
-          <el-tooltip v-if="row.trackingAction && row.primaryAction && row.trackingAction !== row.primaryAction" :content="`筛选命中：${actionLabel(row.trackingAction)}`" placement="top">
-            <small class="filter-match-hint"> ·{{ actionLabel(row.trackingAction) }}</small>
+          <el-tooltip v-if="actionFilter !== 'all' && actionFilter !== 'any' && effectiveAction(row) !== actionFilter" :content="`筛选命中：${actionLabel(actionFilter as TrackingActionCode)}`" placement="top">
+            <small class="filter-match-hint"> ·{{ actionLabel(actionFilter as TrackingActionCode) }}</small>
           </el-tooltip>
           <span v-if="!effectiveAction(row)" class="muted">—</span>
         </template>
@@ -553,7 +553,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { fetchTracking } from '@/api/productionTracking'
-import type { TrackingOrder } from '@/api/productionTracking'
+import type { TrackingActionCode, TrackingOrder } from '@/api/productionTracking'
 import ProductionTaskImportDialog from '@/components/production/ProductionTaskImportDialog.vue'
 import TrackingDetailDrawer from '@/components/production/TrackingDetailDrawer.vue'
 import ProductionTrackingAnalyticsDrawer from './ProductionTrackingAnalyticsDrawer.vue'
