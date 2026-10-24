@@ -1,7 +1,7 @@
 -- P1-A read-only inventory for product_archive. Run with a SELECT-only account.
 -- Send tabular output only; exclude credentials and row-level business data.
 SET SESSION TRANSACTION READ ONLY;
-START TRANSACTION READ ONLY WITH CONSISTENT SNAPSHOT;
+START TRANSACTION READ ONLY;
 SELECT DATABASE() AS schema_name, CURRENT_USER() AS account_name, @@read_only AS server_read_only;
 SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('product_models','product_machine_tiers','product_variants','product_assets','packaging_models','packaging_variants','packaging_molds','product_model_packaging_links','product_machine_tier_packaging_links','product_asset_machine_tier_links','packaging_assets','mold_variant_links','file_assets') ORDER BY TABLE_NAME;
 SELECT TABLE_NAME,COLUMN_NAME,DATA_TYPE,IS_NULLABLE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND (TABLE_NAME IN ('product_models','product_machine_tiers','product_variants','product_assets','packaging_models','packaging_variants','packaging_molds','product_model_packaging_links','product_machine_tier_packaging_links','product_asset_machine_tier_links','packaging_assets','mold_variant_links','file_assets') OR COLUMN_NAME IN ('product_model_id','product_machine_tier_id','product_variant_id','model_id','machine_tier_id','variant_id','packaging_variant_id','asset_id')) ORDER BY TABLE_NAME,ORDINAL_POSITION;
