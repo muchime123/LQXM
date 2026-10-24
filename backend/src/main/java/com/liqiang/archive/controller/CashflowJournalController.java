@@ -305,7 +305,9 @@ public class CashflowJournalController {
                 SELECT a.id AS account_id,a.account_name,NULL AS entry_id,NULL AS entry_date,
                        'MISSING_OPENING' AS issue_code,'账户缺少期初余额' AS detail
                   FROM h3_cash_accounts a
-                 WHERE a.external_source='H3YUN' AND a.opening_balance IS NULL AND (? IS NULL OR a.id=?)
+                  LEFT JOIN cashflow_account_opening opening ON opening.account_id=a.id
+                   AND opening.fiscal_year=2026 AND opening.active=1
+                 WHERE a.external_source='H3YUN' AND opening.amount IS NULL AND (? IS NULL OR a.id=?)
                 UNION ALL
                 SELECT a.id,e.account_name,e.id,e.entry_date,
                        'MISSING_DATE','流水有收支但日期缺失'
