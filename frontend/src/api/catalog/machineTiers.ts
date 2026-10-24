@@ -62,35 +62,3 @@ export function updateMachineTier(id: number, data: MachineTierPayload) {
 export function deleteMachineTier(id: number) {
   return http.delete(`/catalog/machine-tiers/${id}`).then(res => res.data)
 }
-
-export interface PackagingCompatibilityOption {
-  id: number
-  modelId: number
-  modelName: string
-  variantName?: string
-  apertureKey: string
-  apertureLabel: string
-  heightMm?: string
-  capacityMl?: string
-  dimensionLabel: string
-}
-
-export interface ProductPackagingCompatibilityMatrix {
-  options: PackagingCompatibilityOption[]
-  productPackagingVariantIds: number[]
-  machineTierAssignments: Array<{ machineTierId: number; packagingVariantIds: number[] }>
-}
-
-export function fetchProductPackagingCompatibility(modelId: number) {
-  return http.get(`/catalog/models/${modelId}/packaging-compatibility`)
-    .then(res => res.data as ProductPackagingCompatibilityMatrix)
-}
-
-export function replaceProductPackagingCompatibility(
-  modelId: number,
-  machineTierId: number | null,
-  packagingVariantIds: number[]
-) {
-  return http.put(`/catalog/models/${modelId}/packaging-compatibility`, { machineTierId, packagingVariantIds })
-    .then(res => res.data as ProductPackagingCompatibilityMatrix)
-}

@@ -89,7 +89,7 @@ const props = defineProps({
 const emit = defineEmits(['update:active-tab', 'close-drawer', 'open-model-editor', 'toggle-title-menu'])
 
 const detailTabs = [
-  { key: 'variants', label: '机型与包材' },
+  { key: 'variants', label: '机型参数' },
   { key: 'overview', label: '产品概览' },
   { key: 'assets', label: '素材管理' }
 ]
