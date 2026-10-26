@@ -158,7 +158,6 @@
   padding-right: var(--space-control-gap-tight);
 }
 
-.zone-heading,
 .spec-detail-card header {
   display: flex;
   align-items: flex-start;
@@ -533,18 +532,6 @@
   background: var(--color-overlay-image-strong);
 }
 
-.manager-item.active {
-  border-color: var(--color-primary);
-}
-
-.manager-actions button.danger {
-  background: rgba(239, 68, 68, 0.8);
-}
-
-.manager-actions button.danger:hover {
-  background: rgba(239, 68, 68, 1);
-}
-
 .slide-up-enter-active,
 .slide-up-leave-active {
   transition: all var(--transition-base);
@@ -556,19 +543,10 @@
   transform: translateY(-10px);
 }
 
-.zone-heading h3,
 .spec-detail-card h3,
 .series-card h3 {
   margin: 0;
   color: var(--color-text-heading);
-}
-
-.quality-filter-bar button:hover,
-.quality-filter-bar button.active {
-  border-color: var(--color-primary);
-  background: var(--color-primary-bg-light);
-  color: var(--color-primary);
-  font-weight: var(--fw-bold);
 }
 
 .film-overview-strip {
@@ -1364,12 +1342,6 @@
   grid-template-columns: 1fr;
 }
 
-.detail-field {
-  display: grid;
-  gap: 3px;
-  min-width: 0;
-}
-
 .detail-section-dimensions .detail-field {
   gap: 2px;
   border-radius: 7px;
@@ -1718,8 +1690,7 @@
   background: rgba(220, 38, 38, 0.15) !important;
 }
 
-.btn-sm,
-.icon-button {
+.btn-sm {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1827,7 +1798,6 @@
 .variant-form-grid textarea:focus,
 .variant-form-grid select:focus,
 .price-input-group input:focus,
-.exchange-rate-input-group input:focus,
 .exchange-rate-inline input:focus {
   outline: none;
   border-color: var(--color-primary);
