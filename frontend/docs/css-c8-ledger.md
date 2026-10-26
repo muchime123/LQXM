@@ -211,7 +211,74 @@
 
 > 该文件被 3 个组件以 scoped 方式内联（运行时承载作用域号 3 个；删除前产物中 `folder-quality-btn` 出现 9 次 = 3 规则 × 3 副本），故产物缩减 ≈ 源缩减 × 3，属真实收益。全站产物 CSS 文件数 58 不变。首轮前后构建之间发生了并行提交（13d2e86 → fcb5186），已用「同 HEAD 临时还原删除前版本重建」方式归因，PackagingView chunk 数字与 13d2e86 基线完全一致。注意：本批代码改动被并行会话的提交 fcb5186 一并带入仓库历史，未单独形成 `refactor(css)` 提交（不做历史改写）。
 
-**遗留发现（下一批候选，本批未动）**：`.manager-item.active`、`.manager-actions button.danger`、`.manager-actions button.danger:hover`、`.quality-filter-bar button:hover, .quality-filter-bar button.active` —— 因通用词 `active`/`danger` 在其他组件出现而被扫描器归为 C/D，实际其宿主类（`.manager-item` / `.manager-actions` / `.quality-filter-bar`）已删，这 4 条也是死规则。属于扫描器对「通用词尾部 token」的盲点，建议下一批连同 B 类核查一起修正分类方法。
+**遗留发现（下一批候选，本批未动）**：`.manager-item.active`、`.manager-actions button.danger`、`.manager-actions button.danger:hover`、`.quality-filter-bar button:hover, .quality-filter-bar button.active` —— 因通用词 `active`/`danger` 在其他组件出现而被扫描器归为 C/D，实际其宿主类（`.manager-item` / `.manager-actions` / `.quality-filter-bar`）已删，这 4 条也是死规则。属于扫描器对「通用词尾部 token」的盲点，建议下一批连同 B 类核查一起修正分类方法。（已于第二批处理，见下。）
+
+### C8-A 第二批实施记录（2026-10-26，先修扫描器再删）
+
+#### 1. 扫描器修正：`scripts/audit/c8-scan-v2.mjs`
+
+v1 判定式是「规则里任一类名 token 在全仓任一位置出现 → 视为被引用」。它会因通用词（`.manager-item.active` 里的 `active`）把死规则判活，也无法识别复合选择器里的死分支。
+
+v2 的判定（遵循四条原则）：
+
+1. 按**完整选择器分支**（逗号拆分、括号感知）独立判定，不再按 token 集合。
+2. 分支内类名区分**宿主类**与**状态/修饰类**（`active/danger/disabled/selected/…`，以及 `is-`/`has-`/`not-`/`el-` 前缀）；状态类一律不作为「存在消费者」的证据。
+3. 伪类（`:hover`/`:focus`/`:disabled`/`:active`…）与伪元素不参与类名匹配。
+4. **保守方向**：只要分支内任一宿主类被引用即判「有消费者」；只有全部宿主类都无引用才判无消费者；全是状态类同样判有消费者。状态词表收录不全只会少删，不会误删。动态依赖（伪元素、`:deep`、第三方/框架前缀、**Vue 过渡类 `-enter/-leave/-move`**、ts/js 字符串、同前缀拼接）单独列入「需运行时核实」，不直接进入删除候选。
+
+修复过程中还发现 v1 的一处真实缺陷：`class` 绑定只匹配了 `v-bind:class`，漏掉 `:class` 简写；且属性值用 `[^"']` 捕获，对象写法里带单引号的键会被截断。修复后 `PackagingSpecDetailPanel.vue` 通过 `:class` 动态绑定的 `.detail-section-dimensions` 才被正确识别为活跃类——正是「动态依赖」这个风险点的实例。
+
+**用 v2 复核第一批**：重扫删除前版本（13d2e86），v1 判 A 的 44 条中 **44 条仍判整条无消费者，0 条被 v2 认为有消费者**；已删的 42 条无一被 v2 判活；`slide-up` 两条被准确标记为「疑似 Vue 过渡类（运行时生成）」，与第一批保留它们的决定一致。
+
+#### 2. 第二批删除明细（9 处 = 5 条整条 + 4 个分支）
+
+整条删除：
+
+| 行 | 选择器 | 判定依据 |
+|---|---|---|
+| 536 | `.manager-item.active` | 状态类 `active` 剔除后宿主类 `manager-item` 全仓 0 引用；运行时 0 命中 |
+| 540 | `.manager-actions button.danger` | 剔除 `danger` 后宿主类 `manager-actions` 0 引用；运行时 0 命中 |
+| 544 | `.manager-actions button.danger:hover` | 同上；伪类不参与匹配 |
+| 567 | `.quality-filter-bar button:hover, .quality-filter-bar button.active` | 两个分支宿主类同为 `quality-filter-bar`，均 0 引用 |
+| 1367 | `.detail-field` | 全仓 0 引用（已由 `LqDescriptions` 取代）；运行时 0 命中 |
+
+仅移除无效分支（声明块仍被其他分支使用，不动整条）：
+
+| 行 | 规则 | 移除的分支 | 保留的分支 |
+|---|---|---|---|
+| 162 | `.zone-heading, .spec-detail-card header` | `.zone-heading` | `.spec-detail-card header` |
+| 561 | `.zone-heading h3, .spec-detail-card h3, .series-card h3` | `.zone-heading h3` | 另两条 |
+| 1722 | `.btn-sm, .icon-button` | `.icon-button` | `.btn-sm` |
+| 1831 | `… input:focus` 六分支组合块 | `.exchange-rate-input-group input:focus` | 其余五条 |
+
+**未删**：`slide-up` 两条（按约定保留为独立待核项）；`.detail-section-dimensions .detail-field`（容器类 `.detail-section-dimensions` 经 `:class` 动态生效，v2 按保守规则判「有消费者」；运行时 28 状态 0 命中，留待扫描器补上「复合选择器中一宿主类活跃、另一宿主类全仓 0 引用」的判定后再处理）。
+
+#### 3. 验证
+
+- 静态：v2 全仓扫描（覆盖 `class=` / `:class=` 对象键 / 三元字符串 / `classList` / render 函数 `class:`），宿主类 0 引用。
+- 运行时：双主题 × 1600/1024 × 7 状态 = 28 状态，5 条整条候选 **0 命中**，4 个待删分支 **0 命中**。
+- 计算样式：28 状态、每状态 ≤1500 个带类元素 × 32 个属性，**0 差异**。
+- 截图：14 组中 **12 组 0 像素差异**；`dark-05-tab-3` 0.0983%、`light-05-tab-3` 0.0483% 与噪声基线（0.0501% / 0.0507%）同量级；`light-05-tab-1` 的 5.03% 经「删除前版本连跑两次」复现（before vs before2 同样 72488 像素），确认与 CSS 版本无关。
+- lint 通过；vitest 70 文件 / 527 用例通过。
+
+#### 4. 构建体积（同 HEAD `7d43ac3`，前后仅该 CSS 一个文件不同）
+
+| 指标 | 删除前 | 删除后 | 差值 |
+|---|---|---|---|
+| 源文件字节 | 44396 | 43811 | **-585** |
+| 源规则数 | 273 | 268 | -5 |
+| PackagingView 路由产物 CSS 文件数 | 1 | 1 | 0 |
+| PackagingView CSS raw | 172034 | 170057 | **-1977** |
+| PackagingView CSS gzip | 22828 | 22587 | -241 |
+| PackagingView CSS brotli | 12261 | 12154 | -107 |
+
+累计（相对第一批之前）：raw 190766 → 170057（**-20709**）、gzip 24843 → 22587（-2256）、brotli 13067 → 12154（-913）；规则数 315 → 268。
+
+#### 5. 下一批候选（本批未动，未跨文件扩大）
+
+- `src/styles/media-account-view.css`：v2 判整条无消费者 **109** 条（v1 为 79，新增 30），其中 96 条可直接候选、13 条需运行时核实；另有 12 条仅部分分支无消费者。**需先在媒体账号路由做独立运行时核查**，本批不做。
+- `packaging-detail-drawer.css`：`.detail-section-dimensions .detail-field`（1 条，见上）。
+- `slide-up` 两条（Vue 过渡类，待单独确认生命周期后决定）。
 
 ### B 类：归属错位（不等于死代码，需逐个核实）
 
