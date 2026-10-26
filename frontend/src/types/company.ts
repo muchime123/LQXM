@@ -134,10 +134,6 @@ export interface CompanyCertification {
   fileName?: string | null
   description?: string | null
   status: string
-  websiteEnabled?: boolean | null
-  websiteFeatured?: boolean | null
-  websiteSortOrder?: number | null
-  publicDescription?: string | null
   createdAt?: string | null
   updatedAt?: string | null
 }
@@ -155,10 +151,6 @@ export interface CompanyCertificationPayload {
   fileName?: string | null
   description?: string | null
   status: string
-  websiteEnabled?: boolean | null
-  websiteFeatured?: boolean | null
-  websiteSortOrder?: number | null
-  publicDescription?: string | null
 }
 
 /** 公司资质分类预设（含标准、认证、许可三类合规文件） */

@@ -1,0 +1,417 @@
+{
+  "base_url": "http://127.0.0.1:8081",
+  "product_count": 45,
+  "featured_count": 43,
+  "files": {
+    "products.json": "25c7c1b2a7796315afa1e452dd468f50ff832c78cf36e0fa5860ae1bf2f41198",
+    "featured.json": "ae27fe554cff741ecbaa50c734219064d0efdfe94c1a1f0a3ce4c5efee29f5d0",
+    "categories.json": "417c8e10e98bc218a037dd8e9139e565c7cd4692c1a70397fc6e3752ac642443",
+    "details/95aa7e7f784a7a36a43744205b953e69272fb0a37240fd61c65cdc05cd74d84c.json": "c8e98cf109acdcb4331ea566daca7b758ac232ea32f028b65a8a37d56383b00c",
+    "details/58efff855cf6fe2254088cb5863b8393e9b2e3973ae67346eb944f21b3d212ad.json": "6b4532608d5360297f3d137ade0cd08e61cbd1605fc8a233407e72f83c769fe4",
+    "details/9891f3ed1ba9601a77ba457dd43ca7bffe56e7f2a71f3d752add9a3bd5914c0f.json": "28b6b5f9b89c08f80862a0ee8bdfd794be686cf9cb17831090cf4ce00d6e0b17",
+    "details/9ddf41ba524cfacd92a944246d56e0e7962bed7600fb0d2537b43cc13cafd156.json": "4a8be9dd90dd9c958caa7c9ecbe2c980519c13582bdbb6ca0f2e27e497c2cc63",
+    "details/909539a2a9caeadc7b40fe39130778321e65985b9b81df473b3c80ddb3594966.json": "86ce8639dc0c59cd1d2aeac2d6540b6cafc8edb09c6b1895257d00252f8e4c68",
+    "details/7ab0a37d0900241b7b1ef36e7087b58ef87b737ea46beafd830504e347d27132.json": "339ec138fda2f25b9e473a6cec32d2028cbd7b3e5d4049867f857014d7edaf7f",
+    "details/e999e63addea6af7be209ff2094020fa19baeabb9e58e5699463c3fa2298b867.json": "1611e473daffbe839f8be567f7a1cb95e06e7101f621092e776c7b7139239fa1",
+    "details/0c2a62f5905733ba6754a4af52544f558c9bd8caa27b1de5d59ddb4b55f9ba75.json": "edef94f481c37313268db292621bfbb419ee5147f1f68cba950168aa76a9f417",
+    "details/f88538dc6faa7f2dfe19005b8e28aa32bd5178b7a7764cfe9b6bd0bf26b2306d.json": "c4af91fd1cbe33d2f5a83c45b83aeb0edfd9134649e9c75c43aadbdcadb8b4ca",
+    "details/5b2986e33046c1371f48137c87d53abdb7d2c4167f752b9e811178509623ecfa.json": "889a14decbacc1f280b30a0ff75d5cb4f6154f00ff416a79e3b050d1c97052e5",
+    "details/d83e1e0c8c02aeef3bc7733ce7758ed6fe8445c29bd7a8c94161ca30e4f1fca8.json": "4c86042884c4ce7af91e750c14350e96a505a317753481fa8df23c11787e724d",
+    "details/6716052e56c27d4f7e50aad9180def185a56758807f15b6f51687ce58cc3c42d.json": "876cb4e07513dd27b7ec361eed04739d8f793d724b50260c1c58a5936f562af1",
+    "details/1e9f0ed6ca2eb6c069a1412e848ea669683493cac6a47a35c47d53c4f43e8f63.json": "dce5e64c9f32d853133024d8864ba1923252b3309f1a4e4c24f15e78c8bdcafd",
+    "details/b77a8088e1b05389196737c7c2b182f73d3edc86506383283c63570ce9ad0c89.json": "0246b07fd2509611372f029a5c9bac5cb6f2d65fec80fd6b0a7d73f58dee3482",
+    "details/db2e2292b519043e210a02ce3846821ca09a147fa207b9e24262adec1940343f.json": "9a0a3b034082edfb72ecc2597dbcaee88018200d708e7dda21ce9ee6b154de48",
+    "details/e56244e6356420b9cdcf4e96d149e9bfd969d79547fb3bdb9b5e3f45ac5a9a78.json": "99bc5f24e7932cf1d62552b65d6acf9db07a4b7db3b025c2739de796073b0cd5",
+    "details/9b217b6e5ef0b56cb138eb151aca1e4d6de335e49a272e1d63054a674f3cd2d9.json": "e0efdf8c127e601715870360555ab6d998db9293349310135fc62b2b32207182",
+    "details/56f323ec859c0e3135a3f1fd9a961e53a62494bec9c6d76e593860578b75064a.json": "cd6685e2ae27d53dfbffe34236b3c75f3cc336f1baebf68bd6880beff437c307",
+    "details/28102aed8fda52f08bf5b4a8f30daf7b00cb0301c3dda7967899cfc2d035b972.json": "228ddf76ff9e3a52ac747ffae19085cfc5bd5cc2dfa71da2fc16a0062b5a82f1",
+    "details/b4b068de8376c7d6828dfb910dc7c527359b0c76333c077e0264dc49e8153483.json": "f74e0e632cccb2adeaa4719d293371865dc4f28dbaf05eba2bee00d6dfd38093",
+    "details/d3b1f4b3662de0048a270d89e551a4a558f919e3c3c5de56b02e1015457154a8.json": "f62e2efd0aca14372c71e5d97a06cf3f607f3c760857041cb2a2e2782d0967d0",
+    "details/03ab4b835a3621921d0fb7354edb1af9638675c66cad7f7830b7d404f13b003c.json": "47e222a7ea8ad719e7d6cf5c09dd6194f02662743fe25558280832a288d64738",
+    "details/b200cc80aac2eafa96df6257943182f99ee8416bf16e30d900ca380b1ec5ffeb.json": "e847c52aec2a8fd04fe52a44d9b5ff679d41006da58096061fd54a05b8874871",
+    "details/0b1efa759c5ba834c8be9b4069b29ffe31d05abe20b2626f50ab48539ec1619c.json": "7622e15304417ba7941883f0fadee1912f3744bdcd9daa2dd4652d7c4b41881d",
+    "details/97eefbf7e8d018d7ac2158f6b71b26efe600b467868b35554c0fe0dcd01fd329.json": "cac6cbf81ba8a89b8bce53f8b56ad82a1b77e3ae4e977b1278a349b74dfa3730",
+    "details/999978ae465bd9bc546399a2ce130835a08634c74a5c69850c73088bb5ba5c36.json": "0db3301c2bdada168468c2bed66ec66e9c2db590609c6888a61485c5be5040fb",
+    "details/41afaf8d7a69fbbf5a145091e05c9cf458ad638402e51f4a88301d0e29bd1bdd.json": "0aa82cef1801055b1d71746eabff3f2a3ed2acba55e203e09dd43fc6182df14f",
+    "details/51321faea36fd875d3f9922f189093b2ff5f038e98d6ed66285782ae6e1e3eef.json": "657846266cbcfa02c9862227887448c0f4e97f1cd538595bca699fa46a29e003",
+    "details/c5f741c925846c25eebbc299b2754162493821347c42aaae74abe0851c96dc59.json": "a2368934316032170af3afdc40b5b215f622c0eed86123d149c03700026377ef",
+    "details/6bdf903edee85cbd82ba08cd4215ad86e1e2b365897e4097f406c5f5bdd03331.json": "cb977f1e5bd3d70bbe91d071bfe1a4264e54c07be6bb027dcbfd518a44db47b3",
+    "details/90886cf54af8cb3e7b2c7b71e554cc631c75ad6292746a02c4490f14833d4c4b.json": "0ecd72906026c1e454aa11c1c3e6f2bf160d5325884cf72af0481a899b832b76",
+    "details/0f14d0967a8054221976676c73fdb83c38cddd633fd4f612b4423185b37ee5a0.json": "d0afcf272a5037fbf044343ed7fd4aac6f780a7466a7203a36947e03bca88275",
+    "details/20fd1049dd6c9719f325845f237025db7c4511aace16d4c5d2b46cc2d563bd60.json": "1b0652857533bd9971b13d0f6089f83a04e4aac6663bc44ac1adca6d0151c583",
+    "details/54d52d8882ee6ba0c97edb0455c1976bd12da984e74de340fdfe9878ea3e2165.json": "88efdc39608b48172fa3d57f68d1649255b83605d0f5ee121cd1f2b35c19c37e",
+    "details/579669415da32b8b620fb58a0b1bad90df67560d2be8bf82d477d2058e303407.json": "9f8d323d31ef1dcfd4036c2ccefbc61f39bc063d182e489d2bc46b606f35cd42",
+    "details/a27c1398ea9561965ec494cc51c4e7c7ce7212a75bab2a8bc3acd38e6e68d82d.json": "5fc7732bffac5f40c01f104527ccc5c05832fb71aa7bbd03bb30333db683d4c1",
+    "details/0b2d85c8d99293c1cb2290acd00fff20f1cc4add6e51efd08b86ed25ed7c8076.json": "888303781ac42564505815bce077483e90adee4258dd96b84338fbea94a1c6b4",
+    "details/d89d16d1a8c45f44b62ea545310424b98903ce9ee1ac5a61b6ab9c6ea78c6e77.json": "223299925e62560ca9e29ad73de1dc92a6a1f0d4a26cf27b3ccedda75194e84a",
+    "details/a557ea70659477237d4592a898c64a1820a6e650e72b17b088b65e7a9f4deee6.json": "21bbf077e4726c4c1b64f27781384542d0669eb7400cc1d63215960ff892d2f7",
+    "details/0ead3320c7d1294234b14fb59d5d91db172bb63dd959c4d0e271634b32b2b757.json": "6201f43bb4bf30fc74392603129adb259d3d4cf32c5a3f0f29e250775bd1df1b",
+    "details/3d0b86f181dd780cad32ba7e10fb17c3d75f193a734b78eee88d5804b0f84ef8.json": "e439735c83a0858c63d209886df31b47ba5051ccc6f6ca7ac29d5eb66b02ca6f",
+    "details/41e26273688dda3acdd14438a232181d70aa603987f0acd24aac08a714050032.json": "7ede8fcf8f0fba6f3ce27d12c0759dfe073de4c1ffc1c5baba88344d598ce544",
+    "details/ac17ed969dcb22b54fa0189ec5509d8180bc6bda923f6e8523b6165013f47af9.json": "1446aafea42130e8b3bca24d3148c89630f1add4b79018719d0a8d97b4032d5a",
+    "details/c7b1a31cc0900348551c25b44cf16b1958d4d0249d716fff5dbbc65712c6ffda.json": "8d7bb7935216f90ad02e1e2cec2196e69b5d190c064c79b1cfc9d9be05351f93",
+    "details/1f4f5c00241e9d321c9268283b6b0752d0b29dfa62b955da74d80526f867dbc8.json": "1f2218481ea529f85d38a0f3c2c9a4470a120291f7baae2d6995b4d1f0e33706"
+  },
+  "products": [
+    {
+      "legacy_id": 67,
+      "slug": "product-67",
+      "name": "利强手压片膜封口机（斜头）",
+      "detail_file": "details/95aa7e7f784a7a36a43744205b953e69272fb0a37240fd61c65cdc05cd74d84c.json",
+      "gallery_count": 0,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 65,
+      "slug": "product-65",
+      "name": "利强手压片膜封口机",
+      "detail_file": "details/58efff855cf6fe2254088cb5863b8393e9b2e3973ae67346eb944f21b3d212ad.json",
+      "gallery_count": 21,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 66,
+      "slug": "product-66",
+      "name": "利强手压半自动卷膜封口机",
+      "detail_file": "details/9891f3ed1ba9601a77ba457dd43ca7bffe56e7f2a71f3d752add9a3bd5914c0f.json",
+      "gallery_count": 45,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 68,
+      "slug": "product-68",
+      "name": "利强手推自动卷膜封口机",
+      "detail_file": "details/9ddf41ba524cfacd92a944246d56e0e7962bed7600fb0d2537b43cc13cafd156.json",
+      "gallery_count": 46,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 180,
+      "slug": "product-180",
+      "name": "利强手推自动卷膜封口机（气动）",
+      "detail_file": "details/909539a2a9caeadc7b40fe39130778321e65985b9b81df473b3c80ddb3594966.json",
+      "gallery_count": 6,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 72,
+      "slug": "product-72",
+      "name": "利强按钮自动卷膜封口机",
+      "detail_file": "details/7ab0a37d0900241b7b1ef36e7087b58ef87b737ea46beafd830504e347d27132.json",
+      "gallery_count": 37,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 69,
+      "slug": "product-69",
+      "name": "利强手推自动片膜封口机",
+      "detail_file": "details/e999e63addea6af7be209ff2094020fa19baeabb9e58e5699463c3fa2298b867.json",
+      "gallery_count": 23,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 73,
+      "slug": "product-73",
+      "name": "利强按钮自动片膜封口机",
+      "detail_file": "details/0c2a62f5905733ba6754a4af52544f558c9bd8caa27b1de5d59ddb4b55f9ba75.json",
+      "gallery_count": 23,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 74,
+      "slug": "product-74",
+      "name": "利强按钮自动卷膜麻辣烫封口机",
+      "detail_file": "details/f88538dc6faa7f2dfe19005b8e28aa32bd5178b7a7764cfe9b6bd0bf26b2306d.json",
+      "gallery_count": 10,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 75,
+      "slug": "product-75",
+      "name": "利强按钮自动卷膜封口机（黑白机）",
+      "detail_file": "details/5b2986e33046c1371f48137c87d53abdb7d2c4167f752b9e811178509623ecfa.json",
+      "gallery_count": 8,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 77,
+      "slug": "product-77",
+      "name": "利强手动翻盖封口机",
+      "detail_file": "details/d83e1e0c8c02aeef3bc7733ce7758ed6fe8445c29bd7a8c94161ca30e4f1fca8.json",
+      "gallery_count": 7,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 78,
+      "slug": "product-78",
+      "name": "利强台式韩国机",
+      "detail_file": "details/6716052e56c27d4f7e50aad9180def185a56758807f15b6f51687ce58cc3c42d.json",
+      "gallery_count": 14,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 79,
+      "slug": "product-79",
+      "name": "利强自动封口贴标机",
+      "detail_file": "details/1e9f0ed6ca2eb6c069a1412e848ea669683493cac6a47a35c47d53c4f43e8f63.json",
+      "gallery_count": 6,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 70,
+      "slug": "product-70",
+      "name": "利强手推自动片膜广口瓶封口机",
+      "detail_file": "details/b77a8088e1b05389196737c7c2b182f73d3edc86506383283c63570ce9ad0c89.json",
+      "gallery_count": 2,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 82,
+      "slug": "lq250-ts-pneumatic-sealer",
+      "name": "利强台式气动卷膜封口机",
+      "detail_file": "details/db2e2292b519043e210a02ce3846821ca09a147fa207b9e24262adec1940343f.json",
+      "gallery_count": 18,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 83,
+      "slug": "product-83",
+      "name": "利强台式气动片膜封口机",
+      "detail_file": "details/e56244e6356420b9cdcf4e96d149e9bfd969d79547fb3bdb9b5e3f45ac5a9a78.json",
+      "gallery_count": 1,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 88,
+      "slug": "product-88",
+      "name": "利强推杆式气动充氧封口机",
+      "detail_file": "details/9b217b6e5ef0b56cb138eb151aca1e4d6de335e49a272e1d63054a674f3cd2d9.json",
+      "gallery_count": 8,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 89,
+      "slug": "product-89",
+      "name": "利强推杆式气动连续封口机",
+      "detail_file": "details/56f323ec859c0e3135a3f1fd9a961e53a62494bec9c6d76e593860578b75064a.json",
+      "gallery_count": 10,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 181,
+      "slug": "product-181",
+      "name": "利强台式电动气流包装机（充氮充氧）",
+      "detail_file": "details/28102aed8fda52f08bf5b4a8f30daf7b00cb0301c3dda7967899cfc2d035b972.json",
+      "gallery_count": 2,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 90,
+      "slug": "product-90",
+      "name": "利强台式电动气调包装机",
+      "detail_file": "details/b4b068de8376c7d6828dfb910dc7c527359b0c76333c077e0264dc49e8153483.json",
+      "gallery_count": 8,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 76,
+      "slug": "product-76",
+      "name": "利强自吸片膜封口机",
+      "detail_file": "details/d3b1f4b3662de0048a270d89e551a4a558f919e3c3c5de56b02e1015457154a8.json",
+      "gallery_count": 3,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 175,
+      "slug": "product-175",
+      "name": "利强气动自吸片膜封口机",
+      "detail_file": "details/03ab4b835a3621921d0fb7354edb1af9638675c66cad7f7830b7d404f13b003c.json",
+      "gallery_count": 10,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 95,
+      "slug": "product-95",
+      "name": "利强立式贴体包装机",
+      "detail_file": "details/b200cc80aac2eafa96df6257943182f99ee8416bf16e30d900ca380b1ec5ffeb.json",
+      "gallery_count": 18,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 96,
+      "slug": "lq450-benchtop-map-machine",
+      "name": "LQ450利强台式气调保鲜机",
+      "detail_file": "details/0b1efa759c5ba834c8be9b4069b29ffe31d05abe20b2626f50ab48539ec1619c.json",
+      "gallery_count": 6,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 80,
+      "slug": "product-80",
+      "name": "利强立式气调卷膜封口机",
+      "detail_file": "details/97eefbf7e8d018d7ac2158f6b71b26efe600b467868b35554c0fe0dcd01fd329.json",
+      "gallery_count": 8,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 178,
+      "slug": "product-178",
+      "name": "立式气动封盒机",
+      "detail_file": "details/999978ae465bd9bc546399a2ce130835a08634c74a5c69850c73088bb5ba5c36.json",
+      "gallery_count": 1,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 81,
+      "slug": "product-81",
+      "name": "利强立式气动双工位卷膜封口机",
+      "detail_file": "details/41afaf8d7a69fbbf5a145091e05c9cf458ad638402e51f4a88301d0e29bd1bdd.json",
+      "gallery_count": 10,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 91,
+      "slug": "product-91",
+      "name": "利强全自动气调卷膜封口机",
+      "detail_file": "details/51321faea36fd875d3f9922f189093b2ff5f038e98d6ed66285782ae6e1e3eef.json",
+      "gallery_count": 11,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 110,
+      "slug": "product-110",
+      "name": "气调机保鲜包装机",
+      "detail_file": "details/c5f741c925846c25eebbc299b2754162493821347c42aaae74abe0851c96dc59.json",
+      "gallery_count": 6,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 84,
+      "slug": "product-84",
+      "name": "利强转盘式封口机",
+      "detail_file": "details/6bdf903edee85cbd82ba08cd4215ad86e1e2b365897e4097f406c5f5bdd03331.json",
+      "gallery_count": 7,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 87,
+      "slug": "product-87",
+      "name": "利强自动定量灌装转盘式片膜封口机",
+      "detail_file": "details/90886cf54af8cb3e7b2c7b71e554cc631c75ad6292746a02c4490f14833d4c4b.json",
+      "gallery_count": 14,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 171,
+      "slug": "product-171",
+      "name": "贴体真空包装机",
+      "detail_file": "details/0f14d0967a8054221976676c73fdb83c38cddd633fd4f612b4423185b37ee5a0.json",
+      "gallery_count": 8,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 176,
+      "slug": "lq410l-automatic-packaging-machine",
+      "name": "全自动包装机",
+      "detail_file": "details/20fd1049dd6c9719f325845f237025db7c4511aace16d4c5d2b46cc2d563bd60.json",
+      "gallery_count": 1,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 5982,
+      "slug": "product-5982",
+      "name": "连续式气调保鲜机",
+      "detail_file": "details/54d52d8882ee6ba0c97edb0455c1976bd12da984e74de340fdfe9878ea3e2165.json",
+      "gallery_count": 1,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 92,
+      "slug": "product-92",
+      "name": "利强连续式全自动气调卷膜封口机",
+      "detail_file": "details/579669415da32b8b620fb58a0b1bad90df67560d2be8bf82d477d2058e303407.json",
+      "gallery_count": 8,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 179,
+      "slug": "product-179",
+      "name": "LQ750L利强连续式全自动气调片膜封口机",
+      "detail_file": "details/a27c1398ea9561965ec494cc51c4e7c7ce7212a75bab2a8bc3acd38e6e68d82d.json",
+      "gallery_count": 2,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 170,
+      "slug": "lq380a-map-production-line",
+      "name": "LQ380A全自动流水线气调保鲜机",
+      "detail_file": "details/0b2d85c8d99293c1cb2290acd00fff20f1cc4add6e51efd08b86ed25ed7c8076.json",
+      "gallery_count": 3,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 147,
+      "slug": "product-147",
+      "name": "450L型 全自动封切机",
+      "detail_file": "details/d89d16d1a8c45f44b62ea545310424b98903ce9ee1ac5a61b6ab9c6ea78c6e77.json",
+      "gallery_count": 2,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 177,
+      "slug": "product-177",
+      "name": "称重贴体机",
+      "detail_file": "details/a557ea70659477237d4592a898c64a1820a6e650e72b17b088b65e7a9f4deee6.json",
+      "gallery_count": 2,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 93,
+      "slug": "product-93",
+      "name": "利强全自动流水线气调保鲜机",
+      "detail_file": "details/0ead3320c7d1294234b14fb59d5d91db172bb63dd959c4d0e271634b32b2b757.json",
+      "gallery_count": 3,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 94,
+      "slug": "product-94",
+      "name": "利强全自动连续式封口机",
+      "detail_file": "details/3d0b86f181dd780cad32ba7e10fb17c3d75f193a734b78eee88d5804b0f84ef8.json",
+      "gallery_count": 4,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 85,
+      "slug": "rotary-sealing-machine",
+      "name": "利强连续式全自动封口机",
+      "detail_file": "details/41e26273688dda3acdd14438a232181d70aa603987f0acd24aac08a714050032.json",
+      "gallery_count": 2,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 128,
+      "slug": "product-128",
+      "name": "自动称重灌装封口机",
+      "detail_file": "details/ac17ed969dcb22b54fa0189ec5509d8180bc6bda923f6e8523b6165013f47af9.json",
+      "gallery_count": 11,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 5983,
+      "slug": "product-5983",
+      "name": "广口式连续封口机",
+      "detail_file": "details/c7b1a31cc0900348551c25b44cf16b1958d4d0249d716fff5dbbc65712c6ffda.json",
+      "gallery_count": 1,
+      "variant_count": 0
+    },
+    {
+      "legacy_id": 5984,
+      "slug": "product-5984",
+      "name": "空压机",
+      "detail_file": "details/1f4f5c00241e9d321c9268283b6b0752d0b29dfa62b955da74d80526f867dbc8.json",
+      "gallery_count": 1,
+      "variant_count": 0
+    }
+  ]
+}

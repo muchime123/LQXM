@@ -208,7 +208,7 @@
           <el-button v-if="state === 'filtered-empty'" @click="clearAccountFilters">清除筛选</el-button>
         </template>
 
-        <CashflowAccountTable :accounts="visibleAccounts" :year="PERIOD_YEAR" @open-entries="openAccount" />
+        <CashflowAccountTable :accounts="visibleAccounts" :year="PERIOD_YEAR" @open-entries="openAccount" @open-opening="openingAccount = $event" />
       </DataState>
     </template>
 
@@ -298,6 +298,7 @@
     </template>
 
     <CashflowReviewDrawer v-model="reviewOpen" />
+    <CashflowOpeningDialog :account="openingAccount" :year="PERIOD_YEAR" @close="openingAccount = null" />
   </ListPageLayout>
 </template>
 
@@ -325,6 +326,7 @@ import {
   type CashflowReportSummary
 } from '@/api/cashflowJournal'
 import CashflowAccountTable from './cashflow/CashflowAccountTable.vue'
+import CashflowOpeningDialog from './cashflow/CashflowOpeningDialog.vue'
 import CashflowEntryTable from './cashflow/CashflowEntryTable.vue'
 import CashflowIssueTable from './cashflow/CashflowIssueTable.vue'
 import CashflowReviewDrawer from './cashflow/CashflowReviewDrawer.vue'
@@ -371,6 +373,7 @@ const tabItems = computed<TabItem[]>(() => [
 
 // ==================== 账户汇总 ====================
 const accounts = ref<CashflowAccount[]>([])
+const openingAccount = ref<CashflowAccount | null>(null)
 const currencyTotals = ref<CashflowCurrencyTotal[]>([])
 const reportSummary = reactive<CashflowReportSummary>({
   closingComputableCount: 0,

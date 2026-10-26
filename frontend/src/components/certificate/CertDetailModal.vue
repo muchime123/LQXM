@@ -251,14 +251,6 @@ title="点击查看大图"
             <p v-if="data.feeDetail" class="cd-side-note">{{ data.feeDetail }}</p>
           </section>
 
-          <section class="cd-card">
-            <h3 class="cd-card__title">官网展示</h3>
-            <div class="cd-chip-row">
-              <StatusTag :type="data.websiteEnabled ? 'success' : 'neutral'" :label="data.websiteEnabled ? '已公开' : '未公开'" />
-              <span v-if="data.websiteFeatured" class="cd-chip">重点展示</span>
-              <span class="cd-chip cd-chip--muted">排序 {{ data.websiteSortOrder ?? 0 }}</span>
-            </div>
-          </section>
         </aside>
       </div>
 
@@ -420,32 +412,6 @@ placeholder="1-45" />
                 :rows="4"
                 placeholder="如：盆（容器）；黄油碟；碗；瓶；调味瓶..."
               />
-            </div>
-          </div>
-        </section>
-
-        <section class="cf-sec">
-          <div class="cf-sec__head">
-            <h3 class="cf-sec__title">官网展示</h3>
-            <span class="cf-sec__hint">排序数字越小越靠前；设为重点会自动开启官网公开，下线时会自动取消重点</span>
-          </div>
-          <div class="cf-grid cf-grid--4">
-            <div class="cf-field">
-              <label>官网公开</label>
-              <el-switch v-model="modalForm.websiteEnabled" active-text="公开" inactive-text="不公开" />
-            </div>
-            <div class="cf-field">
-              <label>重点展示</label>
-              <el-switch v-model="modalForm.websiteFeatured" active-text="重点" inactive-text="普通" />
-            </div>
-            <div class="cf-field">
-              <label>官网排序</label>
-              <el-input-number
-v-model="modalForm.websiteSortOrder"
-:min="0"
-:step="1"
-controls-position="right"
-style="width: 100%" />
             </div>
           </div>
         </section>

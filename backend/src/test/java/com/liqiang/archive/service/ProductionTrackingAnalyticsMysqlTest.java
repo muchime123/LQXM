@@ -13,10 +13,10 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-/** Read-only verification against the imported purchase receipts. Run with -Derp.foundation.mysql=true. */
+/** Read-only verification against the imported purchase receipts. Run with -Dmain.mysql=true. */
 class ProductionTrackingAnalyticsMysqlTest {
     @Test
-    @EnabledIfSystemProperty(named="erp.foundation.mysql", matches="true")
+    @EnabledIfSystemProperty(named="main.mysql", matches="true")
     void quantityCompletionReachesThePlannedAmountOnItsFirstDate() throws Exception {
         var jdbc=jdbc();
         String from=" FROM production_orders p "+ProductionTrackingService.INBOUND_JOIN

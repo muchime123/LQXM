@@ -21,9 +21,6 @@ export interface CertificateSummary {
   agencyContact: string
   niceClass: number
   applicantAddress: string
-  websiteEnabled: boolean
-  websiteFeatured: boolean
-  websiteSortOrder: number
 }
 
 export interface CertificateDetail extends CertificateSummary {
@@ -72,9 +69,6 @@ export interface CertificatePayload {
   niceClass: number
   niceClassDescription: string
   applicantAddress: string
-  websiteEnabled: boolean
-  websiteFeatured: boolean
-  websiteSortOrder: number
 }
 
 export interface CertificateStats {

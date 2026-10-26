@@ -18,7 +18,7 @@ const cache = new Map()
 
 function defaultTtlFor(path) {
   /* 公司信息 / 分类 / 解决方案 / 里程碑 / Banner / 页面区块：1 小时 */
-  if (/\/(company-detail|product-categories|certification-categories|solutions|milestones|banners|page-sections)/.test(path)) {
+  if (/\/(company-detail|product-categories|solutions|milestones|banners|page-sections)/.test(path)) {
     return 60 * 60 * 1000
   }
   /* 首页聚合 / 精选产品：10 分钟 */

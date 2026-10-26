@@ -1484,12 +1484,15 @@ public class ProductionTrackingService {
                 (r,n)->java.util.Collections.<String,Object>unmodifiableMap(
                         Map.<String,Object>of("month",(Object)r.getString("month"),"count",(Object)r.getLong("count"))),
                 params.toArray()));
-        java.util.concurrent.Future<List<Map<String,Object>>> actionFuture=READ_POOL.submit(()->jdbc.query(
-                "SELECT "+TRACKING_ACTION+" action,COUNT(*) count"
-                +TRACKING_FROM+INBOUND_JOIN+settled+" AND "+TRACKING_ACTION+" IS NOT NULL GROUP BY action",
-                (r,n)->java.util.Collections.<String,Object>unmodifiableMap(
-                        Map.<String,Object>of("action",(Object)r.getString("action"),"count",(Object)r.getLong("count"))),
-                params.toArray()));
+        java.util.concurrent.Future<List<Map<String,Object>>> actionFuture=READ_POOL.submit(()->{
+            String counts=TRACKING_ACTION_CODES.stream()
+                    .map(code->"COALESCE(SUM(CASE WHEN "+trackingActionPredicate(code)+" THEN 1 ELSE 0 END),0) "+code)
+                    .collect(java.util.stream.Collectors.joining(","));
+            var rows=jdbc.queryForList("SELECT "+counts+TRACKING_FROM+INBOUND_JOIN+settled,params.toArray());
+            Map<String,Object> row=rows.isEmpty()?Map.of():rows.getFirst();
+            return TRACKING_ACTION_CODES.stream().map(code->Map.<String,Object>of("action",code,"count",
+                    row.get(code) instanceof Number n?n.longValue():0L)).toList();
+        });
         java.util.concurrent.Future<List<Map<String,Object>>> optionalFuture=READ_POOL.submit(()->jdbc.queryForList(
                 "SELECT COALESCE(SUM("
                 +needsOptionalStage(ProductionTrackingPolicy.OXIDATION)+"),0) oxidation,COALESCE(SUM("

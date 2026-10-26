@@ -89,6 +89,91 @@ public class FileController {
         return resolveFlatFile(category, fileName);
     }
 
+    /**
+     * 品牌资产子分类文件访问：/api/files/company/{subCategory}?encoded=xxx
+     * 解析到 company/<subCategory>/<fileName>，找不到时回退到平铺 company/<fileName>。
+     */
+    @PublicApi
+    @GetMapping("/company/{subCategory}")
+    public ResponseEntity<Resource> getCompanyAssetFile(@PathVariable String subCategory,
+            @RequestParam(value = "encoded", required = false) String encodedFileName) throws Exception {
+        String fileName = decodeFileName(encodedFileName);
+        if (fileName == null || !isSafeFileName(fileName) || !isSafeFileName(subCategory)) {
+            return ResponseEntity.notFound().build();
+        }
+        Path subFile = fileRoot.resolve("company").resolve(subCategory).resolve(fileName).normalize();
+        if (subFile.startsWith(fileRoot) && Files.isRegularFile(subFile)) {
+            return serveFile(subFile);
+        }
+        // 回退到平铺路径（迁移过渡期）
+        Path flatFile = fileRoot.resolve("company").resolve(fileName).normalize();
+        if (flatFile.startsWith(fileRoot) && Files.isRegularFile(flatFile)) {
+            return serveFile(flatFile);
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    /** 品牌资产子分类 Office PDF 预览。 */
+    @PublicApi
+    @GetMapping("/company/{subCategory}/preview-pdf")
+    public ResponseEntity<Resource> previewCompanyAssetAsPdf(
+            @PathVariable String subCategory,
+            @RequestParam(value = "encoded", required = false) String encodedFileName) throws Exception {
+        String fileName = decodeFileName(encodedFileName);
+        if (fileName == null || !isSafeFileName(fileName) || !isSafeFileName(subCategory)) {
+            return ResponseEntity.notFound().build();
+        }
+        Path sourceFile = resolveCompanyAssetSource(subCategory, fileName);
+        if (sourceFile == null || !officePreviewService.supports(fileName)) {
+            return ResponseEntity.notFound().build();
+        }
+        long documentId = hashedDocumentIdForCategory("company/" + subCategory, fileName, Files.getLastModifiedTime(sourceFile).toMillis());
+        Path cacheRoot = fileRoot.resolve(".preview-cache").toAbsolutePath().normalize();
+        Path pdfPath = officePreviewService.previewPdf(documentId, sourceFile, cacheRoot);
+        Resource pdfResource = new FileSystemResource(pdfPath);
+        String previewName = fileName.replaceAll("\\.[^.]+$", "") + ".pdf";
+        String previewEncoded = URLEncoder.encode(previewName, StandardCharsets.UTF_8).replace("+", "%20");
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename*=UTF-8''" + previewEncoded)
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdfResource);
+    }
+
+    /** 品牌资产子分类 Office 预览状态轮询。 */
+    @PublicApi
+    @GetMapping("/company/{subCategory}/preview-pdf/status")
+    public ApiResponse<OfficePreviewStatus> previewCompanyAssetAsPdfStatus(
+            @PathVariable String subCategory,
+            @RequestParam(value = "encoded", required = false) String encodedFileName) throws IOException {
+        String fileName = decodeFileName(encodedFileName);
+        if (fileName == null || !isSafeFileName(fileName) || !isSafeFileName(subCategory)) {
+            throw new EntityNotFoundException("文件名缺失");
+        }
+        Path sourceFile = resolveCompanyAssetSource(subCategory, fileName);
+        if (sourceFile == null) {
+            throw new EntityNotFoundException("源文件不存在");
+        }
+        if (!officePreviewService.supports(fileName)) {
+            throw new EntityNotFoundException("该文件类型不支持预览");
+        }
+        long documentId = hashedDocumentIdForCategory("company/" + subCategory, fileName, Files.getLastModifiedTime(sourceFile).toMillis());
+        Path cacheRoot = fileRoot.resolve(".preview-cache").toAbsolutePath().normalize();
+        return ApiResponse.success(officePreviewService.startOrGetStatus(documentId, sourceFile, cacheRoot));
+    }
+
+    /** 解析品牌资产源文件路径：优先子分类目录，回退平铺。 */
+    private Path resolveCompanyAssetSource(String subCategory, String fileName) {
+        Path subFile = fileRoot.resolve("company").resolve(subCategory).resolve(fileName).normalize();
+        if (subFile.startsWith(fileRoot) && Files.isRegularFile(subFile)) {
+            return subFile;
+        }
+        Path flatFile = fileRoot.resolve("company").resolve(fileName).normalize();
+        if (flatFile.startsWith(fileRoot) && Files.isRegularFile(flatFile)) {
+            return flatFile;
+        }
+        return null;
+    }
+
     private ResponseEntity<Resource> resolveProductFile(Long modelId, String category, String fileName)
             throws Exception {
         String folder = FileCategory.folderOf(category);

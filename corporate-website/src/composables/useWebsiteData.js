@@ -12,11 +12,8 @@ const loading = ref(true)
 const error = ref(null)
 const company = ref({})
 const products = ref([])
-const certifications = ref([])
 const milestones = ref([])
 const productCount = ref(0)
-const patents = ref([])
-const patentCount = ref(0)
 const banners = ref({})
 const loadedOnce = ref(false)
 const inFlight = ref(null)
@@ -41,11 +38,8 @@ async function load({ force = false } = {}) {
       company.value = data.company || {}
       // 核心产品使用独立接口，避免首页聚合接口的历史数量上限影响轮播。
       products.value = (featuredProducts.length ? featuredProducts : (data.products || [])).slice(0, 12)
-      certifications.value = data.certifications || []
       milestones.value = data.milestones || []
       productCount.value = data.productCount || products.value.length || 0
-      patents.value = data.patents || []
-      patentCount.value = data.patentCount || 0
       banners.value = bannerData || {}
       loadedOnce.value = true
     } catch (err) {
@@ -66,11 +60,8 @@ export function useWebsiteData() {
     error,
     company,
     products,
-    certifications,
     milestones,
     productCount,
-    patents,
-    patentCount,
     banners,
     load,
   }

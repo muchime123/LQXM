@@ -6,8 +6,6 @@ import com.liqiang.archive.entity.CompanyCertification;
 import com.liqiang.archive.repository.CompanyCertificationRepository;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,8 +26,7 @@ public class CompanyCertificationService {
 
     private static final Set<String> BATCH_EDITABLE_FIELDS = Set.of(
             "name", "nameEn", "category", "certNumber", "issueDate", "expiryDate",
-            "isPermanent", "issuingAuthority", "description", "status",
-            "websiteEnabled", "websiteFeatured", "websiteSortOrder", "publicDescription");
+            "isPermanent", "issuingAuthority", "description", "status");
 
     private final CompanyCertificationRepository certRepository;
     private final AuditLogService auditLogService;
@@ -44,19 +41,6 @@ public class CompanyCertificationService {
                         || (c.getIssuingAuthority() != null && c.getIssuingAuthority().contains(keyword)))
                 .map(CertificationView::from)
                 .toList();
-    }
-
-    /** 官网资质分页查询：只返回 status='有效' 的资质。 */
-    @Transactional(readOnly = true)
-    public Page<CertificationView> searchWebsite(String keyword, String category, Pageable pageable) {
-        return certRepository.searchWebsiteCertifications(keyword, category, pageable)
-                .map(CertificationView::from);
-    }
-
-    /** 官网资质分类列表。 */
-    @Transactional(readOnly = true)
-    public List<String> getWebsiteCategories() {
-        return certRepository.findWebsiteCategories();
     }
 
     @Transactional
@@ -161,10 +145,6 @@ public class CompanyCertificationService {
                 case "issuingAuthority" -> cert.setIssuingAuthority(stringValue(value));
                 case "description" -> cert.setDescription(stringValue(value));
                 case "status" -> cert.setStatus(stringValue(value));
-                case "websiteEnabled" -> cert.setWebsiteEnabled(booleanValue(value));
-                case "websiteFeatured" -> cert.setWebsiteFeatured(booleanValue(value));
-                case "websiteSortOrder" -> cert.setWebsiteSortOrder(intValue(value));
-                case "publicDescription" -> cert.setPublicDescription(stringValue(value));
                 default -> throw new IllegalArgumentException("不支持批量修改字段: " + key);
             }
         });
@@ -184,15 +164,6 @@ public class CompanyCertificationService {
         return Boolean.parseBoolean(String.valueOf(value));
     }
 
-    private int intValue(Object value) {
-        if (value instanceof Number n) return n.intValue();
-        try {
-            return Integer.parseInt(String.valueOf(value).trim());
-        } catch (NumberFormatException e) {
-            return 0;
-        }
-    }
-
     private void applyPayload(CompanyCertification c, CertificationPayload p) {
         if (p.name() != null) c.setName(p.name());
         if (p.nameEn() != null) c.setNameEn(p.nameEn());
@@ -205,10 +176,6 @@ public class CompanyCertificationService {
         if (p.fileName() != null) c.setFileName(p.fileName());
         if (p.description() != null) c.setDescription(p.description());
         if (p.status() != null) c.setStatus(p.status());
-        if (p.websiteEnabled() != null) c.setWebsiteEnabled(p.websiteEnabled());
-        if (p.websiteFeatured() != null) c.setWebsiteFeatured(p.websiteFeatured());
-        if (p.websiteSortOrder() != null) c.setWebsiteSortOrder(p.websiteSortOrder());
-        if (p.publicDescription() != null) c.setPublicDescription(p.publicDescription());
         // 勾选"长期有效"时清空到期日
         if (Boolean.TRUE.equals(p.isPermanent())) c.setExpiryDate(null);
     }

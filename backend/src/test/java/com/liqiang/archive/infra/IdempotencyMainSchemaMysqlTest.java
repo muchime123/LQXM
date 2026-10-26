@@ -12,10 +12,15 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+/**
+ * V407 验收：幂等服务绑定主库 product_archive.request_idempotency，
+ * 重试返回首次结果，同键不同载荷抛冲突。
+ * <p>启用方式：{@code mvn -o test -Dtest=IdempotencyMainSchemaMysqlTest -Dmain.mysql=true}
+ */
 class IdempotencyMainSchemaMysqlTest {
     @Test
-    @EnabledIfSystemProperty(named = "cashflow.idempotency.mysql", matches = "true")
-    void replayUsesMainSchemaAndDoesNotWriteLegacySchema() {
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
+    void replayUsesMainSchema() {
         var source = new DriverManagerDataSource();
         source.setDriverClassName("com.mysql.cj.jdbc.Driver");
         source.setUrl("jdbc:mysql://" + System.getenv().getOrDefault("DB_HOST", "localhost")
@@ -26,7 +31,6 @@ class IdempotencyMainSchemaMysqlTest {
         var service = new IdempotencyService(jdbc, new DataSourceTransactionManager(source));
         var key = "acceptance-v407-" + UUID.randomUUID();
         var executions = new AtomicInteger();
-        Integer legacyBefore = jdbc.queryForObject("SELECT COUNT(*) FROM erp.idem_request", Integer.class);
         try {
             var actor = new Actor(23, "V407验收");
             String first = service.execute(actor, key, "acceptance.v407", Map.of("sample", 1),
@@ -40,7 +44,6 @@ class IdempotencyMainSchemaMysqlTest {
                     Integer.class, key));
             assertThrows(ApiException.class, () -> service.execute(actor, key, "acceptance.v407",
                     Map.of("sample", 2), () -> "wrong"));
-            assertEquals(legacyBefore, jdbc.queryForObject("SELECT COUNT(*) FROM erp.idem_request", Integer.class));
         } finally {
             jdbc.update("DELETE FROM request_idempotency WHERE request_key=?", key);
         }

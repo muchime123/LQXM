@@ -98,15 +98,6 @@ await loadData()
           clickable
           @click="go('/products')"
         />
-        <MetricCard
-          title="即将过期资质"
-          :value="dashboard?.expiringCertifications ?? 0"
-          :tone="(dashboard?.expiringCertifications ?? 0) > 0 ? 'warning' : 'default'"
-          hint="90 天内到期"
-          :loading="loading"
-          clickable
-          @click="go('/company/certifications')"
-        />
       </MetricGrid>
     </div>
 

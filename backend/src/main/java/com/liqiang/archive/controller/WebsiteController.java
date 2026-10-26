@@ -5,24 +5,17 @@ import com.liqiang.archive.dto.CatalogDtos.ModelDetail;
 import com.liqiang.archive.dto.CatalogDtos.ModelView;
 import com.liqiang.archive.dto.CatalogDtos.VariantView;
 import com.liqiang.archive.dto.CatalogDtos.AssetView;
-import com.liqiang.archive.dto.CompanyDtos.CertificationView;
 import com.liqiang.archive.dto.PackagingMoldDtos.MoldSummary;
-import com.liqiang.archive.entity.Certificate;
 import com.liqiang.archive.entity.CompanyInfo;
 import com.liqiang.archive.entity.CompanyMilestone;
 import com.liqiang.archive.entity.KnowledgeArticle;
 import com.liqiang.archive.entity.KnowledgeCategory;
 import com.liqiang.archive.entity.MediaAccount;
 import com.liqiang.archive.entity.WebsiteInquiry;
-import com.liqiang.archive.repository.CertificateRepository;
-import com.liqiang.archive.repository.CompanyCertificationRepository;
 import com.liqiang.archive.repository.MediaAccountRepository;
 import com.liqiang.archive.repository.WebsiteInquiryRepository;
 import com.liqiang.archive.security.PublicApi;
-import com.liqiang.archive.service.CertificateService;
-import com.liqiang.archive.service.CompanyCertificationService;
 import com.liqiang.archive.service.CompanyInfoService;
-import com.liqiang.archive.service.FileStorageService;
 import com.liqiang.archive.service.InquiryAntiSpamService;
 import com.liqiang.archive.service.ProductCatalogService;
 import com.liqiang.archive.service.PackagingService;
@@ -30,13 +23,8 @@ import com.liqiang.archive.service.PackagingMoldService;
 import com.liqiang.archive.service.WebsiteProductCompatibilityService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
-import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -46,8 +34,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
@@ -65,17 +51,12 @@ public class WebsiteController {
     static final int WEBSITE_FEATURED_MIN_SCORE = 60;
 
     private final CompanyInfoService companyInfoService;
-    private final CompanyCertificationService certificationService;
     private final ProductCatalogService catalogService;
     private final PackagingService packagingService;
     private final PackagingMoldService packagingMoldService;
     private final WebsiteProductCompatibilityService productCompatibilityService;
     private final WebsiteInquiryRepository inquiryRepository;
     private final InquiryAntiSpamService antiSpamService;
-    private final CompanyCertificationRepository certRepository;
-    private final FileStorageService fileStorageService;
-    private final CertificateService certificateService;
-    private final CertificateRepository certificateRepository;
     private final MediaAccountRepository mediaAccountRepository;
 
     @GetMapping("/home")
@@ -107,25 +88,13 @@ public class WebsiteController {
                     .limit(6)
                     .toList();
         }
-        // 官网公开专利总数（首页"知识产权"统计用，与 company_certifications 解耦）
-        long patentCount = certificateService.getWebsitePatentCount();
-        // 首页精选专利（最多 8 条，用于 About 与首页资质分区旁的"专利与知识产权"入口）
-        List<PublicPatentView> featuredPatents = certificateService.getWebsiteFeaturedPatents(8).stream()
-                .map(PublicPatentView::from)
-                .toList();
         return new HomeView(
                 PublicCompanyView.from(company),
                 productCount,
                 products,
                 companyInfoService.getMilestones().stream()
                         .filter(m -> Boolean.TRUE.equals(m.getWebsiteEnabled()))
-                        .map(PublicMilestoneView::from).toList(),
-                certificationService.list(null, null).stream()
-                        .filter(item -> Boolean.TRUE.equals(item.websiteEnabled()))
-                        .filter(item -> item.name() != null && !item.name().isBlank())
-                        .limit(8).map(PublicCertificationView::from).toList(),
-                patentCount,
-                featuredPatents);
+                        .map(PublicMilestoneView::from).toList());
     }
 
     /**
@@ -228,65 +197,6 @@ public class WebsiteController {
                 .sorted(java.util.Comparator.comparingInt(item -> item.websiteSortOrder() == null ? 0 : item.websiteSortOrder()))
                 .map(PublicMoldView::from)
                 .toList();
-    }
-
-    /**
-     * 官网资质列表：分页 + 关键词 + 分类筛选。
-     * 只返回 status='有效' 的资质，按 issueDate DESC 排序。
-     */
-    @GetMapping("/certifications")
-    public PublicCertificationPage certifications(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String category,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) {
-        PageRequest pageable = PageRequest.of(page, size,
-                Sort.by("issueDate").descending().and(Sort.by("id")));
-        Page<CertificationView> result = certificationService.searchWebsite(keyword, category, pageable);
-        return new PublicCertificationPage(
-                result.getContent().stream().map(PublicCertificationView::from).toList(),
-                result.getTotalElements(),
-                result.getTotalPages(),
-                result.getNumber());
-    }
-
-    /** 官网资质分类列表。 */
-    @GetMapping("/certification-categories")
-    public List<String> certificationCategories() {
-        return certificationService.getWebsiteCategories();
-    }
-
-    /**
-     * 官网专利/知识产权列表：分页 + 关键词 + 资产类别 + 专利类型筛选。
-     * 只返回 website_enabled=true 且 asset_status='有效' 的证书，按 grant_date DESC 排序。
-     * 公开字段脱敏：剔除 feeStatus / feeDueDate / agencyContact / processStage / reviewProgress 等内部敏感字段。
-     */
-    @GetMapping("/patents")
-    public PublicPatentPage patents(
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String assetCategory,
-            @RequestParam(required = false) String patentType,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "12") int size) {
-        PageRequest pageable = PageRequest.of(page, size);
-        Page<Certificate> result = certificateService.searchWebsite(assetCategory, patentType, keyword, pageable);
-        return new PublicPatentPage(
-                result.getContent().stream().map(PublicPatentView::from).toList(),
-                result.getTotalElements(),
-                result.getTotalPages(),
-                result.getNumber());
-    }
-
-    /** 官网专利类型列表（用于筛选 Tab：发明专利/实用新型/外观设计/软著）。 */
-    @GetMapping("/patent-types")
-    public List<String> patentTypes() {
-        return certificateService.getWebsitePatentTypes();
-    }
-
-    /** 官网资产类别列表（用于筛选 Tab：专利/软著/商标）。 */
-    @GetMapping("/patent-categories")
-    public List<String> patentCategories() {
-        return certificateService.getWebsiteAssetCategories();
     }
 
     /**
@@ -418,14 +328,9 @@ public class WebsiteController {
                                   String captchaId, String captchaAnswer) {}
 
     public record HomeView(PublicCompanyView company, long productCount, List<PublicProductView> products,
-                           List<PublicMilestoneView> milestones, List<PublicCertificationView> certifications,
-                           long patentCount, List<PublicPatentView> patents) {}
+                           List<PublicMilestoneView> milestones) {}
 
     public record PublicProductPage(List<PublicProductView> items, long total, int totalPages, int page) {}
-
-    public record PublicCertificationPage(List<PublicCertificationView> items, long total, int totalPages, int page) {}
-
-    public record PublicPatentPage(List<PublicPatentView> items, long total, int totalPages, int page) {}
 
     public record PublicCategoryTree(List<String> equipmentCategories, List<String> productLines,
                                      List<String> applications, List<String> containers,
@@ -696,131 +601,6 @@ public class WebsiteController {
                 .map(KnowledgeCategory::getName)
                 .findFirst().orElse("技术知识");
         return ResponseEntity.ok(PublicKnowledgeArticleDetailView.from(article, categoryName));
-    }
-
-    /**
-     * 官网公开资质视图。扩展展示字段：id（用于图片端点）/hasImage/颁发日期/到期日期/长期有效/证书编号/描述。
-     * 剔除 fileName（内部文件路径）和 daysRemaining（内部到期提醒）。
-     */
-    public record PublicCertificationView(Long id, boolean hasImage, String name, String nameEn, String category,
-                                          String certNumber, LocalDate issueDate, LocalDate expiryDate,
-                                          Boolean isPermanent, String issuingAuthority,
-                                          String description, String status) {
-        static PublicCertificationView from(CertificationView item) {
-            // 官网描述优先用 publicDescription，为空时回退到内部 description
-            String desc = item.publicDescription() != null && !item.publicDescription().isBlank()
-                    ? item.publicDescription() : item.description();
-            return new PublicCertificationView(item.id(),
-                    item.fileName() != null && !item.fileName().isBlank(),
-                    item.name(), item.nameEn(), item.category(),
-                    item.certNumber(), item.issueDate(), item.expiryDate(),
-                    item.isPermanent(), item.issuingAuthority(), desc, item.status());
-        }
-    }
-
-    /**
-     * 官网公开专利/知识产权视图。脱敏字段：
-     * - 保留：id/hasImage/name/assetCategory/patentType/patentNo/publicationNo/applicant/inventors/
-     *         applyDate/grantDate/legalYears/expireDate/legalStatus/remark
-     * - 剔除：applicationNo/queryNo/agency/agencyContact/feeStatus/feeDueDate/feeQueryDate/
-     *         lastFeeAmount/feeDetail/invoiceStatus/processStage/reviewProgress 等内部敏感字段
-     */
-    public record PublicPatentView(Long id, boolean hasImage, String name, String assetCategory, String patentType,
-                                    String patentNo, String publicationNo, String applicant, String inventors,
-                                    LocalDate applyDate, LocalDate grantDate, Integer legalYears,
-                                    LocalDate expireDate, String legalStatus, String remark) {
-        static PublicPatentView from(Certificate c) {
-            boolean hasImage = (c.getCertFile() != null && !c.getCertFile().isBlank())
-                    || (c.getSpecFile() != null && !c.getSpecFile().isBlank());
-            return new PublicPatentView(c.getId(),
-                    hasImage,
-                    c.getName(),
-                    c.getAssetCategory(),
-                    c.getPatentType(),
-                    c.getPatentNo(),
-                    c.getPublicationNo(),
-                    c.getApplicant(),
-                    c.getInventors(),
-                    c.getApplyDate(),
-                    c.getGrantDate(),
-                    c.getLegalYears(),
-                    c.getExpireDate(),
-                    c.getLegalStatus(),
-                    c.getRemark());
-        }
-    }
-
-    /**
-     * 官网资质证书图片：按资质 ID 返回证书扫描件图片。
-     * 仅返回 website_enabled=true 的资质图片，防止未发布资质被外部访问。
-     */
-    @GetMapping("/certifications/{id}/image")
-    public ResponseEntity<Resource> certificationImage(@PathVariable Long id) {
-        var cert = certRepository.findById(id).orElse(null);
-        if (cert == null || !Boolean.TRUE.equals(cert.getWebsiteEnabled())
-                || cert.getFileName() == null || cert.getFileName().isBlank()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        // 证书文件存储在 fileRoot/certificate/{fileName}
-        Path filePath = fileStorageService.fileRoot()
-                .resolve("certificate")
-                .resolve(cert.getFileName())
-                .normalize();
-        if (!Files.exists(filePath) || !filePath.startsWith(fileStorageService.fileRoot())) {
-            return ResponseEntity.notFound().build();
-        }
-
-        String contentType = probeContentType(filePath);
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + cert.getFileName() + "\"")
-                .body(new FileSystemResource(filePath));
-    }
-
-    /**
-     * 官网专利/知识产权证书图片：按证书 ID 返回授权证书图片。
-     * 仅返回 website_enabled=true 且 asset_status='有效' 的证书图片，防止未发布或已失效专利被外部访问。
-     * 优先返回授权证书图片（cert_file），其次返回说明书文件（spec_file）。
-     */
-    @GetMapping("/patents/{id}/image")
-    public ResponseEntity<Resource> patentImage(@PathVariable Long id) {
-        Certificate cert = certificateRepository.findById(id).orElse(null);
-        if (cert == null || !Boolean.TRUE.equals(cert.getWebsiteEnabled())
-                || !"有效".equals(cert.getAssetStatus())) {
-            return ResponseEntity.notFound().build();
-        }
-
-        // 优先 cert_file（授权证书图），其次 spec_file（说明书）
-        String fileName = cert.getCertFile() != null && !cert.getCertFile().isBlank()
-                ? cert.getCertFile() : cert.getSpecFile();
-        if (fileName == null || fileName.isBlank()) {
-            return ResponseEntity.notFound().build();
-        }
-
-        // 专利证书文件存储在 fileRoot/certificate/{fileName}（与公司资质同目录）
-        Path filePath = fileStorageService.fileRoot()
-                .resolve("certificate")
-                .resolve(fileName)
-                .normalize();
-        if (!Files.exists(filePath) || !filePath.startsWith(fileStorageService.fileRoot())) {
-            return ResponseEntity.notFound().build();
-        }
-
-        String contentType = probeContentType(filePath);
-        return ResponseEntity.ok()
-                .contentType(MediaType.parseMediaType(contentType))
-                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + fileName + "\"")
-                .body(new FileSystemResource(filePath));
-    }
-
-    private static String probeContentType(Path filePath) {
-        try {
-            String type = Files.probeContentType(filePath);
-            return type != null ? type : "application/octet-stream";
-        } catch (Exception e) {
-            return "application/octet-stream";
-        }
     }
 
     /** 从 Markdown 正文提取纯文本摘要（去掉标题/列表标记，取前 140 字符）。 */

@@ -292,10 +292,6 @@ export interface WebsiteDashboard {
   incompleteProducts: number
   publishedPackaging: number
   publishedMolds: number
-  publishedCertifications: number
-  expiringCertifications: number
-  publishedPatents: number
-  featuredPatents: number
   publishedSolutions: number
   officialMediaAccounts: number
   publishedBanners: number

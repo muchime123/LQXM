@@ -33,8 +33,8 @@ import static org.junit.jupiter.api.Assertions.*;
  *       必须与按编号匹配时逐字相同（它们的编号本来就是对的）。</li>
  * </ol>
  *
- * <p>启用方式：真库断言需要 {@code -Derp.foundation.mysql=true}，否则静默跳过。
- * {@code mvn -o test -Dtest=H3LedgerMatchKeyTest -Derp.foundation.mysql=true}
+ * <p>启用方式：真库断言需要 {@code -Dmain.mysql=true}，否则静默跳过。
+ * {@code mvn -o test -Dtest=H3LedgerMatchKeyTest -Dmain.mysql=true}
  */
 class H3LedgerMatchKeyTest {
 
@@ -115,7 +115,7 @@ class H3LedgerMatchKeyTest {
     // ===== 第二层：真库不变量 =====
 
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void nameMatchingRemovesTheDuplicateRowsWithoutLosingAnything() throws Exception {
         JdbcTemplate jdbc = jdbc();
         long rows = count(jdbc, "SELECT COUNT(*)" + ProductInventoryService.VIEW_FROM);
@@ -133,7 +133,7 @@ class H3LedgerMatchKeyTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void rowsThatActuallyHoldStockKeepTheirOriginalCode() throws Exception {
         JdbcTemplate jdbc = jdbc();
         Map<String, Object> row = jdbc.queryForMap("SELECT COUNT(*) rows_," +
@@ -147,7 +147,7 @@ class H3LedgerMatchKeyTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void ambiguousNamesFallBackToCodeMatchingInsteadOfGuessing() throws Exception {
         JdbcTemplate jdbc = jdbc();
 
@@ -168,7 +168,7 @@ class H3LedgerMatchKeyTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void codeConflictFlagCatchesRewritesAndCollisions() throws Exception {
         JdbcTemplate jdbc = jdbc();
         Map<String, Object> row = jdbc.queryForMap("SELECT COUNT(*) rows_," +
@@ -189,7 +189,7 @@ class H3LedgerMatchKeyTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void issueCountsStayAtBaseline() throws Exception {
         Map<String, Object> info = service().snapshotInfo();
 

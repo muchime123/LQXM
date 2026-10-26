@@ -158,18 +158,6 @@ public class Certificate {
     @Column(name = "applicant_address", length = 500)
     private String applicantAddress;
 
-    /** 是否在官网展示（默认 false，需手动开启）。 */
-    @Column(name = "website_enabled", nullable = false)
-    private Boolean websiteEnabled = false;
-
-    /** 是否在官网首页重点展示。 */
-    @Column(name = "website_featured", nullable = false)
-    private Boolean websiteFeatured = false;
-
-    /** 官网排序（升序）。 */
-    @Column(name = "website_sort_order", nullable = false)
-    private Integer websiteSortOrder = 0;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

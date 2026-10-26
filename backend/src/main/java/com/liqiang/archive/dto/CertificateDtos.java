@@ -37,10 +37,7 @@ public class CertificateDtos {
             String invoiceStatus,
             String agencyContact,
             Integer niceClass,
-            String applicantAddress,
-            Boolean websiteEnabled,
-            Boolean websiteFeatured,
-            Integer websiteSortOrder
+            String applicantAddress
     ) {
     public static CertificateSummary from(Certificate c) {
         return from(c, v -> v);
@@ -76,10 +73,7 @@ public class CertificateDtos {
                 c.getInvoiceStatus(),
                 c.getAgencyContact(),
                 c.getNiceClass(),
-                c.getApplicantAddress(),
-                c.getWebsiteEnabled(),
-                c.getWebsiteFeatured(),
-                c.getWebsiteSortOrder()
+                c.getApplicantAddress()
         );
     }
     }
@@ -119,10 +113,7 @@ public class CertificateDtos {
             String reviewProgress,
             Integer niceClass,
             String niceClassDescription,
-            String applicantAddress,
-            Boolean websiteEnabled,
-            Boolean websiteFeatured,
-            Integer websiteSortOrder
+            String applicantAddress
     ) {
         public static CertificateDetail from(Certificate c) {
             return from(c, v -> v);
@@ -169,10 +160,7 @@ public class CertificateDtos {
                     c.getReviewProgress(),
                     c.getNiceClass(),
                     c.getNiceClassDescription(),
-                    c.getApplicantAddress(),
-                    c.getWebsiteEnabled(),
-                    c.getWebsiteFeatured(),
-                    c.getWebsiteSortOrder()
+                    c.getApplicantAddress()
             );
         }
     }
@@ -211,10 +199,7 @@ public class CertificateDtos {
             String reviewProgress,
             Integer niceClass,
             String niceClassDescription,
-            String applicantAddress,
-            Boolean websiteEnabled,
-            Boolean websiteFeatured,
-            Integer websiteSortOrder
+            String applicantAddress
     ) {
         /** 将 Payload 写入 Entity（用于更新） */
         public void applyTo(Certificate c) {
@@ -249,9 +234,6 @@ public class CertificateDtos {
             if (niceClass != null) c.setNiceClass(niceClass);
             if (niceClassDescription != null) c.setNiceClassDescription(niceClassDescription);
             if (applicantAddress != null) c.setApplicantAddress(applicantAddress);
-            if (websiteEnabled != null) c.setWebsiteEnabled(websiteEnabled);
-            if (websiteFeatured != null) c.setWebsiteFeatured(websiteFeatured);
-            if (websiteSortOrder != null) c.setWebsiteSortOrder(websiteSortOrder);
         }
     }
 

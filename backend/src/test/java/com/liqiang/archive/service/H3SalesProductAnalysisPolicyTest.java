@@ -27,8 +27,8 @@ import static org.junit.jupiter.api.Assertions.*;
  * 两端为空时要与原口径<b>逐字相同</b>，否则「全部历史」的结果会和加时间维度之前不一致。
  * 入参是拼进 SQL 的，因此只接受 {@code yyyy-MM-dd} 白名单格式。
  *
- * <p>启用方式：真库断言需要 {@code -Derp.foundation.mysql=true}，否则静默跳过。
- * {@code mvn -o test -Dtest=H3SalesProductAnalysisPolicyTest -Derp.foundation.mysql=true}
+ * <p>启用方式：真库断言需要 {@code -Dmain.mysql=true}，否则静默跳过。
+ * {@code mvn -o test -Dtest=H3SalesProductAnalysisPolicyTest -Dmain.mysql=true}
  */
 class H3SalesProductAnalysisPolicyTest {
 
@@ -136,7 +136,7 @@ class H3SalesProductAnalysisPolicyTest {
     // ===== 第二层：真库不变量 =====
 
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void analyzeNeverEmitsFeeCategoryRows() throws Exception {
         Map<String, Object> result = service().analyze("", "ALL", "", "", false, "", "", "", "", 1, 200);
 
@@ -161,7 +161,7 @@ class H3SalesProductAnalysisPolicyTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void dateRangeNarrowsTheSamePolicyAndSwapsReversedBounds() throws Exception {
         Map<String, Object> y2026 = service().analyze("", "ALL", "", "", false, "", "",
                 "2026-01-01", "2026-12-31", 1, 200);
@@ -188,7 +188,7 @@ class H3SalesProductAnalysisPolicyTest {
 
     /** 空区间（早于数据起点）必须给出空结果而不是报错，页面自己显示空状态。 */
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void emptyRangeYieldsEmptyResultNotAnError() throws Exception {
         Map<String, Object> none = service().analyze("", "ALL", "", "", false, "", "",
                 "1990-01-01", "1990-12-31", 1, 200);
@@ -202,7 +202,7 @@ class H3SalesProductAnalysisPolicyTest {
 
     /** 归并只改「行属于哪个组合」，不增不减明细行；组合数则应变成名称优先口径。 */
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void groupingByResolvedCodeKeepsEveryLine() throws Exception {
         Map<String, Object> all = service().analyze("", "ALL", "", "", false, "", "", "", "", 1, 100);
 
@@ -219,7 +219,7 @@ class H3SalesProductAnalysisPolicyTest {
      * 按名称应归并到产品信息里的 239SLH，且按氚云录入的原编号也要能搜到。
      */
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void searchingByRawOutboundCodeFindsTheResolvedProduct() throws Exception {
         Map<String, Object> result = service().analyze("SLH239", "ALL", "", "", false, "", "", "", "", 1, 50);
         List<Map<String, Object>> items = castList(result.get("items"));
@@ -250,7 +250,7 @@ class H3SalesProductAnalysisPolicyTest {
      * 剩下的极少数是名称重名（歧义）的行，按口径退回原编号——这是「拿不准就不猜」的正确行为。
      */
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void genericPlaceholderCodeSplitsIntoRealProducts() throws Exception {
         Map<String, Object> result = service().analyze("模具", "ALL", "", "", false, "", "", "", "", 1, 100);
         List<Map<String, Object>> items = castList(result.get("items"));

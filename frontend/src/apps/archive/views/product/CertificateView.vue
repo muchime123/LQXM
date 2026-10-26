@@ -314,14 +314,6 @@ const batchEditFieldGroups = computed<BatchEditFieldGroup[]>(() => [
     ]
   },
   {
-    title: '官网发布',
-    fields: [
-      { key: 'websiteEnabled', label: '官网公开', type: 'switch' },
-      { key: 'websiteFeatured', label: '重点展示', type: 'switch' },
-      { key: 'websiteSortOrder', label: '官网排序', type: 'number' }
-    ]
-  },
-  {
     title: '办理信息',
     fields: [
       { key: 'invoiceStatus', label: '开票状态', type: 'text' },

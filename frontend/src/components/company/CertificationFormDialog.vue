@@ -170,52 +170,6 @@
         />
       </el-form-item>
 
-      <el-divider content-position="left">官网发布</el-divider>
-
-      <el-row :gutter="16">
-        <el-col :span="8">
-          <el-form-item label="官网展示">
-            <el-switch
-              v-model="localForm.websiteEnabled"
-              active-text="是"
-              inactive-text="否"
-            />
-            <div class="form-hint">开启后该资质将出现在官网</div>
-          </el-form-item>
-        </el-col>
-        <el-col :span="8">
-          <el-form-item label="首页精选">
-            <el-switch
-              v-model="localForm.websiteFeatured"
-              :disabled="!localForm.websiteEnabled"
-              active-text="是"
-              inactive-text="否"
-            />
-            <div class="form-hint">在官网首页重点展示</div>
-          </el-form-item>
-        </el-col>
-        <el-col :span="8">
-          <el-form-item label="官网排序">
-            <el-input-number
-              v-model="localForm.websiteSortOrder"
-              :min="0"
-              :max="9999"
-              controls-position="right"
-              style="width: 100%"
-            />
-            <div class="form-hint">升序排列，数字越小越靠前</div>
-          </el-form-item>
-        </el-col>
-      </el-row>
-
-      <el-form-item label="官网描述">
-        <el-input
-          v-model="localForm.publicDescription"
-          type="textarea"
-          :rows="2"
-          placeholder="官网公开描述（可与内部描述不同，留空则使用上方描述）"
-        />
-      </el-form-item>
     </el-form>
   </LqDialog>
 </template>
@@ -269,11 +223,7 @@ const localForm = reactive<CompanyCertificationPayload>({
   issuingAuthority: '',
   fileName: '',
   description: '',
-  status: '有效',
-  websiteEnabled: false,
-  websiteFeatured: false,
-  websiteSortOrder: 0,
-  publicDescription: ''
+  status: '有效'
 })
 
 const fileNames = ref<string[]>([])
@@ -293,11 +243,7 @@ watch(
         issuingAuthority: props.formData.issuingAuthority ?? '',
         fileName: props.formData.fileName ?? '',
         description: props.formData.description ?? '',
-        status: props.formData.status ?? '有效',
-        websiteEnabled: props.formData.websiteEnabled ?? false,
-        websiteFeatured: props.formData.websiteFeatured ?? false,
-        websiteSortOrder: props.formData.websiteSortOrder ?? 0,
-        publicDescription: props.formData.publicDescription ?? ''
+        status: props.formData.status ?? '有效'
       })
       if (props.formData.isPermanent) {
         localForm.expiryDate = ''

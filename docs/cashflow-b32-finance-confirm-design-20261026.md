@@ -24,7 +24,7 @@
 
 ## 3. 核对证据
 
-建议在 B-3.2 实施时增加一张专用、不可覆写的 `cashflow_opening_confirmation` 记录，而不是把凭据放入 `basis` 或仅写 `audit_logs.changes`。最少字段：`id`、`opening_id`、`opening_amount_snapshot DECIMAL(18,4)`、`evidence_type`、`balance_as_of_date`、`verified_balance DECIMAL(18,4)`、`evidence_ref`、`note`、`confirmed_by`、`confirmed_at`、`request_key`。`request_key` 唯一；`opening_id` 不单独设唯一，以便 B-3.3 更正后保留旧确认并追加新确认。`evidence_ref` 为受控凭据编号或文件资产引用，确认时必须校验其存在且可访问；不在审计文字里存密钥或完整敏感文件内容。证据表保存已确认的金额快照，不能仅依赖之后可能更正的期初行。
+建议在 B-3.2 实施时增加一张专用、不可覆写的 `cashflow_opening_confirmation` 记录，而不是把凭据放入 `basis` 或仅写 `audit_logs.changes`。最少字段：`id`、`opening_id`、`opening_amount_snapshot DECIMAL(18,4)`、`evidence_type`、`balance_as_of_date`、`verified_balance DECIMAL(18,4)`、`evidence_ref`、`note`、`confirmed_by`、`confirmed_by_name`（姓名快照）、`confirmed_at`、`request_key`。`request_key` 唯一；`opening_id` 不单独设唯一，以便 B-3.3 更正后保留旧确认并追加新确认。2026-10-26 确定 `evidence_ref` 为**外部凭据编号，由财务保管原件**；系统校验编号非空、长度和格式，无法自动验证外部凭据是否真实存在或可访问，财务确认人对此承担核验责任。不得把编号误表述为已上传的系统文件。不在审计文字里存密钥或完整敏感文件内容。证据表保存已确认的金额快照，不能仅依赖之后可能更正的期初行。
 
 首次确认要求：证据类型（银行对账单、现金盘点或其他可核实凭据）、余额截至日期、凭据引用、凭据所载余额，以及核对说明。`balance_as_of_date` 必须是上年 12 月 31 日期末或本年 1 月 1 日期初；文件出具日期可以晚于该日，但文件必须明确对应这一余额时点。凭据余额必须与当前期初金额按四位小数**精确相等**；不允许自动舍入、容差或隐式修改期初。凭据不对应这一时点或金额不符则 409，本接口不推断中间流水差额。历史账户如无法取得足够证据，保持待确认，不凭导入对拍代替财务核对。
 

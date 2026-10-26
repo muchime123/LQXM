@@ -231,8 +231,8 @@ const sourceInfo = computed<{ label: string; description: string; to?: string }>
   }
   if (key === 'intro') return { label: '页面配置（辅图）', description: '标题、描述、主图与辅图都在此面板修改。主图为左侧大图，辅图为右侧小图（含说明文字）。' }
   if (key === 'manufacturing') return { label: '页面配置（图廊）', description: '标题、描述、主图与下方厂房图廊都在此面板修改。图廊图片按列表顺序展示。' }
-  if (key === 'credentials') return { label: '页面配置 + 资质合规', description: '区块标题与描述在此修改；证书卡片来自资质合规档案。', to: '/company/certifications' }
-  if (key === 'patents') return { label: '页面配置 + 知识产权', description: '区块标题与描述在此修改；专利卡片来自知识产权档案。', to: '/certificates' }
+  if (key === 'credentials') return { label: '页面配置', description: '区块标题、描述与显示状态在此修改；展示条目由官网本地数据维护，不涉及后台档案。' }
+  if (key === 'patents') return { label: '页面配置', description: '区块标题、描述与显示状态在此修改；展示条目由官网本地数据维护，不涉及后台档案。' }
   if (selection.value.pageKey === 'ABOUT') return { label: '页面配置 + 公司信息', description: '区块展示文案与主图在此修改；企业事实、历程、文化及联系方式来自公司信息档案。', to: '/company' }
   return { label: '页面配置', description: '该区块的标题、描述和显示状态由固定页面区块控制。' }
 })

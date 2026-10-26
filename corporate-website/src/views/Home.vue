@@ -15,6 +15,7 @@ import { usePageSections } from '../composables/usePageSections'
 import { useCmsPreview } from '../composables/useCmsPreview'
 import { useInquiryModal } from '../composables/useInquiryModal'
 import { fetchSolutions } from '../api/website'
+import { patents } from '../data/qualifications'
 import { setSchema, createOrganizationSchema, createLocalBusinessSchema } from '../composables/useSchema'
 import ProductCard from '../components/ProductCard.vue'
 import AppIcon from '../components/AppIcon.vue'
@@ -26,7 +27,6 @@ const {
   error,
   products,
   productCount,
-  patentCount,
   banners,
   load,
 } = useWebsiteData()
@@ -537,7 +537,7 @@ function openSceneAssistInquiry(sceneName) {
       <div class="home-strength__facts">
         <RouterLink to="/about"><strong>{{ foundedYear }}</strong><span>创立于温州</span></RouterLink>
         <RouterLink to="/products"><strong>{{ productCount || homeProducts.length || '—' }}</strong><span>公开设备型号</span></RouterLink>
-        <RouterLink to="/patents"><strong>{{ patentCount || '—' }}</strong><span>专利与知识产权</span></RouterLink>
+        <RouterLink to="/patents"><strong>{{ patents.length || '—' }}</strong><span>专利与知识产权</span></RouterLink>
         <RouterLink to="/about"><strong>全链路</strong><span>设备 · 模具 · 耗材</span></RouterLink>
       </div>
     </section>
@@ -604,7 +604,7 @@ function openSceneAssistInquiry(sceneName) {
           <p>{{ homeHeadings.showcase.description }}</p>
           <div class="showcase-proof">
             <RouterLink to="/credentials">ISO 9001 · CE 认证</RouterLink>
-            <RouterLink v-if="patentCount" to="/patents">{{ patentCount }} 项知识产权</RouterLink>
+            <RouterLink v-if="patents.length" to="/patents">{{ patents.length }} 项知识产权</RouterLink>
           </div>
         </template>
       </SectionHeading>

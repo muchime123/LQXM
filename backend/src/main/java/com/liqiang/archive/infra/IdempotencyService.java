@@ -33,7 +33,7 @@ import java.util.function.Supplier;
  *
  * <p><b>⚠️ 绑定纪律（勿改回）：本模板必须与「业务写入」绑定同一个 DataSource 与同一个事务管理器。</b>
  * 否则「业务回滚则键也不存在」与「键冲突则业务回滚」两条都失效。主库业务统一绑定
- * 主库连接 + {@code product_archive.request_idempotency} 表（见 {@code IdempotencyConfig}）。
+ * 主库连接 + 当前数据源的 {@code request_idempotency} 表（见 {@code IdempotencyConfig}）。
  *
  * <p>2026-10-23：随 ERP 独立 schema 下线，由 {@code ErpIdempotencyService} 收敛为系统通用幂等能力；
  * 幂等表从 {@code erp.idem_request} 迁到 {@code product_archive.request_idempotency}。
@@ -46,9 +46,9 @@ public class IdempotencyService {
     private final JdbcTemplate jdbcTemplate;
     private final TransactionTemplate transactionTemplate;
 
-    /** 主库默认绑定（幂等表 {@code product_archive.request_idempotency}）。 */
+    /** 当前数据源默认绑定（幂等表 {@code request_idempotency}）。 */
     public IdempotencyService(JdbcTemplate jdbcTemplate, PlatformTransactionManager transactionManager) {
-        this(jdbcTemplate, transactionManager, "product_archive.request_idempotency");
+        this(jdbcTemplate, transactionManager, "request_idempotency");
     }
 
     /**

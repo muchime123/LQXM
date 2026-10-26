@@ -245,10 +245,6 @@ public class CompanyDtos {
             String fileName,
             String description,
             String status,
-            Boolean websiteEnabled,
-            Boolean websiteFeatured,
-            Integer websiteSortOrder,
-            String publicDescription,
             LocalDateTime createdAt,
             LocalDateTime updatedAt
     ) {
@@ -263,8 +259,6 @@ public class CompanyDtos {
                     c.getCertNumber(), c.getIssueDate(), c.getExpiryDate(),
                     c.getIsPermanent(), days,
                     c.getIssuingAuthority(), c.getFileName(), c.getDescription(), status,
-                    c.getWebsiteEnabled(), c.getWebsiteFeatured(), c.getWebsiteSortOrder(),
-                    c.getPublicDescription(),
                     c.getCreatedAt(), c.getUpdatedAt()
             );
         }
@@ -281,11 +275,7 @@ public class CompanyDtos {
             String issuingAuthority,
             String fileName,
             String description,
-            String status,
-            Boolean websiteEnabled,
-            Boolean websiteFeatured,
-            Integer websiteSortOrder,
-            String publicDescription
+            String status
     ) {
     }
 }

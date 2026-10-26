@@ -136,14 +136,7 @@ sortable="custom">
         <span v-else class="text-muted">-</span>
       </template>
     </el-table-column>
-    <el-table-column label="官网" width="105" align="center">
-      <template #default="{ row }">
-        <div class="website-state">
-          <StatusTag :type="row.websiteEnabled ? 'success' : 'neutral'" :label="row.websiteEnabled ? '已公开' : '未公开'" />
-          <span v-if="row.websiteFeatured" class="featured-mark">重点</span>
-        </div>
-      </template>
-    </el-table-column>
+
     <el-table-column label="操作" fixed="right" width="180">
       <template #default="{ row }">
         <el-button link @click.stop="$emit('edit', row)">编辑</el-button>

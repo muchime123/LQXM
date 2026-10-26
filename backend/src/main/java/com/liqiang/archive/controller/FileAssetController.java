@@ -462,13 +462,17 @@ public class FileAssetController {
     }
 
     private static String storageFileUrl(FileHandle handle) {
+        String encoded = Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(handle.fileName().getBytes(StandardCharsets.UTF_8));
+        // 品牌资产子分类：跳转到 /api/files/company/<subCategory>?encoded=xxx
+        if (isSubcategorizedCompanyAsset(handle)) {
+            return "/api/files/company/" + handle.category() + "?encoded=" + encoded;
+        }
         String category = requireNotBlank(
                 handle.storageCategory() == null ? handle.category() : handle.storageCategory(),
                 "storageCategory"
         );
-        String encoded = Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(handle.fileName().getBytes(StandardCharsets.UTF_8));
         if (handle.storageOwnerId() != null) {
             return "/api/files/" + handle.storageOwnerId() + "/" + category + "?encoded=" + encoded;
         }
@@ -476,13 +480,16 @@ public class FileAssetController {
     }
 
     private static String storagePdfPreviewUrl(FileHandle handle) {
+        String encoded = Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(handle.fileName().getBytes(StandardCharsets.UTF_8));
+        if (isSubcategorizedCompanyAsset(handle)) {
+            return "/api/files/company/" + handle.category() + "/preview-pdf?encoded=" + encoded;
+        }
         String category = requireNotBlank(
                 handle.storageCategory() == null ? handle.category() : handle.storageCategory(),
                 "storageCategory"
         );
-        String encoded = Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(handle.fileName().getBytes(StandardCharsets.UTF_8));
         if (handle.storageOwnerId() != null) {
             return "/api/files/" + handle.storageOwnerId() + "/" + category + "/preview-pdf?encoded=" + encoded;
         }
@@ -491,17 +498,29 @@ public class FileAssetController {
 
     /** 与 {@link #storagePdfPreviewUrl} 对称，仅将路径后缀改为 /preview-pdf/status。 */
     private static String storagePdfPreviewStatusUrl(FileHandle handle) {
+        String encoded = Base64.getUrlEncoder()
+                .withoutPadding()
+                .encodeToString(handle.fileName().getBytes(StandardCharsets.UTF_8));
+        if (isSubcategorizedCompanyAsset(handle)) {
+            return "/api/files/company/" + handle.category() + "/preview-pdf/status?encoded=" + encoded;
+        }
         String category = requireNotBlank(
                 handle.storageCategory() == null ? handle.category() : handle.storageCategory(),
                 "storageCategory"
         );
-        String encoded = Base64.getUrlEncoder()
-                .withoutPadding()
-                .encodeToString(handle.fileName().getBytes(StandardCharsets.UTF_8));
         if (handle.storageOwnerId() != null) {
             return "/api/files/" + handle.storageOwnerId() + "/" + category + "/preview-pdf/status?encoded=" + encoded;
         }
         return "/api/files/" + category + "/preview-pdf/status?encoded=" + encoded;
+    }
+
+    /** 是否为按子分类分目录存储的品牌资产（排除合成 ID 文件）。 */
+    private static boolean isSubcategorizedCompanyAsset(FileHandle handle) {
+        if (handle.ownerType() != OwnerType.COMPANY) return false;
+        if (!"company".equals(handle.storageCategory())) return false;
+        String cat = handle.category();
+        if (cat == null || cat.isBlank()) return false;
+        return !"company".equals(cat) && !"company_finance".equals(cat) && !"company_team".equals(cat);
     }
 
     // ====== 封面辅助方法 ======

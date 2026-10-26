@@ -53,22 +53,6 @@ public class CompanyCertification {
     @Column(length = 20)
     private String status = "有效";
 
-    /** 是否在官网展示。false 时不出现在官网资质列表。默认 false，需手动开启。 */
-    @Column(name = "website_enabled", nullable = false)
-    private Boolean websiteEnabled = false;
-
-    /** 是否在官网首页重点展示。 */
-    @Column(name = "website_featured", nullable = false)
-    private Boolean websiteFeatured = false;
-
-    /** 官网排序（升序）。 */
-    @Column(name = "website_sort_order", nullable = false)
-    private Integer websiteSortOrder = 0;
-
-    /** 官网公开描述，可与内部 description 不同。 */
-    @Column(name = "public_description", columnDefinition = "TEXT")
-    private String publicDescription;
-
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;

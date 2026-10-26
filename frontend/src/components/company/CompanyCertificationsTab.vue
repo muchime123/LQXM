@@ -93,23 +93,6 @@
             <StatusTag :type="statusTagType(row.status)" :label="row.status || '有效'" />
           </template>
         </el-table-column>
-        <el-table-column label="官网发布" width="160" align="center">
-          <template #default="{ row }">
-            <div class="website-cell">
-              <el-switch
-                :model-value="row.websiteEnabled === true"
-                :aria-label="`${row.websiteEnabled ? '取消官网发布' : '发布到官网'}：${row.name}`"
-                @change="(val: boolean | string | number) => toggleWebsiteEnabled(row, Boolean(val))"
-              />
-              <el-tooltip v-if="row.websiteFeatured" content="首页精选" placement="top">
-                <span class="website-featured-badge">★</span>
-              </el-tooltip>
-              <span v-if="row.websiteEnabled" class="website-sort-label">
-                排序{{ row.websiteSortOrder ?? 0 }}
-              </span>
-            </div>
-          </template>
-        </el-table-column>
         <el-table-column label="分类" prop="category" width="112" sortable="custom">
           <template #default="{ row }">
             <span class="ccert-cat-tag">{{ row.category }}</span>
@@ -270,19 +253,6 @@ function toggleSelectAll() {
   tableRef.value?.toggleAllSelection?.()
 }
 
-/** 行内快速切换官网发布状态。 */
-async function toggleWebsiteEnabled(row: CompanyCertification, enabled: boolean) {
-  const prev = row.websiteEnabled === true
-  row.websiteEnabled = enabled
-  try {
-    await batchUpdateCertifications([row.id], { websiteEnabled: enabled })
-    notify(`${row.name} 已${enabled ? '发布到官网' : '取消官网发布'}`)
-  } catch (err) {
-    row.websiteEnabled = prev
-    notify.errorWithDetail('更新官网发布状态失败', err)
-  }
-}
-
 async function handleBatchDelete() {
   const count = selectedIds.size
   if (count === 0) return
@@ -338,15 +308,6 @@ const batchEditFieldGroups = computed<BatchEditFieldGroup[]>(() => [
       { key: 'expiryDate', label: '到期日期', type: 'date' },
       { key: 'isPermanent', label: '长期有效', type: 'switch' },
       { key: 'description', label: '说明', type: 'textarea', full: true }
-    ]
-  },
-  {
-    title: '官网发布',
-    fields: [
-      { key: 'websiteEnabled', label: '官网展示', type: 'switch' },
-      { key: 'websiteFeatured', label: '首页精选', type: 'switch' },
-      { key: 'websiteSortOrder', label: '官网排序', type: 'number' },
-      { key: 'publicDescription', label: '官网描述', type: 'textarea', full: true }
     ]
   }
 ])
@@ -614,11 +575,7 @@ function editItem(c: CompanyCertification) {
     issuingAuthority: c.issuingAuthority ?? '',
     fileName: c.fileName ?? '',
     description: c.description ?? '',
-    status: c.status,
-    websiteEnabled: c.websiteEnabled ?? false,
-    websiteFeatured: c.websiteFeatured ?? false,
-    websiteSortOrder: c.websiteSortOrder ?? 0,
-    publicDescription: c.publicDescription ?? ''
+    status: c.status
   }
   showDialog.value = true
 }

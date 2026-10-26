@@ -1217,12 +1217,15 @@ class ProductionTrackingServiceTest {
 
         service.filterOptions();
 
-        String counts=querySql.getAllValues().stream()
-                .filter(sql->sql.contains("action,COUNT(*) count")).findFirst()
-                .orElseThrow(()->new AssertionError("filter-options 必须返回各类跟单待办的条数："+querySql.getAllValues()));
+        var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
+        verify(jdbc,atLeastOnce()).queryForList(countSql.capture(),any(Object[].class));
+        String counts=countSql.getAllValues().stream()
+                .filter(sql->sql.contains("COALESCE(SUM(CASE WHEN")&&sql.contains("FINISHED_PENDING"))
+                .findFirst().orElseThrow(()->new AssertionError("filter-options 必须返回各类跟单待办的条数："+countSql.getAllValues()));
         assertTrue(counts.contains(ProductionTrackingService.INBOUND_JOIN),
                 "条数要算上采购入库关联，否则「已入库」类会恒为 0："+counts);
-        assertTrue(counts.contains("GROUP BY action")&&counts.contains("IS NOT NULL"),counts);
+        for(String code:ProductionTrackingService.TRACKING_ACTION_CODES)
+            assertTrue(counts.contains(ProductionTrackingService.trackingActionPredicate(code)),counts);
         assertTrue(counts.contains("p.external_source='H3YUN'")&&counts.contains("production_tracking_workbook_rows"),
                 "条数必须与列表同一段可见范围："+counts);
     }

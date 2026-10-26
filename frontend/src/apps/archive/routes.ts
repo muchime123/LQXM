@@ -61,13 +61,13 @@ export const archiveRoutes: RouteRecordRaw[] = [
     path: '/certificates',
     name: 'certificates',
     component: () => import('@/apps/archive/views/product/CertificateView.vue'),
-    meta: { title: '知识产权', layout: 'list', group: 'product', permission: 'certificate.read' }
+    meta: { title: '知识产权', layout: 'list', group: 'marketing', permission: 'certificate.read' }
   },
   {
     path: '/office-assets',
     name: 'officeAssets',
     component: () => import('@/apps/archive/views/product/OfficeAssetView.vue'),
-    meta: { title: '物品资产', layout: 'list', group: 'product', permission: 'officeAsset.read' }
+    meta: { title: '物品资产', layout: 'list', group: 'marketing', permission: 'officeAsset.read' }
   },
 
   // ---- 官网运营 ----

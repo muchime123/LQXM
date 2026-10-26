@@ -8,7 +8,8 @@
  * - CTA：跳转到资质页和联系页
  */
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick, computed, watchEffect } from 'vue'
-import { fetchHome, certImageUrl, patentImageUrl } from '../api/website'
+import { fetchHome } from '../api/website'
+import { certifications, patents } from '../data/qualifications'
 import { useCompany } from '../composables/useCompany'
 import { usePageSections } from '../composables/usePageSections'
 import { useCmsPreview } from '../composables/useCmsPreview'
@@ -117,10 +118,9 @@ const visibleManufacturingGallery = computed(() => {
 
 const milestones = ref([])
 const productCount = ref(0)
-const certifications = ref([])
-const certificationCount = ref(0)
-const patents = ref([])
-const patentCount = ref(0)
+/* 资质与知识产权为官网自有展示内容，见 src/data/qualifications.js */
+const certificationCount = computed(() => certifications.length)
+const patentCount = computed(() => patents.length)
 const certificationCarousel = ref(null)
 const patentCarousel = ref(null)
 
@@ -209,15 +209,11 @@ async function load() {
   loading.value = true
   error.value = null
   try {
-    /* 一次 fetchHome 获取里程碑 + 产品数量 + 资质列表 + 精选专利。
-       company 数据由 useCompany 单例提供（App.vue 已加载）。 */
+    /* 一次 fetchHome 获取里程碑 + 产品数量。
+       资质与知识产权取自官网本地数据，company 由 useCompany 单例提供（App.vue 已加载）。 */
     const data = await fetchHome()
     milestones.value = data.milestones || []
     productCount.value = data.productCount || 0
-    certifications.value = data.certifications || []
-    certificationCount.value = certifications.value.length
-    patents.value = data.patents || []
-    patentCount.value = data.patentCount || 0
   } catch (err) {
     error.value = err
     console.warn('About page data unavailable:', err)
@@ -459,7 +455,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- 企业资质（首页 TrustBar 与 /credentials 路由的锚点目标） -->
-    <section v-if="sectionEnabled('credentials')" class="section about-credentials section--alt" id="credentials" data-cms-page="ABOUT" data-cms-section="credentials" data-cms-source="certificate">
+    <section v-if="sectionEnabled('credentials')" class="section about-credentials section--alt" id="credentials" data-cms-page="ABOUT" data-cms-section="credentials" data-cms-source="static">
       <SectionHeading
         eyebrow="CERTIFICATIONS"
         :title="aboutHeadings.credentials.title"
@@ -471,17 +467,17 @@ onBeforeUnmount(() => {
       </div>
       <!-- 资质证书轮播 -->
       <div ref="certificationCarousel" class="credentials-preview about-showcase-track">
-        <template v-if="!loading && certifications.length">
+        <template v-if="certifications.length">
           <article
             v-for="cert in certifications.slice(0, 6)"
             :key="cert.id || cert.name"
             class="cert-thumb reveal"
             v-reveal
-            :class="{ 'has-image': cert.hasImage }"
+            :class="{ 'has-image': cert.image }"
           >
-            <div v-if="cert.hasImage" class="cert-thumb__image">
+            <div v-if="cert.image" class="cert-thumb__image">
               <img
-                :src="certImageUrl(cert.id)"
+                :src="cert.image"
                 :alt="cert.name"
                 loading="lazy"
                 decoding="async"
@@ -496,12 +492,6 @@ onBeforeUnmount(() => {
               <strong class="cert-thumb__name">{{ cert.name }}</strong>
             </div>
           </article>
-        </template>
-        <template v-else-if="loading">
-          <div v-for="n in 6" :key="n" class="cert-thumb skeleton-thumb">
-            <div class="sk-img"></div>
-            <div class="sk-cap"></div>
-          </div>
         </template>
         <template v-else>
           <div class="cert-thumb placeholder-thumb" v-for="n in 6" :key="n">
@@ -518,7 +508,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- 专利与知识产权 -->
-    <section v-if="sectionEnabled('patents')" class="section about-patents" id="patents" data-cms-page="ABOUT" data-cms-section="patents" data-cms-source="patent">
+    <section v-if="sectionEnabled('patents')" class="section about-patents" id="patents" data-cms-page="ABOUT" data-cms-section="patents" data-cms-source="static">
       <SectionHeading
         eyebrow="PATENTS &amp; IP"
         :title="aboutHeadings.patents.title"
@@ -530,15 +520,15 @@ onBeforeUnmount(() => {
       </div>
       <!-- 专利证书轮播 -->
       <div ref="patentCarousel" class="patents-preview about-showcase-track">
-        <template v-if="!loading && patents.length">
+        <template v-if="patents.length">
           <article
             v-for="p in patents.slice(0, 6)"
             :key="p.id"
             class="patent-thumb reveal"
             v-reveal
           >
-            <div v-if="p.hasImage" class="patent-thumb__image">
-              <img :src="patentImageUrl(p.id)" :alt="p.name" loading="lazy" decoding="async" @error="(e) => (e.target.style.display = 'none')" />
+            <div v-if="p.image" class="patent-thumb__image">
+              <img :src="p.image" :alt="p.name" loading="lazy" decoding="async" @error="(e) => (e.target.style.display = 'none')" />
             </div>
             <div class="patent-thumb__head">
               <span class="patent-thumb__cat">{{ p.assetCategory || '知识产权' }}</span>
@@ -550,11 +540,6 @@ onBeforeUnmount(() => {
               <span v-else-if="p.applicant">{{ p.applicant }}</span>
             </div>
           </article>
-        </template>
-        <template v-else-if="loading">
-          <div v-for="n in 6" :key="n" class="patent-thumb skeleton-thumb">
-            <div class="sk-cap"></div>
-          </div>
         </template>
         <template v-else>
           <div class="patents-empty">

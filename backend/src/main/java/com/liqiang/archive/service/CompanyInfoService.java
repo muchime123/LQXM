@@ -11,6 +11,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -338,6 +342,8 @@ public class CompanyInfoService {
         if (asset.getSortOrder() == null) asset.setSortOrder(0);
         if (asset.getDefaultAsset() == null) asset.setDefaultAsset(false);
         CompanyAsset saved = assetRepo.save(asset);
+        // 物理文件从平铺 company/ 移动到子分类子目录 company/<category>/
+        moveFileToSubCategory(saved.getCategory(), saved.getFileName());
         auditLogService.log("CompanyAsset", saved.getId(), saved.getFileName(),
                 "COMPANY_ASSET_CREATE", "创建品牌资产 " + saved.getCategory() + " / " + saved.getFileName());
         return saved;
@@ -437,6 +443,10 @@ public class CompanyInfoService {
         // 批量加载，避免循环内 N 次 SELECT
         List<CompanyAsset> assets = assetRepo.findAllById(ids);
         for (CompanyAsset a : assets) {
+            String oldCategory = a.getCategory();
+            if (oldCategory != null && !oldCategory.equals(category)) {
+                moveFileBetweenCategories(oldCategory, category, a.getFileName());
+            }
             a.setCategory(category);
             a.setDefaultAsset(false);
         }
@@ -544,11 +554,69 @@ public class CompanyInfoService {
         if (deletePhysical) {
             CompanyAsset asset = assetRepo.findDeletedById(id)
                     .orElseThrow(() -> new EntityNotFoundException("Asset does not exist: " + id));
-            fileStorageService.deleteIfExists("company", asset.getFileName());
+            // 删除子分类目录和旧平铺目录中的文件
+            deleteCompanyAssetFile(asset.getCategory(), asset.getFileName());
         }
         int rows = assetRepo.permanentDelete(id);
         if (rows == 0) throw new EntityNotFoundException("资产不存在: " + id);
         auditLogService.log("CompanyAsset", id, "品牌资产",
                 "COMPANY_ASSET_PERMANENT_DELETE", "永久删除品牌资产 #" + id + (deletePhysical ? "（含物理文件）" : ""));
+    }
+
+    // ===== 品牌资产文件物理搬运 =====
+
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(CompanyInfoService.class);
+
+    /** 创建资产时：把文件从平铺 company/ 移到 company/<category>/ */
+    private void moveFileToSubCategory(String category, String fileName) {
+        if (category == null || fileName == null) return;
+        try {
+            Path companyDir = fileStorageService.fileRoot().resolve("company");
+            Path flatFile = companyDir.resolve(fileName).normalize();
+            Path subDir = companyDir.resolve(category).normalize();
+            Path subFile = subDir.resolve(fileName).normalize();
+            if (Files.isRegularFile(flatFile) && !Files.exists(subFile)) {
+                Files.createDirectories(subDir);
+                Files.move(flatFile, subFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            log.warn("移动品牌资产文件到子分类目录失败: {}/{}", category, fileName, e);
+        }
+    }
+
+    /** 切换分类时：把文件从旧子目录移到新子目录 */
+    private void moveFileBetweenCategories(String oldCategory, String newCategory, String fileName) {
+        if (fileName == null) return;
+        try {
+            Path companyDir = fileStorageService.fileRoot().resolve("company");
+            Path newDir = companyDir.resolve(newCategory).normalize();
+            Path newFile = newDir.resolve(fileName).normalize();
+            // 源文件可能在旧子目录，也可能在平铺根目录
+            Path oldFile = companyDir.resolve(oldCategory).resolve(fileName).normalize();
+            if (!Files.isRegularFile(oldFile)) {
+                oldFile = companyDir.resolve(fileName).normalize();
+            }
+            if (Files.isRegularFile(oldFile) && !Files.exists(newFile)) {
+                Files.createDirectories(newDir);
+                Files.move(oldFile, newFile, StandardCopyOption.REPLACE_EXISTING);
+            }
+        } catch (IOException e) {
+            log.warn("移动品牌资产文件分类失败: {} → {}/{}", oldCategory, newCategory, fileName, e);
+        }
+    }
+
+    /** 永久删除时：从子分类目录和平铺根目录都清理 */
+    private void deleteCompanyAssetFile(String category, String fileName) {
+        if (fileName == null) return;
+        fileStorageService.deleteIfExists("company", fileName);
+        if (category != null && !category.isBlank()) {
+            try {
+                Path subFile = fileStorageService.fileRoot().resolve("company").resolve(category).resolve(fileName).normalize();
+                if (Files.isRegularFile(subFile)) {
+                    Files.deleteIfExists(subFile);
+                }
+            } catch (IOException ignored) {
+            }
+        }
     }
 }

@@ -284,33 +284,6 @@
   }
 }
 
-/* ===== 官网发布列样式 ===== */
-
-.website-cell {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: nowrap;
-}
-
-.website-featured-badge {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 18px;
-  height: 18px;
-  font-size: 12px;
-  color: var(--color-warning, #e6a23c);
-  background: var(--color-warning-bg-light, #fdf6ec);
-  border-radius: var(--radius-xs, 3px);
-  line-height: 1;
-}
-
-.website-sort-label {
-  font-size: 11px;
-  color: var(--color-text-tertiary);
-}
-
 .text-muted {
   color: var(--color-text-tertiary);
 }

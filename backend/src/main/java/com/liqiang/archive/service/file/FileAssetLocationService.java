@@ -198,14 +198,50 @@ public class FileAssetLocationService {
 
         Long storageOwnerId = handle.storageOwnerId();
         if (storageOwnerId == null) {
-            return fileRoot.resolve(folder).resolve(handle.fileName()).normalize();
+            return resolveFlatPath(folder, handle);
         }
         return switch (FileCategory.scopeOf(category)) {
-            case FLAT -> fileRoot.resolve(folder).resolve(handle.fileName()).normalize();
+            case FLAT -> resolveFlatPath(folder, handle);
             case PACKAGING -> fileStorageService.packagingDir(storageOwnerId).resolve(folder).resolve(handle.fileName()).normalize();
             case EMPLOYEE -> fileStorageService.employeeDir(storageOwnerId).resolve(folder).resolve(handle.fileName()).normalize();
             case PRODUCT -> resolveProductFile(storageOwnerId, folder, handle.fileName());
         };
+    }
+
+    /**
+     * 解析 FLAT 作用域的文件路径。
+     * 对于品牌资产（company 文件夹下的子分类），优先查找 company/<子分类>/<fileName>，
+     * 找不到时回退到旧的平铺路径 company/<fileName>（迁移过渡期兼容）。
+     */
+    private Path resolveFlatPath(String folder, FileHandle handle) {
+        // 品牌资产子分类：company/brand_logo/xxx.jpg 等
+        if ("company".equals(folder) && isSubcategorizedCompanyAsset(handle)) {
+            Path subPath = fileRoot.resolve(folder).resolve(handle.category()).resolve(handle.fileName()).normalize();
+            if (subPath.startsWith(fileRoot) && Files.isRegularFile(subPath)) {
+                return subPath;
+            }
+            // 回退到平铺路径（旧文件尚未迁移）
+            Path flatPath = fileRoot.resolve(folder).resolve(handle.fileName()).normalize();
+            if (flatPath.startsWith(fileRoot)) {
+                return flatPath;
+            }
+            // 文件不存在时返回子分类路径（上传新文件时自动创建目录）
+            return subPath;
+        }
+        return fileRoot.resolve(folder).resolve(handle.fileName()).normalize();
+    }
+
+    /**
+     * 判断是否为"按子分类分目录存储"的品牌资产。
+     * 排除：合成 ID 文件（资质证书附件 category="company"、对公二维码 company_finance、团队照片 company_team）。
+     */
+    private boolean isSubcategorizedCompanyAsset(FileHandle handle) {
+        if (handle.ownerType() != OwnerType.COMPANY) return false;
+        if (!"company".equals(handle.storageCategory())) return false;
+        String cat = handle.category();
+        if (cat == null || cat.isBlank()) return false;
+        // 这些值是 FLAT 文件夹名，不是子分类
+        return !"company".equals(cat) && !"company_finance".equals(cat) && !"company_team".equals(cat);
     }
 
     /**
@@ -282,18 +318,26 @@ public class FileAssetLocationService {
 
         Long storageOwnerId = handle.storageOwnerId();
         if (storageOwnerId == null) {
-            return fileRoot.resolve(folder).normalize();
+            return resolveFlatAssetDir(folder, handle);
         }
         StorageScope scope = FileCategory.scopeOf(category);
         if (scope == null) {
             return fileRoot.resolve(folder).normalize();
         }
         return switch (scope) {
-            case FLAT -> fileRoot.resolve(folder).normalize();
+            case FLAT -> resolveFlatAssetDir(folder, handle);
             case PACKAGING -> fileStorageService.packagingDir(storageOwnerId).resolve(folder).normalize();
             case EMPLOYEE -> fileStorageService.employeeDir(storageOwnerId).resolve(folder).normalize();
             case PRODUCT -> fileStorageService.productDir(storageOwnerId).resolve(folder).normalize();
         };
+    }
+
+    /** FLAT 作用域的目录解析：品牌资产返回子分类目录。 */
+    private Path resolveFlatAssetDir(String folder, FileHandle handle) {
+        if ("company".equals(folder) && isSubcategorizedCompanyAsset(handle)) {
+            return fileRoot.resolve(folder).resolve(handle.category()).normalize();
+        }
+        return fileRoot.resolve(folder).normalize();
     }
 
     private Path resolveProductFile(Long modelId, String folder, String fileName) {

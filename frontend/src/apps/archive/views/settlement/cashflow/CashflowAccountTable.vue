@@ -95,9 +95,10 @@
         </el-tooltip>
       </template>
     </el-table-column>
-    <el-table-column label="操作" width="90" fixed="right">
+    <el-table-column label="操作" width="165" fixed="right">
       <template #default="{ row }">
         <el-button link type="primary" @click.stop="emit('openEntries', row)">看流水</el-button>
+        <el-button link type="primary" @click.stop="emit('openOpening', row)">年度期初</el-button>
       </template>
     </el-table-column>
   </LqTable>
@@ -112,7 +113,7 @@ import { notify } from '@/composables/ui/useToast'
 import { amount, closingTagType, downloadCsv, openingAmount } from './cashflowFormat'
 
 const props = defineProps<{ accounts: CashflowAccount[]; year: number }>()
-const emit = defineEmits<{ openEntries: [account: CashflowAccount] }>()
+const emit = defineEmits<{ openEntries: [account: CashflowAccount]; openOpening: [account: CashflowAccount] }>()
 
 // ==================== 逐月汇总（展开行，P1 从抽屉迁入） ====================
 const monthlyCache = ref<Record<number, CashflowMonthlyRow[]>>({})

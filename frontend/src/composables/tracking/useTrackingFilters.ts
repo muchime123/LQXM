@@ -21,7 +21,7 @@ import { shortWorkshop, TRACKING_STATUS_FILTER_LABEL, trackingStatusText } from 
 
 export type TrackingDateFilter = { from: string; to: string }
 export type FilterChip = { key: string; label: string }
-export type QuickFilterKey = 'open' | 'inbound'
+export type QuickFilterKey = 'open' | 'inbound' | 'overdue'
 
 const emptyTrackingDateFilter = (): TrackingDateFilter => ({ from: '', to: '' })
 
@@ -41,10 +41,10 @@ const DELIVERY_FILTER_OPTIONS = [
 ]
 /**
  * 「生产倒计时」常用区多选筛选。
- * 2026-10-21 精简：删除「已超期」「待定交期」——工作台默认口径（open）已经排掉逾期与已交付，
- * 这两项在默认视图里恒为空（真库实测 0 条），只有切到「全部跟单状态」才有意义，不再单列选项。
+ * 「超期未完工」与快捷标签共用 overdue 值。
  */
 const COUNTDOWN_FILTER_OPTIONS = [
+  { value: 'overdue', label: '超期未完工' },
   { value: 'today', label: '今日到期' },
   { value: 'soon', label: '未来 1～3 天' }, { value: 'later', label: '3 天后' },
   { value: 'delivered', label: '已交付' }
@@ -110,7 +110,7 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   let filterOptionsLoaded = false
 
   /**
-   * 快捷标签（2026-10-21 精简后只留两个）：
+   * 快捷标签：
    * - open＝「需要处理」，与工作台默认视图同一口径；
    * - inbound＝「已报工待入库」，真库 23 条——节点走完、货还没入库，跟单员每天必催的那批，
    *   原先要展开「更多筛选 → 跟单待办」才能找到，现在一键直达。
@@ -119,6 +119,7 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   const quickFilterPresets: { key: QuickFilterKey; label: string }[] = [
     { key: 'open', label: '需要处理' },
     { key: 'inbound', label: '已报工待入库' },
+    { key: 'overdue', label: '超期未完工' },
   ]
   const timeFilterLabels: Record<string, string> = {
     time_attention: '待核实问题', time_source: '日期异常（含已核实）', time_production: '生产时间异常',
@@ -173,11 +174,16 @@ export function useTrackingFilters(options: { onChange: () => void }) {
 
   function quickFilterActive(key: QuickFilterKey) {
     if (key === 'open') return trackingStatus.value === 'open'
+    if (key === 'overdue') return countdownFilter.value.includes('overdue')
     // inbound＝已报工待入库：节点走完、货还没入库，即跟单待办里的 INBOUND_PENDING。
     return actionFilter.value === 'INBOUND_PENDING'
   }
   function applyQuickFilter(key: QuickFilterKey) {
     if (key === 'open') trackingStatus.value = trackingStatus.value === 'open' ? 'all' : 'open'
+    else if (key === 'overdue') {
+      countdownFilter.value = countdownFilter.value.includes('overdue') ? [] : ['overdue']
+      if (countdownFilter.value.length) trackingStatus.value = 'all'
+    }
     else actionFilter.value = actionFilter.value === 'INBOUND_PENDING' ? 'all' : 'INBOUND_PENDING'
     options.onChange()
   }

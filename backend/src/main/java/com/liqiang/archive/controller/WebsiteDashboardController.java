@@ -5,8 +5,6 @@ import com.liqiang.archive.entity.ProductModel;
 import com.liqiang.archive.entity.PackagingModel;
 import com.liqiang.archive.entity.PackagingMold;
 import com.liqiang.archive.entity.WebsiteSolution;
-import com.liqiang.archive.repository.CertificateRepository;
-import com.liqiang.archive.repository.CompanyCertificationRepository;
 import com.liqiang.archive.repository.MediaAccountRepository;
 import com.liqiang.archive.repository.PackagingModelRepository;
 import com.liqiang.archive.repository.PackagingMoldRepository;
@@ -22,7 +20,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,8 +40,6 @@ public class WebsiteDashboardController {
     private final ProductModelRepository modelRepository;
     private final PackagingModelRepository packagingModelRepository;
     private final PackagingMoldRepository packagingMoldRepository;
-    private final CompanyCertificationRepository certificationRepository;
-    private final CertificateRepository certificateRepository;
     private final WebsiteSolutionRepository solutionRepository;
     private final WebsiteInquiryRepository inquiryRepository;
     private final MediaAccountRepository mediaAccountRepository;
@@ -69,16 +64,6 @@ public class WebsiteDashboardController {
                 .filter(m -> m.completenessScore() < WebsiteController.WEBSITE_LIST_MIN_SCORE).count();
         List<ProductHealthIssue> productIssues = buildProductIssues(published, nameEnById);
 
-        // ===== 资质 / 专利 =====
-        long publishedCertifications = certificationRepository.findAllWebsiteEnabled().size();
-        LocalDate today = LocalDate.now();
-        long expiringCertifications = certificationRepository
-                .findExpiringSoon(today, today.plusDays(90)).stream()
-                .filter(c -> Boolean.TRUE.equals(c.getWebsiteEnabled()))
-                .count();
-        long publishedPatents = certificateRepository.countWebsiteEnabled();
-        long featuredPatents = certificateRepository.countWebsiteFeatured();
-
         // ===== 其他档案 =====
         long publishedPackaging = packagingModelRepository.countByWebsiteEnabledTrue();
         long publishedMolds = packagingMoldRepository.countByWebsiteEnabledTrue();
@@ -95,8 +80,6 @@ public class WebsiteDashboardController {
         return new WebsiteDashboardView(
                 published.size(), featuredProducts, incompleteProducts,
                 publishedPackaging, publishedMolds,
-                publishedCertifications, expiringCertifications,
-                publishedPatents, featuredPatents,
                 publishedSolutions, officialMediaAccounts, publishedBanners,
                 pendingInquiries, recentInquiries,
                 productIssues, readinessIssues);
@@ -204,10 +187,6 @@ public class WebsiteDashboardController {
             long incompleteProducts,
             long publishedPackaging,
             long publishedMolds,
-            long publishedCertifications,
-            long expiringCertifications,
-            long publishedPatents,
-            long featuredPatents,
             long publishedSolutions,
             long officialMediaAccounts,
             long publishedBanners,

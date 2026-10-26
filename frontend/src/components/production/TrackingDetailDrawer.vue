@@ -41,16 +41,11 @@
           :description="`${detail.order.closedByName || '跟单员'} · ${formatTime(detail.order.closedAt)} · 说明：${detail.order.closedNote || '见跟单历史'}。状态按「结案优先」展示为「跟单已完成」，节点未补齐无需补充。`" />
 
         <section class="key-dates">
-          <header class="section-head"><h3>交期与开工</h3><el-button link type="primary" size="small" @click="showSecondaryMetrics = !showSecondaryMetrics">{{ showSecondaryMetrics ? '收起时间明细' : '展开时间明细与核实' }}</el-button></header>
-          <div class="key-dates-grid">
-            <div><span>业务员要求</span><strong>{{ detail.order.dueDate || '未定' }}</strong></div>
-            <div><span>排产开工</span><strong>{{ detail.order.scheduleTime ? formatMinute(detail.order.scheduleTime) : '未排产' }}</strong><small v-if="!detail.order.scheduleTime && detail.schedule.latestStartDate">建议最晚 {{ detail.schedule.latestStartDate }}</small></div>
-            <div><span>当前车间交期</span><strong>{{ detail.schedule.deadline || '未定' }}</strong><el-button v-if="canFollowup && !detail.order.stoppedAt" link type="primary" size="small" @click="openDelayDialog">{{ detail.order.forecastFinishDate ? '修改延期' : '登记延期' }}</el-button></div>
-          </div>
+          <header class="section-head"><h3>交期与开工</h3></header>
           <el-alert v-if="detail.schedule.risk === 'NO_BASELINE' || detail.schedule.risk === 'UNKNOWN'" type="info" :closable="false" show-icon
             description="系统参考包含通用基准；本产品节点参考数据不完整，暂无法计算可靠的交期倒排目标。" />
         </section>
-        <div v-if="showSecondaryMetrics" class="metric-grid show-secondary">
+        <div class="metric-grid show-secondary">
           <div :class="['metric', { 'metric-exception': invalidApplicationDate(detail.order) }]"><span>生产工单申请时间</span><strong>{{ detail.order.applicationDate || '未填写' }}</strong><small v-if="detail.order.sourceCreatedAt" class="muted">任务单提交 {{ formatMinute(detail.order.sourceCreatedAt) }}</small><small v-if="invalidApplicationDate(detail.order)" class="metric-exception-text">申请日期早于任务单提交日期，疑似填写错误</small><el-button v-if="invalidApplicationDate(detail.order) && needsTimeReason(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE')">记录日期核实</el-button><span v-else-if="invalidApplicationDate(detail.order)" class="metric-reviewed">已记录核实：{{ reviewOf(detail.order, 'SOURCE_DATE')?.reason }}<el-button v-if="reviewOf(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE', reviewOf(detail.order, 'SOURCE_DATE'))">修改</el-button></span></div>
           <div :class="['metric', { 'metric-exception': invalidRequiredDate(detail.order) }]"><span>订单要求完成（业务员）</span><strong :class="{ 'is-danger': invalidRequiredDate(detail.order) }">{{ detail.order.dueDate || '未定' }}</strong><small v-if="invalidRequiredDate(detail.order)" class="metric-exception-text">早于申请日期或任务单提交日期，疑似填写错误；请核对源工单日期</small><el-button v-if="invalidRequiredDate(detail.order) && !invalidApplicationDate(detail.order) && needsTimeReason(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE')">记录日期核实</el-button><span v-else-if="invalidRequiredDate(detail.order) && !invalidApplicationDate(detail.order)" class="metric-reviewed">已记录核实：{{ reviewOf(detail.order, 'SOURCE_DATE')?.reason }}<el-button v-if="reviewOf(detail.order, 'SOURCE_DATE')" link type="danger" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('SOURCE_DATE', reviewOf(detail.order, 'SOURCE_DATE'))">修改</el-button></span></div>
           <div class="metric"><el-tooltip placement="top" raw-content :content="leadDaysTooltipHtml(detail.order)"><span class="lead-detail-heading">工期（当前） ⓘ</span></el-tooltip><strong :class="{ 'is-danger': leadDaysAlarm(detail.order) }">{{ effectiveLeadDaysText(detail.order) }}<small class="lead-kind">{{ leadDaysKindText(detail.order) }}</small></strong><small v-if="otherLeadDaysText(detail.order)" class="muted">{{ otherLeadDaysText(detail.order) }}</small><small v-if="leadDaysDeltaText(detail.order)" :class="leadDeltaClass(detail.order)">{{ leadDaysDeltaText(detail.order) }}</small><small v-if="negativeLeadDays(detail.order)" class="metric-exception-text">{{ negativeLeadReason(detail.order) }}</small></div>
@@ -67,7 +62,7 @@
           </button>
           <div v-else class="metric"><span>采购入库时间（仅供对照）</span><strong>尚无采购入库</strong><small v-if="detail.order.actualFinishDate" class="muted">报工后尚未入库，不据此判定未完工</small><el-button v-if="detail.order.actualFinishDate" link type="info" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('WAREHOUSING', reviewOf(detail.order, 'WAREHOUSING'))">{{ reviewOf(detail.order, 'WAREHOUSING') ? '修改暂缓入库安排' : '记录暂缓入库安排（可选）' }}</el-button></div>
         </div>
-        <el-collapse v-if="detail.order.sourceOptionalConfiguration?.trim() || detail.order.sourceOrderRemark?.trim()" class="source-order-remark">
+        <el-collapse v-if="detail.order.sourceOptionalConfiguration?.trim() || detail.order.sourceOrderRemark?.trim()" v-model="sourceOrderPanels" class="source-order-remark">
           <el-collapse-item title="任务单配置与原始备注" name="source">
             <p v-if="detail.order.sourceOptionalConfiguration?.trim()"><strong>可选配置：</strong>{{ detail.order.sourceOptionalConfiguration }}</p>
             <p v-if="detail.order.sourceOrderRemark?.trim()"><strong>备注：</strong>{{ detail.order.sourceOrderRemark }}</p>
@@ -86,13 +81,12 @@
             <strong>参考进度晚于车间交期 {{ referencePressure.days }} 天</strong>
             <span>{{ referencePressure.stageLabel }}节点参考完成 {{ referencePressure.referenceDate }}，当前车间交期 {{ detail.schedule.deadline }}。请与车间核实能否提前关键节点；目标完成日期仅供协调。</span>
           </div>
-          <p v-if="baselineNotice" class="baseline-notice">系统参考日期可能采用车间通用工期；本产品的节点参考工期尚未配齐，暂无法可靠倒排全部目标日期。</p>
           <el-alert v-if="!detail.order.stoppedAt && stageGapLabels.length" type="warning" :closable="false" show-icon
             :title="`后续节点已完成，前面的 ${stageGapLabels.join('、')} 尚未完成或未核实顺序。`"
             description="确实完成的节点请补完成日期；未按常规顺序经过的节点可逐项记录原因并保存，保存后不再重复提醒。" />
           <div class="stage-list">
             <div class="stage-head">
-              <span>节点</span><span>阶段状态</span><span>参考完成</span><span>目标完成</span><span>完成时间</span><span>节点备注</span><span>节点记录</span>
+              <span>节点</span><span>阶段状态</span><span>参考完成</span><span>目标完成 <el-tooltip v-if="baselineNotice" placement="top" content="系统参考日期可能采用车间通用工期；本产品节点参考工期尚未配齐，暂无法可靠倒排全部目标日期。"><span class="baseline-hint" tabindex="0" aria-label="产品基准不足说明">ⓘ</span></el-tooltip></span><span>完成时间</span><span>节点备注</span><span>节点记录</span>
             </div>
             <div v-for="(stage, index) in milestones" :key="stage.code" :class="['stage-item', stage.optional && !stage.applicable ? 'na' : '', { current: index === currentStageIndex }]">
               <div class="stage-grid">
@@ -345,7 +339,7 @@ const emit = defineEmits<{ 'update:modelValue': [boolean]; saved: [] }>()
 
 const auth = useCurrentUser()
 const canFollowup = computed(() => auth.can('manufacturing.followup'))
-const showSecondaryMetrics = ref(false)
+const sourceOrderPanels = ref(['source'])
 function canEditManualReference(stage: TrackingMilestone) {
   return canFollowup.value && Boolean(detail.value?.order.scheduleTime) && !detail.value?.order.stoppedAt
     && stage.status !== 'DONE' && (!stage.optional || stage.applicable)
@@ -413,7 +407,6 @@ const baselineNotice = computed(() => Boolean(detail.value?.order.scheduleTime &
 
 function loadOrder(id: number) {
   if (!Number.isInteger(id) || id <= 0) return
-  showSecondaryMetrics.value = false
   void openDetail({ id } as TrackingOrder)
 }
 /** 打开时拉详情；打开状态下 orderId 变化（例如又点了另一行）也要重新拉。 */
@@ -469,7 +462,7 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .key-dates-grid strong { color: #101828; font-size: 15px; font-weight: 600; white-space: nowrap; line-height: 1.4; }
 .key-dates-grid small { color: #667085; font-size: 12px; }
 .key-dates-grid .el-button { margin: -5px 0; }
-.metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.metric-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
 .secondary-toggle { justify-self: start; margin: -8px 0 0; }
 .metric { background: #f9fafb; border: 1px solid #eef0f3; border-radius: 8px; padding: 9px 12px; display: grid; gap: 3px; min-width: 0; }
 .metric span { color: #667085; font-size: 12.5px; }
@@ -519,7 +512,7 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .cell-date { width: 132px; }
 .cell-reference { font-size: 13px; color: #475467; display: flex; flex-direction: column; gap: 2px; line-height: 1.4; min-width: 0; }
 .reference-pressure { display: flex; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; padding: 9px 11px; border: 1px solid #fecdca; border-radius: 7px; background: #fff6f5; color: #912018; font-size: 12.5px; line-height: 1.5; }
-.baseline-notice { margin: 0 0 10px; padding: 7px 10px; border-radius: 6px; background: #f7f8fa; color: #667085; font-size: 12px; line-height: 1.5; }
+.baseline-hint { color: #b54708; cursor: help; font-size: 13px; }
 .reference-pressure strong { color: #b42318; }
 .cell-reference.is-late-target .reference-date, .cell-reference .reference-meta.is-late { color: #b42318; }
 .cell-target { font-size: 13px; color: #475467; white-space: nowrap; }

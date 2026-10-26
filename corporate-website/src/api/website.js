@@ -82,79 +82,6 @@ export function packagingImageUrl(item, size = 640) {
 }
 
 /**
- * 官网资质列表：分页 + 关键词 + 分类筛选。
- * @param {object} params { keyword, category, page, size }
- * @returns {Promise<PublicCertificationPage>}
- */
-export function fetchCertifications(params = {}) {
-  const query = new URLSearchParams()
-  if (params.keyword) query.set('keyword', params.keyword)
-  if (params.category) query.set('category', params.category)
-  query.set('page', params.page ?? 0)
-  query.set('size', params.size ?? 12)
-  return getJson(`/api/website/certifications?${query.toString()}`)
-}
-
-/**
- * 官网资质分类列表。
- * @returns {Promise<string[]>}
- */
-export function fetchCertificationCategories() {
-  return getJson('/api/website/certification-categories')
-}
-
-/**
- * 构造资质证书图片 URL。
- * @param {number} id 资质 ID
- * @returns {string} 图片 URL
- */
-export function certImageUrl(id) {
-  return `${apiBase}/api/website/certifications/${id}/image`
-}
-
-/**
- * 官网专利/知识产权列表：分页 + 关键词 + 资产类别 + 专利类型筛选。
- * 只返回 website_enabled=true 且 asset_status='有效' 的专利/软著/商标。
- * @param {object} params { keyword, assetCategory, patentType, page, size }
- * @returns {Promise<PublicPatentPage>}
- */
-export function fetchPatents(params = {}) {
-  const query = new URLSearchParams()
-  if (params.keyword) query.set('keyword', params.keyword)
-  if (params.assetCategory) query.set('assetCategory', params.assetCategory)
-  if (params.patentType) query.set('patentType', params.patentType)
-  query.set('page', params.page ?? 0)
-  query.set('size', params.size ?? 12)
-  return getJson(`/api/website/patents?${query.toString()}`)
-}
-
-/**
- * 官网可见专利类型列表（用于筛选 Tab：发明专利/实用新型/外观设计/软著）。
- * @returns {Promise<string[]>}
- */
-export function fetchPatentTypes() {
-  return getJson('/api/website/patent-types')
-}
-
-/**
- * 官网可见资产类别列表（用于筛选 Tab：专利/软著/商标）。
- * @returns {Promise<string[]>}
- */
-export function fetchPatentCategories() {
-  return getJson('/api/website/patent-categories')
-}
-
-/**
- * 构造专利/知识产权证书图片 URL。
- * 仅 website_enabled=true 且 asset_status='有效' 的专利可访问，否则后端返回 404。
- * @param {number} id 专利 ID
- * @returns {string} 图片 URL
- */
-export function patentImageUrl(id) {
-  return `${apiBase}/api/website/patents/${id}/image`
-}
-
-/**
  * 官网公司详情（含工商信息）。
  * @returns {Promise<PublicCompanyDetailView>}
  */
@@ -273,36 +200,6 @@ export function fetchPageSections(pageKey) {
  * @property {number} productCount
  * @property {PublicProductView[]} products
  * @property {PublicMilestoneView[]} milestones
- * @property {PublicCertificationView[]} certifications
- * @property {number} patentCount  官网公开专利/知识产权总数
- * @property {PublicPatentView[]} patents  首页精选专利（最多 8 条）
- */
-
-/**
- * @typedef {object} PublicPatentView
- * @property {number} id
- * @property {boolean} hasImage
- * @property {string} name
- * @property {string} assetCategory  资产类别：专利/软著/商标
- * @property {string} patentType  专利类型：发明专利/实用新型/外观设计/软著
- * @property {string} [patentNo]
- * @property {string} [publicationNo]
- * @property {string} [applicant]
- * @property {string} [inventors]
- * @property {string} [applyDate]  ISO 日期字符串
- * @property {string} [grantDate]  ISO 日期字符串
- * @property {number} [legalYears]
- * @property {string} [expireDate]  ISO 日期字符串
- * @property {string} [legalStatus]
- * @property {string} [remark]
- */
-
-/**
- * @typedef {object} PublicPatentPage
- * @property {PublicPatentView[]} items
- * @property {number} total
- * @property {number} totalPages
- * @property {number} page
  */
 
 /**
@@ -343,11 +240,3 @@ export function fetchPageSections(pageKey) {
  * @property {number} [defaultImageAssetId]
  */
 
-/**
- * @typedef {object} PublicCertificationView
- * @property {string} name
- * @property {string} nameEn
- * @property {string} category
- * @property {string} issuingAuthority
- * @property {string} status
- */

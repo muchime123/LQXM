@@ -123,10 +123,21 @@ describe('tracking/useTrackingFilters · 筛选清单单一来源', () => {
     expect(filters.quickFilterActive('open')).toBe(false)
   })
 
-  it('倒计时不再提供「已超期 / 待定交期」：工作台默认口径下两者恒为空', () => {
+  it('「超期未完工」快筛使用后端倒计时口径并退出默认 open 范围', () => {
+    const { filters } = setup()
+    filters.applyQuickFilter('overdue')
+    expect(filters.quickFilterActive('overdue')).toBe(true)
+    expect(filters.trackingFilters().countdown).toBe('overdue')
+    expect(filters.trackingFilters().trackingStatus).toBe('all')
+    filters.applyQuickFilter('overdue')
+    expect(filters.quickFilterActive('overdue')).toBe(false)
+    expect(filters.trackingFilters().countdown).toBe('')
+  })
+
+  it('倒计时提供「超期未完工」，与快捷标签共用筛选值', () => {
     const { filters } = setup()
     const values = filters.COUNTDOWN_FILTER_OPTIONS.map(option => option.value)
-    expect(values).toEqual(['today', 'soon', 'later', 'delivered'])
+    expect(values).toEqual(['overdue', 'today', 'soon', 'later', 'delivered'])
   })
 
   it('角标只统计「更多筛选」里的条件，常用区不计入（跟单状态的默认口径不算）', () => {

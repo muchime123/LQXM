@@ -21,7 +21,7 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * 产品生产工期（排产 → 入库完成）的**实库只读**核对。
  *
- * <p>跑法：{@code mvn -o test -Dtest=ProductionTrackingDurationMysqlTest -Derp.foundation.mysql=true}
+ * <p>跑法：{@code mvn -o test -Dtest=ProductionTrackingDurationMysqlTest -Dmain.mysql=true}
  *
  * <p>钉住三件事，缺一件这个数字就会静默变成「一个看起来合理的错数」：
  * <ol>
@@ -36,7 +36,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class ProductionTrackingDurationMysqlTest {
 
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void referenceDaysIsTheSumOfEffectiveStagesAndMatchesTheNodeChain() throws Exception {
         var jdbc = jdbc();
         var service = new ProductionTrackingService(jdbc, null, null, new ObjectMapper(), null);
@@ -104,7 +104,7 @@ class ProductionTrackingDurationMysqlTest {
     }
 
     @Test
-    @EnabledIfSystemProperty(named = "erp.foundation.mysql", matches = "true")
+    @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void actualDurationCountsOnlyScheduleAnchoredOrdersThatFinished() throws Exception {
         var jdbc = jdbc();
         var service = new ProductionTrackingService(jdbc, null, null, new ObjectMapper(), null);

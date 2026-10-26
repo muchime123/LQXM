@@ -21,7 +21,6 @@ import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,8 +60,7 @@ public class CertificateService {
     private static final Set<String> BATCH_EDITABLE_FIELDS = Set.of(
             "assetStatus", "assetCategory", "patentType", "applicant", "inventors",
             "agency", "agencyContact", "legalStatus", "feeStatus",
-            "invoiceStatus", "reviewProgress", "remark",
-            "websiteEnabled", "websiteFeatured", "websiteSortOrder"
+            "invoiceStatus", "reviewProgress", "remark"
     );
     private static final Set<String> ASSET_CATEGORIES = Set.of("专利", "软著", "商标");
     private static final Set<String> PATENT_TYPES = Set.of("发明专利", "实用新型", "外观设计", "软著");
@@ -207,7 +205,6 @@ public class CertificateService {
         List<Certificate> certificates = certificateRepository.findAllById(ids);
         for (Certificate c : certificates) {
             applyFieldUpdate(c, fields);
-            normalizeWebsitePublishing(c);
         }
         if (!certificates.isEmpty()) {
             certificateRepository.saveAll(certificates);
@@ -235,9 +232,6 @@ public class CertificateService {
                 case "invoiceStatus" -> c.setInvoiceStatus(StringUtils.blankToNull(v));
                 case "reviewProgress" -> c.setReviewProgress(StringUtils.blankToNull(v));
                 case "remark" -> c.setRemark(v == null ? null : v);
-                case "websiteEnabled" -> c.setWebsiteEnabled(Boolean.parseBoolean(v));
-                case "websiteFeatured" -> c.setWebsiteFeatured(Boolean.parseBoolean(v));
-                case "websiteSortOrder" -> c.setWebsiteSortOrder(v == null || v.isBlank() ? 0 : Integer.parseInt(v));
                 default -> { }
             }
         });
@@ -576,13 +570,6 @@ public class CertificateService {
             c.setNiceClassDescription(payload.niceClassDescription());
         if (payload.applicantAddress() != null)
             c.setApplicantAddress(payload.applicantAddress());
-        if (payload.websiteEnabled() != null)
-            c.setWebsiteEnabled(payload.websiteEnabled());
-        if (payload.websiteFeatured() != null)
-            c.setWebsiteFeatured(payload.websiteFeatured());
-        if (payload.websiteSortOrder() != null)
-            c.setWebsiteSortOrder(payload.websiteSortOrder());
-        normalizeWebsitePublishing(c);
     }
 
     /**
@@ -608,57 +595,4 @@ public class CertificateService {
         return value.replaceAll("\\D", "");
     }
 
-    /** 保持官网发布状态一致：精选必然公开，下线同时取消精选。 */
-    private void normalizeWebsitePublishing(Certificate c) {
-        if (Boolean.TRUE.equals(c.getWebsiteFeatured())) {
-            c.setWebsiteEnabled(true);
-        }
-        if (!Boolean.TRUE.equals(c.getWebsiteEnabled())) {
-            c.setWebsiteFeatured(false);
-        }
-        if (c.getWebsiteSortOrder() == null) {
-            c.setWebsiteSortOrder(0);
-        }
-    }
-
-    // ==================== 官网公开查询 ====================
-
-    /**
-     * 官网专利/知识产权分页查询：只返回 website_enabled=true 且 asset_status='有效'。
-     * 支持按 assetCategory（专利/软著/商标）和 patentType（发明专利/实用新型/外观设计/软著）筛选 + 关键词。
-     * 返回脱敏后的 Certificate 实体（不含 feeStatus/feeDueDate/agencyContact/processStage 等内部敏感字段，
-     * 由 WebsiteController.PublicPatentView 进一步脱敏）。
-     */
-    @Transactional(readOnly = true)
-    public Page<Certificate> searchWebsite(String assetCategory, String patentType, String keyword, Pageable pageable) {
-        return certificateRepository.searchWebsite(assetCategory, patentType, keyword, pageable);
-    }
-
-    /** 官网可见专利类型列表（用于筛选 Tab）。 */
-    @Transactional(readOnly = true)
-    public List<String> getWebsitePatentTypes() {
-        return certificateRepository.findWebsitePatentTypes();
-    }
-
-    /** 官网可见资产类别列表（用于筛选 Tab，含专利/软著/商标）。 */
-    @Transactional(readOnly = true)
-    public List<String> getWebsiteAssetCategories() {
-        return certificateRepository.findWebsiteAssetCategories();
-    }
-
-    /**
-     * 官网首页精选专利：取 website_enabled=true 且 asset_status='有效' 的前 N 条，
-     * 按 website_featured DESC, website_sort_order ASC, grant_date DESC 排序。
-     */
-    @Transactional(readOnly = true)
-    public List<Certificate> getWebsiteFeaturedPatents(int limit) {
-        return certificateRepository.findAllWebsiteEnabled(PageRequest.of(0, limit))
-                .stream().toList();
-    }
-
-    /** 官网公开专利总数（首页统计用）。 */
-    @Transactional(readOnly = true)
-    public long getWebsitePatentCount() {
-        return certificateRepository.countWebsiteEnabled();
-    }
 }
