@@ -19,13 +19,6 @@ public interface MoldVariantLinkRepository extends JpaRepository<MoldVariantLink
 
     List<MoldVariantLink> findByMoldIdIn(List<Long> moldIds);
 
-    @Query("SELECT l FROM MoldVariantLink l " +
-            "JOIN FETCH l.mold m JOIN FETCH m.model LEFT JOIN FETCH m.group " +
-            "JOIN FETCH l.variant v " +
-            "WHERE v.id IN :variantIds AND m.websiteEnabled = true AND m.status = 'in_use' " +
-            "ORDER BY l.isDefault DESC, m.websiteSortOrder, m.id")
-    List<MoldVariantLink> findWebsiteVisibleByPackagingVariantIds(@Param("variantIds") List<Long> variantIds);
-
     @Query("SELECT l.mold.id, COUNT(l) FROM MoldVariantLink l WHERE l.mold.id IN :moldIds GROUP BY l.mold.id")
     List<Object[]> countByMoldIds(@Param("moldIds") List<Long> moldIds);
 

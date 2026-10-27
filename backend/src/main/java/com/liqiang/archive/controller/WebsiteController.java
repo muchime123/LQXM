@@ -20,7 +20,6 @@ import com.liqiang.archive.service.InquiryAntiSpamService;
 import com.liqiang.archive.service.ProductCatalogService;
 import com.liqiang.archive.service.PackagingService;
 import com.liqiang.archive.service.PackagingMoldService;
-import com.liqiang.archive.service.WebsiteProductCompatibilityService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.PageRequest;
@@ -54,7 +53,6 @@ public class WebsiteController {
     private final ProductCatalogService catalogService;
     private final PackagingService packagingService;
     private final PackagingMoldService packagingMoldService;
-    private final WebsiteProductCompatibilityService productCompatibilityService;
     private final WebsiteInquiryRepository inquiryRepository;
     private final InquiryAntiSpamService antiSpamService;
     private final MediaAccountRepository mediaAccountRepository;
@@ -156,8 +154,7 @@ public class WebsiteController {
     @GetMapping("/products/{slug}")
     public ResponseEntity<PublicProductDetail> productDetail(@PathVariable String slug) {
         return catalogService.getByWebsiteSlug(slug)
-                .map(detail -> PublicProductDetail.from(detail,
-                        productCompatibilityService.getForProduct(detail.model().id())))
+                .map(PublicProductDetail::from)
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
@@ -409,15 +406,19 @@ public class WebsiteController {
      * - 剔除 sourceFile / sourceSheet / sourceRowNumber / importBatchId
      * - 剔除 workshop / shopUrl / internal remark
      * 保留：基础信息 + 规格 + 适用行业 + 营销文案 + 图库 + 变体规格。
+     *
+     * <p>P1-B 批次 1（2026-10-27）：产品 ↔ 包材 / 模具的旧适配关联表（product_model_packaging_links、
+     * product_machine_tier_packaging_links、product_variant_packaging_links）已随本次退役，这两个字段不再
+     * 由任何数据计算，恒定返回非 null 的空数组。保留字段是**过渡契约**，避免对未识别的接口消费者产生破坏。
+     * 移除条件：批次 2-A 确定官网正式配置模型（或统一接口版本调整）后再决定由新模型接管还是删除字段。
      */
     public record PublicProductDetail(PublicProductModelView model,
                                       List<PublicVariantView> variants,
                                       List<PublicAssetView> gallery,
                                       long variantCount,
-                                      List<PublicCompatiblePackagingView> compatiblePackaging,
-                                      List<PublicCompatibleMoldView> compatibleMolds) {
-        static PublicProductDetail from(ModelDetail detail,
-                                        WebsiteProductCompatibilityService.Snapshot compatibility) {
+                                      @Deprecated List<PublicCompatiblePackagingView> compatiblePackaging,
+                                      @Deprecated List<PublicCompatibleMoldView> compatibleMolds) {
+        static PublicProductDetail from(ModelDetail detail) {
             ModelView m = detail.model();
             // 官网图库：只展示 website_visible=true 的素材，按 websiteSortOrder 升序排序
             List<PublicAssetView> gallery = detail.assets().stream()
@@ -431,36 +432,33 @@ public class WebsiteController {
                     detail.variants().stream().map(PublicVariantView::from).toList(),
                     gallery,
                     detail.variantCount(),
-                    compatibility.packaging().stream().map(PublicCompatiblePackagingView::from).toList(),
-                    compatibility.molds().stream().map(PublicCompatibleMoldView::from).toList());
+                    List.of(),
+                    List.of());
         }
     }
 
-    /** 官网兼容包材视图：只公开选型所需字段，不包含采购价、供应商及内部备注。 */
+    /**
+     * 官网兼容包材视图：随旧适配链退役，字段保留但不再产出数据。
+     * 移除条件见 {@link PublicProductDetail} 的 javadoc。
+     */
+    @Deprecated
     public record PublicCompatiblePackagingView(Long productVariantId, String productVariantName,
                                                 Long packagingModelId, String packagingModelName,
                                                 String packagingKind, String material, String shapeType,
                                                 Long packagingVariantId, String packagingVariantName,
                                                 String apertureLabel, String capacityMl, Boolean customizable) {
-        static PublicCompatiblePackagingView from(
-                WebsiteProductCompatibilityService.CompatiblePackaging item) {
-            return new PublicCompatiblePackagingView(item.productVariantId(), item.productVariantName(),
-                    item.packagingModelId(), item.packagingModelName(), item.packagingKind(), item.material(),
-                    item.shapeType(), item.packagingVariantId(), item.packagingVariantName(),
-                    item.apertureLabel(), item.capacityMl(), item.customizable());
-        }
     }
 
-    /** 官网可配模具视图：隐藏模具编码，仅保留客户判断适配关系所需的信息。 */
+    /**
+     * 官网可配模具视图：随旧适配链退役，字段保留但不再产出数据。
+     * 仅供契约兼容；未来官网选型应以正式配置模型为准。
+     * 移除条件见 {@link PublicProductDetail} 的 javadoc。
+     */
+    @Deprecated
     public record PublicCompatibleMoldView(Long packagingVariantId, String packagingModelName,
                                            String packagingVariantName, Long moldId, String moldCategory,
                                            Integer cavityCount, String relationType, Boolean defaultMold,
                                            String apertureLabel) {
-        static PublicCompatibleMoldView from(WebsiteProductCompatibilityService.CompatibleMold item) {
-            return new PublicCompatibleMoldView(item.packagingVariantId(), item.packagingModelName(), item.packagingVariantName(),
-                    item.moldId(), item.moldCategory(), item.cavityCount(), item.relationType(),
-                    item.defaultMold(), item.apertureLabel());
-        }
     }
 
     public record PublicProductModelView(Long id, String name, String nameEn, String modelCode,

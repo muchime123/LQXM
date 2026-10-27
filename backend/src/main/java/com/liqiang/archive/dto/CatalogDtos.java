@@ -182,25 +182,6 @@ public class CatalogDtos {
     ) {
     }
 
-    public record PackagingSpecOption(
-            Long id, Long modelId, String modelName, String variantName,
-            String shapeType, String apertureKey, String apertureLabel,
-            String heightMm, String capacityMl, String dimensionLabel
-    ) {}
-
-    public record MachineTierPackagingAssignment(Long machineTierId, List<Long> packagingVariantIds) {}
-
-    public record ProductPackagingCompatibilityMatrix(
-            List<PackagingSpecOption> options,
-            List<Long> productPackagingVariantIds,
-            List<MachineTierPackagingAssignment> machineTierAssignments
-    ) {}
-
-    public record ProductPackagingCompatibilityRequest(
-            Long machineTierId,
-            List<Long> packagingVariantIds
-    ) {}
-
     public record VariantView(
             Long id,
             String variantName,
@@ -360,9 +341,6 @@ public class CatalogDtos {
     }
 
     public record BatchDeleteRequest(List<Long> ids) {
-    }
-
-    public record MoveVariantRequest(Long targetModelId) {
     }
 
     public record MoveAssetRequest(Long targetModelId, Long targetVariantId, String targetCategory) {

@@ -15,12 +15,9 @@ import com.liqiang.archive.dto.CatalogDtos.ModelView;
 import com.liqiang.archive.dto.CatalogDtos.MoveAssetRequest;
 import com.liqiang.archive.dto.CatalogDtos.ReorderRequest;
 import com.liqiang.archive.dto.CatalogDtos.VideoAssetView;
-import com.liqiang.archive.dto.CatalogDtos.ProductPackagingCompatibilityMatrix;
-import com.liqiang.archive.dto.CatalogDtos.ProductPackagingCompatibilityRequest;
 import com.liqiang.archive.entity.ProductModel;
 import com.liqiang.archive.service.ProductCatalogService;
 import com.liqiang.archive.service.ProductMachineTierService;
-import com.liqiang.archive.service.ProductPackagingCompatibilityService;
 import com.liqiang.archive.service.VideoLibraryMaintenanceService;
 import com.liqiang.archive.service.VideoPersonalWorkspaceService;
 import com.liqiang.archive.service.ProductCatalogService.AssetPayload;
@@ -63,7 +60,6 @@ public class ProductCatalogController {
 
     private final ProductCatalogService catalogService;
     private final ProductMachineTierService machineTierService;
-    private final ProductPackagingCompatibilityService packagingCompatibilityService;
     private final VideoLibraryMaintenanceService videoMaintenanceService;
     private final VideoPersonalWorkspaceService videoWorkspaceService;
 
@@ -208,18 +204,6 @@ public class ProductCatalogController {
     @DeleteMapping("/machine-tiers/{id}")
     public void deleteMachineTier(@PathVariable Long id) {
         machineTierService.delete(id);
-    }
-
-    @GetMapping("/models/{id}/packaging-compatibility")
-    public ProductPackagingCompatibilityMatrix getPackagingCompatibility(@PathVariable Long id) {
-        return packagingCompatibilityService.getMatrix(id);
-    }
-
-    @RequirePermission("product.manage")
-    @PutMapping("/models/{id}/packaging-compatibility")
-    public ProductPackagingCompatibilityMatrix replacePackagingCompatibility(
-            @PathVariable Long id, @RequestBody ProductPackagingCompatibilityRequest request) {
-        return packagingCompatibilityService.replace(id, request);
     }
 
     // ====== Assets ======
