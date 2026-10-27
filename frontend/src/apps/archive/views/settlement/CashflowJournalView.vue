@@ -71,6 +71,9 @@
       <div class="cf-toolbar">
         <LqTabs v-model="activeTab" :items="tabItems" @tab-change="onTabChange" />
         <div class="cf-toolbar__right">
+          <el-select :model-value="PERIOD_YEAR" aria-label="账年" style="width: 105px" @change="setYear">
+            <el-option v-for="year in availableYears" :key="year" :label="`${year} 年`" :value="year" />
+          </el-select>
           <el-select
             v-model="accountFilter"
             clearable
@@ -298,7 +301,7 @@
     </template>
 
     <CashflowReviewDrawer v-model="reviewOpen" />
-    <CashflowOpeningDialog :account="openingAccount" :year="PERIOD_YEAR" @close="openingAccount = null" />
+    <CashflowOpeningDialog :account="openingAccount" :year="PERIOD_YEAR" @close="openingAccount = null" @opening-changed="loadReport" />
   </ListPageLayout>
 </template>
 
@@ -317,6 +320,7 @@ import { useListPagination } from '@/composables/list/useListPagination'
 import { notify } from '@/composables/ui/useToast'
 import {
   fetchCashflowEntries,
+  fetchCashflowFiscalYears,
   fetchCashflowIssues,
   fetchCashflowReport,
   type CashflowAccount,
@@ -335,10 +339,14 @@ import { useCashflowPeriod } from './cashflow/useCashflowPeriod'
 
 const router = useRouter()
 const route = useRoute()
+const availableYears = await fetchCashflowFiscalYears().catch(() => {
+  notify.error('可用账年加载失败，暂按 2026 年查询')
+  return [2026]
+})
 
 // ==================== 期间 + 快捷期间（唯一状态源在 cashflow/useCashflowPeriod.ts） ====================
 const {
-  CASHFLOW_PERIOD_YEAR: PERIOD_YEAR,
+  year: PERIOD_YEAR,
   start,
   end,
   period,
@@ -346,12 +354,15 @@ const {
   presetLabel,
   isPresetCappedToday,
   setPeriod,
+  setYear,
   onPeriodPicked,
   disableOtherYears
 } = useCashflowPeriod({
+  availableYears,
   initialStart: route.query.start,
   initialEnd: route.query.end,
   onChange: () => {
+    openingAccount.value = null
     pagination.resetPage()
     syncQuery()
     void loadReport()
@@ -465,14 +476,19 @@ const currencyClosingText = computed(() =>
   currencyTotals.value.length > 1
     ? `${currencyTotals.value.length} 个币种`
     : currencyTotals.value.length === 1
-      ? amount(currencyTotals.value[0].closing)
+      ? currencyTotals.value[0].count === currencyTotals.value[0].unknownOpeningCount
+        ? '不可计算'
+        : amount(currencyTotals.value[0].closing)
       : '—'
 )
 const closingCardHint = computed(() => {
   if (!currencyTotals.value.length) return '暂无可计算账户'
-  if (currencyTotals.value.length === 1) return currencyTotals.value[0].currency
+  if (currencyTotals.value.length === 1) {
+    const group = currencyTotals.value[0]
+    return `${group.currency} · ${group.count - group.unknownOpeningCount} 户可计算${group.unknownOpeningCount ? `，${group.unknownOpeningCount} 户缺期初未计入` : ''}`
+  }
   return currencyTotals.value
-    .map(group => `${group.currency} ${group.unknownOpening ? '部分缺期初' : amount(group.closing)}`)
+    .map(group => `${group.currency} ${group.count === group.unknownOpeningCount ? '不可计算' : amount(group.closing)}${group.unknownOpeningCount ? `（${group.unknownOpeningCount} 户未计入）` : ''}`)
     .join(' · ')
 })
 const reportBlockedCount = computed(() => reportSummary.closingBlockedCount)

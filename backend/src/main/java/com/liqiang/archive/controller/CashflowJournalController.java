@@ -23,7 +23,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** 2026 年流水日记账期间报表；来源分录保持只读。
+/** 按账年查询流水日记账期间报表；来源分录保持只读。
  *  A-0（2026-10-23）：全部端点由 integration.h3 收口为 cashflow.read——
  *  资金数据走独立财务读取权限，不再凭「氚云集成」权限查看（LQ P2-A 修订 5）。 */
 @RestController
@@ -32,6 +32,17 @@ import java.util.Map;
 public class CashflowJournalController {
     private final JdbcTemplate jdbc;
     private final CashflowJournalReviewService reviewService;
+
+    @GetMapping("/fiscal-years")
+    @RequirePermission("cashflow.read")
+    public Map<String, Object> fiscalYears() {
+        List<Integer> years = jdbc.queryForList("""
+                SELECT DISTINCT o.fiscal_year FROM cashflow_account_opening o
+                  JOIN h3_cash_accounts a ON a.id=o.account_id AND a.external_source='H3YUN'
+                 WHERE o.active=1 ORDER BY o.fiscal_year DESC
+                """, Integer.class);
+        return Map.of("items", years);
+    }
 
     @GetMapping("/review-batches")
     @RequirePermission("cashflow.read")
@@ -52,22 +63,24 @@ public class CashflowJournalController {
     @RequirePermission("cashflow.read")
     public Map<String, Object> accounts(@RequestParam LocalDate start, @RequestParam LocalDate end) {
         validatePeriod(start, end);
+        int year = start.getYear();
+        LocalDate yearStart = LocalDate.of(year, 1, 1);
         List<Map<String, Object>> items = jdbc.query("""
                 SELECT a.id, a.account_name, a.currency, opening.amount AS opening_balance,
                        a.entity_id, a.status, e.name AS entity_name,
-                       COALESCE(SUM(CASE WHEN e2.entry_date >= '2026-01-01' AND e2.entry_date < ? THEN COALESCE(e2.income,0)-COALESCE(e2.expense,0) ELSE 0 END),0) AS before_net,
+                       COALESCE(SUM(CASE WHEN e2.entry_date >= ? AND e2.entry_date < ? THEN COALESCE(e2.income,0)-COALESCE(e2.expense,0) ELSE 0 END),0) AS before_net,
                        COALESCE(SUM(CASE WHEN e2.entry_date BETWEEN ? AND ? THEN e2.income ELSE 0 END),0) AS income,
                        COALESCE(SUM(CASE WHEN e2.entry_date BETWEEN ? AND ? THEN e2.expense ELSE 0 END),0) AS expense,
                        COUNT(CASE WHEN e2.entry_date BETWEEN ? AND ? THEN 1 END) AS entry_count
                   FROM h3_cash_accounts a
                   LEFT JOIN cashflow_account_opening opening ON opening.account_id=a.id
-                   AND opening.fiscal_year=2026 AND opening.active=1
+                   AND opening.fiscal_year=? AND opening.active=1
                   LEFT JOIN cashflow_entities e ON e.id = a.entity_id
                   LEFT JOIN h3_cashflow_entries e2 ON e2.external_source='H3YUN' AND e2.account_name=a.account_name
                  WHERE a.external_source='H3YUN'
                  GROUP BY a.id,a.account_name,a.currency,opening.amount,a.entity_id,a.status,e.name
                  ORDER BY entry_count DESC, a.account_name ASC
-                """, (rs, ignored) -> accountRow(rs), start, start, end, start, end, start, end);
+                """, (rs, ignored) -> accountRow(rs), yearStart, start, start, end, start, end, start, end, year);
         Map<String, CurrencyTotal> byCurrency = new LinkedHashMap<>();
         // 取全部账户的核对结果（含 0 断点），这样每个账户都能报出自己真实的「已衔接链接数」。
         Map<String, CashflowReviewRules.SourceBalanceReview> review =
@@ -84,7 +97,10 @@ public class CashflowJournalController {
             total.income = total.income.add((BigDecimal) item.get("income"));
             total.expense = total.expense.add((BigDecimal) item.get("expense"));
             BigDecimal closing = (BigDecimal) item.get("closingBalance");
-            if (closing == null) total.unknownOpening = true;
+            if (closing == null) {
+                total.unknownOpening = true;
+                total.unknownOpeningCount++;
+            }
             else total.closing = total.closing.add(closing);
             CashflowReviewRules.SourceBalanceReview accountReview = review.get((String) item.get("accountName"));
             int exceptions = attachReview(item, accountReview, startText, endText);
@@ -96,7 +112,8 @@ public class CashflowJournalController {
         for (CurrencyTotal total : byCurrency.values()) {
             totals.add(Map.of("currency", total.currency, "count", total.count,
                     "income", total.income, "expense", total.expense,
-                    "closing", total.closing, "unknownOpening", total.unknownOpening));
+                    "closing", total.closing, "unknownOpening", total.unknownOpening,
+                    "unknownOpeningCount", total.unknownOpeningCount));
         }
         Map<String, Object> summary = new LinkedHashMap<>();
         summary.put("closingComputableCount",
@@ -152,11 +169,13 @@ public class CashflowJournalController {
 
     @GetMapping("/accounts/{accountId}/monthly")
     @RequirePermission("cashflow.read")
-    public Map<String, Object> monthly(@PathVariable long accountId) {
+    public Map<String, Object> monthly(@PathVariable long accountId,
+                                       @RequestParam(defaultValue = "2026") int year) {
+        validateYear(year);
         List<Map<String, Object>> accountRows = jdbc.query("""
                 SELECT a.account_name,a.currency,opening.amount AS opening_balance FROM h3_cash_accounts a
                   LEFT JOIN cashflow_account_opening opening ON opening.account_id=a.id
-                   AND opening.fiscal_year=2026 AND opening.active=1
+                   AND opening.fiscal_year=? AND opening.active=1
                  WHERE a.id=? AND a.external_source='H3YUN'
                 """, (rs, ignored) -> {
             Map<String, Object> row = new LinkedHashMap<>();
@@ -164,7 +183,7 @@ public class CashflowJournalController {
             row.put("currency", rs.getString("currency"));
             row.put("opening", rs.getBigDecimal("opening_balance"));
             return row;
-        }, accountId);
+        }, year, accountId);
         if (accountRows.isEmpty()) throw new IllegalArgumentException("账户不存在");
         Map<String, Object> account = accountRows.getFirst();
         String name = (String) account.get("accountName");
@@ -175,11 +194,12 @@ public class CashflowJournalController {
                        COUNT(*) AS entry_count
                   FROM h3_cashflow_entries
                  WHERE external_source='H3YUN' AND account_name=?
-                   AND entry_date BETWEEN '2026-01-01' AND '2026-12-31'
+                   AND entry_date BETWEEN ? AND ?
                  GROUP BY MONTH(entry_date)
                 """, (rs, ignored) -> Map.of(
                 "month", rs.getInt("month_no"), "income", rs.getBigDecimal("income"),
-                "expense", rs.getBigDecimal("expense"), "entryCount", rs.getLong("entry_count")), name);
+                "expense", rs.getBigDecimal("expense"), "entryCount", rs.getLong("entry_count")),
+                name, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
         Map<Integer, Map<String, Object>> byMonth = new LinkedHashMap<>();
         for (Map<String, Object> row : source) byMonth.put((Integer) row.get("month"), row);
         BigDecimal balance = (BigDecimal) account.get("opening");
@@ -201,7 +221,7 @@ public class CashflowJournalController {
             items.add(item);
         }
         return Map.of("accountId", accountId, "accountName", name,
-                "currency", account.get("currency"), "items", items);
+                "currency", account.get("currency"), "year", year, "items", items);
     }
 
     @GetMapping("/entries")
@@ -306,7 +326,7 @@ public class CashflowJournalController {
                        'MISSING_OPENING' AS issue_code,'账户缺少期初余额' AS detail
                   FROM h3_cash_accounts a
                   LEFT JOIN cashflow_account_opening opening ON opening.account_id=a.id
-                   AND opening.fiscal_year=2026 AND opening.active=1
+                   AND opening.fiscal_year=? AND opening.active=1
                  WHERE a.external_source='H3YUN' AND opening.amount IS NULL AND (? IS NULL OR a.id=?)
                 UNION ALL
                 SELECT a.id,e.account_name,e.id,e.entry_date,
@@ -340,7 +360,7 @@ public class CashflowJournalController {
             row.put("issueCode", rs.getString("issue_code"));
             row.put("detail", rs.getString("detail"));
             return row;
-        }, accountId, accountId, accountId, accountId, start, end, accountId, accountId,
+        }, start.getYear(), accountId, accountId, accountId, accountId, start, end, accountId, accountId,
                 start, end, accountId, accountId);
     }
 
@@ -388,10 +408,20 @@ public class CashflowJournalController {
         };
     }
 
-    private static void validatePeriod(LocalDate start, LocalDate end) {
-        if (start.isAfter(end) || start.getYear() != 2026 || end.getYear() != 2026) {
-            throw new IllegalArgumentException("当前仅支持 2026 年内的起止日期");
-        }
+    private void validatePeriod(LocalDate start, LocalDate end) {
+        if (start == null || end == null || start.isAfter(end) || start.getYear() != end.getYear())
+            throw new IllegalArgumentException("查询期间须在同一账年内且开始日期不晚于结束日期");
+        validateYear(start.getYear());
+    }
+
+    private void validateYear(int year) {
+        if (year < 2026 || year > 9999) throw new IllegalArgumentException("账年无效");
+        Integer available = jdbc.queryForObject("""
+                SELECT COUNT(*) FROM cashflow_account_opening o
+                  JOIN h3_cash_accounts a ON a.id=o.account_id AND a.external_source='H3YUN'
+                 WHERE o.fiscal_year=? AND o.active=1
+                """, Integer.class, year);
+        if (available == null || available == 0) throw new IllegalArgumentException("该账年尚无生效期初");
     }
 
     private static Map<String, Object> accountRow(ResultSet rs) throws SQLException {
@@ -404,6 +434,7 @@ public class CashflowJournalController {
         row.put("accountName", rs.getString("account_name"));
         row.put("currency", rs.getString("currency"));
         row.put("openingBalance", opening);
+        row.put("openingStatus", sourceOpening == null ? "MISSING" : "ACTIVE");
         row.put("income", income);
         row.put("expense", expense);
         row.put("netFlow", income.subtract(expense));
@@ -435,6 +466,7 @@ public class CashflowJournalController {
         private BigDecimal expense = BigDecimal.ZERO;
         private BigDecimal closing = BigDecimal.ZERO;
         private boolean unknownOpening;
+        private int unknownOpeningCount;
 
         private CurrencyTotal(String currency) { this.currency = currency; }
     }

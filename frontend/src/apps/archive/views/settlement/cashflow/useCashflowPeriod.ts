@@ -1,102 +1,94 @@
 import { computed, ref } from 'vue'
 
-/** P1 仍限制在 2026 年（P2 随年度结转放开）。 */
-export const CASHFLOW_PERIOD_YEAR = 2026
-
 export type PeriodPreset = 'month' | 'quarter' | 'year' | 'custom'
 
 const pad = (value: number) => String(value).padStart(2, '0')
 export const dateText = (date: Date) => `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`
-
 const queryDate = (value: unknown) =>
   typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : null
 
 const today = new Date()
 const todayText = dateText(today)
-const anchorMonth = today.getFullYear() === CASHFLOW_PERIOD_YEAR ? today.getMonth() : 11
 
-/** 自然月 / 自然季 / 自然年 的完整区间（季度一律自然季度）。 */
-export function fullRange(kind: 'month' | 'quarter' | 'year'): [string, string] {
-  if (kind === 'year') return [`${CASHFLOW_PERIOD_YEAR}-01-01`, `${CASHFLOW_PERIOD_YEAR}-12-31`]
-  const months = kind === 'quarter' ? 3 : 1
-  const firstMonth = kind === 'quarter' ? Math.floor(anchorMonth / 3) * 3 : anchorMonth
-  return [
-    dateText(new Date(CASHFLOW_PERIOD_YEAR, firstMonth, 1)),
-    dateText(new Date(CASHFLOW_PERIOD_YEAR, firstMonth + months, 0))
-  ]
+function anchorMonth(year: number) {
+  return year === today.getFullYear() ? today.getMonth() : year < today.getFullYear() ? 11 : 0
 }
 
-/**
- * 快捷期间的默认查询区间：**截至今天**，不把未来的月末/季末/年末算进查询范围。
- * 自定义期间仍允许未来日期，由页面显式展示实际查询范围。
- */
-export function periodRange(kind: 'month' | 'quarter' | 'year'): [string, string] {
-  const [from, to] = fullRange(kind)
+/** 自然月、季、年的完整区间。 */
+export function fullRange(kind: 'month' | 'quarter' | 'year', year: number): [string, string] {
+  if (kind === 'year') return [`${year}-01-01`, `${year}-12-31`]
+  const month = anchorMonth(year)
+  const first = kind === 'quarter' ? Math.floor(month / 3) * 3 : month
+  return [dateText(new Date(year, first, 1)), dateText(new Date(year, first + (kind === 'quarter' ? 3 : 1), 0))]
+}
+
+/** 当前账年截至今日；历史账年展示完整期间，未来账年先从首日开始。 */
+export function periodRange(kind: 'month' | 'quarter' | 'year', year: number): [string, string] {
+  const [from, to] = fullRange(kind, year)
   const capped = to > todayText ? todayText : to
   return [from, capped < from ? from : capped]
 }
 
-export function matchPresetOf(from: string, to: string): PeriodPreset {
+export function matchPresetOf(from: string, to: string, year: number): PeriodPreset {
   for (const kind of ['month', 'quarter', 'year'] as const) {
-    for (const range of [periodRange(kind), fullRange(kind)]) {
+    for (const range of [periodRange(kind, year), fullRange(kind, year)]) {
       if (range[0] === from && range[1] === to) return kind
     }
   }
   return 'custom'
 }
 
-/**
- * 期间与快捷期间的唯一状态源。三个视图共用同一份 start/end，切换视图不需要重新选条件。
- *
- * <p>注意：同一天可能同时是「本月」和「本季」的起点（如 10-01 ~ 10-22），
- * 因此按钮高亮由**最后点击的预设**决定，不从区间反推，避免两个按钮抢高亮。
- */
+/** 三个工作视图共享同一账年和期间；可用年度由服务端有效期初决定。 */
 export function useCashflowPeriod(options: {
+  availableYears: number[]
   initialStart?: unknown
   initialEnd?: unknown
   onChange: () => void
 }) {
-  const initial = periodRange('month')
-  const start = ref(queryDate(options.initialStart) ?? initial[0])
-  const end = ref(queryDate(options.initialEnd) ?? initial[1])
+  const years = [...new Set(options.availableYears)].sort((a, b) => b - a)
+  const requestedStart = queryDate(options.initialStart)
+  const requestedEnd = queryDate(options.initialEnd)
+  const requestedYear = requestedStart ? Number(requestedStart.slice(0, 4)) : null
+  const initialYear = requestedYear != null && years.includes(requestedYear)
+    ? requestedYear : years.includes(today.getFullYear()) ? today.getFullYear() : years[0] ?? 2026
+  const year = ref(initialYear)
+  const initial = periodRange('month', initialYear)
+  const validQuery = requestedStart && requestedEnd && requestedStart <= requestedEnd
+    && requestedStart.slice(0, 4) === String(initialYear) && requestedEnd.slice(0, 4) === String(initialYear)
+  const start = ref(validQuery ? requestedStart : initial[0])
+  const end = ref(validQuery ? requestedEnd : initial[1])
   const period = ref<[string, string]>([start.value, end.value])
-  const preset = ref<PeriodPreset>(matchPresetOf(start.value, end.value))
-
-  const presetLabel = computed(
-    () => ({ month: '本月', quarter: '本季', year: '本年', custom: '自定义' })[preset.value]
-  )
+  const preset = ref<PeriodPreset>(matchPresetOf(start.value, end.value, initialYear))
+  const presetLabel = computed(() => ({ month: '本月', quarter: '本季', year: '本年', custom: '自定义' })[preset.value])
   const isPresetCappedToday = computed(() => preset.value !== 'custom' && end.value === todayText)
 
   function apply(range: [string, string], explicit?: PeriodPreset) {
     start.value = range[0]
     end.value = range[1]
-    period.value = [range[0], range[1]]
-    preset.value = explicit ?? matchPresetOf(range[0], range[1])
+    period.value = range
+    preset.value = explicit ?? matchPresetOf(range[0], range[1], year.value)
     options.onChange()
   }
 
   function setPeriod(kind: 'month' | 'quarter' | 'year') {
-    apply(periodRange(kind), kind)
+    apply(periodRange(kind, year.value), kind)
+  }
+
+  function setYear(value: number) {
+    if (!years.includes(value) || value === year.value) return
+    year.value = value
+    apply(periodRange('year', value), 'year')
   }
 
   function onPeriodPicked() {
     if (!period.value || period.value.length !== 2) return
-    apply([period.value[0], period.value[1]])
+    const [from, to] = period.value
+    if (from > to || from.slice(0, 4) !== String(year.value) || to.slice(0, 4) !== String(year.value)) return
+    apply([from, to])
   }
 
-  const disableOtherYears = (date: Date) => date.getFullYear() !== CASHFLOW_PERIOD_YEAR
+  const disableOtherYears = (date: Date) => date.getFullYear() !== year.value
 
-  return {
-    CASHFLOW_PERIOD_YEAR,
-    todayText,
-    start,
-    end,
-    period,
-    preset,
-    presetLabel,
-    isPresetCappedToday,
-    setPeriod,
-    onPeriodPicked,
-    disableOtherYears
-  }
+  return { year, start, end, period, preset, presetLabel, isPresetCappedToday,
+    setPeriod, setYear, onPeriodPicked, disableOtherYears }
 }

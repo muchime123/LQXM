@@ -5,6 +5,7 @@ export interface CashflowAccount {
   accountName: string
   currency: string
   openingBalance: number | null
+  openingStatus: 'ACTIVE' | 'MISSING'
   income: number
   expense: number
   netFlow: number
@@ -85,6 +86,7 @@ export interface CashflowCurrencyTotal {
   expense: number
   closing: number
   unknownOpening: boolean
+  unknownOpeningCount: number
 }
 
 export interface CashflowMonthlyRow {
@@ -174,8 +176,15 @@ export async function fetchCashflowReport(start: string, end: string) {
   return (await http.get<CashflowReport>('/cashflow-journal/accounts', { params: { start, end } })).data
 }
 
-export async function fetchCashflowMonthly(accountId: number) {
-  return (await http.get<CashflowMonthlyReport>(`/cashflow-journal/accounts/${accountId}/monthly`)).data
+export async function fetchCashflowFiscalYears(): Promise<number[]> {
+  const { data } = await http.get<{ items: number[] }>('/cashflow-journal/fiscal-years')
+  return data.items
+}
+
+export async function fetchCashflowMonthly(accountId: number, year = 2026) {
+  return (await http.get<CashflowMonthlyReport>(`/cashflow-journal/accounts/${accountId}/monthly`, {
+    params: { year }
+  })).data
 }
 
 export async function fetchCashflowEntries(accountId: number | null, start: string, end: string, page: number, size = 30, keyword = '') {

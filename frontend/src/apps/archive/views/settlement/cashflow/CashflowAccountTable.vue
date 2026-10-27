@@ -105,7 +105,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import LqTable from '@/components/common/LqTable.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import { fetchCashflowMonthly, type CashflowAccount, type CashflowMonthlyRow } from '@/api/cashflowJournal'
@@ -119,18 +119,25 @@ const emit = defineEmits<{ openEntries: [account: CashflowAccount]; openOpening:
 const monthlyCache = ref<Record<number, CashflowMonthlyRow[]>>({})
 const monthlyLoadingId = ref<number | null>(null)
 const monthlyOf = (accountId: number) => monthlyCache.value[accountId] ?? []
+watch(() => props.year, () => {
+  monthlyCache.value = {}
+  monthlyLoadingId.value = null
+})
 
 async function ensureMonthly(accountId: number) {
   if (monthlyCache.value[accountId] || monthlyLoadingId.value === accountId) return
+  const requestedYear = props.year
   monthlyLoadingId.value = accountId
   try {
-    const report = await fetchCashflowMonthly(accountId)
+    const report = await fetchCashflowMonthly(accountId, requestedYear)
+    if (requestedYear !== props.year) return
     monthlyCache.value = { ...monthlyCache.value, [accountId]: report.items }
   } catch {
+    if (requestedYear !== props.year) return
     monthlyCache.value = { ...monthlyCache.value, [accountId]: [] }
     notify.error('月度汇总加载失败')
   } finally {
-    if (monthlyLoadingId.value === accountId) monthlyLoadingId.value = null
+    if (requestedYear === props.year && monthlyLoadingId.value === accountId) monthlyLoadingId.value = null
   }
 }
 

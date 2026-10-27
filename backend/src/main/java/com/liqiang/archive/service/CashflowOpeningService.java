@@ -13,6 +13,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 
 /** 年度期初管理的只读基础；写入须经过独立权限、幂等和审计。 */
 @Service
@@ -90,6 +91,45 @@ public class CashflowOpeningService {
         result.put("fiscalYear", year);
         result.put("openingStatus", result.get("openingId") == null ? "MISSING"
                 : isActive(result.get("active")) ? "ACTIVE" : "CANDIDATE");
+        return result;
+    }
+
+    /** 只读测算：期初差额会等量改变该账年所有可计算的期间余额。 */
+    public Map<String, Object> correctionPreview(long openingId, BigDecimal newAmount) {
+        if (openingId <= 0) throw new IllegalArgumentException("期初记录无效");
+        if (newAmount == null || newAmount.scale() > 4 || newAmount.precision() - newAmount.scale() > 14)
+            throw new IllegalArgumentException("金额超出 DECIMAL(18,4) 范围或小数超过 4 位");
+        if (!users.can("cashflow.manage") && !users.can("cashflow.opening.correct"))
+            throw new SecurityException("没有年度期初更正预览权限");
+        var scope = users.current().featureScopes().get("CASHFLOW");
+        if (scope == null || !"ALL".equals(scope.scope()))
+            throw new SecurityException("当前资金数据范围不允许预览期初更正");
+        var rows = jdbc.queryForList("""
+                SELECT o.account_id,o.fiscal_year,o.amount,o.active,o.finance_confirmed,
+                       a.account_name,a.currency
+                  FROM cashflow_account_opening o
+                  JOIN h3_cash_accounts a ON a.id=o.account_id AND a.external_source='H3YUN'
+                 WHERE o.id=?
+                """, openingId);
+        if (rows.isEmpty()) throw new IllegalArgumentException("年度期初不存在");
+        var row = rows.getFirst();
+        if (!isActive(row.get("active"))) throw new IllegalArgumentException("候选期初尚未生效");
+        BigDecimal oldAmount = (BigDecimal) row.get("amount");
+        if (oldAmount.compareTo(newAmount) == 0) throw new IllegalArgumentException("新旧金额相同，无需更正");
+        int year = ((Number) row.get("fiscal_year")).intValue();
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("openingId", openingId);
+        result.put("accountId", row.get("account_id"));
+        result.put("accountName", row.get("account_name"));
+        result.put("currency", row.get("currency"));
+        result.put("fiscalYear", year);
+        result.put("oldAmount", oldAmount.toPlainString());
+        result.put("newAmount", newAmount.toPlainString());
+        result.put("balanceDelta", newAmount.subtract(oldAmount).toPlainString());
+        result.put("affectedFrom", LocalDate.of(year, 1, 1).toString());
+        result.put("affectedThrough", LocalDate.of(year, 12, 31).toString());
+        result.put("wouldResetFinanceConfirmation", isActive(row.get("finance_confirmed")));
+        result.put("applied", false);
         return result;
     }
 
