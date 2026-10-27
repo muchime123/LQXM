@@ -1,0 +1,452 @@
+﻿[
+    {
+        "slug":  "product-67",
+        "modelName":  "利强手压片膜封口机（斜头）",
+        "completenessScore":  80,
+        "variantCount":  3,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-65",
+        "modelName":  "利强手压片膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-66",
+        "modelName":  "利强手压半自动卷膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-68",
+        "modelName":  "利强手推自动卷膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-180",
+        "modelName":  "利强手推自动卷膜封口机（气动）",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-72",
+        "modelName":  "利强按钮自动卷膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-69",
+        "modelName":  "利强手推自动片膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-73",
+        "modelName":  "利强按钮自动片膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-74",
+        "modelName":  "利强按钮自动卷膜麻辣烫封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-75",
+        "modelName":  "利强按钮自动卷膜封口机（黑白机）",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-77",
+        "modelName":  "利强手动翻盖封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-78",
+        "modelName":  "利强台式韩国机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-79",
+        "modelName":  "利强自动封口贴标机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-70",
+        "modelName":  "利强手推自动片膜广口瓶封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "lq250-ts-pneumatic-sealer",
+        "modelName":  "利强台式气动卷膜封口机",
+        "completenessScore":  80,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-83",
+        "modelName":  "利强台式气动片膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-88",
+        "modelName":  "利强推杆式气动充氧封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-89",
+        "modelName":  "利强推杆式气动连续封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-181",
+        "modelName":  "利强台式电动气流包装机（充氮充氧）",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-90",
+        "modelName":  "利强台式电动气调包装机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-76",
+        "modelName":  "利强自吸片膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-175",
+        "modelName":  "利强气动自吸片膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-95",
+        "modelName":  "利强立式贴体包装机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "lq450-benchtop-map-machine",
+        "modelName":  "LQ450利强台式气调保鲜机",
+        "completenessScore":  80,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-80",
+        "modelName":  "利强立式气调卷膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-178",
+        "modelName":  "立式气动封盒机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-81",
+        "modelName":  "利强立式气动双工位卷膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-91",
+        "modelName":  "利强全自动气调卷膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-110",
+        "modelName":  "气调机保鲜包装机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-84",
+        "modelName":  "利强转盘式封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-87",
+        "modelName":  "利强自动定量灌装转盘式片膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-171",
+        "modelName":  "贴体真空包装机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "lq410l-automatic-packaging-machine",
+        "modelName":  "全自动包装机",
+        "completenessScore":  80,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-5982",
+        "modelName":  "连续式气调保鲜机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-92",
+        "modelName":  "利强连续式全自动气调卷膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-179",
+        "modelName":  "LQ750L利强连续式全自动气调片膜封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "lq380a-map-production-line",
+        "modelName":  "LQ380A全自动流水线气调保鲜机",
+        "completenessScore":  80,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-147",
+        "modelName":  "450L型 全自动封切机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-177",
+        "modelName":  "称重贴体机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-93",
+        "modelName":  "利强全自动流水线气调保鲜机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-94",
+        "modelName":  "利强全自动连续式封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "rotary-sealing-machine",
+        "modelName":  "利强连续式全自动封口机",
+        "completenessScore":  80,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-128",
+        "modelName":  "自动称重灌装封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-5983",
+        "modelName":  "广口式连续封口机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    },
+    {
+        "slug":  "product-5984",
+        "modelName":  "空压机",
+        "completenessScore":  60,
+        "variantCount":  0,
+        "variants":  0,
+        "compatiblePackaging":  0,
+        "compatibleMolds":  0,
+        "hasCompatibilityKeys":  true
+    }
+]
