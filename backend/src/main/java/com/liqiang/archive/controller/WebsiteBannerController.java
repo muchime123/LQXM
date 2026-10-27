@@ -87,6 +87,7 @@ public class WebsiteBannerController {
                 .description(form.description())
                 .imageUrl(form.imageUrl())
                 .imageAssetId(form.imageAssetId())
+                .websiteMediaId(form.websiteMediaId())
                 .buttonText(form.buttonText())
                 .buttonUrl(form.buttonUrl())
                 .secondaryButtonText(form.secondaryButtonText())
@@ -116,6 +117,7 @@ public class WebsiteBannerController {
                 .description(form.description())
                 .imageUrl(form.imageUrl())
                 .imageAssetId(form.imageAssetId())
+                .websiteMediaId(form.websiteMediaId())
                 .buttonText(form.buttonText())
                 .buttonUrl(form.buttonUrl())
                 .secondaryButtonText(form.secondaryButtonText())
@@ -181,6 +183,7 @@ public class WebsiteBannerController {
             String description,
             String imageUrl,
             Long imageAssetId,
+            Long websiteMediaId,
             String buttonText,
             String buttonUrl,
             String secondaryButtonText,
@@ -215,7 +218,9 @@ public class WebsiteBannerController {
                     banner.getTitle(),
                     banner.getSubtitle(),
                     banner.getDescription(),
-                    banner.getImageUrl(),
+                    banner.getWebsiteMediaId() != null
+                            ? "/api/website/media/" + banner.getWebsiteMediaId() + "/content"
+                            : banner.getImageUrl(),
                     banner.getButtonText(),
                     banner.getButtonUrl(),
                     banner.getSecondaryButtonText(),
@@ -269,6 +274,7 @@ public class WebsiteBannerController {
             String description,
             String imageUrl,
             Long imageAssetId,
+            Long websiteMediaId,
             String buttonText,
             String buttonUrl,
             String secondaryButtonText,
@@ -291,6 +297,7 @@ public class WebsiteBannerController {
                     banner.getDescription(),
                     banner.getImageUrl(),
                     banner.getImageAssetId(),
+                    banner.getWebsiteMediaId(),
                     banner.getButtonText(),
                     banner.getButtonUrl(),
                     banner.getSecondaryButtonText(),

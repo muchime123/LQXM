@@ -189,6 +189,7 @@ export interface WebsiteBannerDetail {
   description: string | null
   imageUrl: string | null
   imageAssetId: number | null
+  websiteMediaId: number | null
   buttonText: string | null
   buttonUrl: string | null
   secondaryButtonText: string | null
@@ -211,6 +212,7 @@ export interface WebsiteBannerPayload {
   description?: string
   imageUrl?: string
   imageAssetId?: number
+  websiteMediaId?: number | null
   buttonText?: string
   buttonUrl?: string
   secondaryButtonText?: string

@@ -101,6 +101,18 @@ export const archiveRoutes: RouteRecordRaw[] = [
     component: () => import('@/apps/archive/views/marketing/WebsiteBannerView.vue'),
     meta: { title: 'Banner管理', layout: 'list', permission: 'website.manage', group: 'marketing' }
   },
+  {
+    path: '/website/products',
+    name: 'websiteProducts',
+    component: () => import('@/apps/archive/views/marketing/WebsiteProductsView.vue'),
+    meta: { title: '官网产品草稿', layout: 'list', permission: 'website.manage', group: 'marketing' }
+  },
+  {
+    path: '/website/media',
+    name: 'websiteMedia',
+    component: () => import('@/apps/archive/views/marketing/WebsiteMediaView.vue'),
+    meta: { title: '官网媒体库', layout: 'list', permission: 'website.manage', group: 'marketing' }
+  },
 
   // ---- 公司管理 ----
   {

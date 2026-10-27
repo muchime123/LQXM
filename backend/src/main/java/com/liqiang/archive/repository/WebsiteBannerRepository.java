@@ -12,6 +12,12 @@ import java.util.List;
 @Repository
 public interface WebsiteBannerRepository extends JpaRepository<WebsiteBanner, Long> {
 
+    @Query("SELECT COUNT(b) > 0 FROM WebsiteBanner b WHERE b.websiteMediaId = :mediaId " +
+           "AND b.websiteEnabled = true AND b.deletedAt IS NULL " +
+           "AND (b.startDate IS NULL OR b.startDate <= CURRENT_DATE) " +
+           "AND (b.endDate IS NULL OR b.endDate >= CURRENT_DATE)")
+    boolean existsActiveWebsiteMediaReference(@Param("mediaId") Long mediaId);
+
     List<WebsiteBanner> findByPositionAndDeletedAtIsNullOrderBySortOrderAscIdAsc(
             BannerPosition position);
 

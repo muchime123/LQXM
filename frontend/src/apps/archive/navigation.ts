@@ -191,6 +191,22 @@ export const archiveNavItems: NavItem[] = [
         description: '管理官网首页 Banner 轮播图。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
         group: 'marketing'
+      },
+      {
+        to: '/website/products',
+        permission: 'website.manage',
+        label: '官网产品草稿',
+        description: '独立维护官网产品草稿，发布切换前不会改变官网展示。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h7"/></svg>',
+        group: 'marketing'
+      },
+      {
+        to: '/website/media',
+        permission: 'website.manage',
+        label: '官网媒体库',
+        description: '独立上传、查看官网图片、视频和文档草稿。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8" cy="8" r="1"/><path d="m4 18 5-5 3 3 3-4 5 6"/></svg>',
+        group: 'marketing'
       }
     ]
   },

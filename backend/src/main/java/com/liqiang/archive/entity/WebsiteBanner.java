@@ -46,6 +46,9 @@ public class WebsiteBanner {
     @Column(name = "image_asset_id")
     private Long imageAssetId;
 
+    @Column(name = "website_media_id")
+    private Long websiteMediaId;
+
     @Column(name = "button_text", length = 100)
     private String buttonText;
 

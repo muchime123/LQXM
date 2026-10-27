@@ -1,0 +1,41 @@
+package com.liqiang.archive.controller;
+
+import com.liqiang.archive.entity.WebsiteMediaAsset;
+import com.liqiang.archive.repository.WebsiteMediaAssetRepository;
+import com.liqiang.archive.service.WebsiteMediaService;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+import org.springframework.test.util.ReflectionTestUtils;
+
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Optional;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
+class WebsiteMediaAdminControllerTest {
+    @TempDir
+    Path root;
+
+    @Test
+    void servesOnlyWebsiteMediaFiles() throws Exception {
+        WebsiteMediaAssetRepository repository = mock(WebsiteMediaAssetRepository.class);
+        WebsiteMediaAdminController controller = new WebsiteMediaAdminController(repository, mock(WebsiteMediaService.class));
+        ReflectionTestUtils.setField(controller, "fileRoot", root.toString());
+        Path image = root.resolve("website/images/sample.png");
+        Files.createDirectories(image.getParent());
+        Files.write(image, new byte[]{1, 2, 3});
+        WebsiteMediaAsset asset = new WebsiteMediaAsset();
+        asset.setStorageKey("website/images/sample.png");
+        asset.setMimeType("image/png");
+        asset.setSizeBytes(3L);
+        when(repository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(asset));
+
+        assertNotNull(controller.content(1L).getBody());
+        asset.setStorageKey("../outside.png");
+        assertEquals(404, controller.content(1L).getStatusCode().value());
+    }
+}

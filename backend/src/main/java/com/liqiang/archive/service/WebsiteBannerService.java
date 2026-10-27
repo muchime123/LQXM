@@ -3,6 +3,8 @@ package com.liqiang.archive.service;
 import com.liqiang.archive.entity.WebsiteBanner;
 import com.liqiang.archive.entity.WebsiteBanner.BannerPosition;
 import com.liqiang.archive.repository.WebsiteBannerRepository;
+import com.liqiang.archive.repository.WebsiteMediaAssetRepository;
+import com.liqiang.archive.entity.WebsiteMediaAsset;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -23,6 +25,7 @@ import java.util.stream.Collectors;
 public class WebsiteBannerService {
 
     private final WebsiteBannerRepository bannerRepository;
+    private final WebsiteMediaAssetRepository mediaRepository;
     private final AuditLogService auditLogService;
 
     /**
@@ -104,6 +107,7 @@ public class WebsiteBannerService {
         if (banner.getWebsiteEnabled() == null) {
             banner.setWebsiteEnabled(true);
         }
+        validateAndPublishMedia(banner);
         WebsiteBanner saved = bannerRepository.save(banner);
         auditLogService.log("WebsiteBanner", saved.getId(), saved.getTitle(), "BANNER_CREATE",
                 String.format("创建Banner position=%s", saved.getPosition()));
@@ -117,6 +121,7 @@ public class WebsiteBannerService {
     @Transactional
     public WebsiteBanner update(Long id, WebsiteBanner banner) {
         WebsiteBanner existing = getById(id);
+        validateAndPublishMedia(banner);
         Map<String, Object> before = bannerSnapshot(existing);
         existing.setPosition(banner.getPosition());
         existing.setTitle(banner.getTitle());
@@ -124,6 +129,7 @@ public class WebsiteBannerService {
         existing.setDescription(banner.getDescription());
         existing.setImageUrl(banner.getImageUrl());
         existing.setImageAssetId(banner.getImageAssetId());
+        existing.setWebsiteMediaId(banner.getWebsiteMediaId());
         existing.setButtonText(banner.getButtonText());
         existing.setButtonUrl(banner.getButtonUrl());
         existing.setSecondaryButtonText(banner.getSecondaryButtonText());
@@ -160,6 +166,7 @@ public class WebsiteBannerService {
     @Transactional
     public WebsiteBanner restore(Long id) {
         WebsiteBanner banner = getById(id);
+        validateAndPublishMedia(banner);
         banner.setDeletedAt(null);
         WebsiteBanner saved = bannerRepository.save(banner);
         auditLogService.log("WebsiteBanner", id, banner.getTitle(), "BANNER_RESTORE",
@@ -175,6 +182,7 @@ public class WebsiteBannerService {
     public WebsiteBanner toggleWebsiteEnabled(Long id) {
         WebsiteBanner banner = getById(id);
         banner.setWebsiteEnabled(!Boolean.TRUE.equals(banner.getWebsiteEnabled()));
+        validateAndPublishMedia(banner);
         WebsiteBanner saved = bannerRepository.save(banner);
         auditLogService.log("WebsiteBanner", id, banner.getTitle(), "BANNER_TOGGLE",
                 String.format("切换Banner可见性 websiteEnabled=%s", saved.getWebsiteEnabled()));
@@ -201,12 +209,26 @@ public class WebsiteBannerService {
 
     /* -------- Banner 审计辅助 -------- */
 
+    private void validateAndPublishMedia(WebsiteBanner banner) {
+        if (banner.getWebsiteMediaId() == null) return;
+        WebsiteMediaAsset media = mediaRepository.findByIdAndDeletedAtIsNull(banner.getWebsiteMediaId())
+                .orElseThrow(() -> new IllegalArgumentException("官网媒体不存在或已删除"));
+        if (!"IMAGE".equals(media.getMediaType()) || "ARCHIVED".equals(media.getStatus())) {
+            throw new IllegalArgumentException("Banner 只能使用未归档的官网图片");
+        }
+        if (Boolean.TRUE.equals(banner.getWebsiteEnabled()) && "DRAFT".equals(media.getStatus())) {
+            media.setStatus("PUBLISHED");
+            mediaRepository.save(media);
+        }
+    }
+
     private static java.util.Map<String, Object> bannerSnapshot(WebsiteBanner b) {
         java.util.LinkedHashMap<String, Object> m = new java.util.LinkedHashMap<>();
         m.put("position", b.getPosition());
         m.put("title", b.getTitle());
         m.put("subtitle", b.getSubtitle());
         m.put("imageUrl", b.getImageUrl());
+        m.put("websiteMediaId", b.getWebsiteMediaId());
         m.put("badge", b.getBadge());
         m.put("buttonText", b.getButtonText());
         m.put("buttonUrl", b.getButtonUrl());

@@ -8,7 +8,7 @@ import type {
   BannerPosition
 } from '@/types/website'
 import { notify } from '@/composables/ui/useToast'
-import WebsiteImageField from '@/components/website/WebsiteImageField.vue'
+import WebsiteMediaPicker from '@/components/website/WebsiteMediaPicker.vue'
 
 const props = defineProps<{
   banner: WebsiteBannerDetail | null
@@ -30,6 +30,7 @@ const form = ref<WebsiteBannerPayload>({
   description: '',
   imageUrl: '',
   imageAssetId: undefined,
+  websiteMediaId: null,
   buttonText: '',
   buttonUrl: '',
   secondaryButtonText: '',
@@ -57,6 +58,7 @@ watch(
           description: detail.description || '',
           imageUrl: detail.imageUrl || '',
           imageAssetId: detail.imageAssetId || undefined,
+          websiteMediaId: detail.websiteMediaId,
           buttonText: detail.buttonText || '',
           buttonUrl: detail.buttonUrl || '',
           secondaryButtonText: detail.secondaryButtonText || '',
@@ -80,6 +82,7 @@ watch(
         description: '',
         imageUrl: '',
         imageAssetId: undefined,
+        websiteMediaId: null,
         buttonText: '',
         buttonUrl: '',
         secondaryButtonText: '',
@@ -117,6 +120,7 @@ async function handleSubmit() {
     description: form.value.description?.trim() || undefined,
     imageUrl: form.value.imageUrl?.trim() || undefined,
     imageAssetId: form.value.imageAssetId || undefined,
+    websiteMediaId: form.value.websiteMediaId ?? null,
     buttonText: form.value.buttonText?.trim() || undefined,
     buttonUrl: form.value.buttonUrl?.trim() || undefined,
     secondaryButtonText: form.value.secondaryButtonText?.trim() || undefined,
@@ -206,11 +210,11 @@ const positionOptions = computed(() =>
         </el-form-item>
 
         <el-form-item label="Banner图片">
-          <WebsiteImageField
-            v-model="form.imageUrl"
-            aspect-ratio="12 / 5"
-            hint="首页 Hero 建议 1920×800（2.4:1）纯场景/设备图，不要内嵌文字；标题/描述/按钮由下方表单独立编辑，官网以 HTML 渲染。"
-          />
+          <div>
+            <WebsiteMediaPicker v-model="form.websiteMediaId" />
+            <p v-if="form.imageUrl && !form.websiteMediaId" class="form-hint">当前 Banner 的旧图片继续保留；选择官网图片后才会替换公开展示。</p>
+            <p class="form-hint">建议上传 1920×800 图片。新图片保存在官网专用媒体库，保存 Banner 后公开展示。</p>
+          </div>
         </el-form-item>
 
         <el-form-item label="标签文字">
