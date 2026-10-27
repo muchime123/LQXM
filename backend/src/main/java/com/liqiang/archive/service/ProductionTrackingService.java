@@ -46,8 +46,10 @@ public class ProductionTrackingService {
     private static final Set<String> STAGE_STATUSES=Set.of("PENDING","IN_PROGRESS","DONE");
     private static final String STAGE_TOTAL_CASE=ProductionTrackingPolicy.stageTotalCase("p.production_line");
     private static final String CONFIGURED_OXIDATION="(p.production_line LIKE '%封口%' AND "
-            +"(p.optional_configuration LIKE '%氧化%' OR p.optional_configuration LIKE '%特氟龙%') "
-            +"AND p.optional_configuration NOT REGEXP '(不含|无需|不用|不需要|无)(氧化|特氟龙)')";
+            +"((p.optional_configuration REGEXP '氧化|特氟龙|特富龙' "
+            +"AND p.optional_configuration NOT REGEXP '(不含|无需|不用|不需要|无)(氧化|特氟龙|特富龙)') "
+            +"OR (p.production_requirement REGEXP '氧化|特氟龙|特富龙' "
+            +"AND p.production_requirement NOT REGEXP '(不含|无需|不用|不需要|无)(氧化|特氟龙|特富龙)')))";
     private static final String CONFIGURED_WOODEN_CRATE="(p.optional_configuration LIKE '%木箱%' "
             +"AND p.optional_configuration NOT REGEXP '(不含|无需|不用|不需要|无)木箱')";
     /**
@@ -1701,7 +1703,7 @@ public class ProductionTrackingService {
                 var stage=milestones.get(code);
                 applicable.put(code,!ProductionTrackingPolicy.isOptionalStage(code)||stage!=null
                         ||ProductionTrackingPolicy.configuredOptionalStage(code,
-                                (String)item.get("sourceOptionalConfiguration")));
+                                (String)item.get("sourceOptionalConfiguration"),(String)item.get("sourceOrderRemark")));
                 if(stage!=null){
                     statuses.put(code,(String)stage.get("status"));
                     if(stage.get("completed") instanceof LocalDate d)completed.put(code,d);
@@ -2517,7 +2519,7 @@ public class ProductionTrackingService {
                 // 按需工序：没有里程碑行＝本单不走这道工序，前端不该把它显示成「未完成」。
                 stage.put("optional",optional);
                 stage.put("applicable",!optional||milestone!=null||ProductionTrackingPolicy.configuredOptionalStage(code,
-                        (String)item.get("sourceOptionalConfiguration")));
+                        (String)item.get("sourceOptionalConfiguration"),(String)item.get("sourceOrderRemark")));
                 stages.add(stage);
             }
             item.put("stageProgress",stages);
@@ -2610,7 +2612,7 @@ public class ProductionTrackingService {
             item.put("optional",optional);
             // 按需工序没有里程碑行 ⇒ 本单不适用；有行则按行上的状态走。
             item.put("applicable",!optional||savedRow.isPresent()||ProductionTrackingPolicy.configuredOptionalStage(code,
-                    (String)source.get("sourceOptionalConfiguration")));
+                    (String)source.get("sourceOptionalConfiguration"),(String)source.get("sourceOrderRemark")));
             item.put("status","PENDING");item.put("completedDate",null);item.put("note",null);
             item.put("manualReferenceDate",null);item.put("manualReferenceReason",null);
             savedRow.ifPresent(s->{

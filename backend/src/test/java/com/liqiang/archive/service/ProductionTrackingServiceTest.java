@@ -323,6 +323,8 @@ class ProductionTrackingServiceTest {
         assertFalse(ProductionTrackingPolicy.configuredOptionalStage("WOODEN_CRATE","不含木箱"));
         assertTrue(ProductionTrackingPolicy.configuredOptionalStage("OXIDATION","喷特氟龙"));
         assertFalse(ProductionTrackingPolicy.configuredOptionalStage("OXIDATION","无需氧化"));
+        assertTrue(ProductionTrackingPolicy.configuredOptionalStage("OXIDATION",null,"模具更换都需要特富龙"));
+        assertFalse(ProductionTrackingPolicy.configuredOptionalStage("OXIDATION",null,"无需特富龙"));
         // 完成判据的分母＝必经节点数，按需工序不计入，否则封口机会永远差一个节点完成不了。
         assertEquals("CASE WHEN p.production_line LIKE '%封口%' THEN 4 ELSE 7 END",
                 ProductionTrackingPolicy.stageTotalCase("p.production_line"));
@@ -1408,8 +1410,9 @@ class ProductionTrackingServiceTest {
 
         String predicate=ProductionTrackingService.needsOptionalStage("OXIDATION");
         assertTrue(predicate.contains("ms.oxidation_count"),"要看该单有没有这道工序的节点记录："+predicate);
-        assertTrue(predicate.contains("特氟龙")&&predicate.contains("氧化"),
-                "也要认源单可选配置里写明的「氧化/特氟龙」："+predicate);
+        assertTrue(predicate.contains("特氟龙")&&predicate.contains("特富龙")&&predicate.contains("氧化")
+                        &&predicate.contains("p.production_requirement"),
+                "也要认源单可选配置或备注里写明的「氧化/特氟龙/特富龙」："+predicate);
         assertTrue(predicate.contains("p.production_line LIKE '%封口%'"),
                 "氧化只存在于封口机的节点序列里，机器车间的单不该被筛出来："+predicate);
         for(String sql:List.of(countSql.getValue(),rowSql.getValue()))

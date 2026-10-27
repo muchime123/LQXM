@@ -48,9 +48,13 @@ final class ProductionTrackingPolicy {
         String value=configuration.replaceAll("[\\s\\u3000]","");
         if(WOODEN_CRATE.equals(code))return value.contains("木箱")
                 && !value.matches(".*(?:不含|无需|不用|不需要|无)木箱.*");
-        if(OXIDATION.equals(code))return (value.contains("氧化")||value.contains("特氟龙"))
-                && !value.matches(".*(?:不含|无需|不用|不需要|无)(?:氧化|特氟龙).*");
+        if(OXIDATION.equals(code))return (value.contains("氧化")||value.contains("特氟龙")||value.contains("特富龙"))
+                && !value.matches(".*(?:不含|无需|不用|不需要|无)(?:氧化|特氟龙|特富龙).*");
         return false;
+    }
+    /** 可选配置与任务单备注分别判断，避免一处写明需要、另一处提到不需要时互相覆盖。 */
+    static boolean configuredOptionalStage(String code,String configuration,String remark) {
+        return configuredOptionalStage(code,configuration)||configuredOptionalStage(code,remark);
     }
     static String stageLabel(String code,boolean sealer) {
         if("MOLD".equals(code)&&!sealer)return "模具";

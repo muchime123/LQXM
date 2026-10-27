@@ -52,7 +52,7 @@ const COUNTDOWN_FILTER_OPTIONS = [
 /**
  * 「按需工序」筛选（10-15 跟单员需求：筛出需要氧化/喷特氟龙这道工序的所有跟单）。
  * 取值是固定工序码，与列表/导出的后端白名单一一对应；空串＝不筛。
- * 口径＝源单可选配置写明需要这道工序 **或** 已有该节点的跟单记录（后端 needsOptionalStage 唯一源）。
+ * 口径＝源单可选配置或备注写明需要这道工序，或已有该节点的跟单记录（后端 needsOptionalStage 唯一源）。
  */
 const OPTIONAL_STAGE_OPTIONS = [
   { value: 'OXIDATION', label: '需要氧化 / 喷特氟龙' },
