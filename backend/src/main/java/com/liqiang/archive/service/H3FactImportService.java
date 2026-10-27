@@ -2274,10 +2274,12 @@ ps.setString(1, fileName); ps.setString(2, type); ps.setInt(3, count); return ps
 return Objects.requireNonNull(holder.getKey()).longValue();
 }
 
-private void saveImportRow(long batchId, Group group, String action, Long businessId) {
-jdbc.update("INSERT INTO h3_import_rows(batch_id,external_id,source_row_number,raw_data,source_hash,action,business_id,processed_at) VALUES(?,?,?,?,?,?,?,NOW())",
-batchId, group.externalId(), sourceRowNumber(group.main()), groupJson(group), group.hash(), action, businessId);
-}
+    private void saveImportRow(long batchId, Group group, String action, Long businessId) {
+        // UNCHANGED 行不存原始快照：数据未变化，事实表已有最新数据，raw_data 留空省空间
+        String rawData = "UNCHANGED".equals(action) ? null : groupJson(group);
+        jdbc.update("INSERT INTO h3_import_rows(batch_id,external_id,source_row_number,raw_data,source_hash,action,business_id,processed_at) VALUES(?,?,?,?,?,?,?,NOW())",
+                batchId, group.externalId(), sourceRowNumber(group.main()), rawData, group.hash(), action, businessId);
+    }
 
 private static Integer sourceRowNumber(Map<String, String> values) {
     String value = values.get("__sourceRowNumber");
@@ -2864,7 +2866,8 @@ case CASHIER_LOG -> saveCashierRow(group);
     jdbc.update("""
         UPDATE h3_import_batches SET status='CONFIRMING', progress_stage='ORCHESTRATING', progress_pct=98,
                created_count=?,updated_count=?,unchanged_count=?,
-               missing_customer_count=?,missing_date_count=?,missing_quantity_count=?
+               missing_customer_count=?,missing_date_count=?,missing_quantity_count=?,
+               preview_json = NULL
          WHERE id=?
         """, created, updated, unchanged, missingCustomer, missingDate, missingQuantity, batchId);
 
