@@ -76,14 +76,14 @@ public class CashflowJournalController {
                   LEFT JOIN cashflow_account_opening opening ON opening.account_id=a.id
                    AND opening.fiscal_year=? AND opening.active=1
                   LEFT JOIN cashflow_entities e ON e.id = a.entity_id
-                  LEFT JOIN h3_cashflow_entries e2 ON e2.external_source='H3YUN' AND e2.account_name=a.account_name
+                  LEFT JOIN h3_cashflow_entries e2 ON e2.external_source='H3YUN' AND e2.account_id=a.id
                  WHERE a.external_source='H3YUN'
                  GROUP BY a.id,a.account_name,a.currency,opening.amount,a.entity_id,a.status,e.name
                  ORDER BY entry_count DESC, a.account_name ASC
                 """, (rs, ignored) -> accountRow(rs), yearStart, start, start, end, start, end, start, end, year);
         Map<String, CurrencyTotal> byCurrency = new LinkedHashMap<>();
         // 取全部账户的核对结果（含 0 断点），这样每个账户都能报出自己真实的「已衔接链接数」。
-        Map<String, CashflowReviewRules.SourceBalanceReview> review =
+        Map<Long, CashflowReviewRules.SourceBalanceReview> review =
                 reviewService.sourceBalanceReviewsAll(start, end);
         String startText = start.toString();
         String endText = end.toString();
@@ -102,7 +102,7 @@ public class CashflowJournalController {
                 total.unknownOpeningCount++;
             }
             else total.closing = total.closing.add(closing);
-            CashflowReviewRules.SourceBalanceReview accountReview = review.get((String) item.get("accountName"));
+            CashflowReviewRules.SourceBalanceReview accountReview = review.get((Long) item.get("id"));
             int exceptions = attachReview(item, accountReview, startText, endText);
             totalExceptions += exceptions;
             if (exceptions > 0) affectedAccounts++;
@@ -193,13 +193,13 @@ public class CashflowJournalController {
                        COALESCE(SUM(expense),0) AS expense,
                        COUNT(*) AS entry_count
                   FROM h3_cashflow_entries
-                 WHERE external_source='H3YUN' AND account_name=?
+                 WHERE external_source='H3YUN' AND account_id=?
                    AND entry_date BETWEEN ? AND ?
                  GROUP BY MONTH(entry_date)
                 """, (rs, ignored) -> Map.of(
                 "month", rs.getInt("month_no"), "income", rs.getBigDecimal("income"),
                 "expense", rs.getBigDecimal("expense"), "entryCount", rs.getLong("entry_count")),
-                name, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
+                accountId, LocalDate.of(year, 1, 1), LocalDate.of(year, 12, 31));
         Map<Integer, Map<String, Object>> byMonth = new LinkedHashMap<>();
         for (Map<String, Object> row : source) byMonth.put((Integer) row.get("month"), row);
         BigDecimal balance = (BigDecimal) account.get("opening");
@@ -232,17 +232,17 @@ public class CashflowJournalController {
                                        @RequestParam(defaultValue = "30") int size) {
         validatePeriod(start, end);
         if (page < 1 || size < 1 || size > 100) throw new IllegalArgumentException("分页参数无效");
-        String name = null;
         if (accountId != null) {
-            name = jdbc.query("SELECT account_name FROM h3_cash_accounts WHERE id=? AND external_source='H3YUN'",
-                    rs -> rs.next() ? rs.getString(1) : null, accountId);
-            if (name == null) throw new IllegalArgumentException("账户不存在");
+            Integer exists = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM h3_cash_accounts WHERE id=? AND external_source='H3YUN'",
+                    Integer.class, accountId);
+            if (exists == null || exists == 0) throw new IllegalArgumentException("账户不存在");
         }
         StringBuilder where = new StringBuilder(" WHERE external_source='H3YUN' AND entry_date BETWEEN ? AND ?");
         List<Object> params = new ArrayList<>(List.of(start, end));
-        if (name != null) {
-            where.append(" AND account_name=?");
-            params.add(name);
+        if (accountId != null) {
+            where.append(" AND account_id=?");
+            params.add(accountId);
         }
         if (keyword != null && !keyword.isBlank()) {
             where.append(" AND (INSTR(COALESCE(summary,''),?)>0 OR INSTR(COALESCE(supplier_raw,''),?)>0")
@@ -284,12 +284,11 @@ public class CashflowJournalController {
      */
     private List<Map<String, Object>> detailIssues(LocalDate start, LocalDate end, Long accountId) {
         List<Map<String, Object>> result = new ArrayList<>();
-        Map<String, Long> accountIds = new HashMap<>();
-        reviewService.sourceBalanceBreakdown(start, end).forEach((account, exceptions) -> {
-            Long id = accountIds.computeIfAbsent(account, name -> jdbc.query(
-                    "SELECT id FROM h3_cash_accounts WHERE external_source='H3YUN' AND account_name=?",
-                    rs -> rs.next() ? rs.getLong(1) : null, name));
+        Map<Long, String> accountNames = new HashMap<>();
+        reviewService.sourceBalanceBreakdown(start, end).forEach((id, exceptions) -> {
             if (accountId != null && !accountId.equals(id)) return;
+            String account = accountNames.computeIfAbsent(id, key -> jdbc.queryForObject(
+                    "SELECT account_name FROM h3_cash_accounts WHERE id=?", String.class, key));
             for (CashflowReviewRules.SourceBalanceException exception : exceptions) {
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("accountId", id);
@@ -331,21 +330,21 @@ public class CashflowJournalController {
                 UNION ALL
                 SELECT a.id,e.account_name,e.id,e.entry_date,
                        'MISSING_DATE','流水有收支但日期缺失'
-                  FROM h3_cashflow_entries e JOIN h3_cash_accounts a ON a.account_name=e.account_name
+                  FROM h3_cashflow_entries e JOIN h3_cash_accounts a ON a.id=e.account_id
                  WHERE e.external_source='H3YUN' AND a.external_source='H3YUN'
                    AND e.entry_date IS NULL AND (COALESCE(e.income,0)<>0 OR COALESCE(e.expense,0)<>0)
                    AND (? IS NULL OR a.id=?)
                 UNION ALL
                 SELECT a.id,e.account_name,e.id,e.entry_date,
                        'BOTH_SIDES','同一行同时填写收入与支出'
-                  FROM h3_cashflow_entries e JOIN h3_cash_accounts a ON a.account_name=e.account_name
+                  FROM h3_cashflow_entries e JOIN h3_cash_accounts a ON a.id=e.account_id
                  WHERE e.external_source='H3YUN' AND a.external_source='H3YUN'
                    AND e.entry_date BETWEEN ? AND ? AND COALESCE(e.income,0)<>0 AND COALESCE(e.expense,0)<>0
                    AND (? IS NULL OR a.id=?)
                 UNION ALL
                 SELECT a.id,e.account_name,e.id,e.entry_date,
                        'MISSING_FX','外币流水缺少汇率和人民币折算值'
-                  FROM h3_cashflow_entries e JOIN h3_cash_accounts a ON a.account_name=e.account_name
+                  FROM h3_cashflow_entries e JOIN h3_cash_accounts a ON a.id=e.account_id
                  WHERE e.external_source='H3YUN' AND a.external_source='H3YUN'
                    AND a.currency<>'CNY' AND e.entry_date BETWEEN ? AND ?
                    AND (COALESCE(e.income,0)<>0 OR COALESCE(e.expense,0)<>0)

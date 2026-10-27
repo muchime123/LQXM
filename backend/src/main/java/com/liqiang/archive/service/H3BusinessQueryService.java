@@ -997,7 +997,7 @@ public class H3BusinessQueryService {
                        MAX(e.entry_date) AS last_entry_date
                   FROM h3_cash_accounts a
                   LEFT JOIN h3_cashflow_entries e
-                         ON e.external_source='H3YUN' AND e.account_name = a.account_name
+                         ON e.external_source='H3YUN' AND e.account_id = a.id
                  GROUP BY a.id, a.account_name, a.currency, a.opening_balance
                  ORDER BY a.id
                 """, this::row);

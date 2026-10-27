@@ -1743,18 +1743,24 @@ private Long saveCashflowEntry(Group g) {
                 "SELECT id FROM h3_cash_accounts WHERE external_source='H3YUN' AND external_id=?",
                 Long.class, account);
     }
+    List<Long> accountIds = jdbc.queryForList("""
+            SELECT id FROM h3_cash_accounts
+             WHERE external_source='H3YUN' AND account_name=?
+            """, Long.class, account);
+    if (accountIds.size() != 1) throw new IllegalStateException("流水账户未唯一建档：" + account);
+    Long accountId = accountIds.getFirst();
     jdbc.update("""
-        INSERT INTO h3_cashflow_entries(external_source,external_id,source_no,account_name,entry_date,month_label,
+        INSERT INTO h3_cashflow_entries(external_source,external_id,source_no,account_name,account_id,entry_date,month_label,
         summary,supplier_raw,counterparty_raw,reimbursed_by,invoiced,income,expense,balance,
         fx_rate,fx_cny,settle_rate,settle_cny,fx_gain_loss,source_hash,last_synced_at)
-        VALUES('H3YUN',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())
-        ON DUPLICATE KEY UPDATE account_name=VALUES(account_name),entry_date=VALUES(entry_date),
+        VALUES('H3YUN',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())
+        ON DUPLICATE KEY UPDATE account_name=VALUES(account_name),account_id=VALUES(account_id),entry_date=VALUES(entry_date),
         month_label=VALUES(month_label),summary=VALUES(summary),supplier_raw=VALUES(supplier_raw),
         counterparty_raw=VALUES(counterparty_raw),reimbursed_by=VALUES(reimbursed_by),invoiced=VALUES(invoiced),
         income=VALUES(income),expense=VALUES(expense),balance=VALUES(balance),fx_rate=VALUES(fx_rate),
         fx_cny=VALUES(fx_cny),settle_rate=VALUES(settle_rate),settle_cny=VALUES(settle_cny),
         fx_gain_loss=VALUES(fx_gain_loss),source_hash=VALUES(source_hash),last_synced_at=NOW()
-        """, g.externalId(), g.externalId(), account, entryDate == null ? null : Date.valueOf(entryDate),
+        """, g.externalId(), g.externalId(), account, accountId, entryDate == null ? null : Date.valueOf(entryDate),
             clean(m.get("月份")), clean(m.get("摘要")), clean(m.get("供应商")),
             // ⚠️ 表头归一后的键是「客户供应商」（putHeader 已剥不规则空白），此处曾写成带空格的
             // 「客户 供应商」→ 取值恒 null、counterparty_raw 全表 0 行（源侧 7 129 行！）。
