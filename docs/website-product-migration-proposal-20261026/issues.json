@@ -1,0 +1,77 @@
+[
+  {
+    "kind": "STATIC_IMAGE_FALLBACK",
+    "legacy_product_id": 67,
+    "slug": "product-67",
+    "action": "review category image or website placeholder"
+  },
+  {
+    "kind": "DEFAULT_IMAGE_OUTSIDE_GALLERY",
+    "legacy_product_id": 67,
+    "asset_id": 5221,
+    "action": "check list card image separately"
+  },
+  {
+    "kind": "NON_DISPLAY_GALLERY_ASSET",
+    "legacy_product_id": 87,
+    "asset_id": 5103,
+    "category": "drawing",
+    "action": "retain source file; review public role"
+  },
+  {
+    "kind": "NON_DISPLAY_GALLERY_ASSET",
+    "legacy_product_id": 87,
+    "asset_id": 5212,
+    "category": "drawing",
+    "action": "retain source file; review public role"
+  },
+  {
+    "kind": "NON_DISPLAY_GALLERY_ASSET",
+    "legacy_product_id": 87,
+    "asset_id": 5213,
+    "category": "drawing",
+    "action": "retain source file; review public role"
+  },
+  {
+    "kind": "NON_DISPLAY_GALLERY_ASSET",
+    "legacy_product_id": 87,
+    "asset_id": 5214,
+    "category": "drawing",
+    "action": "retain source file; review public role"
+  },
+  {
+    "kind": "NON_DISPLAY_GALLERY_ASSET",
+    "legacy_product_id": 92,
+    "asset_id": 5145,
+    "category": "manual",
+    "action": "retain source file; review public role"
+  },
+  {
+    "kind": "NON_DISPLAY_GALLERY_ASSET",
+    "legacy_product_id": 92,
+    "asset_id": 5209,
+    "category": "drawing",
+    "action": "retain source file; review public role"
+  },
+  {
+    "kind": "NON_DISPLAY_GALLERY_ASSET",
+    "legacy_product_id": 92,
+    "asset_id": 5201,
+    "category": "brochure",
+    "action": "retain source file; review public role"
+  },
+  {
+    "kind": "NON_DISPLAY_GALLERY_ASSET",
+    "legacy_product_id": 92,
+    "asset_id": 5215,
+    "category": "drawing",
+    "action": "retain source file; review public role"
+  },
+  {
+    "kind": "NON_DISPLAY_GALLERY_ASSET",
+    "legacy_product_id": 128,
+    "asset_id": 4558,
+    "category": "brochure",
+    "action": "retain source file; review public role"
+  }
+]

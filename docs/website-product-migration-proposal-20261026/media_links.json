@@ -1,0 +1,4392 @@
+[
+  {
+    "legacy_product_id": 67,
+    "legacy_asset_id": 5221,
+    "category": "main_image",
+    "file_name": "image_20260803093458990.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4624,
+    "category": "detail_image",
+    "file_name": "20260621125308145_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4625,
+    "category": "detail_image",
+    "file_name": "20260621125308494_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4626,
+    "category": "detail_image",
+    "file_name": "20260621125308813_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4627,
+    "category": "detail_image",
+    "file_name": "20260621125309135_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4628,
+    "category": "detail_image",
+    "file_name": "20260621125309464_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4629,
+    "category": "detail_image",
+    "file_name": "20260621125335998_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4630,
+    "category": "detail_image",
+    "file_name": "20260621125336575_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4631,
+    "category": "detail_image",
+    "file_name": "20260621125336901_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4632,
+    "category": "detail_image",
+    "file_name": "20260621125337233_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4633,
+    "category": "detail_image",
+    "file_name": "20260621125337567_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4638,
+    "category": "main_image",
+    "file_name": "20260626175130756_42-利强手动片膜封口机（烤漆款）-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4639,
+    "category": "main_image",
+    "file_name": "20260626175131137_52-利强手动片膜封口机（烤漆款）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4640,
+    "category": "main_image",
+    "file_name": "20260626175131514_52-利强手动片膜封口机（烤漆款）-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4641,
+    "category": "main_image",
+    "file_name": "20260626175131894_26-利强手动片膜封口机（烤漆款）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4642,
+    "category": "main_image",
+    "file_name": "20260626175132255_26-利强手动片膜封口机（烤漆款）-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4643,
+    "category": "main_image",
+    "file_name": "20260626175132619_42-利强手动片膜封口机（烤漆款）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4644,
+    "category": "main_image",
+    "file_name": "20260626175156689_42-利强手动片膜封口机（烤漆款）-主图_03.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4647,
+    "category": "scene_image",
+    "file_name": "20260627101702244_52-利强手动片膜封口机（烤漆款）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4648,
+    "category": "scene_image",
+    "file_name": "20260627101702989_26-利强手动片膜封口机（烤漆款）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 4649,
+    "category": "scene_image",
+    "file_name": "20260627101703355_42-利强手动片膜封口机（烤漆款）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 65,
+    "legacy_asset_id": 5222,
+    "category": "main_image",
+    "file_name": "image_20260803154718710.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4650,
+    "category": "detail_image",
+    "file_name": "20260621113536655_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4651,
+    "category": "detail_image",
+    "file_name": "20260621113537242_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4652,
+    "category": "detail_image",
+    "file_name": "20260621113537568_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4653,
+    "category": "detail_image",
+    "file_name": "20260621113537893_未标题-132.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4654,
+    "category": "detail_image",
+    "file_name": "20260621113553740_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4655,
+    "category": "detail_image",
+    "file_name": "20260621113554065_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4656,
+    "category": "detail_image",
+    "file_name": "20260621113554389_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4657,
+    "category": "detail_image",
+    "file_name": "20260621113554718_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4658,
+    "category": "detail_image",
+    "file_name": "20260621113555055_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4659,
+    "category": "detail_image",
+    "file_name": "20260621113618883_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4660,
+    "category": "detail_image",
+    "file_name": "20260621113619470_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4661,
+    "category": "detail_image",
+    "file_name": "20260621113619791_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4662,
+    "category": "detail_image",
+    "file_name": "20260621113620119_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4663,
+    "category": "detail_image",
+    "file_name": "20260621124442935_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4664,
+    "category": "detail_image",
+    "file_name": "20260621124443534_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4665,
+    "category": "detail_image",
+    "file_name": "20260621124443865_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4666,
+    "category": "detail_image",
+    "file_name": "20260621124444188_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4667,
+    "category": "detail_image",
+    "file_name": "20260621124444514_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4668,
+    "category": "detail_image",
+    "file_name": "20260621124444840_323.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4669,
+    "category": "detail_image",
+    "file_name": "20260626180009503_101-利强手压半自动卷膜封口机（烤漆款）-主图_05.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4670,
+    "category": "detail_image",
+    "file_name": "20260626180009879_101-利强手压半自动卷膜封口机（烤漆款）-主图_04.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4671,
+    "category": "detail_image",
+    "file_name": "20260626180054527_77-利强手压半自动卷膜封口机（烤漆款）（带点洞）-主图_05.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4672,
+    "category": "main_image",
+    "file_name": "20260622164427157_20260621113619470_2.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4673,
+    "category": "main_image",
+    "file_name": "20260626175928899_102-利强手压半自动卷膜封口机（烤漆款）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4674,
+    "category": "main_image",
+    "file_name": "20260626175929268_60-利强手压半自动卷膜封口机（烤漆款）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4675,
+    "category": "main_image",
+    "file_name": "20260626175929630_60-利强手压半自动卷膜封口机（烤漆款）-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4676,
+    "category": "main_image",
+    "file_name": "20260626175929991_71-利强手压半自动卷膜封口机（烤漆款）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4677,
+    "category": "main_image",
+    "file_name": "20260626175930360_98-利强手压半自动卷膜封口机（烤漆款）-SKU_01_豆腐半自动封口机.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4678,
+    "category": "main_image",
+    "file_name": "20260626175930729_98-利强手压半自动卷膜封口机（烤漆款）-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4679,
+    "category": "main_image",
+    "file_name": "20260626175931086_99-利强手压半自动卷膜封口机（烤漆款）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4680,
+    "category": "main_image",
+    "file_name": "20260626175931455_99-利强手压半自动卷膜封口机（烤漆款）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4681,
+    "category": "main_image",
+    "file_name": "20260626175931908_100-利强手压半自动卷膜封口机（烤漆款）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4682,
+    "category": "main_image",
+    "file_name": "20260626175932283_101-利强手压半自动卷膜封口机（烤漆款）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4683,
+    "category": "main_image",
+    "file_name": "20260626175932666_102-利强手压半自动卷膜封口机（烤漆款）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4684,
+    "category": "main_image",
+    "file_name": "20260626180100657_77-利强手压半自动卷膜封口机（烤漆款）（带点洞）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4685,
+    "category": "main_image",
+    "file_name": "20260626180116335_96-利强手压半自动卷膜封口机（烤漆款）（铝箔膜）-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4686,
+    "category": "main_image",
+    "file_name": "20260626180117145_96-利强手压半自动卷膜封口机（烤漆款）（铝箔膜）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4689,
+    "category": "scene_image",
+    "file_name": "20260627101408519_102-利强手压半自动卷膜封口机（烤漆款）-image(1).png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4690,
+    "category": "scene_image",
+    "file_name": "20260627101409311_71-利强手压半自动卷膜封口机（烤漆款）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4691,
+    "category": "scene_image",
+    "file_name": "20260627101409665_99-利强手压半自动卷膜封口机（烤漆款）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4692,
+    "category": "scene_image",
+    "file_name": "20260627101410082_100-利强手压半自动卷膜封口机（烤漆款）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4693,
+    "category": "scene_image",
+    "file_name": "20260627101453478_60-利强手压半自动卷膜封口机（烤漆款）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4694,
+    "category": "scene_image",
+    "file_name": "20260627101523842_98-利强手压半自动卷膜封口机（烤漆款）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4695,
+    "category": "sku_image",
+    "file_name": "20260626175820293_103-利强手压半自动打码卷膜封口机（烤漆款）-主图_01.jpg",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 66,
+    "legacy_asset_id": 4696,
+    "category": "sku_image",
+    "file_name": "20260627101053289_103-利强手压半自动打码卷膜封口机（烤漆款）-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4742,
+    "category": "detail_image",
+    "file_name": "20260621125545925_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4743,
+    "category": "detail_image",
+    "file_name": "20260621125546508_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4744,
+    "category": "detail_image",
+    "file_name": "20260621125546834_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4745,
+    "category": "detail_image",
+    "file_name": "20260621125547163_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4746,
+    "category": "detail_image",
+    "file_name": "20260621125829787_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4747,
+    "category": "detail_image",
+    "file_name": "20260621125830118_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4748,
+    "category": "detail_image",
+    "file_name": "20260621125830444_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4749,
+    "category": "detail_image",
+    "file_name": "20260621125830771_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4750,
+    "category": "detail_image",
+    "file_name": "20260621125831093_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4751,
+    "category": "detail_image",
+    "file_name": "20260621130050331_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4752,
+    "category": "detail_image",
+    "file_name": "20260621130050670_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4753,
+    "category": "detail_image",
+    "file_name": "20260621130050995_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4754,
+    "category": "detail_image",
+    "file_name": "20260621130051328_6.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4755,
+    "category": "detail_image",
+    "file_name": "20260621130051660_未标题-1-恢复的-恢复的-恢复的.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4756,
+    "category": "detail_image",
+    "file_name": "20260621133906677_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4757,
+    "category": "detail_image",
+    "file_name": "20260621133907000_66.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4758,
+    "category": "detail_image",
+    "file_name": "20260621133907324_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4759,
+    "category": "detail_image",
+    "file_name": "20260621133907651_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4760,
+    "category": "detail_image",
+    "file_name": "20260626175412603_126-利强手推自动卷膜封口机（铝箔膜）-主图_05.png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4764,
+    "category": "main_image",
+    "file_name": "20260623170703926_20260621125547163_4.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4765,
+    "category": "main_image",
+    "file_name": "20260626175309955_123-利强手推自动卷膜封口机-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4766,
+    "category": "main_image",
+    "file_name": "20260626175310349_124-利强手推自动卷膜封口机-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4767,
+    "category": "main_image",
+    "file_name": "20260626175310717_124-利强手推自动卷膜封口机-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4768,
+    "category": "main_image",
+    "file_name": "20260626175311101_125-利强手推自动卷膜封口机-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4769,
+    "category": "main_image",
+    "file_name": "20260626175311474_111-利强手推自动卷膜封口机-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4771,
+    "category": "main_image",
+    "file_name": "20260626175312202_120-利强手推自动卷膜封口机-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4772,
+    "category": "main_image",
+    "file_name": "20260626175312580_120-利强手推自动卷膜封口机-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4773,
+    "category": "main_image",
+    "file_name": "20260626175358232_126-利强手推自动卷膜封口机（铝箔膜）-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4774,
+    "category": "main_image",
+    "file_name": "20260626175358619_126-利强手推自动卷膜封口机（铝箔膜）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4775,
+    "category": "main_image",
+    "file_name": "20260626175709763_160-利强手推自动片膜广口瓶封口机-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4776,
+    "category": "main_image",
+    "file_name": "20260626175712363_160-利强手推自动片膜广口瓶封口机-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4781,
+    "category": "scene_image",
+    "file_name": "125-利强手推自动卷膜封口机-主图_04.jpg",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4782,
+    "category": "scene_image",
+    "file_name": "128-利强手推自动卷膜封口机（气动）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4783,
+    "category": "scene_image",
+    "file_name": "20260626175734843_160-利强手推自动片膜广口瓶封口机-image(2).png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4784,
+    "category": "scene_image",
+    "file_name": "20260627101227329_111-利强手推自动卷膜封口机-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4785,
+    "category": "scene_image",
+    "file_name": "20260627101227698_128-利强手推自动卷膜封口机（气动）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4786,
+    "category": "scene_image",
+    "file_name": "20260627101241586_120-利强手推自动卷膜封口机-image(1).png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4787,
+    "category": "scene_image",
+    "file_name": "20260627101249497_123-利强手推自动卷膜封口机-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4788,
+    "category": "scene_image",
+    "file_name": "20260627101331870_160-利强手推自动片膜广口瓶封口机-image(1).png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4797,
+    "category": "sku_image",
+    "file_name": "120-利强手推自动卷膜封口机-SKU_31_150圆形手推自动封口机.jpg",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4800,
+    "category": "sku_image",
+    "file_name": "123-利强手推自动卷膜封口机-SKU_02_手推封口式封口机.jpg",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4801,
+    "category": "sku_image",
+    "file_name": "124-利强手推自动卷膜封口机-主图_01.jpg",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4802,
+    "category": "sku_image",
+    "file_name": "125-利强手推自动卷膜封口机-主图_01.jpg",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4804,
+    "category": "sku_image",
+    "file_name": "127-利强手推自动卷膜封口机（铝箔膜）-SKU_04_一出四手推托盘自动.jpg",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4805,
+    "category": "sku_image",
+    "file_name": "128-利强手推自动卷膜封口机（气动）-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 68,
+    "legacy_asset_id": 4806,
+    "category": "sku_image",
+    "file_name": "129-利强手推自动卷膜封口机（气动）-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 180,
+    "legacy_asset_id": 4616,
+    "category": "main_image",
+    "file_name": "20260626175515144_128-利强手推自动卷膜封口机（气动）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 180,
+    "legacy_asset_id": 4617,
+    "category": "main_image",
+    "file_name": "20260626175515781_128-利强手推自动卷膜封口机（气动）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 180,
+    "legacy_asset_id": 4618,
+    "category": "main_image",
+    "file_name": "20260626175521825_129-利强手推自动卷膜封口机（气动）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 180,
+    "legacy_asset_id": 4619,
+    "category": "main_image",
+    "file_name": "20260626175522458_129-利强手推自动卷膜封口机（气动）-image(2).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 180,
+    "legacy_asset_id": 4620,
+    "category": "scene_image",
+    "file_name": "20260627101310895_129-利强手推自动卷膜封口机（气动）-image(1).png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 180,
+    "legacy_asset_id": 5273,
+    "category": "main_image",
+    "file_name": "535a0dfe9cbe41056c56d54bb2500ea4_20260820162042703.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4854,
+    "category": "detail_image",
+    "file_name": "20260621105836643_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4855,
+    "category": "detail_image",
+    "file_name": "20260621105837223_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4856,
+    "category": "detail_image",
+    "file_name": "20260621105837549_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4857,
+    "category": "detail_image",
+    "file_name": "20260621105837879_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4858,
+    "category": "detail_image",
+    "file_name": "20260621105838210_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4859,
+    "category": "detail_image",
+    "file_name": "20260621105939220_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4860,
+    "category": "detail_image",
+    "file_name": "20260621105939551_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4861,
+    "category": "detail_image",
+    "file_name": "20260621105939887_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4862,
+    "category": "detail_image",
+    "file_name": "20260621105940214_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4863,
+    "category": "detail_image",
+    "file_name": "20260621105940541_421.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4864,
+    "category": "detail_image",
+    "file_name": "20260621124327218_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4865,
+    "category": "detail_image",
+    "file_name": "20260621124327806_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4866,
+    "category": "detail_image",
+    "file_name": "20260621124328133_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4867,
+    "category": "detail_image",
+    "file_name": "20260621124328460_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4868,
+    "category": "detail_image",
+    "file_name": "20260621125121396_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4869,
+    "category": "detail_image",
+    "file_name": "20260621125121730_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4870,
+    "category": "detail_image",
+    "file_name": "20260621125122060_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4871,
+    "category": "detail_image",
+    "file_name": "20260621125122385_8.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4872,
+    "category": "detail_image",
+    "file_name": "20260621125122714_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4873,
+    "category": "detail_image",
+    "file_name": "20260621125202880_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4874,
+    "category": "detail_image",
+    "file_name": "20260621125203470_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4875,
+    "category": "detail_image",
+    "file_name": "20260621125203798_22.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4876,
+    "category": "detail_image",
+    "file_name": "20260621125204123_88.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4877,
+    "category": "detail_image",
+    "file_name": "20260621125204451_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4878,
+    "category": "detail_image",
+    "file_name": "20260621133146124_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4879,
+    "category": "detail_image",
+    "file_name": "20260621133146455_8.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4880,
+    "category": "detail_image",
+    "file_name": "20260621133146784_未标题-1-恢复的-恢复的-恢复的.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4881,
+    "category": "detail_image",
+    "file_name": "20260621133147114_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4882,
+    "category": "detail_image",
+    "file_name": "20260621133147439_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4883,
+    "category": "detail_image",
+    "file_name": "20260621133147761_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4884,
+    "category": "detail_image",
+    "file_name": "20260623175817297_174-利强按钮自动卷膜封口机-image(3).png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4885,
+    "category": "detail_image",
+    "file_name": "20260623175907533_162-利强按钮自动卷膜封口机-image(3).png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4887,
+    "category": "main_image",
+    "file_name": "20260623171012359_20260621105836643_1.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4888,
+    "category": "main_image",
+    "file_name": "20260626105423014_162-利强按钮自动卷膜封口机-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4889,
+    "category": "main_image",
+    "file_name": "20260626105423386_162-利强按钮自动卷膜封口机-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4893,
+    "category": "scene_image",
+    "file_name": "20260627100919440_162-利强按钮自动卷膜封口机-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 72,
+    "legacy_asset_id": 4894,
+    "category": "scene_image",
+    "file_name": "20260627101005315_103-利强手压半自动打码卷膜封口机（烤漆款）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4808,
+    "category": "detail_image",
+    "file_name": "157-利强手推自动片膜封口机-image.png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4809,
+    "category": "detail_image",
+    "file_name": "158-利强手推自动片膜封口机-image.png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4810,
+    "category": "detail_image",
+    "file_name": "20260621122116995_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4811,
+    "category": "detail_image",
+    "file_name": "20260621122117582_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4812,
+    "category": "detail_image",
+    "file_name": "20260621122117909_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4813,
+    "category": "detail_image",
+    "file_name": "20260621122118251_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4814,
+    "category": "detail_image",
+    "file_name": "20260621122118588_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4815,
+    "category": "detail_image",
+    "file_name": "20260621133734193_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4816,
+    "category": "detail_image",
+    "file_name": "20260621133734780_2121.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4817,
+    "category": "detail_image",
+    "file_name": "20260621133735103_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4818,
+    "category": "detail_image",
+    "file_name": "20260621133735428_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4819,
+    "category": "detail_image",
+    "file_name": "20260621133735752_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4820,
+    "category": "main_image",
+    "file_name": "20260621133827754_4.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4821,
+    "category": "main_image",
+    "file_name": "20260626175619961_158-利强手推自动片膜封口机-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4822,
+    "category": "main_image",
+    "file_name": "20260626175620352_158-利强手推自动片膜封口机-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4823,
+    "category": "main_image",
+    "file_name": "20260626175620735_130-利强手推自动片膜封口机-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4824,
+    "category": "main_image",
+    "file_name": "20260626175621120_157-利强手推自动片膜封口机-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4825,
+    "category": "main_image",
+    "file_name": "20260626175621571_157-利强手推自动片膜封口机-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4827,
+    "category": "scene_image",
+    "file_name": "20260627101725115_157-利强手推自动片膜封口机-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4850,
+    "category": "sku_image",
+    "file_name": "157-利强手推自动片膜封口机-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4851,
+    "category": "sku_image",
+    "file_name": "158-利强手推自动片膜封口机-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4852,
+    "category": "sku_image",
+    "file_name": "159-利强手推自动片膜封口机-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 69,
+    "legacy_asset_id": 4853,
+    "category": "sku_image",
+    "file_name": "160-利强手推自动片膜广口瓶封口机-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4897,
+    "category": "detail_image",
+    "file_name": "20260621125701255_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4899,
+    "category": "detail_image",
+    "file_name": "20260621125701898_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4900,
+    "category": "detail_image",
+    "file_name": "20260621125950302_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4901,
+    "category": "detail_image",
+    "file_name": "20260621125950640_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4902,
+    "category": "detail_image",
+    "file_name": "20260621125950964_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4903,
+    "category": "detail_image",
+    "file_name": "20260621125951311_未标题-1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4908,
+    "category": "detail_image",
+    "file_name": "20260621133028841_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4909,
+    "category": "detail_image",
+    "file_name": "20260621133029435_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4910,
+    "category": "detail_image",
+    "file_name": "20260621133029762_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4911,
+    "category": "detail_image",
+    "file_name": "20260621133030090_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4912,
+    "category": "detail_image",
+    "file_name": "20260621133030417_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4921,
+    "category": "main_image",
+    "file_name": "20260621125730837_65.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4922,
+    "category": "main_image",
+    "file_name": "20260626153859451_182-利强按钮自动片膜封口机-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4923,
+    "category": "main_image",
+    "file_name": "20260626153900185_183-利强按钮自动片膜封口机-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4924,
+    "category": "main_image",
+    "file_name": "20260626153900564_182-利强按钮自动片膜封口机-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4929,
+    "category": "scene_image",
+    "file_name": "183-利强按钮自动片膜封口机-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4930,
+    "category": "sku_image",
+    "file_name": "178-利强按钮自动片膜封口机-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4931,
+    "category": "sku_image",
+    "file_name": "179-利强按钮自动片膜封口机-主图_01.jpg",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4932,
+    "category": "sku_image",
+    "file_name": "180-利强按钮自动片膜封口机-主图_02.jpg",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4933,
+    "category": "sku_image",
+    "file_name": "181-利强按钮自动片膜封口机-主图_02.jpg",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4934,
+    "category": "sku_image",
+    "file_name": "182-利强按钮自动片膜封口机-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4935,
+    "category": "sku_image",
+    "file_name": "183-利强按钮自动片膜封口机-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 73,
+    "legacy_asset_id": 4936,
+    "category": "sku_image",
+    "file_name": "184-利强按钮自动卷膜麻辣烫封口机-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 74,
+    "legacy_asset_id": 4937,
+    "category": "detail_image",
+    "file_name": "20260621134238203_22 (1).jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 74,
+    "legacy_asset_id": 4938,
+    "category": "detail_image",
+    "file_name": "20260621134238795_1212.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 74,
+    "legacy_asset_id": 4939,
+    "category": "detail_image",
+    "file_name": "20260621134239124_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 74,
+    "legacy_asset_id": 4940,
+    "category": "detail_image",
+    "file_name": "20260621134239450_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 74,
+    "legacy_asset_id": 4941,
+    "category": "detail_image",
+    "file_name": "20260621134239780_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 74,
+    "legacy_asset_id": 4942,
+    "category": "main_image",
+    "file_name": "20260621134243484_22 (1).jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 74,
+    "legacy_asset_id": 4943,
+    "category": "main_image",
+    "file_name": "20260626153815581_185-利强按钮自动卷膜麻辣烫封口机（烤漆款）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 74,
+    "legacy_asset_id": 4944,
+    "category": "main_image",
+    "file_name": "20260626153820417_185-利强按钮自动卷膜麻辣烫封口机（烤漆款）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 74,
+    "legacy_asset_id": 4945,
+    "category": "sku_image",
+    "file_name": "185-利强按钮自动卷膜麻辣烫封口机（烤漆款）-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 74,
+    "legacy_asset_id": 4946,
+    "category": "sku_image",
+    "file_name": "186-利强按钮自动卷膜封口机（黑白机）-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 75,
+    "legacy_asset_id": 4947,
+    "category": "detail_image",
+    "file_name": "20260621125037829_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 75,
+    "legacy_asset_id": 4948,
+    "category": "detail_image",
+    "file_name": "20260621125038424_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 75,
+    "legacy_asset_id": 4949,
+    "category": "detail_image",
+    "file_name": "20260621125038750_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 75,
+    "legacy_asset_id": 4950,
+    "category": "detail_image",
+    "file_name": "20260621125039077_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 75,
+    "legacy_asset_id": 4951,
+    "category": "detail_image",
+    "file_name": "20260621125039401_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 75,
+    "legacy_asset_id": 4952,
+    "category": "main_image",
+    "file_name": "20260621125045183_5.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 75,
+    "legacy_asset_id": 4953,
+    "category": "main_image",
+    "file_name": "20260626153754723_186-利强按钮自动卷膜封口机（黑白机）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 75,
+    "legacy_asset_id": 4954,
+    "category": "main_image",
+    "file_name": "20260626153755193_186-利强按钮自动卷膜封口机（黑白机）-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 77,
+    "legacy_asset_id": 4981,
+    "category": "detail_image",
+    "file_name": "20260621105759221_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 77,
+    "legacy_asset_id": 4982,
+    "category": "detail_image",
+    "file_name": "20260621105759817_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 77,
+    "legacy_asset_id": 4983,
+    "category": "detail_image",
+    "file_name": "20260621105800169_13.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 77,
+    "legacy_asset_id": 4984,
+    "category": "detail_image",
+    "file_name": "20260621105800501_14.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 77,
+    "legacy_asset_id": 4985,
+    "category": "detail_image",
+    "file_name": "20260621105800830_15.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 77,
+    "legacy_asset_id": 4987,
+    "category": "main_image",
+    "file_name": "20260622164408849_20260621105800501_14.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 77,
+    "legacy_asset_id": 4993,
+    "category": "scene_image",
+    "file_name": "20260627100906128_206-利强手动翻盖封口机（前后）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5008,
+    "category": "detail_image",
+    "file_name": "20260621124829670_4443.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5009,
+    "category": "detail_image",
+    "file_name": "20260621124829997_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5010,
+    "category": "detail_image",
+    "file_name": "20260621124830322_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5011,
+    "category": "detail_image",
+    "file_name": "20260621124830644_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5012,
+    "category": "detail_image",
+    "file_name": "20260621124830971_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5013,
+    "category": "detail_image",
+    "file_name": "20260621124831297_3131.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5014,
+    "category": "detail_image",
+    "file_name": "20260627092736849_222-利强台式韩国机-主图_03.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5015,
+    "category": "detail_image",
+    "file_name": "20260627092737491_222-利强台式韩国机-主图_04.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5016,
+    "category": "detail_image",
+    "file_name": "20260627092737848_222-利强台式韩国机-主图_05.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5017,
+    "category": "main_image",
+    "file_name": "20260621124857931_4443.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5018,
+    "category": "main_image",
+    "file_name": "20260627092659985_222-利强台式韩国机-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5019,
+    "category": "main_image",
+    "file_name": "20260627092700627_222-利强台式韩国机-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5025,
+    "category": "scene_image",
+    "file_name": "20260627100818730_222-利强台式韩国机-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 78,
+    "legacy_asset_id": 5026,
+    "category": "sku_image",
+    "file_name": "223-利强台式韩国机-SKU_02_方形机型.jpg",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 79,
+    "legacy_asset_id": 4525,
+    "category": "main_image",
+    "file_name": "226-利强自动封口贴标机（普通款）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 79,
+    "legacy_asset_id": 5027,
+    "category": "detail_image",
+    "file_name": "20260627100511040_224-利强自动封口贴标机（高速款）-image(4).png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 79,
+    "legacy_asset_id": 5028,
+    "category": "detail_image",
+    "file_name": "20260627100511671_224-利强自动封口贴标机（高速款）-image(2).png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 79,
+    "legacy_asset_id": 5029,
+    "category": "detail_image",
+    "file_name": "20260627100512076_224-利强自动封口贴标机（高速款）-image(3).png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 79,
+    "legacy_asset_id": 5031,
+    "category": "main_image",
+    "file_name": "20260627100355073_224-利强自动封口贴标机（高速款）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 79,
+    "legacy_asset_id": 5033,
+    "category": "scene_image",
+    "file_name": "20260627100854425_224-利强自动封口贴标机（高速款）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 70,
+    "legacy_asset_id": 4519,
+    "category": "scene_image",
+    "file_name": "161-利强自动封罐机-主图_03.jpg",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 70,
+    "legacy_asset_id": 4521,
+    "category": "main_image",
+    "file_name": "161-利强自动封罐机-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5053,
+    "category": "detail_image",
+    "file_name": "20260621130906967_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5054,
+    "category": "detail_image",
+    "file_name": "20260621130907288_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5055,
+    "category": "detail_image",
+    "file_name": "20260621130907620_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5056,
+    "category": "detail_image",
+    "file_name": "20260621130907948_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5057,
+    "category": "detail_image",
+    "file_name": "20260621130908271_111.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5058,
+    "category": "detail_image",
+    "file_name": "20260621130908595_222.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5059,
+    "category": "detail_image",
+    "file_name": "20260621131344668_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5060,
+    "category": "detail_image",
+    "file_name": "20260621131345001_43.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5061,
+    "category": "detail_image",
+    "file_name": "20260621131345330_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5062,
+    "category": "detail_image",
+    "file_name": "20260627093455717_231-利强台式气动卷膜封口机（3方）-image(4).png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5063,
+    "category": "main_image",
+    "file_name": "20260621130933236_1.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5064,
+    "category": "main_image",
+    "file_name": "20260627092834047_227-利强台式气动卷膜封口机（2电热）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5065,
+    "category": "main_image",
+    "file_name": "237-利强台式气动片膜封口机（6方）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5066,
+    "category": "main_image",
+    "file_name": "237-利强台式气动片膜封口机（6方）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5071,
+    "category": "scene_image",
+    "file_name": "20260627101949899_231-利强台式气动卷膜封口机（3方）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5072,
+    "category": "scene_image",
+    "file_name": "20260627102005983_230-利强台式气动卷膜封口机（4方）-image(1).png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5073,
+    "category": "scene_image",
+    "file_name": "20260627102010799_232-利强台式气动卷膜封口机（6方）（山楂鱼）-image(1).png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 82,
+    "legacy_asset_id": 5074,
+    "category": "scene_image",
+    "file_name": "20260627102015769_237-利强台式气动片膜封口机（6方）-image(1).png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 83,
+    "legacy_asset_id": 5091,
+    "category": "main_image",
+    "file_name": "20260621131151888_3.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 88,
+    "legacy_asset_id": 4535,
+    "category": "main_image",
+    "file_name": "248-利强推杆式气动连续封口机（450）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 88,
+    "legacy_asset_id": 4536,
+    "category": "main_image",
+    "file_name": "248-利强推杆式气动连续封口机（450）-image(2).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 88,
+    "legacy_asset_id": 4537,
+    "category": "main_image",
+    "file_name": "248-利强推杆式气动连续封口机（450）-image(3).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 88,
+    "legacy_asset_id": 4538,
+    "category": "main_image",
+    "file_name": "248-利强推杆式气动连续封口机（450）-image(4).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 88,
+    "legacy_asset_id": 4539,
+    "category": "main_image",
+    "file_name": "248-利强推杆式气动连续封口机（450）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 88,
+    "legacy_asset_id": 5107,
+    "category": "detail_image",
+    "file_name": "20260627095847424_248-利强推杆式气动连续封口机（450）-image(2).png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 88,
+    "legacy_asset_id": 5108,
+    "category": "main_image",
+    "file_name": "20260627095751457_247-利强推杆式气动充氧封口机-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 88,
+    "legacy_asset_id": 5109,
+    "category": "main_image",
+    "file_name": "20260627095752102_247-利强推杆式气动充氧封口机-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 89,
+    "legacy_asset_id": 5110,
+    "category": "detail_image",
+    "file_name": "20260627173143933_DSC01426-拷贝.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 89,
+    "legacy_asset_id": 5111,
+    "category": "detail_image",
+    "file_name": "20260627173144520_DSC01428-拷贝.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 89,
+    "legacy_asset_id": 5112,
+    "category": "detail_image",
+    "file_name": "20260627173144844_DSC01429-拷贝.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 89,
+    "legacy_asset_id": 5113,
+    "category": "detail_image",
+    "file_name": "20260627173145175_DSC01433-拷贝.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 89,
+    "legacy_asset_id": 5114,
+    "category": "detail_image",
+    "file_name": "20260627173145498_DSC01435-拷贝.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 89,
+    "legacy_asset_id": 5115,
+    "category": "detail_image",
+    "file_name": "20260627173145828_DSC01437-拷贝.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 89,
+    "legacy_asset_id": 5116,
+    "category": "detail_image",
+    "file_name": "20260627173146147_未标题-1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 89,
+    "legacy_asset_id": 5117,
+    "category": "detail_image",
+    "file_name": "20260627173146470_未标题-3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 89,
+    "legacy_asset_id": 5118,
+    "category": "detail_image",
+    "file_name": "20260627173146793_未标题-11.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 89,
+    "legacy_asset_id": 5119,
+    "category": "main_image",
+    "file_name": "20260627173136590_未标题-3.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 181,
+    "legacy_asset_id": 4621,
+    "category": "main_image",
+    "file_name": "20260626180414464_251-利强台式电动气流包装机（充氮充氧）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 181,
+    "legacy_asset_id": 4622,
+    "category": "main_image",
+    "file_name": "20260626180436020_251-利强台式电动气流包装机（充氮充氧）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 90,
+    "legacy_asset_id": 5121,
+    "category": "main_image",
+    "file_name": "20260626180157694_249-利强台式电动气调包装机（电动台式（PLC））-image(3).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 90,
+    "legacy_asset_id": 5122,
+    "category": "main_image",
+    "file_name": "20260626180205363_249-利强台式电动气调包装机（电动台式（PLC））-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 90,
+    "legacy_asset_id": 5123,
+    "category": "main_image",
+    "file_name": "20260626180347808_251-利强台式电动气流包装机（充氮充氧）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 90,
+    "legacy_asset_id": 5124,
+    "category": "main_image",
+    "file_name": "251-利强台式电动气流包装机（充氮充氧）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 90,
+    "legacy_asset_id": 5125,
+    "category": "main_image",
+    "file_name": "251-利强台式电动气流包装机（充氮充氧）-image(2).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 90,
+    "legacy_asset_id": 5126,
+    "category": "main_image",
+    "file_name": "251-利强台式电动气流包装机（充氮充氧）-image(3).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 90,
+    "legacy_asset_id": 5127,
+    "category": "main_image",
+    "file_name": "251-利强台式电动气流包装机（充氮充氧）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 90,
+    "legacy_asset_id": 5129,
+    "category": "scene_image",
+    "file_name": "20260627101905256_249-利强台式电动气调包装机（电动台式（PLC））-image(1).png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 76,
+    "legacy_asset_id": 4962,
+    "category": "main_image",
+    "file_name": "20260621132004774_3.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 76,
+    "legacy_asset_id": 4963,
+    "category": "scene_image",
+    "file_name": "20260627102049792_187-利强自吸片膜封口机-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 76,
+    "legacy_asset_id": 4979,
+    "category": "sku_image",
+    "file_name": "205-利强自吸片膜封口机-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 175,
+    "legacy_asset_id": 4595,
+    "category": "detail_image",
+    "file_name": "20260621132125043_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 175,
+    "legacy_asset_id": 4596,
+    "category": "detail_image",
+    "file_name": "20260621132125373_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 175,
+    "legacy_asset_id": 4597,
+    "category": "detail_image",
+    "file_name": "20260621132125699_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 175,
+    "legacy_asset_id": 4598,
+    "category": "detail_image",
+    "file_name": "20260621132126021_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 175,
+    "legacy_asset_id": 4599,
+    "category": "detail_image",
+    "file_name": "20260621132126348_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 175,
+    "legacy_asset_id": 4600,
+    "category": "detail_image",
+    "file_name": "20260621132126682_6.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 175,
+    "legacy_asset_id": 4601,
+    "category": "main_image",
+    "file_name": "20260621132132808_1.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 175,
+    "legacy_asset_id": 4602,
+    "category": "main_image",
+    "file_name": "20260627100539398_205-利强自吸片膜封口机-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 175,
+    "legacy_asset_id": 4603,
+    "category": "main_image",
+    "file_name": "20260627100539761_187-利强自吸片膜封口机-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 175,
+    "legacy_asset_id": 4604,
+    "category": "main_image",
+    "file_name": "20260627100540104_205-利强自吸片膜封口机-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5161,
+    "category": "detail_image",
+    "file_name": "20260621130408463_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5162,
+    "category": "detail_image",
+    "file_name": "20260621130409055_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5163,
+    "category": "detail_image",
+    "file_name": "20260621130409375_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5164,
+    "category": "detail_image",
+    "file_name": "20260621130409702_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5165,
+    "category": "detail_image",
+    "file_name": "20260621130410026_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5166,
+    "category": "detail_image",
+    "file_name": "20260621130410355_555.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5167,
+    "category": "detail_image",
+    "file_name": "20260621132307873_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5168,
+    "category": "detail_image",
+    "file_name": "20260621132308197_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5169,
+    "category": "detail_image",
+    "file_name": "20260621132308541_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5170,
+    "category": "detail_image",
+    "file_name": "20260621132308865_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5171,
+    "category": "detail_image",
+    "file_name": "20260621132309190_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5172,
+    "category": "detail_image",
+    "file_name": "20260621132309515_7.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5173,
+    "category": "detail_image",
+    "file_name": "20260621132309839_34.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5174,
+    "category": "main_image",
+    "file_name": "20260621130426111_555.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5175,
+    "category": "main_image",
+    "file_name": "20260626154138743_264-利强立式贴体包装机（LQ330）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5176,
+    "category": "main_image",
+    "file_name": "20260626154139126_264-利强立式贴体包装机（LQ330）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5180,
+    "category": "sku_image",
+    "file_name": "264-利强立式贴体包装机（LQ330）-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 95,
+    "legacy_asset_id": 5181,
+    "category": "sku_image",
+    "file_name": "266-利强立式贴体包装机（LQ450）-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 96,
+    "legacy_asset_id": 5182,
+    "category": "detail_image",
+    "file_name": "20260621132815329_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 96,
+    "legacy_asset_id": 5183,
+    "category": "detail_image",
+    "file_name": "20260621132815657_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 96,
+    "legacy_asset_id": 5184,
+    "category": "detail_image",
+    "file_name": "20260621132815984_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 96,
+    "legacy_asset_id": 5185,
+    "category": "detail_image",
+    "file_name": "20260621132816307_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 96,
+    "legacy_asset_id": 5186,
+    "category": "detail_image",
+    "file_name": "20260621132816628_55.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 96,
+    "legacy_asset_id": 5187,
+    "category": "main_image",
+    "file_name": "20260621132827456_55.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 80,
+    "legacy_asset_id": 5034,
+    "category": "detail_image",
+    "file_name": "20260621132504878_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 80,
+    "legacy_asset_id": 5035,
+    "category": "detail_image",
+    "file_name": "20260621132505474_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 80,
+    "legacy_asset_id": 5036,
+    "category": "detail_image",
+    "file_name": "20260621132505801_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 80,
+    "legacy_asset_id": 5037,
+    "category": "detail_image",
+    "file_name": "20260621132506128_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 80,
+    "legacy_asset_id": 5038,
+    "category": "detail_image",
+    "file_name": "20260621132506456_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 80,
+    "legacy_asset_id": 5039,
+    "category": "detail_image",
+    "file_name": "20260621132506786_7.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 80,
+    "legacy_asset_id": 5040,
+    "category": "detail_image",
+    "file_name": "20260621132507110_34.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 80,
+    "legacy_asset_id": 5041,
+    "category": "main_image",
+    "file_name": "20260621132512002_3.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 178,
+    "legacy_asset_id": 4613,
+    "category": "main_image",
+    "file_name": "20260623192007179_WPS图片.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 81,
+    "legacy_asset_id": 5042,
+    "category": "detail_image",
+    "file_name": "20260621131232273_6.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 81,
+    "legacy_asset_id": 5043,
+    "category": "detail_image",
+    "file_name": "20260621131232863_7.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 81,
+    "legacy_asset_id": 5044,
+    "category": "detail_image",
+    "file_name": "20260621131233188_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 81,
+    "legacy_asset_id": 5045,
+    "category": "detail_image",
+    "file_name": "20260621131233515_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 81,
+    "legacy_asset_id": 5046,
+    "category": "detail_image",
+    "file_name": "20260621131233838_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 81,
+    "legacy_asset_id": 5047,
+    "category": "detail_image",
+    "file_name": "20260621131234162_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 81,
+    "legacy_asset_id": 5048,
+    "category": "detail_image",
+    "file_name": "20260621131234485_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 81,
+    "legacy_asset_id": 5049,
+    "category": "main_image",
+    "file_name": "20260627095645724_235-利强台式气动双工位卷膜封口机（4方）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 81,
+    "legacy_asset_id": 5050,
+    "category": "main_image",
+    "file_name": "235-利强台式气动双工位卷膜封口机（4方）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 81,
+    "legacy_asset_id": 5052,
+    "category": "sku_image",
+    "file_name": "236-利强台式气动打码卷膜封口机（4方）-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 91,
+    "legacy_asset_id": 5130,
+    "category": "detail_image",
+    "file_name": "20260621132729744_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 91,
+    "legacy_asset_id": 5131,
+    "category": "detail_image",
+    "file_name": "20260621132730337_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 91,
+    "legacy_asset_id": 5132,
+    "category": "detail_image",
+    "file_name": "20260621132730665_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 91,
+    "legacy_asset_id": 5133,
+    "category": "detail_image",
+    "file_name": "20260621132730997_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 91,
+    "legacy_asset_id": 5134,
+    "category": "detail_image",
+    "file_name": "20260621132731336_111.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 91,
+    "legacy_asset_id": 5135,
+    "category": "detail_image",
+    "file_name": "20260621132731665_未标题-1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 91,
+    "legacy_asset_id": 5136,
+    "category": "main_image",
+    "file_name": "20260621132736837_111.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 91,
+    "legacy_asset_id": 5137,
+    "category": "main_image",
+    "file_name": "20260626174932487_253-利强全自动气调卷膜封口机-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 91,
+    "legacy_asset_id": 5138,
+    "category": "main_image",
+    "file_name": "20260626174932842_253-利强全自动气调卷膜封口机-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 91,
+    "legacy_asset_id": 5139,
+    "category": "sku_image",
+    "file_name": "253-利强全自动气调卷膜封口机-image.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 91,
+    "legacy_asset_id": 5140,
+    "category": "sku_image",
+    "file_name": "254-利强连续式全自动气调卷膜封口机（气调保鲜版）280L-SKU_01_包装机一出一.jpg",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 110,
+    "legacy_asset_id": 4548,
+    "category": "detail_image",
+    "file_name": "20260617150238376-1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 110,
+    "legacy_asset_id": 4549,
+    "category": "detail_image",
+    "file_name": "20260617150238701-2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 110,
+    "legacy_asset_id": 4550,
+    "category": "detail_image",
+    "file_name": "20260617150239036-3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 110,
+    "legacy_asset_id": 4551,
+    "category": "detail_image",
+    "file_name": "20260617150239359-4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 110,
+    "legacy_asset_id": 4552,
+    "category": "detail_image",
+    "file_name": "20260617150239682-5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 110,
+    "legacy_asset_id": 5265,
+    "category": "main_image",
+    "file_name": "image_20260820161130691.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 84,
+    "legacy_asset_id": 4528,
+    "category": "main_image",
+    "file_name": "239-利强全自动转盘式封口机（4工位）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 84,
+    "legacy_asset_id": 4529,
+    "category": "main_image",
+    "file_name": "239-利强全自动转盘式封口机（4工位）-image(2).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 84,
+    "legacy_asset_id": 4530,
+    "category": "main_image",
+    "file_name": "239-利强全自动转盘式封口机（4工位）-image(3).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 84,
+    "legacy_asset_id": 4531,
+    "category": "main_image",
+    "file_name": "239-利强全自动转盘式封口机（4工位）-image(4).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 84,
+    "legacy_asset_id": 4532,
+    "category": "main_image",
+    "file_name": "239-利强全自动转盘式封口机（4工位）-image(5).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 84,
+    "legacy_asset_id": 5094,
+    "category": "main_image",
+    "file_name": "20260627100004000_238-利强转盘式封口机（5工位）（小）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 84,
+    "legacy_asset_id": 5095,
+    "category": "scene_image",
+    "file_name": "20260627102030010_238-利强转盘式封口机（5工位）（小）-image.png",
+    "proposed_role": "SCENE",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5103,
+    "category": "drawing",
+    "file_name": "20260625161446738_244-利强自动定量灌装转盘式封口机-全自动圆盘式灌装封口机示意图.PDF",
+    "proposed_role": "DOCUMENT",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5104,
+    "category": "main_image",
+    "file_name": "20260621131850601_1.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5105,
+    "category": "main_image",
+    "file_name": "20260627100307725_245-利强自动定量灌装转盘式封口机-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5106,
+    "category": "main_image",
+    "file_name": "20260627100308089_244-利强自动定量灌装转盘式封口机-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5212,
+    "category": "drawing",
+    "file_name": "圆盘机部件示意图_20260724102956764.psd",
+    "proposed_role": "DOCUMENT",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5213,
+    "category": "drawing",
+    "file_name": "圆盘机部件示意图-英文版_20260724102957357.jpg",
+    "proposed_role": "DOCUMENT",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5214,
+    "category": "drawing",
+    "file_name": "全自动圆盘式灌装封口机示意图-1_20260724102957693.jpg",
+    "proposed_role": "DOCUMENT",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5223,
+    "category": "main_image",
+    "file_name": "20260621131838209_未标题-177_20260806093519269.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5224,
+    "category": "detail_image",
+    "file_name": "20260621131830497_4_20260806093633746.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5225,
+    "category": "detail_image",
+    "file_name": "20260621131828600_5_20260806093634374.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5226,
+    "category": "detail_image",
+    "file_name": "20260621131829195_未标题-177_20260806093634729.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5227,
+    "category": "detail_image",
+    "file_name": "20260621131829520_1_20260806093635089.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5228,
+    "category": "detail_image",
+    "file_name": "20260621131829846_2_20260806093635447.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 87,
+    "legacy_asset_id": 5229,
+    "category": "detail_image",
+    "file_name": "20260621131830175_3_20260806093635803.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 171,
+    "legacy_asset_id": 4580,
+    "category": "detail_image",
+    "file_name": "20260621130244658_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 171,
+    "legacy_asset_id": 4581,
+    "category": "detail_image",
+    "file_name": "20260621130245254_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 171,
+    "legacy_asset_id": 4582,
+    "category": "detail_image",
+    "file_name": "20260621130245577_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 171,
+    "legacy_asset_id": 4583,
+    "category": "detail_image",
+    "file_name": "20260621130245916_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 171,
+    "legacy_asset_id": 4584,
+    "category": "detail_image",
+    "file_name": "20260621130246241_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 171,
+    "legacy_asset_id": 4585,
+    "category": "detail_image",
+    "file_name": "20260621130246572_6.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 171,
+    "legacy_asset_id": 4586,
+    "category": "detail_image",
+    "file_name": "20260621130246904_3232.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 171,
+    "legacy_asset_id": 4587,
+    "category": "main_image",
+    "file_name": "20260621130504088_5.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 176,
+    "legacy_asset_id": 4606,
+    "category": "main_image",
+    "file_name": "20260627172929926_image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 5982,
+    "legacy_asset_id": 5203,
+    "category": "main_image",
+    "file_name": "image_20260723173017485.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 92,
+    "legacy_asset_id": 5141,
+    "category": "detail_image",
+    "file_name": "255-利强连续式全自动气调卷膜封口机（气调保鲜版）280L-image.png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 92,
+    "legacy_asset_id": 5143,
+    "category": "main_image",
+    "file_name": "256-利强连续式全自动气调卷膜封口机（气调保鲜版）280L-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 92,
+    "legacy_asset_id": 5144,
+    "category": "main_image",
+    "file_name": "256-利强连续式全自动气调卷膜封口机（气调保鲜版）280L-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 92,
+    "legacy_asset_id": 5145,
+    "category": "manual",
+    "file_name": "750全自动进盒生产线.PDF",
+    "proposed_role": "DOCUMENT",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 92,
+    "legacy_asset_id": 5209,
+    "category": "drawing",
+    "file_name": "全自动连续式生产线示意图_20260724100359953.PDF",
+    "proposed_role": "DOCUMENT",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 92,
+    "legacy_asset_id": 5201,
+    "category": "brochure",
+    "file_name": "图9_第9页_Liqiang-catalog浙江利强产品目录_20260721162236162.jpg",
+    "proposed_role": "DOCUMENT",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 92,
+    "legacy_asset_id": 5215,
+    "category": "drawing",
+    "file_name": "LQ1L-750B.0 总装图图纸_20260724103045098.pdf",
+    "proposed_role": "DOCUMENT",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 92,
+    "legacy_asset_id": 5202,
+    "category": "main_image",
+    "file_name": "image_20260721162347170.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 179,
+    "legacy_asset_id": 4614,
+    "category": "main_image",
+    "file_name": "20260626174220688_256-利强连续式全自动气调卷膜封口机（气调保鲜版）280L-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 179,
+    "legacy_asset_id": 4615,
+    "category": "main_image",
+    "file_name": "20260626174259299_256-利强连续式全自动气调卷膜封口机（气调保鲜版）280L-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 170,
+    "legacy_asset_id": 4575,
+    "category": "main_image",
+    "file_name": "20260618151419701_257-利强全自动流水线气调保鲜机（LQ380A）（气流置换）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 170,
+    "legacy_asset_id": 4577,
+    "category": "main_image",
+    "file_name": "257-利强全自动流水线气调保鲜机（LQ380A）（气流置换）-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 170,
+    "legacy_asset_id": 5193,
+    "category": "main_image",
+    "file_name": "20260618151226414_257-利强全自动流水线气调保鲜机（LQ380A）（气流置换）-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 147,
+    "legacy_asset_id": 4571,
+    "category": "main_image",
+    "file_name": "20260627173017301_image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 147,
+    "legacy_asset_id": 4572,
+    "category": "main_image",
+    "file_name": "20260627173033699_image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 177,
+    "legacy_asset_id": 4607,
+    "category": "main_image",
+    "file_name": "20260627172814624_image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 177,
+    "legacy_asset_id": 4608,
+    "category": "main_image",
+    "file_name": "20260627172830524_image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 93,
+    "legacy_asset_id": 5151,
+    "category": "detail_image",
+    "file_name": "261-利强全自动连续式封口机（LQ750）（4方）-image(3).png",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 93,
+    "legacy_asset_id": 5153,
+    "category": "main_image",
+    "file_name": "261-利强全自动连续式封口机（LQ750）（4方）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 93,
+    "legacy_asset_id": 5154,
+    "category": "main_image",
+    "file_name": "261-利强全自动连续式封口机（LQ750）（4方）-image(2).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 94,
+    "legacy_asset_id": 4543,
+    "category": "main_image",
+    "file_name": "262-利强全自动连续式封口机（LQ750）（12方）-image(1).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 94,
+    "legacy_asset_id": 4544,
+    "category": "main_image",
+    "file_name": "262-利强全自动连续式封口机（LQ750）（12方）-image(2).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 94,
+    "legacy_asset_id": 4545,
+    "category": "main_image",
+    "file_name": "262-利强全自动连续式封口机（LQ750）（12方）-image(3).png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 94,
+    "legacy_asset_id": 4546,
+    "category": "main_image",
+    "file_name": "262-利强全自动连续式封口机（LQ750）（12方）-image.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 85,
+    "legacy_asset_id": 5096,
+    "category": "main_image",
+    "file_name": "243-利强连续式封口机-主图_01.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 85,
+    "legacy_asset_id": 5097,
+    "category": "main_image",
+    "file_name": "243-利强连续式封口机-主图_02.jpg",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 128,
+    "legacy_asset_id": 4558,
+    "category": "brochure",
+    "file_name": "20260618104431003_LQ-A14-F6 自动称重灌装封口机.PNG",
+    "proposed_role": "DOCUMENT",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 128,
+    "legacy_asset_id": 4559,
+    "category": "detail_image",
+    "file_name": "20260618101443258_1.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 128,
+    "legacy_asset_id": 4560,
+    "category": "detail_image",
+    "file_name": "20260618101443609_2.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 128,
+    "legacy_asset_id": 4561,
+    "category": "detail_image",
+    "file_name": "20260618101444204_3.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 128,
+    "legacy_asset_id": 4562,
+    "category": "detail_image",
+    "file_name": "20260618101444536_4.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 128,
+    "legacy_asset_id": 4563,
+    "category": "detail_image",
+    "file_name": "20260618101444862_5.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 128,
+    "legacy_asset_id": 4564,
+    "category": "detail_image",
+    "file_name": "20260618101445194_6.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 128,
+    "legacy_asset_id": 4565,
+    "category": "detail_image",
+    "file_name": "20260618101445531_7.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 128,
+    "legacy_asset_id": 4566,
+    "category": "detail_image",
+    "file_name": "20260618101445852_5555.jpg",
+    "proposed_role": "DETAIL",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 128,
+    "legacy_asset_id": 4567,
+    "category": "main_image",
+    "file_name": "20260618102926673__DSC3072-1.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 128,
+    "legacy_asset_id": 4568,
+    "category": "sku_image",
+    "file_name": "20260621102939681__DSC3072-1.png",
+    "proposed_role": "GALLERY",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": false,
+    "selected_by_current_list_card": false
+  },
+  {
+    "legacy_product_id": 5983,
+    "legacy_asset_id": 5205,
+    "category": "main_image",
+    "file_name": "image_20260723173300633.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  },
+  {
+    "legacy_product_id": 5984,
+    "legacy_asset_id": 5234,
+    "category": "main_image",
+    "file_name": "image_20260810152328946.png",
+    "proposed_role": "HERO",
+    "sort_order": 0,
+    "selected_by_current_detail_gallery": true,
+    "selected_by_current_list_card": true
+  }
+]

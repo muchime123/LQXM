@@ -1,0 +1,127 @@
+{
+  "flyway_versions": [
+    {
+      "version": "411",
+      "success": 1
+    },
+    {
+      "version": "413",
+      "success": 1
+    },
+    {
+      "version": "417",
+      "success": 1
+    }
+  ],
+  "banners": [
+    {
+      "id": 2,
+      "position": "ANNOUNCEMENT",
+      "website_enabled": true,
+      "start_date": null,
+      "end_date": null,
+      "deleted": false,
+      "image_asset_id": null,
+      "image_url": null,
+      "source_kind": "none",
+      "source_filename": null,
+      "files": []
+    },
+    {
+      "id": 3,
+      "position": "HERO",
+      "website_enabled": true,
+      "start_date": null,
+      "end_date": null,
+      "deleted": true,
+      "image_asset_id": null,
+      "image_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgzKV8yMDI2MDgyMDA5MTEzOTA2MS5wbmc",
+      "source_kind": "local_company",
+      "source_filename": "ChatGPT Image 2026年8月20日 09_10_33 (3)_20260820091139061.png",
+      "files": [
+        {
+          "relative_path": "company/website_media/ChatGPT Image 2026年8月20日 09_10_33 (3)_20260820091139061.png",
+          "size_bytes": 1477850,
+          "sha256": "ddf8c0feb5677816ae2574da1f7927ec44bf6f370439693a4b498549c0b9ba76"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "position": "HERO",
+      "website_enabled": true,
+      "start_date": null,
+      "end_date": null,
+      "deleted": false,
+      "image_asset_id": null,
+      "image_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgyKV8yMDI2MDgyMDA5MTEzODczNy5wbmc",
+      "source_kind": "local_company",
+      "source_filename": "ChatGPT Image 2026年8月20日 09_10_33 (2)_20260820091138737.png",
+      "files": [
+        {
+          "relative_path": "company/website_media/ChatGPT Image 2026年8月20日 09_10_33 (2)_20260820091138737.png",
+          "size_bytes": 1535013,
+          "sha256": "b0004abd6d401569c6787488bde196308cc61278c02a1e239d3d2b522f9fddee"
+        }
+      ]
+    },
+    {
+      "id": 5,
+      "position": "HERO",
+      "website_enabled": true,
+      "start_date": null,
+      "end_date": null,
+      "deleted": false,
+      "image_asset_id": null,
+      "image_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgxKV8yMDI2MDgyMDA5MTEzODQwNC5wbmc",
+      "source_kind": "local_company",
+      "source_filename": "ChatGPT Image 2026年8月20日 09_10_33 (1)_20260820091138404.png",
+      "files": [
+        {
+          "relative_path": "company/website_media/ChatGPT Image 2026年8月20日 09_10_33 (1)_20260820091138404.png",
+          "size_bytes": 1571521,
+          "sha256": "d4df1f129689737dd3c3b457b0d61da0983d5af7d554c4d9ae96fca10af8acb4"
+        }
+      ]
+    },
+    {
+      "id": 6,
+      "position": "HERO",
+      "website_enabled": false,
+      "start_date": null,
+      "end_date": null,
+      "deleted": true,
+      "image_asset_id": null,
+      "image_url": "",
+      "source_kind": "none",
+      "source_filename": null,
+      "files": []
+    },
+    {
+      "id": 7,
+      "position": "HERO",
+      "website_enabled": false,
+      "start_date": null,
+      "end_date": null,
+      "deleted": true,
+      "image_asset_id": null,
+      "image_url": "",
+      "source_kind": "none",
+      "source_filename": null,
+      "files": []
+    },
+    {
+      "id": 8,
+      "position": "HERO",
+      "website_enabled": false,
+      "start_date": null,
+      "end_date": null,
+      "deleted": true,
+      "image_asset_id": null,
+      "image_url": "",
+      "source_kind": "none",
+      "source_filename": null,
+      "files": []
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "ready_for_runtime_cutover_test": false,
+  "checks": [
+    {
+      "banner_id": 4,
+      "website_media_id": 2,
+      "sha256": "b0004abd6d401569c6787488bde196308cc61278c02a1e239d3d2b522f9fddee",
+      "bytes": 1535013,
+      "legacy_url_unchanged": null
+    },
+    {
+      "banner_id": 5,
+      "website_media_id": 3,
+      "sha256": "d4df1f129689737dd3c3b457b0d61da0983d5af7d554c4d9ae96fca10af8acb4",
+      "bytes": 1571521,
+      "legacy_url_unchanged": null
+    }
+  ],
+  "issues": [
+    "public API unavailable: [WinError 10061] 由于目标计算机积极拒绝，无法连接。"
+  ]
+}

@@ -1,0 +1,47 @@
+{
+  "banners": [
+    {
+      "banner_id": 2,
+      "status": "no_image"
+    },
+    {
+      "banner_id": 3,
+      "legacy_source": "company/website_media/ChatGPT Image 2026年8月20日 09_10_33 (3)_20260820091139061.png",
+      "storage_key": "website/images/ddf8c0feb5677816ae2574da1f7927ec44bf6f370439693a4b498549c0b9ba76.png",
+      "sha256": "ddf8c0feb5677816ae2574da1f7927ec44bf6f370439693a4b498549c0b9ba76",
+      "size_bytes": 1477850,
+      "copy_status": "copied",
+      "status": "historical_draft"
+    },
+    {
+      "banner_id": 4,
+      "legacy_source": "company/website_media/ChatGPT Image 2026年8月20日 09_10_33 (2)_20260820091138737.png",
+      "storage_key": "website/images/b0004abd6d401569c6787488bde196308cc61278c02a1e239d3d2b522f9fddee.png",
+      "sha256": "b0004abd6d401569c6787488bde196308cc61278c02a1e239d3d2b522f9fddee",
+      "size_bytes": 1535013,
+      "copy_status": "copied",
+      "status": "public_candidate"
+    },
+    {
+      "banner_id": 5,
+      "legacy_source": "company/website_media/ChatGPT Image 2026年8月20日 09_10_33 (1)_20260820091138404.png",
+      "storage_key": "website/images/d4df1f129689737dd3c3b457b0d61da0983d5af7d554c4d9ae96fca10af8acb4.png",
+      "sha256": "d4df1f129689737dd3c3b457b0d61da0983d5af7d554c4d9ae96fca10af8acb4",
+      "size_bytes": 1571521,
+      "copy_status": "copied",
+      "status": "public_candidate"
+    },
+    {
+      "banner_id": 6,
+      "status": "no_image"
+    },
+    {
+      "banner_id": 7,
+      "status": "no_image"
+    },
+    {
+      "banner_id": 8,
+      "status": "no_image"
+    }
+  ]
+}

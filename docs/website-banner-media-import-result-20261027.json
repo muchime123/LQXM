@@ -1,0 +1,23 @@
+{
+  "applied": true,
+  "media": [
+    {
+      "banner_id": 3,
+      "storage_key": "website/images/ddf8c0feb5677816ae2574da1f7927ec44bf6f370439693a4b498549c0b9ba76.png",
+      "website_media_id": 1,
+      "status": "DRAFT"
+    },
+    {
+      "banner_id": 4,
+      "storage_key": "website/images/b0004abd6d401569c6787488bde196308cc61278c02a1e239d3d2b522f9fddee.png",
+      "website_media_id": 2,
+      "status": "DRAFT"
+    },
+    {
+      "banner_id": 5,
+      "storage_key": "website/images/d4df1f129689737dd3c3b457b0d61da0983d5af7d554c4d9ae96fca10af8acb4.png",
+      "website_media_id": 3,
+      "status": "DRAFT"
+    }
+  ]
+}
