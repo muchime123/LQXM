@@ -181,6 +181,13 @@ const DEFAULT_VIEW_MODE_OPTIONS: ToolbarViewModeOption[] = [
 const props = withDefaults(
   defineProps<{
     searchPlaceholder?: string
+    /**
+     * 输入即搜（防抖）开关。
+     * @deprecated 旧 API，新调用方请改用 `searchMode`（'debounce' | 'submit'）。
+     * B4 复核（2026-10-28）：全仓无任何调用方显式传入该属性（既无 `searchOnInput`
+     * 也无 `search-on-input`），但**它仍是 `searchMode` 缺省时的兜底默认值**（默认 true），
+     * 因此保留实现、仅作文档标记，不在本阶段删除。
+     */
     searchOnInput?: boolean
     /** 搜索触发模式；设置后优先于 searchOnInput，推荐新调用方使用 */
     searchMode?: ToolbarSearchMode

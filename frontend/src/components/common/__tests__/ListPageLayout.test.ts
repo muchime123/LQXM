@@ -7,7 +7,8 @@ describe('ListPageLayout', () => {
     const wrapper = mount(ListPageLayout, {
       props: { title: '文档管理', description: '维护文档资料' }
     })
-    expect(wrapper.find('.list-page-layout__header').exists()).toBe(false)
+    // 头部外观现由公共 .page-surface-header 统一承载（B5-B）
+    expect(wrapper.find('.page-surface-header').exists()).toBe(false)
   })
 
   it('exposes loading state and an optional content label', () => {
@@ -24,7 +25,7 @@ describe('ListPageLayout', () => {
       props: { title: '文档管理', description: '维护文档资料', showHeader: true }
     })
     expect(wrapper.get('h1').text()).toBe('文档管理')
-    expect(wrapper.get('.list-page-layout__header p').text()).toBe('维护文档资料')
+    expect(wrapper.get('.page-surface-header p').text()).toBe('维护文档资料')
   })
 
   it('renders named layout regions only when provided', () => {

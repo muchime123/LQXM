@@ -1,0 +1,294 @@
+﻿/* ===== 统一抽屉布局（lq-drawer） ===== */
+/*
+ * 框架（Element Plus el-drawer）负责：遮罩、ESC、滚动锁定、动画、焦点陷阱
+ * 组件（LqDrawer）负责：标题区、内容区、底部操作区的视觉一致性
+ *
+ * 标准三段式：Header（标题区）→ Body（内容）→ Footer（操作区）
+ *
+ * 尺寸规范：唯一来源为 styles/tokens.css 的 --drawer-width-* 令牌
+ * （由 LqDrawer 的 size 映射后作为 el-drawer 的 size 传入，
+ *  横向作用于 width，纵向 ttb/btt 作用于 height）
+ *
+ * 模式（mode）：
+ * - detail     查看详情，默认无 footer，内容区域滚动
+ * - form       编辑表单，默认有 footer，含保存/取消
+ * - workspace  大型操作，减少 padding
+ *
+ * 涉及组件：所有 .lq-drawer 抽屉（通过 <LqDrawer> 统一管理）
+ *
+ * 关于与 dialog-layout.css 的关系：
+ * 两套布局刻意不合并、不互相抽取。弹窗是居中卡片，抽屉是贴边面板，
+ * 边框圆角、阴影方向、最大高度约束都不同；B5-A 的边界要求
+ * 「不为减少少量重复而改动稳定的 LqDialog」，因此这里是独立的抽屉布局表，
+ * 只共享 tokens.css 的设计变量，不共享也不复制 LqDialog 的关闭状态机。
+ */
+
+/* ============ 容器 ============ */
+/* el-drawer 自身已是 display:flex; flex-direction:column; overflow:hidden，
+   这里只覆盖视觉与内边距，不重复声明布局模式。 */
+.lq-drawer.el-drawer {
+  padding: 0;
+  background: var(--color-surface);
+  /* B5-B：此前硬编码 0 0 48px rgba(15,23,42,.28)，绕过了已有且已被 dark.css 覆盖的
+     --shadow-drawer 令牌，导致深色主题下抽屉投影不随主题变化。改用令牌。 */
+  box-shadow: var(--shadow-drawer);
+}
+
+/* 纵向抽屉（ttb / btt）需要限高，避免内容超高时铺满视口无法操作 */
+.lq-drawer.el-drawer.ttb,
+.lq-drawer.el-drawer.btt {
+  max-height: 92vh;
+}
+
+/* 重置 el-drawer 默认结构，使用 LqDrawer 自定义内容。
+   与弹窗同理：保留外层 __header / __body / __footer 作为布局容器，
+   由子元素 .lq-drawer__head / .lq-drawer__foot 撑开高度；
+   flex 尺寸必须作用于外层节点（它们是 .el-drawer flex 容器的直接子项），
+   否则默认 min-height:auto 会让 body 无法收缩，内容超高时 footer 被裁掉。 */
+.lq-drawer .el-drawer__header {
+  flex-shrink: 0;
+  padding: 0;
+  margin: 0;
+  border-bottom: none;
+  color: inherit;
+}
+
+.lq-drawer .el-drawer__body {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.lq-drawer .el-drawer__footer {
+  flex-shrink: 0;
+  padding: 0;
+}
+
+/* ============ Header ============ */
+/* 与弹窗同样的命名约定：用 __head / __foot，避免与 EP 的 __header / __footer 混淆 */
+.lq-drawer__head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  gap: var(--space-md);
+  min-height: 56px;
+  padding: 14px 20px 14px 22px;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.lq-drawer__title {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+
+.lq-drawer__title-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-control-gap);
+  color: var(--color-text-heading);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-extrabold);
+  line-height: 1.3;
+}
+
+.lq-drawer__title-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lq-drawer__eyebrow {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-primary-bg);
+  color: var(--color-primary);
+  font-size: var(--fs-xxs);
+  font-weight: var(--fw-bold);
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.lq-drawer__eyebrow.dirty {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+}
+
+.lq-drawer__subtitle {
+  margin: 0;
+  overflow: hidden;
+  color: var(--color-text-muted);
+  font-size: var(--fs-xs);
+  font-weight: var(--fw-medium);
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lq-drawer__actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: var(--space-control-gap);
+  margin-left: 8px;
+}
+
+.lq-drawer__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.lq-drawer__close:hover {
+  border-color: var(--color-border);
+  background: var(--color-surface-hover);
+  color: var(--color-text-strong);
+}
+
+/* ============ Body ============ */
+.lq-drawer__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--color-surface);
+}
+
+/* 非滚动模式（业务自定义双栏 / 内部滚动布局）：
+   让 body 成为 flex 容器，使子级 flex:1 / min-height:0 生效 */
+.lq-drawer__body:not(.is-scrollable) {
+  display: flex;
+  flex-direction: column;
+}
+
+/* 可滚动模式：统一内容内边距，滚动条出现在 body 内部而非页面级。
+   不设 max-height，依赖 flex:1 + min-height:0 让 body 自然填满剩余空间。 */
+.lq-drawer__body.is-scrollable {
+  padding: 20px 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+/* workspace 模式：减少 padding，更大内容区 */
+.lq-drawer--workspace .lq-drawer__body {
+  padding: 16px 20px;
+}
+
+/* ============ Footer ============ */
+.lq-drawer__foot {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-control-gap);
+  padding: 12px 22px;
+  border-top: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.lq-drawer__foot .footer-status {
+  margin-right: auto;
+  color: var(--color-text-muted);
+  font-size: var(--fs-xs);
+}
+
+.lq-drawer__foot .footer-status strong {
+  color: var(--color-primary);
+  font-size: var(--fs-md);
+  font-weight: var(--fw-bold);
+}
+
+/* Footer 内通用按钮。
+   规格与 dialog-layout.css 的 .lq-dialog__foot button 保持一致，
+   但不共用选择器：抽公共类需要改稳定的 dialog-layout.css，
+   按 B5-A 边界（不为减少少量重复改动 LqDialog）这里独立维护。 */
+.lq-drawer__foot button {
+  min-height: 34px;
+  padding: 0 16px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--color-surface);
+  color: var(--color-text-strong);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-semibold);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.lq-drawer__foot button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.lq-drawer__foot button.primary {
+  border-color: var(--color-primary);
+  background: var(--color-primary);
+  color: var(--color-surface);
+}
+
+.lq-drawer__foot button.primary:hover:not(:disabled) {
+  filter: brightness(1.05);
+  color: var(--color-surface);
+}
+
+.lq-drawer__foot button:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+/* ============ Loading 状态 ============ */
+.lq-drawer__loading-dot {
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: var(--color-surface);
+  border-radius: 50%;
+  animation: lq-drawer-spin 0.8s linear infinite;
+  vertical-align: middle;
+}
+
+.lq-drawer--loading .lq-drawer__body {
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+@keyframes lq-drawer-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============ 小屏适配 ============ */
+@media (max-width: 767px) {
+  .lq-drawer__head,
+  .lq-drawer__foot {
+    padding: 10px 14px;
+  }
+
+  .lq-drawer__foot button {
+    min-height: 36px;
+    padding: 0 14px;
+  }
+
+  .lq-drawer__body.is-scrollable {
+    padding: 16px;
+  }
+}

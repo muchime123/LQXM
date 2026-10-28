@@ -233,6 +233,11 @@
   --shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
   --shadow-lg: 0 8px 24px rgba(15, 23, 42, 0.05);
   --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.3), 0 8px 20px rgba(0, 0, 0, 0.15);
+  /* 弹窗/抽屉投影 — 由 dialog-layout.css / drawer-layout.css 唯一使用。
+     B5-B：此前 dialog-layout.css 硬编码 0 24px 80px rgba(15,23,42,.32)，
+     深色模式下投影颜色不变（仍为深蓝灰），几乎不可见；提取为令牌后由 themes/dark.css 覆盖。
+     浅色取值与历史完全一致，不做视觉改动。 */
+  --shadow-dialog: 0 24px 80px rgba(15, 23, 42, 0.32);
   --shadow-drawer: 0 24px 72px rgba(15, 23, 42, 0.26);
   --shadow-focus: 0 0 0 3px var(--color-primary-ring);
 
@@ -375,6 +380,20 @@
   --dialog-width-lg: 1100px;
   --dialog-width-xl: min(1400px, 90vw);
   --dialog-width-workspace: min(1200px, 96vw);
+
+  /* Drawer Widths — 抽屉尺寸唯一来源（LqDrawer size 映射）
+     与弹窗分开定义：抽屉是侧边面板，宽度本质上是「视口占比 + 上限」，
+     而弹窗是居中宽度，二者语义不同，不复用 --dialog-width-*。
+     每档都带 vw 上限，保证窄屏下不溢出。
+     sm  简单详情、轻量确认
+     md  普通详情、基础资料（默认）
+     lg  复杂业务、表格、多区域
+     xl  大型工作台
+     纵向方向（ttb / btt）下这些值作用于高度。 */
+  --drawer-width-sm: min(420px, 100vw);
+  --drawer-width-md: min(720px, 94vw);
+  --drawer-width-lg: min(1000px, 94vw);
+  --drawer-width-xl: min(1280px, 96vw);
 
   /* Deprecated compatibility aliases. Do not use in new code; migrate touched
      modules to the canonical semantic token on the right-hand side. */

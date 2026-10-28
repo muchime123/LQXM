@@ -90,6 +90,7 @@
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.2);
   --shadow-xl: 0 20px 60px rgba(0, 0, 0, 0.5), 0 8px 20px rgba(0, 0, 0, 0.3);
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --shadow-dialog: 0 24px 80px rgba(0, 0, 0, 0.55);
   --shadow-drawer: 0 24px 72px rgba(0, 0, 0, 0.5);
 
   /* Shadow color components — 深色模式 */

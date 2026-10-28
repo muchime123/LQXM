@@ -1,4 +1,5 @@
 import { mount } from '@vue/test-utils'
+import type { VueWrapper } from '@vue/test-utils'
 import { describe, expect, it, vi } from 'vitest'
 import { defineComponent } from 'vue'
 import LqTable from '../LqTable.vue'
@@ -64,7 +65,8 @@ describe('LqTable event forwarding', () => {
   it('keeps declared emit listeners out of $attrs', () => {
     // defineEmits 声明过的监听器不会残留在 $attrs，因此不会被 v-bind="$attrs" 再绑一次
     const { wrapper } = mountWithListeners()
-    const attrs = Object.keys(wrapper.findComponent(LqTable).vm.$attrs)
+    // 泛型组件会让 VTU 的 findComponent 重载解析退化为 DOMWrapper，这里断言回组件 wrapper
+    const attrs = Object.keys((wrapper.findComponent(LqTable) as unknown as VueWrapper).vm.$attrs)
 
     expect(attrs).not.toContain('onSelectionChange')
     expect(attrs).not.toContain('onSortChange')
@@ -76,7 +78,9 @@ describe('LqTable event forwarding', () => {
     // 未声明的事件仍经 $attrs 透传，且只派发一次（不应被"剔除 onXxx"式改动波及）
     const { wrapper, handlers, table } = mountWithListeners()
 
-    expect(Object.keys(wrapper.findComponent(LqTable).vm.$attrs)).toContain('onExpandChange')
+    expect(Object.keys((wrapper.findComponent(LqTable) as unknown as VueWrapper).vm.$attrs)).toContain(
+      'onExpandChange'
+    )
 
     await table.vm.$emit('expand-change', [{ id: 1 }], [])
 

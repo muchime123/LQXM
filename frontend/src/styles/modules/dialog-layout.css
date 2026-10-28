@@ -49,7 +49,8 @@
   padding: 0;
   border-radius: 14px;
   background: var(--color-surface);
-  box-shadow: 0 24px 80px rgba(15, 23, 42, 0.32);
+  /* B5-B：此前硬编码 rgba(15,23,42,.32)，深色主题下投影不随主题变化。改用令牌。 */
+  box-shadow: var(--shadow-dialog);
   overflow: hidden;
   max-height: 90vh;
   max-width: 95vw;
@@ -176,11 +177,11 @@
   height: 28px;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: transparent;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .lq-dialog__close:hover {
@@ -257,13 +258,13 @@
   min-height: 34px;
   padding: 0 16px;
   border: 1px solid var(--color-border);
-  border-radius: 8px;
+  border-radius: var(--radius-lg);
   background: var(--color-surface);
   color: var(--color-text-strong);
   font-size: var(--fs-sm);
   font-weight: var(--fw-semibold);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .lq-dialog__foot button:hover:not(:disabled) {
@@ -285,13 +286,13 @@
 .lq-dialog__foot button.danger {
   border-color: #dc2626 !important;
   background: #dc2626 !important;
-  color: #ffffff !important;
+  color: var(--color-text-on-primary) !important;
 }
 
 .lq-dialog__foot button.danger:hover:not(:disabled) {
   background: #b91c1c !important;
   border-color: #b91c1c !important;
-  color: #ffffff !important;
+  color: var(--color-text-on-primary) !important;
   /* 抵消 button.primary:hover 的 brightness 提亮，保证 danger 三档红色一致 */
   filter: none !important;
 }
@@ -299,36 +300,36 @@
 .lq-dialog__foot button.danger:active:not(:disabled) {
   background: #991b1b !important;
   border-color: #991b1b !important;
-  color: #ffffff !important;
+  color: var(--color-text-on-primary) !important;
 }
 
 [data-theme='dark'] .lq-dialog__foot button.danger {
   border-color: #dc2626 !important;
   background: #dc2626 !important;
-  color: #ffffff !important;
+  color: var(--color-text-on-primary) !important;
 }
 [data-theme='dark'] .lq-dialog__foot button.danger:hover:not(:disabled) {
   background: #ef4444 !important;
   border-color: #ef4444 !important;
-  color: #ffffff !important;
+  color: var(--color-text-on-primary) !important;
 }
 
 /* 成功语义主操作（如确认结案）：与 danger 对称，同样抵消 primary 的 brightness 提亮 */
 .lq-dialog__foot button.success {
   border-color: var(--color-success);
   background: var(--color-success);
-  color: #ffffff;
+  color: var(--color-text-on-primary);
 }
 
 .lq-dialog__foot button.success:hover:not(:disabled) {
   border-color: var(--color-success-text);
   background: var(--color-success-text);
-  color: #ffffff;
+  color: var(--color-text-on-primary);
   filter: none !important;
 }
 
 .lq-dialog__foot button:disabled {
-  opacity: 0.5;
+  opacity: var(--opacity-disabled);
   cursor: not-allowed;
 }
 

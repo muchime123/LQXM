@@ -5,3 +5,101 @@
   min-width: 0;
   overflow: hidden;
 }
+
+/* ===== 页面级头部统一外观（page-surface-header）=====
+   B5-B 整改：此前 PageHeader.vue 与 ListPageLayout.vue 各自在 scoped 样式里
+   维护了一份完全相同的页面头部（含 ::before 强调条、渐变背景、标题排版、窄屏断点），
+   实测 77 行中有 72 行完全相同，属典型的「相同设计代码多处重复维护」。
+   现将这一份外观收敛为公共 CSS 模块，两个公共组件共用同一个类名。
+
+   归属约定（B5-B3）：
+   - 头部外壳 / 强调条 / 标题排版 / 操作区 / 窄屏断点 → 本文件统一管理，组件不得各自复制
+   - 组件仅保留自身结构语义（--with-header 之类的状态类），不得再写重复外观
+   - 业务若需差异，用包装 class + 覆盖变量值的方式，不要重写整套头部样式 */
+.page-surface-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-section-gap-wide);
+  min-height: 76px;
+  padding: var(--space-section-gap) var(--space-xl);
+  overflow: hidden;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-xl);
+  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-alt) 100%);
+  box-shadow: var(--shadow-sm);
+}
+
+.page-surface-header::before {
+  position: absolute;
+  inset: var(--space-section-gap) auto var(--space-section-gap) 0;
+  width: 3px;
+  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  background: var(--color-primary);
+  content: '';
+}
+
+.page-surface-header__title {
+  position: relative;
+  display: grid;
+  gap: var(--space-control-gap-tight);
+  min-width: 0;
+}
+
+.page-surface-header__title h1 {
+  margin: 0;
+  color: var(--color-text-heading);
+  font-size: var(--fs-2xl);
+  font-weight: var(--fw-semibold);
+  line-height: var(--lh-snug);
+  /* 原为字面的 -0.02em，与 tokens 的 --tracking-tight 同值，改用令牌 */
+  letter-spacing: var(--tracking-tight);
+}
+
+.page-surface-header__title p {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--fs-base);
+  line-height: var(--lh-loose);
+}
+
+.page-surface-header__actions {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
+@media (max-width: 767px) {
+  .page-surface-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--space-control-gap-wide);
+    min-height: 0;
+    padding: var(--space-control-gap-wide);
+  }
+
+  .page-surface-header::before {
+    inset: 0 var(--space-control-gap-wide) auto;
+    width: auto;
+    height: 3px;
+    border-radius: 0 0 var(--radius-pill) var(--radius-pill);
+  }
+
+  .page-surface-header__title h1 {
+    font-size: var(--fs-xl);
+  }
+
+  .page-surface-header__actions {
+    justify-content: flex-start;
+  }
+
+  .page-surface-header__actions > * {
+    max-width: 100%;
+  }
+}

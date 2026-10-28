@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { nextTick } from 'vue'
 import { useListPagination } from '../useListPagination'
 
 describe('useListPagination', () => {
@@ -162,6 +163,100 @@ describe('useListPagination', () => {
     it('跨页计算正确', () => {
       const { indexMethod } = useListPagination({ page: 3, size: 50 })
       expect(indexMethod(0)).toBe(151)
+    })
+  })
+
+  // ------------------------------------------------------------------
+  // B1 补充：响应映射优先级、边界条件与实例隔离
+  // ------------------------------------------------------------------
+  describe('B1 补充：响应字段优先级', () => {
+    it('number 与 page 同时存在时以 number 为准', () => {
+      const { pageInfo, updateFromResponse } = useListPagination()
+      updateFromResponse({ number: 1, page: 5, size: 20 })
+      expect(pageInfo.page).toBe(1)
+    })
+
+    it('totalElements 为 0 时取 0，不回退到 total', () => {
+      const { pageInfo, updateFromResponse } = useListPagination()
+      updateFromResponse({ totalElements: 0, total: 80, size: 20 })
+      expect(pageInfo.total).toBe(0)
+    })
+
+    it('totalPages 为 0 时 pages 取 0', () => {
+      const { pageInfo, updateFromResponse } = useListPagination()
+      updateFromResponse({ totalPages: 0, pages: 3, size: 20 })
+      expect(pageInfo.pages).toBe(0)
+    })
+
+    it('size 为 0 时保留 0（不静默回退）', () => {
+      const { pageInfo, updateFromResponse } = useListPagination({ size: 20 })
+      updateFromResponse({ size: 0, totalElements: 100 })
+      expect(pageInfo.size).toBe(0)
+    })
+  })
+
+  describe('B1 补充：边界条件', () => {
+    it('onPageChange(0) 与负值同样 clamp 到 0', () => {
+      const { pageInfo, onPageChange } = useListPagination({ page: 4 })
+      onPageChange(0)
+      expect(pageInfo.page).toBe(0)
+      onPageChange(-3)
+      expect(pageInfo.page).toBe(0)
+    })
+
+    it('resetPage 只重置 page，不改变 size 与 total', () => {
+      const { pageInfo, resetPage } = useListPagination({ page: 5, size: 50, total: 300 })
+      resetPage()
+      expect(pageInfo.page).toBe(0)
+      expect(pageInfo.size).toBe(50)
+      expect(pageInfo.total).toBe(300)
+    })
+
+    it('resetPage 后 indexMethod 回到从 1 开始', () => {
+      const { pageInfo, indexMethod, resetPage } = useListPagination({ page: 3, size: 20 })
+      expect(indexMethod(0)).toBe(61)
+      resetPage()
+      expect(pageInfo.page).toBe(0)
+      expect(indexMethod(0)).toBe(1)
+    })
+
+    it('getPageParams 返回拷贝，修改返回值不污染内部状态', () => {
+      const { getPageParams, pageInfo } = useListPagination({ page: 2, size: 20 })
+      const params = getPageParams()
+      params.page = 99
+      expect(pageInfo.page).toBe(2)
+    })
+
+    it('queryParams 随 page / size 变化保持响应式', async () => {
+      const { queryParams, onPageChange, onPageSizeChange } = useListPagination()
+      expect(queryParams.value).toEqual({ page: 0, size: 20 })
+
+      onPageChange(3)
+      await nextTick()
+      expect(queryParams.value).toEqual({ page: 2, size: 20 })
+
+      onPageSizeChange(50)
+      await nextTick()
+      expect(queryParams.value).toEqual({ page: 0, size: 50 })
+    })
+
+    it('pages 已由响应给出时 totalPages 不受 total 影响', () => {
+      const { totalPages, updateFromResponse } = useListPagination({ size: 20 })
+      updateFromResponse({ totalPages: 2, totalElements: 1000 })
+      expect(totalPages.value).toBe(2)
+    })
+  })
+
+  describe('B1 补充：实例隔离', () => {
+    it('多个实例之间不共享分页状态', () => {
+      const first = useListPagination({ page: 0, size: 20 })
+      const second = useListPagination({ page: 0, size: 20 })
+
+      first.onPageChange(4)
+
+      expect(first.pageInfo.page).toBe(3)
+      expect(second.pageInfo.page).toBe(0)
+      expect(first.pageInfo).not.toBe(second.pageInfo)
     })
   })
 })

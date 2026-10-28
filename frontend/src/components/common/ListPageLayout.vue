@@ -4,8 +4,9 @@
     'list-page-layout--with-summary': Boolean($slots.summary),
     'list-page-layout--with-toolbar': Boolean($slots.toolbar)
   }" :aria-labelledby="showHeader && title && !$slots.title ? titleId : undefined">
-    <header v-if="showHeader" class="list-page-layout__header">
-      <div class="list-page-layout__title">
+    <!-- 头部外观与 PageHeader 共用 styles/modules/list-page-surfaces.css 的 .page-surface-header -->
+    <header v-if="showHeader" class="page-surface-header">
+      <div class="page-surface-header__title">
         <slot name="eyebrow"></slot>
         <slot name="title">
           <h1 :id="titleId">{{ title }}</h1>
@@ -15,7 +16,7 @@
         </slot>
       </div>
 
-      <div v-if="$slots.actions" class="list-page-layout__actions">
+      <div v-if="$slots.actions" class="page-surface-header__actions">
         <slot name="actions"></slot>
       </div>
     </header>
@@ -189,68 +190,9 @@ const showPagination = computed(() => {
   min-width: 0;
 }
 
-/* ==================== Header ==================== */
-.list-page-layout__header {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-section-gap-wide);
-  min-height: 76px;
-  padding: var(--space-section-gap) var(--space-xl);
-  overflow: hidden;
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-xl);
-  background: linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-alt) 100%);
-  box-shadow: var(--shadow-sm);
-}
-
-.list-page-layout__header::before {
-  position: absolute;
-  inset: var(--space-section-gap) auto var(--space-section-gap) 0;
-  width: 3px;
-  border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
-  background: var(--color-primary);
-  content: '';
-}
-
-.list-page-layout__title {
-  position: relative;
-  display: grid;
-  gap: var(--space-control-gap-tight);
-  min-width: 0;
-}
-
-.list-page-layout__title h1 {
-  margin: 0;
-  color: var(--color-text-heading);
-  font-size: var(--fs-2xl);
-  font-weight: var(--fw-semibold);
-  line-height: var(--lh-snug);
-  letter-spacing: -0.02em;
-}
-
-.list-page-layout__title p {
-  max-width: 68ch;
-  margin: 0;
-  color: var(--color-text-secondary);
-  font-size: var(--fs-base);
-  line-height: var(--lh-loose);
-}
-
-.list-page-layout__actions,
-.list-page-layout__toolbar-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: var(--space-sm);
-}
-
-.list-page-layout__actions {
-  position: relative;
-  flex: 0 0 auto;
-}
+/* ==================== Header ====================
+   页面头部外观统一由 styles/modules/list-page-surfaces.css 的
+   .page-surface-header 维护，与 PageHeader 共用，此处不再重复定义（B5-B）。 */
 
 /* ==================== Summary & Toolbar ==================== */
 .list-page-layout__summary {
@@ -326,33 +268,10 @@ const showPagination = computed(() => {
     gap: var(--space-control-gap-wide);
   }
 
-  .list-page-layout__header {
-    align-items: stretch;
-    flex-direction: column;
-    gap: var(--space-control-gap-wide);
-    min-height: 0;
-    padding: var(--space-control-gap-wide);
-  }
+  /* 头部的窄屏断点同样由 .page-surface-header 统一维护，此处不再重复 */
 
-  .list-page-layout__header::before {
-    inset: 0 var(--space-control-gap-wide) auto;
-    width: auto;
-    height: 3px;
-    border-radius: 0 0 var(--radius-pill) var(--radius-pill);
-  }
-
-  .list-page-layout__title h1 {
-    font-size: var(--fs-xl);
-  }
-
-  .list-page-layout__actions,
-  .list-page-layout__toolbar-actions,
   .list-page-layout__pagination-bar {
     justify-content: flex-start;
-  }
-
-  .list-page-layout__actions > :deep(*) {
-    max-width: 100%;
   }
 
   .list-page-layout__list-header {
