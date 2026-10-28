@@ -94,6 +94,49 @@ if (-not (Test-Path -LiteralPath $backend)) {
   throw "找不到后端目录：$backend（请把仓库放在预期位置，或检查 scripts 目录是否被移动过）。"
 }
 
+# ---------------------------------------------------------------- ⓪ 迁移脚本体检
+# Flyway 遇到重复版本号会直接抛 "Found more than one migration with version XXX"，
+# 症状是「打包成功、等 30 秒才报端口未监听」。这里在打包前先查出来，省一轮无效重启。
+# 同时扫 target/classes：迁移文件改名/删除后，maven-resources 只增不删，旧的副本会留在
+# target/classes 里被一起打进 jar，于是「源码已修好、启动仍报重复版本号」。
+$migDir = Join-Path $backend 'src\main\resources\db\migration'
+$classesMigDir = Join-Path $backend 'target\classes\db\migration'
+$staleMigrations = @()
+if (Test-Path -LiteralPath $migDir) {
+  $migFiles = @()
+  foreach ($d in @($migDir, $classesMigDir)) {
+    if (Test-Path -LiteralPath $d) {
+      $migFiles += Get-ChildItem -LiteralPath $d -Filter 'V*.sql' -File | ForEach-Object {
+        if ($_.Name -match '^V(\d+)__') {
+          [pscustomobject]@{ Version = [int]$Matches[1]; Name = $_.Name; Dir = $d }
+        }
+      }
+    }
+  }
+  # 同一份文件在两个目录各出现一次，按文件名去重后再判版本号冲突。
+  $distinct = @($migFiles | Group-Object Name | ForEach-Object { $_.Group[0] })
+  $dupes = @($distinct | Group-Object Version | Where-Object { $_.Count -gt 1 })
+  if ($dupes.Count -gt 0) {
+    Write-Host ''
+    Write-Host '迁移脚本版本号重复（Flyway 会在启动时直接失败）：' -ForegroundColor Red
+    foreach ($g in $dupes) {
+      Write-Host ("  V{0}: {1}" -f $g.Name, (($g.Group | ForEach-Object { $_.Name }) -join '  /  ')) -ForegroundColor Red
+    }
+    $maxVer = ($distinct | Measure-Object -Property Version -Maximum).Maximum
+    throw "请给后加的那个脚本换个未占用的版本号（当前最大 V$maxVer），然后重跑本脚本。"
+  }
+
+  # 残留：target/classes 里有、src 里已经没有的迁移文件 —— 会自动补一次 clean。
+  $srcNames = @($migFiles | Where-Object { $_.Dir -eq $migDir } | ForEach-Object { $_.Name })
+  $staleMigrations = @($distinct | Where-Object { $srcNames -notcontains $_.Name })
+  if ($staleMigrations.Count -gt 0) {
+    Write-Host ''
+    Write-Host 'target/classes 里残留已改名或已删除的迁移脚本，会被一起打进 jar：' -ForegroundColor Yellow
+    foreach ($s in $staleMigrations) { Write-Host ("  " + $s.Name) -ForegroundColor Yellow }
+    Write-Host '  本次打包自动带上 clean 清理。' -ForegroundColor Yellow
+  }
+}
+
 # ---------------------------------------------------------------- ① 打包
 if ($SkipPackage) {
   Write-Step '跳过打包（-SkipPackage），直接重启后端。'
@@ -106,7 +149,7 @@ if ($SkipPackage) {
   $beforeTime = if (Test-Path -LiteralPath $jar) { (Get-Item -LiteralPath $jar).LastWriteTime } else { $null }
 
   $mvnArgs = @()
-  if ($Clean) { $mvnArgs += 'clean' }
+  if ($Clean -or $staleMigrations.Count -gt 0) { $mvnArgs += 'clean' }
   if (-not $Online) { $mvnArgs += '-o' }
   $mvnArgs += @('-DskipTests', '-Djacoco.skip=true', 'package')
 

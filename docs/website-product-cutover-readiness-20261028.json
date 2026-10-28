@@ -1,0 +1,21 @@
+{
+  "read_only": true,
+  "schema": "product_archive",
+  "status_counts": {
+    "website_products": {
+      "DRAFT": 45
+    },
+    "website_product_categories": {
+      "DRAFT": 9
+    },
+    "website_media_assets": {
+      "DRAFT": 139
+    }
+  },
+  "eligible_published_products": 0,
+  "published_featured_products": 0,
+  "visible_product_gallery_rows": 0,
+  "published_products_missing_hero_card_or_gallery": [],
+  "technical_gate_clear": false,
+  "note": "Technical counts only; editorial and page parity approval is separate."
+}

@@ -152,7 +152,19 @@ if (Test-PortListening $BackendPort) {
   if ($up) {
     Write-Host "后端已就绪：http://127.0.0.1:$BackendPort（约 $waited 秒）"
   } else {
-    Write-Host "后端在 $waited 秒内未监听 $BackendPort，疑似启动失败。最近日志：" -ForegroundColor Red
+    Write-Host "后端在 $waited 秒内未监听 $BackendPort，疑似启动失败。" -ForegroundColor Red
+    # 关键错误先摘出来：真正的根因（Flyway / Hibernate 校验等）通常埋在堆栈中间，
+    # 只看 tail 12 行往往全是 at ... 帧，看不到原因。
+    foreach ($lf in @('logs\backend-local.err.log', 'logs\backend-local.out.log')) {
+      $lp = Join-Path $backend $lf
+      if (-not (Test-Path -LiteralPath $lp)) { continue }
+      $hits = @(Select-String -LiteralPath $lp -Encoding UTF8 -Pattern 'APPLICATION FAILED TO START|Application run failed|checksum mismatch|Found more than one migration|Schema-validation|Caused by:|Port .* was already in use|Web server failed to start' |
+          Select-Object -First 8)
+      if ($hits.Count -gt 0) {
+        Write-Host "  --- $lf 关键错误 ---" -ForegroundColor Yellow
+        foreach ($h in $hits) { Write-Host ("  L" + $h.LineNumber + ": " + $h.Line.Trim()) -ForegroundColor Yellow }
+      }
+    }
     foreach ($lf in @('logs\backend-local.err.log', 'logs\backend-local.out.log')) {
       $lp = Join-Path $backend $lf
       if (Test-Path -LiteralPath $lp) {

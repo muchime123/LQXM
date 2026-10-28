@@ -1,0 +1,19 @@
+{
+  "applied": false,
+  "schema": "product_archive",
+  "source_products": 45,
+  "source_categories": 9,
+  "mapped_media": 136,
+  "draft_only": true,
+  "category_slugs_require_editorial_review": true,
+  "products_requiring_review": [
+    67
+  ],
+  "categories": [],
+  "products": [],
+  "verified_counts": {
+    "website_product_categories": 9,
+    "website_products": 45,
+    "website_media_assets": 136
+  }
+}

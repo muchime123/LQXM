@@ -140,8 +140,30 @@ Write-Host ($stamp -replace "`n", ' | ')
 
 if ($Restart) {
   Write-Host "=== 重启稳定实例 ===" -ForegroundColor Cyan
-  & (Join-Path $PSScriptRoot 'stop-stable.ps1') -Port $Port
+  # 停止失败时必须中止：start-stable.ps1 发现端口还在监听会直接跳过启动，
+  # 结果就是「发布看似成功、同事其实还在用旧版」。
+  try {
+    & (Join-Path $PSScriptRoot 'stop-stable.ps1') -Port $Port
+  } catch {
+    Write-Host ""
+    Write-Host "稳定实例未能停止，未拉起新实例（同事仍在用旧版）：$($_.Exception.Message)" -ForegroundColor Red
+    Write-Host "产物已经冻结好了，停止旧实例后单独执行：.\scripts\start-stable.ps1 -Port $Port" -ForegroundColor Yellow
+    throw
+  }
   & (Join-Path $PSScriptRoot 'start-stable.ps1') -Port $Port
+
+  # 确认真的起来了：稳定实例启动失败（端口冲突、端口占用）时不要静默放行。
+  $stableUp = $false
+  for ($i = 0; $i -lt 30; $i++) {
+    Start-Sleep -Seconds 1
+    if (Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue) { $stableUp = $true; break }
+  }
+  if (-not $stableUp) {
+    Write-Host ""
+    Write-Host "稳定实例在 30 秒内未监听 $Port。看日志：release\stable\logs\stable.out.log" -ForegroundColor Red
+    throw "稳定实例启动失败（端口 $Port 未监听）。"
+  }
+  Write-Host "稳定实例已就绪：http://<本机局域网IP>:$Port" -ForegroundColor Green
 } else {
   Write-Host ""
   Write-Host "产物已冻结。同事当前还在用旧版，直到你执行：" -ForegroundColor Yellow

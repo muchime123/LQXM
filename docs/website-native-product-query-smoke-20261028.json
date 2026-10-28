@@ -1,0 +1,12 @@
+{
+  "read_only": true,
+  "schema": "product_archive",
+  "product_status_counts": {
+    "DRAFT": 45
+  },
+  "native_list_explain_rows": 1,
+  "native_filtered_public_rows": 0,
+  "draft_detail_query_resolved": true,
+  "draft_published_gallery_rows": 0,
+  "draft_published_variant_rows": 0
+}

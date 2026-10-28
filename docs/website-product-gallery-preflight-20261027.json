@@ -1,0 +1,994 @@
+{
+  "applied": false,
+  "source_detail_references": 141,
+  "draft_only": true,
+  "associations": [
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4638,
+      "website_product_id": 2,
+      "website_media_id": 5,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4639,
+      "website_product_id": 2,
+      "website_media_id": 6,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4640,
+      "website_product_id": 2,
+      "website_media_id": 7,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4641,
+      "website_product_id": 2,
+      "website_media_id": 8,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4642,
+      "website_product_id": 2,
+      "website_media_id": 9,
+      "sort_order": 4
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4643,
+      "website_product_id": 2,
+      "website_media_id": 10,
+      "sort_order": 5
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4644,
+      "website_product_id": 2,
+      "website_media_id": 11,
+      "sort_order": 6
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 5222,
+      "website_product_id": 2,
+      "website_media_id": 12,
+      "sort_order": 7
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4672,
+      "website_product_id": 3,
+      "website_media_id": 13,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4673,
+      "website_product_id": 3,
+      "website_media_id": 14,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4674,
+      "website_product_id": 3,
+      "website_media_id": 15,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4675,
+      "website_product_id": 3,
+      "website_media_id": 16,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4676,
+      "website_product_id": 3,
+      "website_media_id": 17,
+      "sort_order": 4
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4677,
+      "website_product_id": 3,
+      "website_media_id": 18,
+      "sort_order": 5
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4678,
+      "website_product_id": 3,
+      "website_media_id": 19,
+      "sort_order": 6
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4679,
+      "website_product_id": 3,
+      "website_media_id": 20,
+      "sort_order": 7
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4680,
+      "website_product_id": 3,
+      "website_media_id": 21,
+      "sort_order": 8
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4681,
+      "website_product_id": 3,
+      "website_media_id": 22,
+      "sort_order": 9
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4682,
+      "website_product_id": 3,
+      "website_media_id": 23,
+      "sort_order": 10
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4683,
+      "website_product_id": 3,
+      "website_media_id": 24,
+      "sort_order": 11
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4684,
+      "website_product_id": 3,
+      "website_media_id": 25,
+      "sort_order": 12
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4685,
+      "website_product_id": 3,
+      "website_media_id": 26,
+      "sort_order": 13
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4686,
+      "website_product_id": 3,
+      "website_media_id": 27,
+      "sort_order": 14
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4764,
+      "website_product_id": 4,
+      "website_media_id": 28,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4765,
+      "website_product_id": 4,
+      "website_media_id": 29,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4766,
+      "website_product_id": 4,
+      "website_media_id": 30,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4767,
+      "website_product_id": 4,
+      "website_media_id": 31,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4768,
+      "website_product_id": 4,
+      "website_media_id": 32,
+      "sort_order": 4
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4769,
+      "website_product_id": 4,
+      "website_media_id": 33,
+      "sort_order": 5
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4771,
+      "website_product_id": 4,
+      "website_media_id": 34,
+      "sort_order": 6
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4772,
+      "website_product_id": 4,
+      "website_media_id": 35,
+      "sort_order": 7
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4773,
+      "website_product_id": 4,
+      "website_media_id": 36,
+      "sort_order": 8
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4774,
+      "website_product_id": 4,
+      "website_media_id": 37,
+      "sort_order": 9
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4775,
+      "website_product_id": 4,
+      "website_media_id": 38,
+      "sort_order": 10
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4776,
+      "website_product_id": 4,
+      "website_media_id": 39,
+      "sort_order": 11
+    },
+    {
+      "legacy_product_id": 180,
+      "legacy_asset_id": 4616,
+      "website_product_id": 5,
+      "website_media_id": 40,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 180,
+      "legacy_asset_id": 4617,
+      "website_product_id": 5,
+      "website_media_id": 41,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 180,
+      "legacy_asset_id": 4618,
+      "website_product_id": 5,
+      "website_media_id": 42,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 180,
+      "legacy_asset_id": 4619,
+      "website_product_id": 5,
+      "website_media_id": 43,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 180,
+      "legacy_asset_id": 5273,
+      "website_product_id": 5,
+      "website_media_id": 44,
+      "sort_order": 4
+    },
+    {
+      "legacy_product_id": 72,
+      "legacy_asset_id": 4887,
+      "website_product_id": 6,
+      "website_media_id": 45,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 72,
+      "legacy_asset_id": 4888,
+      "website_product_id": 6,
+      "website_media_id": 46,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 72,
+      "legacy_asset_id": 4889,
+      "website_product_id": 6,
+      "website_media_id": 47,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4820,
+      "website_product_id": 7,
+      "website_media_id": 48,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4821,
+      "website_product_id": 7,
+      "website_media_id": 49,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4822,
+      "website_product_id": 7,
+      "website_media_id": 50,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4823,
+      "website_product_id": 7,
+      "website_media_id": 51,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4824,
+      "website_product_id": 7,
+      "website_media_id": 52,
+      "sort_order": 4
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4825,
+      "website_product_id": 7,
+      "website_media_id": 53,
+      "sort_order": 5
+    },
+    {
+      "legacy_product_id": 73,
+      "legacy_asset_id": 4921,
+      "website_product_id": 8,
+      "website_media_id": 54,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 73,
+      "legacy_asset_id": 4922,
+      "website_product_id": 8,
+      "website_media_id": 55,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 73,
+      "legacy_asset_id": 4923,
+      "website_product_id": 8,
+      "website_media_id": 56,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 73,
+      "legacy_asset_id": 4924,
+      "website_product_id": 8,
+      "website_media_id": 57,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 74,
+      "legacy_asset_id": 4942,
+      "website_product_id": 9,
+      "website_media_id": 59,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 74,
+      "legacy_asset_id": 4943,
+      "website_product_id": 9,
+      "website_media_id": 58,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 74,
+      "legacy_asset_id": 4944,
+      "website_product_id": 9,
+      "website_media_id": 60,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 75,
+      "legacy_asset_id": 4952,
+      "website_product_id": 10,
+      "website_media_id": 61,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 75,
+      "legacy_asset_id": 4953,
+      "website_product_id": 10,
+      "website_media_id": 62,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 75,
+      "legacy_asset_id": 4954,
+      "website_product_id": 10,
+      "website_media_id": 63,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 77,
+      "legacy_asset_id": 4987,
+      "website_product_id": 11,
+      "website_media_id": 64,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 78,
+      "legacy_asset_id": 5017,
+      "website_product_id": 12,
+      "website_media_id": 65,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 78,
+      "legacy_asset_id": 5018,
+      "website_product_id": 12,
+      "website_media_id": 66,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 78,
+      "legacy_asset_id": 5019,
+      "website_product_id": 12,
+      "website_media_id": 67,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 79,
+      "legacy_asset_id": 4525,
+      "website_product_id": 13,
+      "website_media_id": 68,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 79,
+      "legacy_asset_id": 5031,
+      "website_product_id": 13,
+      "website_media_id": 69,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 70,
+      "legacy_asset_id": 4521,
+      "website_product_id": 14,
+      "website_media_id": 70,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 82,
+      "legacy_asset_id": 5063,
+      "website_product_id": 15,
+      "website_media_id": 71,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 82,
+      "legacy_asset_id": 5064,
+      "website_product_id": 15,
+      "website_media_id": 72,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 82,
+      "legacy_asset_id": 5065,
+      "website_product_id": 15,
+      "website_media_id": 73,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 82,
+      "legacy_asset_id": 5066,
+      "website_product_id": 15,
+      "website_media_id": 74,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 83,
+      "legacy_asset_id": 5091,
+      "website_product_id": 16,
+      "website_media_id": 75,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 4535,
+      "website_product_id": 17,
+      "website_media_id": 76,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 4536,
+      "website_product_id": 17,
+      "website_media_id": 77,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 4537,
+      "website_product_id": 17,
+      "website_media_id": 78,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 4538,
+      "website_product_id": 17,
+      "website_media_id": 79,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 4539,
+      "website_product_id": 17,
+      "website_media_id": 80,
+      "sort_order": 4
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 5108,
+      "website_product_id": 17,
+      "website_media_id": 81,
+      "sort_order": 5
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 5109,
+      "website_product_id": 17,
+      "website_media_id": 82,
+      "sort_order": 6
+    },
+    {
+      "legacy_product_id": 89,
+      "legacy_asset_id": 5119,
+      "website_product_id": 18,
+      "website_media_id": 83,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 181,
+      "legacy_asset_id": 4621,
+      "website_product_id": 19,
+      "website_media_id": 84,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 181,
+      "legacy_asset_id": 4622,
+      "website_product_id": 19,
+      "website_media_id": 85,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5121,
+      "website_product_id": 20,
+      "website_media_id": 86,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5122,
+      "website_product_id": 20,
+      "website_media_id": 87,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5123,
+      "website_product_id": 20,
+      "website_media_id": 84,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5124,
+      "website_product_id": 20,
+      "website_media_id": 84,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5125,
+      "website_product_id": 20,
+      "website_media_id": 88,
+      "sort_order": 4
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5126,
+      "website_product_id": 20,
+      "website_media_id": 89,
+      "sort_order": 5
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5127,
+      "website_product_id": 20,
+      "website_media_id": 85,
+      "sort_order": 6
+    },
+    {
+      "legacy_product_id": 76,
+      "legacy_asset_id": 4962,
+      "website_product_id": 21,
+      "website_media_id": 90,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 175,
+      "legacy_asset_id": 4601,
+      "website_product_id": 22,
+      "website_media_id": 91,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 175,
+      "legacy_asset_id": 4602,
+      "website_product_id": 22,
+      "website_media_id": 92,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 175,
+      "legacy_asset_id": 4603,
+      "website_product_id": 22,
+      "website_media_id": 93,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 175,
+      "legacy_asset_id": 4604,
+      "website_product_id": 22,
+      "website_media_id": 94,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 95,
+      "legacy_asset_id": 5174,
+      "website_product_id": 23,
+      "website_media_id": 95,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 95,
+      "legacy_asset_id": 5175,
+      "website_product_id": 23,
+      "website_media_id": 97,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 95,
+      "legacy_asset_id": 5176,
+      "website_product_id": 23,
+      "website_media_id": 98,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 96,
+      "legacy_asset_id": 5187,
+      "website_product_id": 24,
+      "website_media_id": 99,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 80,
+      "legacy_asset_id": 5041,
+      "website_product_id": 25,
+      "website_media_id": 96,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 178,
+      "legacy_asset_id": 4613,
+      "website_product_id": 26,
+      "website_media_id": 100,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 81,
+      "legacy_asset_id": 5049,
+      "website_product_id": 27,
+      "website_media_id": 101,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 81,
+      "legacy_asset_id": 5050,
+      "website_product_id": 27,
+      "website_media_id": 102,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 91,
+      "legacy_asset_id": 5136,
+      "website_product_id": 28,
+      "website_media_id": 103,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 91,
+      "legacy_asset_id": 5137,
+      "website_product_id": 28,
+      "website_media_id": 104,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 91,
+      "legacy_asset_id": 5138,
+      "website_product_id": 28,
+      "website_media_id": 105,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 110,
+      "legacy_asset_id": 5265,
+      "website_product_id": 29,
+      "website_media_id": 106,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 4528,
+      "website_product_id": 30,
+      "website_media_id": 107,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 4529,
+      "website_product_id": 30,
+      "website_media_id": 108,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 4530,
+      "website_product_id": 30,
+      "website_media_id": 109,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 4531,
+      "website_product_id": 30,
+      "website_media_id": 110,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 4532,
+      "website_product_id": 30,
+      "website_media_id": 111,
+      "sort_order": 4
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 5094,
+      "website_product_id": 30,
+      "website_media_id": 112,
+      "sort_order": 5
+    },
+    {
+      "legacy_product_id": 87,
+      "legacy_asset_id": 5104,
+      "website_product_id": 31,
+      "website_media_id": 113,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 87,
+      "legacy_asset_id": 5105,
+      "website_product_id": 31,
+      "website_media_id": 114,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 87,
+      "legacy_asset_id": 5106,
+      "website_product_id": 31,
+      "website_media_id": 115,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 87,
+      "legacy_asset_id": 5223,
+      "website_product_id": 31,
+      "website_media_id": 116,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 171,
+      "legacy_asset_id": 4587,
+      "website_product_id": 32,
+      "website_media_id": 117,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 176,
+      "legacy_asset_id": 4606,
+      "website_product_id": 33,
+      "website_media_id": 118,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 5982,
+      "legacy_asset_id": 5203,
+      "website_product_id": 34,
+      "website_media_id": 119,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 92,
+      "legacy_asset_id": 5143,
+      "website_product_id": 35,
+      "website_media_id": 120,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 92,
+      "legacy_asset_id": 5144,
+      "website_product_id": 35,
+      "website_media_id": 121,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 92,
+      "legacy_asset_id": 5202,
+      "website_product_id": 35,
+      "website_media_id": 122,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 179,
+      "legacy_asset_id": 4614,
+      "website_product_id": 36,
+      "website_media_id": 120,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 179,
+      "legacy_asset_id": 4615,
+      "website_product_id": 36,
+      "website_media_id": 121,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 170,
+      "legacy_asset_id": 4575,
+      "website_product_id": 37,
+      "website_media_id": 123,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 170,
+      "legacy_asset_id": 4577,
+      "website_product_id": 37,
+      "website_media_id": 124,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 170,
+      "legacy_asset_id": 5193,
+      "website_product_id": 37,
+      "website_media_id": 123,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 147,
+      "legacy_asset_id": 4571,
+      "website_product_id": 38,
+      "website_media_id": 125,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 147,
+      "legacy_asset_id": 4572,
+      "website_product_id": 38,
+      "website_media_id": 126,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 177,
+      "legacy_asset_id": 4607,
+      "website_product_id": 39,
+      "website_media_id": 127,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 177,
+      "legacy_asset_id": 4608,
+      "website_product_id": 39,
+      "website_media_id": 128,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 93,
+      "legacy_asset_id": 5153,
+      "website_product_id": 40,
+      "website_media_id": 129,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 93,
+      "legacy_asset_id": 5154,
+      "website_product_id": 40,
+      "website_media_id": 130,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 94,
+      "legacy_asset_id": 4543,
+      "website_product_id": 41,
+      "website_media_id": 131,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 94,
+      "legacy_asset_id": 4544,
+      "website_product_id": 41,
+      "website_media_id": 132,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 94,
+      "legacy_asset_id": 4545,
+      "website_product_id": 41,
+      "website_media_id": 133,
+      "sort_order": 2
+    },
+    {
+      "legacy_product_id": 94,
+      "legacy_asset_id": 4546,
+      "website_product_id": 41,
+      "website_media_id": 134,
+      "sort_order": 3
+    },
+    {
+      "legacy_product_id": 85,
+      "legacy_asset_id": 5096,
+      "website_product_id": 42,
+      "website_media_id": 135,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 85,
+      "legacy_asset_id": 5097,
+      "website_product_id": 42,
+      "website_media_id": 136,
+      "sort_order": 1
+    },
+    {
+      "legacy_product_id": 128,
+      "legacy_asset_id": 4567,
+      "website_product_id": 43,
+      "website_media_id": 137,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 5983,
+      "legacy_asset_id": 5205,
+      "website_product_id": 44,
+      "website_media_id": 138,
+      "sort_order": 0
+    },
+    {
+      "legacy_product_id": 5984,
+      "legacy_asset_id": 5234,
+      "website_product_id": 45,
+      "website_media_id": 139,
+      "sort_order": 0
+    }
+  ]
+}

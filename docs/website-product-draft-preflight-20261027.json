@@ -1,0 +1,425 @@
+{
+  "applied": false,
+  "schema": "product_archive",
+  "source_products": 45,
+  "source_categories": 9,
+  "mapped_media": 136,
+  "draft_only": true,
+  "category_slugs_require_editorial_review": true,
+  "products_requiring_review": [
+    67
+  ],
+  "categories": [
+    {
+      "name": "封口机",
+      "slug": "sealing-machines",
+      "website_category_id": null
+    },
+    {
+      "name": "封切机",
+      "slug": "sealing-cutting-machines",
+      "website_category_id": null
+    },
+    {
+      "name": "辅助设备",
+      "slug": "auxiliary-equipment",
+      "website_category_id": null
+    },
+    {
+      "name": "灌装封口生产线",
+      "slug": "filling-sealing-lines",
+      "website_category_id": null
+    },
+    {
+      "name": "配件",
+      "slug": "accessories",
+      "website_category_id": null
+    },
+    {
+      "name": "气调包装机",
+      "slug": "modified-atmosphere-packaging-machines",
+      "website_category_id": null
+    },
+    {
+      "name": "气调封口机",
+      "slug": "modified-atmosphere-sealers",
+      "website_category_id": null
+    },
+    {
+      "name": "贴体包装机",
+      "slug": "skin-packaging-machines",
+      "website_category_id": null
+    },
+    {
+      "name": "托盒封口机",
+      "slug": "tray-sealers",
+      "website_category_id": null
+    }
+  ],
+  "products": [
+    {
+      "legacy_product_id": 67,
+      "slug": "product-67",
+      "website_product_id": null,
+      "hero_media_id": null,
+      "card_media_id": 4,
+      "review_required": true
+    },
+    {
+      "legacy_product_id": 65,
+      "slug": "product-65",
+      "website_product_id": null,
+      "hero_media_id": 5,
+      "card_media_id": 12,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 66,
+      "slug": "product-66",
+      "website_product_id": null,
+      "hero_media_id": 13,
+      "card_media_id": 13,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 68,
+      "slug": "product-68",
+      "website_product_id": null,
+      "hero_media_id": 28,
+      "card_media_id": 28,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 180,
+      "slug": "product-180",
+      "website_product_id": null,
+      "hero_media_id": 40,
+      "card_media_id": 44,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 72,
+      "slug": "product-72",
+      "website_product_id": null,
+      "hero_media_id": 45,
+      "card_media_id": 45,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 69,
+      "slug": "product-69",
+      "website_product_id": null,
+      "hero_media_id": 48,
+      "card_media_id": 48,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 73,
+      "slug": "product-73",
+      "website_product_id": null,
+      "hero_media_id": 54,
+      "card_media_id": 54,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 74,
+      "slug": "product-74",
+      "website_product_id": null,
+      "hero_media_id": 59,
+      "card_media_id": 59,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 75,
+      "slug": "product-75",
+      "website_product_id": null,
+      "hero_media_id": 61,
+      "card_media_id": 61,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 77,
+      "slug": "product-77",
+      "website_product_id": null,
+      "hero_media_id": 64,
+      "card_media_id": 64,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 78,
+      "slug": "product-78",
+      "website_product_id": null,
+      "hero_media_id": 65,
+      "card_media_id": 65,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 79,
+      "slug": "product-79",
+      "website_product_id": null,
+      "hero_media_id": 68,
+      "card_media_id": 68,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 70,
+      "slug": "product-70",
+      "website_product_id": null,
+      "hero_media_id": 70,
+      "card_media_id": 70,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 82,
+      "slug": "lq250-ts-pneumatic-sealer",
+      "website_product_id": null,
+      "hero_media_id": 71,
+      "card_media_id": 71,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 83,
+      "slug": "product-83",
+      "website_product_id": null,
+      "hero_media_id": 75,
+      "card_media_id": 75,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 88,
+      "slug": "product-88",
+      "website_product_id": null,
+      "hero_media_id": 76,
+      "card_media_id": 77,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 89,
+      "slug": "product-89",
+      "website_product_id": null,
+      "hero_media_id": 83,
+      "card_media_id": 83,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 181,
+      "slug": "product-181",
+      "website_product_id": null,
+      "hero_media_id": 84,
+      "card_media_id": 84,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 90,
+      "slug": "product-90",
+      "website_product_id": null,
+      "hero_media_id": 86,
+      "card_media_id": 86,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 76,
+      "slug": "product-76",
+      "website_product_id": null,
+      "hero_media_id": 90,
+      "card_media_id": 90,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 175,
+      "slug": "product-175",
+      "website_product_id": null,
+      "hero_media_id": 91,
+      "card_media_id": 91,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 95,
+      "slug": "product-95",
+      "website_product_id": null,
+      "hero_media_id": 95,
+      "card_media_id": 95,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 96,
+      "slug": "lq450-benchtop-map-machine",
+      "website_product_id": null,
+      "hero_media_id": 99,
+      "card_media_id": 99,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 80,
+      "slug": "product-80",
+      "website_product_id": null,
+      "hero_media_id": 96,
+      "card_media_id": 96,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 178,
+      "slug": "product-178",
+      "website_product_id": null,
+      "hero_media_id": 100,
+      "card_media_id": 100,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 81,
+      "slug": "product-81",
+      "website_product_id": null,
+      "hero_media_id": 101,
+      "card_media_id": 102,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 91,
+      "slug": "product-91",
+      "website_product_id": null,
+      "hero_media_id": 103,
+      "card_media_id": 103,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 110,
+      "slug": "product-110",
+      "website_product_id": null,
+      "hero_media_id": 106,
+      "card_media_id": 106,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 84,
+      "slug": "product-84",
+      "website_product_id": null,
+      "hero_media_id": 107,
+      "card_media_id": 111,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 87,
+      "slug": "product-87",
+      "website_product_id": null,
+      "hero_media_id": 113,
+      "card_media_id": 113,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 171,
+      "slug": "product-171",
+      "website_product_id": null,
+      "hero_media_id": 117,
+      "card_media_id": 117,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 176,
+      "slug": "lq410l-automatic-packaging-machine",
+      "website_product_id": null,
+      "hero_media_id": 118,
+      "card_media_id": 118,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 5982,
+      "slug": "product-5982",
+      "website_product_id": null,
+      "hero_media_id": 119,
+      "card_media_id": 119,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 92,
+      "slug": "product-92",
+      "website_product_id": null,
+      "hero_media_id": 120,
+      "card_media_id": 122,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 179,
+      "slug": "product-179",
+      "website_product_id": null,
+      "hero_media_id": 120,
+      "card_media_id": 120,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 170,
+      "slug": "lq380a-map-production-line",
+      "website_product_id": null,
+      "hero_media_id": 123,
+      "card_media_id": 124,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 147,
+      "slug": "product-147",
+      "website_product_id": null,
+      "hero_media_id": 125,
+      "card_media_id": 125,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 177,
+      "slug": "product-177",
+      "website_product_id": null,
+      "hero_media_id": 127,
+      "card_media_id": 127,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 93,
+      "slug": "product-93",
+      "website_product_id": null,
+      "hero_media_id": 129,
+      "card_media_id": 129,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 94,
+      "slug": "product-94",
+      "website_product_id": null,
+      "hero_media_id": 131,
+      "card_media_id": 131,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 85,
+      "slug": "rotary-sealing-machine",
+      "website_product_id": null,
+      "hero_media_id": 135,
+      "card_media_id": 135,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 128,
+      "slug": "product-128",
+      "website_product_id": null,
+      "hero_media_id": 137,
+      "card_media_id": 137,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 5983,
+      "slug": "product-5983",
+      "website_product_id": null,
+      "hero_media_id": 138,
+      "card_media_id": 138,
+      "review_required": false
+    },
+    {
+      "legacy_product_id": 5984,
+      "slug": "product-5984",
+      "website_product_id": null,
+      "hero_media_id": 139,
+      "card_media_id": 139,
+      "review_required": false
+    }
+  ],
+  "target_counts_before": {
+    "website_product_categories": 0,
+    "website_products": 0
+  }
+}

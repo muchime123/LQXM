@@ -1,0 +1,1003 @@
+{
+  "applied": true,
+  "selected_images": 136,
+  "selected_references": 142,
+  "copied_files": 0,
+  "registered_media": 0,
+  "references": [
+    {
+      "legacy_product_id": 67,
+      "legacy_asset_id": 5221,
+      "storage_key": "website/images/4c1969037127618021b21caacb02a45d7e5c3c3c0911a545d9f6fdd6960b5107.png",
+      "website_media_id": 4,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4638,
+      "storage_key": "website/images/27d680eaade9a6e2aafae677793773aee96a2474d448196c9c42ef8fa509c21f.jpg",
+      "website_media_id": 5,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4639,
+      "storage_key": "website/images/0d1802de98dbc9f7702389d634d990e777718807af66022aa760df27382f6da1.jpg",
+      "website_media_id": 6,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4640,
+      "storage_key": "website/images/6962e2fb7d3b74f807ed25b3a38f0fa3a23743db2a8c6e1f2bf0c62e395019da.jpg",
+      "website_media_id": 7,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4641,
+      "storage_key": "website/images/bc422dc77db8684c873307cdb9c8c0a42769047f7a936d3f0ce9e3e761cdfa7b.jpg",
+      "website_media_id": 8,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4642,
+      "storage_key": "website/images/486c9721b7e5c979b7ce9368f9d53a2d93c5b70e5ac42e7c61d9233b013d3c88.jpg",
+      "website_media_id": 9,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4643,
+      "storage_key": "website/images/f859c491465b2424064707988a2dde1fe72b45ca240211a3150e10d7968c1304.jpg",
+      "website_media_id": 10,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 4644,
+      "storage_key": "website/images/3f29f47918397e28d38287a75f02cb6aaa47373939f39e46261849ba7ef86df3.jpg",
+      "website_media_id": 11,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 65,
+      "legacy_asset_id": 5222,
+      "storage_key": "website/images/3a5edeae3951791d36e8d0bb970ca488e85137a8df18582e214875ade1cd1665.png",
+      "website_media_id": 12,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4672,
+      "storage_key": "website/images/7e9b95340cefebe8d26e2246692256e0018fa8ca10903b6c42d919af57d24ce1.jpg",
+      "website_media_id": 13,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4673,
+      "storage_key": "website/images/a2eeae69501530f6dc226fcb7b537058c3b1f5f6d934697db946651ef23e8959.png",
+      "website_media_id": 14,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4674,
+      "storage_key": "website/images/eba965249de8b0de7fa8a8900a6456b9fea818754b6820568c856ca1b63f89b8.jpg",
+      "website_media_id": 15,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4675,
+      "storage_key": "website/images/38f47510df248b5e13cb80e0a1c6d74a089db75b6939f2713bfb00c869ddbf96.jpg",
+      "website_media_id": 16,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4676,
+      "storage_key": "website/images/77d2181448def3a4584454f18583feffcb341027076150328c43013fae8cc8f4.jpg",
+      "website_media_id": 17,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4677,
+      "storage_key": "website/images/34d4599c57ede608ddecb462f7697d5040aae2dff8b4b7afe5879b02dd987daf.jpg",
+      "website_media_id": 18,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4678,
+      "storage_key": "website/images/13a8c1e192b5ca252c397a26aaa44700b38255e68869a16ab4c084bcfcf1f2f2.jpg",
+      "website_media_id": 19,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4679,
+      "storage_key": "website/images/28127935170b7f386940fb3acc2a2111112b3fd9de706cb6aa1807d82b1c93cf.png",
+      "website_media_id": 20,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4680,
+      "storage_key": "website/images/1a0e0fd97137e79df81f1de064ecaa188478400297295692b8503f585ae17deb.png",
+      "website_media_id": 21,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4681,
+      "storage_key": "website/images/cef393befe6e5a394e9d6879b04c71fd1ddd900b000257d5d7bb78bbdd13ef06.png",
+      "website_media_id": 22,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4682,
+      "storage_key": "website/images/56c90faebf569ea6e9030ba934a9044884eb838f85e70974f54b8fcce069681d.jpg",
+      "website_media_id": 23,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4683,
+      "storage_key": "website/images/b593355b289593437195a1a4208ea3e038dbc4a4079385f5e69618a45d7e1e67.png",
+      "website_media_id": 24,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4684,
+      "storage_key": "website/images/bfd35249ed50138824f87d35b6d9d9a2d68d4b7913d23aa3d391d2862efb7906.jpg",
+      "website_media_id": 25,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4685,
+      "storage_key": "website/images/0730cace4f1b2d0080f3d261b6c16b8eab6a518be269f7f6176871e54dffce0d.jpg",
+      "website_media_id": 26,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 66,
+      "legacy_asset_id": 4686,
+      "storage_key": "website/images/1bfa6eb9b3831d074d1d8ac88beaa755b5bc84d655e8370d97bdc7c9ae678df0.jpg",
+      "website_media_id": 27,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4764,
+      "storage_key": "website/images/d285b52b107886c42070e6b50557fdfc9d66443d069d0651831e8f7fec7f8740.jpg",
+      "website_media_id": 28,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4765,
+      "storage_key": "website/images/839834250387c07ec1e79d0691260950973e70c2ed2239552ab49428b9e35ecd.jpg",
+      "website_media_id": 29,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4766,
+      "storage_key": "website/images/6b1df004be104088e40b518718160918856110b1ec00320ea83f1d84ac5d64d7.jpg",
+      "website_media_id": 30,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4767,
+      "storage_key": "website/images/3b793f6ac094dd438b4317d69420eefb8eba7135f619b1dcf4653ffe00d824b9.jpg",
+      "website_media_id": 31,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4768,
+      "storage_key": "website/images/fdaf23ac91542d21cd1330f56e9f52fdbfc43b0e6613736670347f81c8dd6c48.jpg",
+      "website_media_id": 32,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4769,
+      "storage_key": "website/images/2798ae584ec0f6709aa37d007a9b6c7ed8d62b9b777ddfb540c9f8e62c199a91.jpg",
+      "website_media_id": 33,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4771,
+      "storage_key": "website/images/feef21e097385a4b400af8c2c0eebcbee6705c8d78df24410e75e4058e97e689.jpg",
+      "website_media_id": 34,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4772,
+      "storage_key": "website/images/d9adf853f862e3d6f3b82a25eb1f7e1e8790aeaf4c2e020023ba1b56a083df14.jpg",
+      "website_media_id": 35,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4773,
+      "storage_key": "website/images/c9c3d86e245029fd02c55ed104660f756e64b45ca2d4e181f5fb6c67821aa36a.jpg",
+      "website_media_id": 36,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4774,
+      "storage_key": "website/images/2caf8eab9731febe95e46e465bacfaee41a4cac2a00404eb0f90f7e819b6a4fa.jpg",
+      "website_media_id": 37,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4775,
+      "storage_key": "website/images/5829f647d7db3cdfe1312cfc64c4e4af8601e6a6d481df672547bc094af21ad7.png",
+      "website_media_id": 38,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 68,
+      "legacy_asset_id": 4776,
+      "storage_key": "website/images/bee67bd3842017f0b075226f7ae065b0ce29a83342ff0c807415dc37c6f8c872.png",
+      "website_media_id": 39,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 180,
+      "legacy_asset_id": 4616,
+      "storage_key": "website/images/fefb2ce1612c059b36eb771d0c3f550813fcb7c94eb5c821d7f24cab9c90a1d8.png",
+      "website_media_id": 40,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 180,
+      "legacy_asset_id": 4617,
+      "storage_key": "website/images/b780a85cfef34839c81ba2918163dbb2996a1daea03992ad7e2ffbac962757c5.png",
+      "website_media_id": 41,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 180,
+      "legacy_asset_id": 4618,
+      "storage_key": "website/images/cc04fd83595bcbbc71fd38fbbaa4eed6cea347c8655aa2e45254b0c337ab5bc2.png",
+      "website_media_id": 42,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 180,
+      "legacy_asset_id": 4619,
+      "storage_key": "website/images/e1d3cd1eebd992f1ba1bfaf87177e0d5bb8565565b286d545bba1b1332b8f63d.png",
+      "website_media_id": 43,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 180,
+      "legacy_asset_id": 5273,
+      "storage_key": "website/images/e022278d0b9cfcae7b53c172aa0f936f7fcf485699c42f081b4c20a99fd6caac.jpg",
+      "website_media_id": 44,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 72,
+      "legacy_asset_id": 4887,
+      "storage_key": "website/images/d428d7d100e14cdf52d54f192f9247d9e8bf99ba1122f18e2e8f6141310c86a7.jpg",
+      "website_media_id": 45,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 72,
+      "legacy_asset_id": 4888,
+      "storage_key": "website/images/b5f0d4b3dcf752b06622b525cc2b2bb83bffb633cdd5b01c224ab8288212a36c.jpg",
+      "website_media_id": 46,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 72,
+      "legacy_asset_id": 4889,
+      "storage_key": "website/images/ced92d2832c430ac7658133322491b3bffc5868976266a861689f832fb18850b.jpg",
+      "website_media_id": 47,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4820,
+      "storage_key": "website/images/808d2f2fff460a357dec866f0fabb7d5faee026c6c3646d4f05c7e7deb3b7372.jpg",
+      "website_media_id": 48,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4821,
+      "storage_key": "website/images/70537a8de873b362c0b096f255e3b668505a20f3734b92de7a0e633b21fe9f57.png",
+      "website_media_id": 49,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4822,
+      "storage_key": "website/images/a66d01cdecfacc1c1cb69d8ae125219e791f62ee521ecf67d32e46506c165de1.png",
+      "website_media_id": 50,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4823,
+      "storage_key": "website/images/eb49af850c5bad13823d32ec26c258dc1bbe1550cd94b57794cbb2759e2b97e7.jpg",
+      "website_media_id": 51,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4824,
+      "storage_key": "website/images/4d22de7cac495fddbeaf42e5dd4bccce22769aa5d8d156e8fcb491fdb2b4aee5.png",
+      "website_media_id": 52,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 69,
+      "legacy_asset_id": 4825,
+      "storage_key": "website/images/adc394df9b8325582ead72e4592163c9f9169f43309fac735544e0beb47a2009.png",
+      "website_media_id": 53,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 73,
+      "legacy_asset_id": 4921,
+      "storage_key": "website/images/a95d7c493fa1af4319c8fd8f9d32cda8e20ce5287c9718431e7c1c1f6c7f23a3.jpg",
+      "website_media_id": 54,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 73,
+      "legacy_asset_id": 4922,
+      "storage_key": "website/images/d88dd07bdaedff595c73bd318f8b198157190cd3f89e19c994f450444e93badf.png",
+      "website_media_id": 55,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 73,
+      "legacy_asset_id": 4923,
+      "storage_key": "website/images/4fe6d28106e9a4175e24b7fbe2d31685c5fd0f8671f1cb673bf3199f64f54aeb.png",
+      "website_media_id": 56,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 73,
+      "legacy_asset_id": 4924,
+      "storage_key": "website/images/c7bc1d6d540ae6eb8f42dad38fb8aaae63c6143821579ed78cfad40ca6efc36f.png",
+      "website_media_id": 57,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 74,
+      "legacy_asset_id": 4942,
+      "storage_key": "website/images/c2892ae312b594b7a51070390d2dfa84d18a5cdc0fe469b1b54f4f8a9d8cc9dd.jpg",
+      "website_media_id": 59,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 74,
+      "legacy_asset_id": 4943,
+      "storage_key": "website/images/923777c3f55c01a8b707fffc2a02c10c77c937f1e4b9b05320bb037b8b0a7807.png",
+      "website_media_id": 58,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 74,
+      "legacy_asset_id": 4944,
+      "storage_key": "website/images/d757cc14dcb6301efb8b078f6fc860bca302a3708bc02715d71f74f140593f7c.png",
+      "website_media_id": 60,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 75,
+      "legacy_asset_id": 4952,
+      "storage_key": "website/images/8be334915c43cf42f2e6c4040d89dad389ad16073ddd5be8139a432773117096.jpg",
+      "website_media_id": 61,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 75,
+      "legacy_asset_id": 4953,
+      "storage_key": "website/images/fc4a0350fc24842e40f438641bc2da67a6829a0300f63ab6306d23b1353234f6.jpg",
+      "website_media_id": 62,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 75,
+      "legacy_asset_id": 4954,
+      "storage_key": "website/images/3356b1dd2e05f26840f3ab2ca066245d51e1df8d56063c397d116da4dc7b798c.jpg",
+      "website_media_id": 63,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 77,
+      "legacy_asset_id": 4987,
+      "storage_key": "website/images/f2dd2680829b18b6b91e285ebe02c93e24ecfe9d61a3debf91ca89f460dbf430.jpg",
+      "website_media_id": 64,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 78,
+      "legacy_asset_id": 5017,
+      "storage_key": "website/images/e31677824f02cdeec460bc6e04880667d870112ecf1cb71972981ae16f38fa0e.jpg",
+      "website_media_id": 65,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 78,
+      "legacy_asset_id": 5018,
+      "storage_key": "website/images/0cd93ad1c59a1946f4628ac1c104ead13223dc4e44fef58290ee267d16a9dc63.jpg",
+      "website_media_id": 66,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 78,
+      "legacy_asset_id": 5019,
+      "storage_key": "website/images/ba02077636367ea58f4fd9d551d8404d9ead3e27223534f1e4ded0e0d64e59cc.jpg",
+      "website_media_id": 67,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 79,
+      "legacy_asset_id": 4525,
+      "storage_key": "website/images/125e16ce9a747bdc6d5323e0ba3672f779e6a50bd75a82a34ca2250fa383ff42.png",
+      "website_media_id": 68,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 79,
+      "legacy_asset_id": 5031,
+      "storage_key": "website/images/697cb414eaf48cc2a0a2f56e9057c0229eefc29d9fa2ca89242321d7488deb66.png",
+      "website_media_id": 69,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 70,
+      "legacy_asset_id": 4521,
+      "storage_key": "website/images/3450bbf7e78cc3e3451fd085e48dbdb64d200ad91631c6f12ac0ff1606953338.jpg",
+      "website_media_id": 70,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 82,
+      "legacy_asset_id": 5063,
+      "storage_key": "website/images/f826f9c5605c47f80c0825f8103cca1454be7f8eecbb122a650c65596712fa54.jpg",
+      "website_media_id": 71,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 82,
+      "legacy_asset_id": 5064,
+      "storage_key": "website/images/3190724fa407fa2fc5f09b108511d368a2a22ea4f11afac80eb5161fdab4b3af.jpg",
+      "website_media_id": 72,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 82,
+      "legacy_asset_id": 5065,
+      "storage_key": "website/images/153997b652e8eddf5d66edc57e8cd68d26b424d870bd8c35e88cf8a13ec5f419.png",
+      "website_media_id": 73,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 82,
+      "legacy_asset_id": 5066,
+      "storage_key": "website/images/09d7b0e018fabfebf6f388306dac3c43b9d95bbd227d61e08923929446fb0bfa.png",
+      "website_media_id": 74,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 83,
+      "legacy_asset_id": 5091,
+      "storage_key": "website/images/2b5fcdb2cca74430bacb233355651caea46ce0e3a2f36530f05fd95869f6c3f2.jpg",
+      "website_media_id": 75,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 4535,
+      "storage_key": "website/images/071a920f258ff5629e2030b172f16bb417e0ed31a639386171093727990ccdfb.png",
+      "website_media_id": 76,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 4536,
+      "storage_key": "website/images/6284b45d098a5d404b1b05b6472715811f6b7f7231e51174bd7d8999c1793437.png",
+      "website_media_id": 77,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 4537,
+      "storage_key": "website/images/f7225330d0a3ae71196f3897698b86a6c2b3beb1fa93a3117ba04b50a13053b7.png",
+      "website_media_id": 78,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 4538,
+      "storage_key": "website/images/d2a94498576b2cfcb71d9c3cc13cfb9f170339fd5b98a45c1bf6d145e8b8040b.png",
+      "website_media_id": 79,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 4539,
+      "storage_key": "website/images/0abb5c2631afb04e098ad67c7fdc8aac0b45af00a8ca7c5cdb528a21c6cf1814.png",
+      "website_media_id": 80,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 5108,
+      "storage_key": "website/images/587c6a366c478077124fdbeffc7d1b1a99b778f81e4ae8126323545669f466d1.png",
+      "website_media_id": 81,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 88,
+      "legacy_asset_id": 5109,
+      "storage_key": "website/images/005cbee002a9a7547adfcd9d9dd09c0e0c06eb2a8cdbf128844743cee603ca01.png",
+      "website_media_id": 82,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 89,
+      "legacy_asset_id": 5119,
+      "storage_key": "website/images/b67ca08d967946b17d1564bd1994398c123c81e33b7bddae6e5ef41dc49536e2.jpg",
+      "website_media_id": 83,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 181,
+      "legacy_asset_id": 4621,
+      "storage_key": "website/images/793facc9043e362431e2b165c692dbc2e34624bc55ffbf22318b89f60036c730.png",
+      "website_media_id": 84,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 181,
+      "legacy_asset_id": 4622,
+      "storage_key": "website/images/5c62256ba8a7e5302e332aee9370688b2d3e41423ebb1cc6206b8f8f7c41cc6a.png",
+      "website_media_id": 85,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5121,
+      "storage_key": "website/images/49812b8d96087d8b708e1abf7fc04e1cfa643cf96c262c520ef058e6df9420c2.png",
+      "website_media_id": 86,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5122,
+      "storage_key": "website/images/eb0acfb3976cfd9548467eb4f03eb7fbc3fc9f6b666d34e656e90c8d40ff0e9a.png",
+      "website_media_id": 87,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5123,
+      "storage_key": "website/images/793facc9043e362431e2b165c692dbc2e34624bc55ffbf22318b89f60036c730.png",
+      "website_media_id": 84,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5124,
+      "storage_key": "website/images/793facc9043e362431e2b165c692dbc2e34624bc55ffbf22318b89f60036c730.png",
+      "website_media_id": 84,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5125,
+      "storage_key": "website/images/f9ad24dc6abbbdeb5674eac1a51a37640fb0e8522874aa249ef2de0df3d5aed8.png",
+      "website_media_id": 88,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5126,
+      "storage_key": "website/images/a5ce967efb6c3c57b4e6f34ea4d5b81bbb20f139455496c50ab5a3d6bf480d6d.png",
+      "website_media_id": 89,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 90,
+      "legacy_asset_id": 5127,
+      "storage_key": "website/images/5c62256ba8a7e5302e332aee9370688b2d3e41423ebb1cc6206b8f8f7c41cc6a.png",
+      "website_media_id": 85,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 76,
+      "legacy_asset_id": 4962,
+      "storage_key": "website/images/11862f7450bf00ee1185ede3fd22366329ba2cf7df4ef56a65286530fb4c96ea.jpg",
+      "website_media_id": 90,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 175,
+      "legacy_asset_id": 4601,
+      "storage_key": "website/images/3a18ab3b07970404e5a92ce9077959816dfe50eb8b549e9a57612a30b0e09e51.jpg",
+      "website_media_id": 91,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 175,
+      "legacy_asset_id": 4602,
+      "storage_key": "website/images/078598f1d6f13f4c1e58d2e21a33909edcf6db9596fea2d435a96dca548cd779.png",
+      "website_media_id": 92,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 175,
+      "legacy_asset_id": 4603,
+      "storage_key": "website/images/97089c6042075a409fe575e166be389747ec1089476fb6028dbac2355a9c8cce.jpg",
+      "website_media_id": 93,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 175,
+      "legacy_asset_id": 4604,
+      "storage_key": "website/images/cfa553887a5d64bdee49a58b8c9802b148f0c9af43c4f9ee867073343f500ff5.png",
+      "website_media_id": 94,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 95,
+      "legacy_asset_id": 5174,
+      "storage_key": "website/images/75ffbb79e1ba8702af0c8f671b3f321d364d532585a0337228cf0df7ade03f47.jpg",
+      "website_media_id": 95,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 95,
+      "legacy_asset_id": 5175,
+      "storage_key": "website/images/d53fc34f3b2f896bb24c8ee928315812fb36feac46f1b6c51b5213bab50ad233.png",
+      "website_media_id": 97,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 95,
+      "legacy_asset_id": 5176,
+      "storage_key": "website/images/50a5f181025623620d45a856deb1af01ad5adc66c3f0e088a3a77f135c5403cf.png",
+      "website_media_id": 98,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 96,
+      "legacy_asset_id": 5187,
+      "storage_key": "website/images/1fbe927f4d3c194cdde0ffc72c9de6e538490e70ca89b0ed66398117ac969a88.jpg",
+      "website_media_id": 99,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 80,
+      "legacy_asset_id": 5041,
+      "storage_key": "website/images/c78b549b07568197671039868d62aa17c6e3bda841a308275f270390b5c1079a.jpg",
+      "website_media_id": 96,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 178,
+      "legacy_asset_id": 4613,
+      "storage_key": "website/images/c5fe1eaeebd5f479be6fc54f735817ccfcc95ec3ba88c733b58ddebecdb55b3f.png",
+      "website_media_id": 100,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 81,
+      "legacy_asset_id": 5049,
+      "storage_key": "website/images/e8003b2f02c157f0d6ec20f14fbd0bf94b87f0454038b0d967e2d8279fbea152.png",
+      "website_media_id": 101,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 81,
+      "legacy_asset_id": 5050,
+      "storage_key": "website/images/9c1dffaa9188f3d67322301166165b056ca3e6473f2cbaa5f021e7e3f4386390.png",
+      "website_media_id": 102,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 91,
+      "legacy_asset_id": 5136,
+      "storage_key": "website/images/7bb8d9e62638f170cdb27a4f90f7b98608f40d4246b5ff1852e926cb8e174d1e.jpg",
+      "website_media_id": 103,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 91,
+      "legacy_asset_id": 5137,
+      "storage_key": "website/images/a2da4151093b808de9976972eb0e1b40d90810f6d31e63f1c49cb7714a0ba9a4.png",
+      "website_media_id": 104,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 91,
+      "legacy_asset_id": 5138,
+      "storage_key": "website/images/11a71d7f4a001e8ab1b815c0743575a5783c6f0908a1eacccfd9e73415150942.png",
+      "website_media_id": 105,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 110,
+      "legacy_asset_id": 5265,
+      "storage_key": "website/images/84ee66dbe235f8ed6646631a375674812cc4465e86d791ef0e5edc82d82fe255.png",
+      "website_media_id": 106,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 4528,
+      "storage_key": "website/images/1a354670bcfbf5466ebb77f7cd852f4b74896692c09a808a7b95642703771675.png",
+      "website_media_id": 107,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 4529,
+      "storage_key": "website/images/0cc55c4a1d851d18263ecafcb09f97822deff24dbca6b14559a75d169b3ca21c.png",
+      "website_media_id": 108,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 4530,
+      "storage_key": "website/images/9c7d1742a46c78d42c1532afd25734cb8d63083f0d532af7e6b296ac286dece1.png",
+      "website_media_id": 109,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 4531,
+      "storage_key": "website/images/43adb903dd4b79c32830eeb131a8e870aa9e8d96424e1612a3de8662501431ac.png",
+      "website_media_id": 110,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 4532,
+      "storage_key": "website/images/be5ddc611002b07dab50ef0c8123d468d3a9e4c46f289b77a3013cd5ba5b54b4.png",
+      "website_media_id": 111,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 84,
+      "legacy_asset_id": 5094,
+      "storage_key": "website/images/04875f46e33374eaa06a77657a98e70318630ee1a971dcc1ccbb216891471117.jpg",
+      "website_media_id": 112,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 87,
+      "legacy_asset_id": 5104,
+      "storage_key": "website/images/23b5ac492529cb9fc1b902f6df479ebd5e76e87ec58e42659ad23fc622824707.jpg",
+      "website_media_id": 113,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 87,
+      "legacy_asset_id": 5105,
+      "storage_key": "website/images/a05d28cb7c6ab807000dd70913b322a3ae317b2fd9fdfcbaf34b2ee2d551bb97.png",
+      "website_media_id": 114,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 87,
+      "legacy_asset_id": 5106,
+      "storage_key": "website/images/88904e8626e3b47a1896a40a8e29e7d4ea3b022d27babb66bb6e09a36579a48e.png",
+      "website_media_id": 115,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 87,
+      "legacy_asset_id": 5223,
+      "storage_key": "website/images/b07586a5d38c026c5514df9205b5679818e7e18f0a740203810daa095b1c1958.jpg",
+      "website_media_id": 116,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 171,
+      "legacy_asset_id": 4587,
+      "storage_key": "website/images/89aee1f1e8b82e96f4a42ee57abc14031cd9cc7a138a3353355f87c0425de61d.jpg",
+      "website_media_id": 117,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 176,
+      "legacy_asset_id": 4606,
+      "storage_key": "website/images/8d4154157d949a7ea637c6ef0e51e83642ef750bc2961a504a5c8e9b879b9964.png",
+      "website_media_id": 118,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 5982,
+      "legacy_asset_id": 5203,
+      "storage_key": "website/images/a5ffd112ec1f48c274a5fec684b85e0c08742526085598825be19a9c8abf4110.png",
+      "website_media_id": 119,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 92,
+      "legacy_asset_id": 5143,
+      "storage_key": "website/images/7d6c2b7f06899aac8c28d9d5dfbcb53f7e47ce1b996c14b1aa18fd2bb168488a.jpg",
+      "website_media_id": 120,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 92,
+      "legacy_asset_id": 5144,
+      "storage_key": "website/images/9c9f0a6e30051044be35acc4895109aaf44139e6abe64eecf6b8736002184a82.jpg",
+      "website_media_id": 121,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 92,
+      "legacy_asset_id": 5202,
+      "storage_key": "website/images/7bb7d70a655ccae1119fed7aaef24f58629a8ac34aa70466f3e2a20f1065e6fd.png",
+      "website_media_id": 122,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 179,
+      "legacy_asset_id": 4614,
+      "storage_key": "website/images/7d6c2b7f06899aac8c28d9d5dfbcb53f7e47ce1b996c14b1aa18fd2bb168488a.jpg",
+      "website_media_id": 120,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 179,
+      "legacy_asset_id": 4615,
+      "storage_key": "website/images/9c9f0a6e30051044be35acc4895109aaf44139e6abe64eecf6b8736002184a82.jpg",
+      "website_media_id": 121,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 170,
+      "legacy_asset_id": 4575,
+      "storage_key": "website/images/2e23250b40e0bd4627302fb8b595a57509bcb2b8b427a54daa2308bc32b70bc2.jpg",
+      "website_media_id": 123,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 170,
+      "legacy_asset_id": 4577,
+      "storage_key": "website/images/ebebfe4444d4c93005aa1ed3b0908b1959a8094220cbcf8b7233fbf86373eff8.jpg",
+      "website_media_id": 124,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 170,
+      "legacy_asset_id": 5193,
+      "storage_key": "website/images/2e23250b40e0bd4627302fb8b595a57509bcb2b8b427a54daa2308bc32b70bc2.jpg",
+      "website_media_id": 123,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 147,
+      "legacy_asset_id": 4571,
+      "storage_key": "website/images/8bd7e1470a0e0643fd976bb3690ef7c19ed8b339c9304acc6f450dc14e9a3e4d.png",
+      "website_media_id": 125,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 147,
+      "legacy_asset_id": 4572,
+      "storage_key": "website/images/f916b535f9af647ef0c4013c7f2cc0f0957d3908ccb092e607703e33748af256.png",
+      "website_media_id": 126,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 177,
+      "legacy_asset_id": 4607,
+      "storage_key": "website/images/d3ae96b30a1e70e8a0966538d6b94dbcea8f98eb8187bd4e7bcc408cdc954403.png",
+      "website_media_id": 127,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 177,
+      "legacy_asset_id": 4608,
+      "storage_key": "website/images/9240013dc22444d36d29ea0726db1332acbe8dbe7df1861441f9b328d1f3f852.png",
+      "website_media_id": 128,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 93,
+      "legacy_asset_id": 5153,
+      "storage_key": "website/images/fe8ac550bf99e6898928e291109c9ab283b19c21ca8d25903ac850d34337c973.png",
+      "website_media_id": 129,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 93,
+      "legacy_asset_id": 5154,
+      "storage_key": "website/images/4f21c4478efd23bbe50e05fcc1782ca0103c8bfc2c64098db6666c696ebf8838.png",
+      "website_media_id": 130,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 94,
+      "legacy_asset_id": 4543,
+      "storage_key": "website/images/d8c11ad44b4fd28d7ba53add60643f7bd52374fe18aa86e18cf56cd7213e7825.png",
+      "website_media_id": 131,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 94,
+      "legacy_asset_id": 4544,
+      "storage_key": "website/images/4e2f9f4ca4ddf67dde3dcc242b7b444e831a73a4dc18f97fee5e8b8a175a379c.png",
+      "website_media_id": 132,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 94,
+      "legacy_asset_id": 4545,
+      "storage_key": "website/images/1868c1138873970d809dedad46ddca02df25fd9acf3b4bc5d77bd4d84b31412c.png",
+      "website_media_id": 133,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 94,
+      "legacy_asset_id": 4546,
+      "storage_key": "website/images/515ad780cdcc91c3afaa08275c681fa552325b7faeb8b1b939082199190d64cc.png",
+      "website_media_id": 134,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 85,
+      "legacy_asset_id": 5096,
+      "storage_key": "website/images/aa54a05ae73a8325f1f15a9c459817aa8b6c085adc67297b7ca89dfc89ea3748.jpg",
+      "website_media_id": 135,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 85,
+      "legacy_asset_id": 5097,
+      "storage_key": "website/images/c520946cf17deb83f87de29a0d02f9cc4a83f50deec8e987e244b006dcc98bea.jpg",
+      "website_media_id": 136,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 128,
+      "legacy_asset_id": 4567,
+      "storage_key": "website/images/4c6e2bbdede61324dca4a3ecb44caff28ccb1a21672a7dc8e23a37d6564570e7.png",
+      "website_media_id": 137,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 5983,
+      "legacy_asset_id": 5205,
+      "storage_key": "website/images/3d32f2d03beca112e37fb1c85877cb82fd185320dd69e63f12e837c0e829bc13.png",
+      "website_media_id": 138,
+      "status": "DRAFT"
+    },
+    {
+      "legacy_product_id": 5984,
+      "legacy_asset_id": 5234,
+      "storage_key": "website/images/14f941fe3b646a7af45546fab1ce6b74de045654c327012bd483e12396bbd7a0.png",
+      "website_media_id": 139,
+      "status": "DRAFT"
+    }
+  ]
+}
