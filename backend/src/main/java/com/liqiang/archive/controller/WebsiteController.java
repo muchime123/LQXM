@@ -18,10 +18,12 @@ import com.liqiang.archive.security.PublicApi;
 import com.liqiang.archive.service.CompanyInfoService;
 import com.liqiang.archive.service.InquiryAntiSpamService;
 import com.liqiang.archive.service.ProductCatalogService;
+import com.liqiang.archive.service.WebsiteNativeProductQueryService;
 import com.liqiang.archive.service.PackagingService;
 import com.liqiang.archive.service.PackagingMoldService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
@@ -51,15 +53,32 @@ public class WebsiteController {
 
     private final CompanyInfoService companyInfoService;
     private final ProductCatalogService catalogService;
+    private final WebsiteNativeProductQueryService nativeProducts;
     private final PackagingService packagingService;
     private final PackagingMoldService packagingMoldService;
     private final WebsiteInquiryRepository inquiryRepository;
     private final InquiryAntiSpamService antiSpamService;
     private final MediaAccountRepository mediaAccountRepository;
 
+    @Value("${app.website.product-source:legacy}")
+    private String productSource;
+
+    private boolean useNativeProducts() {
+        return "native".equalsIgnoreCase(productSource);
+    }
+
     @GetMapping("/home")
-    public HomeView home() {
+    public Object home() {
         CompanyInfo company = companyInfoService.getCompanyInfo();
+        if (useNativeProducts()) {
+            List<WebsiteNativeProductQueryService.ProductView> featured = nativeProducts.featured(12);
+            var page = nativeProducts.list(null, null, null, null, null, null, 0, 6);
+            return new NativeHomeView(PublicCompanyView.from(company), page.total(),
+                    featured.isEmpty() ? page.items() : featured,
+                    companyInfoService.getMilestones().stream()
+                            .filter(m -> Boolean.TRUE.equals(m.getWebsiteEnabled()))
+                            .map(PublicMilestoneView::from).toList());
+        }
         // 首页产品：后台明确勾选的核心产品优先展示。
         // websiteFeatured 已经表达了运营人员的发布意图，不再用资料完整度二次静默过滤。
         List<PublicProductView> featuredView = catalogService.getWebsiteFeaturedProducts(500).stream()
@@ -100,8 +119,9 @@ public class WebsiteController {
      * 用于首页「核心产品」区域，后台通过 website_featured 标记决定哪些产品上首页。
      */
     @GetMapping("/products/featured")
-    public List<PublicProductView> featuredProducts(@RequestParam(defaultValue = "500") int limit) {
+    public List<?> featuredProducts(@RequestParam(defaultValue = "500") int limit) {
         int safeLimit = Math.max(1, Math.min(limit, 500));
+        if (useNativeProducts()) return nativeProducts.featured(safeLimit);
         return catalogService.getWebsiteFeaturedProducts(500).stream()
                 .map(PublicProductView::from)
                 .filter(p -> p.completenessScore() >= WEBSITE_FEATURED_MIN_SCORE)
@@ -116,7 +136,7 @@ public class WebsiteController {
      * 总量统计由全量（上限 500）过门槛的产品总数提供。
      */
     @GetMapping("/products")
-    public PublicProductPage products(
+    public Object products(
             @RequestParam(required = false) String keyword,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String application,
@@ -125,6 +145,9 @@ public class WebsiteController {
             @RequestParam(required = false) String capacity,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "12") int size) {
+        if (useNativeProducts()) {
+            return nativeProducts.list(keyword, category, application, container, process, capacity, page, size);
+        }
         final int fetchSize = Math.max(size * 2, 24);
         PageRequest fetchPageable = PageRequest.of(page, fetchSize,
                 Sort.by("sortOrder").ascending().and(Sort.by("id")));
@@ -152,7 +175,11 @@ public class WebsiteController {
      * slug 不存在或未发布返回 404。
      */
     @GetMapping("/products/{slug}")
-    public ResponseEntity<PublicProductDetail> productDetail(@PathVariable String slug) {
+    public ResponseEntity<?> productDetail(@PathVariable String slug) {
+        if (useNativeProducts()) {
+            return nativeProducts.detail(slug).map(ResponseEntity::ok)
+                    .orElseGet(() -> ResponseEntity.notFound().build());
+        }
         return catalogService.getByWebsiteSlug(slug)
                 .map(PublicProductDetail::from)
                 .map(ResponseEntity::ok)
@@ -161,7 +188,8 @@ public class WebsiteController {
 
     /** 官网产品分类导航：已发布产品的分类列表。V108 起合并 equipmentCategory/productLineName 为 category。 */
     @GetMapping("/product-categories")
-    public PublicCategoryTree productCategories() {
+    public Object productCategories() {
+        if (useNativeProducts()) return nativeProducts.filterOptions();
         List<String> categories = catalogService.getWebsiteCategories();
         return new PublicCategoryTree(
                 categories,
@@ -326,6 +354,10 @@ public class WebsiteController {
 
     public record HomeView(PublicCompanyView company, long productCount, List<PublicProductView> products,
                            List<PublicMilestoneView> milestones) {}
+
+    public record NativeHomeView(PublicCompanyView company, long productCount,
+                                 List<WebsiteNativeProductQueryService.ProductView> products,
+                                 List<PublicMilestoneView> milestones) {}
 
     public record PublicProductPage(List<PublicProductView> items, long total, int totalPages, int page) {}
 

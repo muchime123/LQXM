@@ -22,8 +22,8 @@ watch(() => props.modelValue, value => {
 async function load() {
   loading.value = true
   try {
-    const result = await fetchWebsiteMedia(page.value, 20)
-    rows.value = result.content.filter(item => item.mediaType === 'IMAGE' && item.status !== 'ARCHIVED')
+    const result = await fetchWebsiteMedia(page.value, 20, true)
+    rows.value = result.content
     total.value = result.totalElements
     const current = result.content.find(item => item.id === props.modelValue)
     if (current) selectedName.value = current.displayName || current.originalFilename

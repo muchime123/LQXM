@@ -10,7 +10,12 @@ import java.util.Optional;
 public interface WebsiteMediaAssetRepository extends JpaRepository<WebsiteMediaAsset, Long> {
     Page<WebsiteMediaAsset> findByDeletedAtIsNull(Pageable pageable);
 
+    Page<WebsiteMediaAsset> findByDeletedAtIsNullAndMediaTypeAndStatusNot(
+            String mediaType, String status, Pageable pageable);
+
     Optional<WebsiteMediaAsset> findByIdAndDeletedAtIsNull(Long id);
+
+    long countByDeletedAtIsNullAndStatus(String status);
 
     Optional<WebsiteMediaAsset> findByStorageKeyAndDeletedAtIsNull(String storageKey);
 }

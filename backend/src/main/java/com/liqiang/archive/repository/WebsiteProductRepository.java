@@ -12,6 +12,12 @@ public interface WebsiteProductRepository extends JpaRepository<WebsiteProduct, 
 
     Optional<WebsiteProduct> findByIdAndDeletedAtIsNull(Long id);
 
+    Page<WebsiteProduct> findByDeletedAtIsNullAndStatus(String status, Pageable pageable);
+
+    long countByDeletedAtIsNullAndStatus(String status);
+
+    long countByDeletedAtIsNullAndStatusAndFeaturedTrue(String status);
+
     boolean existsBySlug(String slug);
 
     boolean existsBySlugAndIdNot(String slug, Long id);

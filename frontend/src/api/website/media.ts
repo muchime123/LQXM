@@ -20,8 +20,8 @@ export interface WebsiteMediaPage {
   size: number
 }
 
-export async function fetchWebsiteMedia(page = 0, size = 20): Promise<WebsiteMediaPage> {
-  const response = await http.get<WebsiteMediaPage>('/website/admin/media', { params: { page, size } })
+export async function fetchWebsiteMedia(page = 0, size = 20, imageOnly = false): Promise<WebsiteMediaPage> {
+  const response = await http.get<WebsiteMediaPage>('/website/admin/media', { params: { page, size, imageOnly } })
   return response.data
 }
 
@@ -35,5 +35,10 @@ export async function uploadWebsiteMedia(file: File): Promise<WebsiteMediaItem> 
 /** Admin previews use the authenticated axios instance; native img URLs cannot carry the token. */
 export async function fetchWebsiteMediaBlob(id: number): Promise<Blob> {
   const response = await http.get<Blob>(`/website/admin/media/${id}/content`, { responseType: 'blob' })
+  return response.data
+}
+
+export async function fetchWebsiteMediaItem(id: number): Promise<WebsiteMediaItem> {
+  const response = await http.get<WebsiteMediaItem>(`/website/admin/media/${id}`)
   return response.data
 }

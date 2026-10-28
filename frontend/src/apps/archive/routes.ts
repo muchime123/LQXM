@@ -108,6 +108,12 @@ export const archiveRoutes: RouteRecordRaw[] = [
     meta: { title: '官网产品草稿', layout: 'list', permission: 'website.manage', group: 'marketing' }
   },
   {
+    path: '/website/company-profile',
+    name: 'websiteCompanyProfile',
+    component: () => import('@/apps/archive/views/marketing/WebsiteCompanyProfileView.vue'),
+    meta: { title: '官网公司介绍草稿', layout: 'list', permission: 'website.manage', group: 'marketing' }
+  },
+  {
     path: '/website/media',
     name: 'websiteMedia',
     component: () => import('@/apps/archive/views/marketing/WebsiteMediaView.vue'),
@@ -192,6 +198,16 @@ export const archiveRoutes: RouteRecordRaw[] = [
     name: 'manufacturingTaskConfigs',
     component: () => import('@/apps/archive/views/production/ManufacturingTaskConfigView.vue'),
     meta: { title: '生产参考工期', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
+  },
+  // 「制程管理」（2026-10-27）：车间类别下的跟单节点序列维护。
+  // 节点原先硬编码在后端常量（还被拼进 SQL 字面量），加一个节点要改代码 + 写迁移 + 改测试 + 发版；
+  // 落表后独立成页自助维护。与「生产参考工期」是两件事：本页定「有哪些节点」，那页定「每个节点多少天」，
+  // 故不再挂在参考工期页面底部。权限沿用 manufacturing.template.manage（同为制造主数据维护）。
+  {
+    path: '/production-process-configs',
+    name: 'productionProcessConfigs',
+    component: () => import('@/apps/archive/views/production/ProductionProcessConfigView.vue'),
+    meta: { title: '制程管理', layout: 'list', permission: 'manufacturing.template.manage', group: 'h3' }
   },
   // 月度提成核算（现行简化口径，独立只读视图）：本月实际回款 − 上月运杂费，不依赖旧提成体系
   {

@@ -1,7 +1,10 @@
 package com.liqiang.archive.service;
 
 import com.liqiang.archive.entity.WebsiteProduct;
+import com.liqiang.archive.entity.WebsiteMediaAsset;
 import com.liqiang.archive.repository.WebsiteProductRepository;
+import com.liqiang.archive.repository.WebsiteProductCategoryRepository;
+import com.liqiang.archive.repository.WebsiteMediaAssetRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,6 +23,8 @@ public class WebsiteProductService {
     private static final Pattern SLUG = Pattern.compile("[a-z0-9]+(?:-[a-z0-9]+)*");
 
     private final WebsiteProductRepository repository;
+    private final WebsiteProductCategoryRepository categoryRepository;
+    private final WebsiteMediaAssetRepository mediaRepository;
     private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
@@ -40,6 +45,8 @@ public class WebsiteProductService {
         if (repository.existsBySlug(fields.slug())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "官网产品 URL 标识已存在");
         }
+        validateCategory(fields.categoryId());
+        validateImages(fields.heroMediaId(), fields.cardMediaId());
         WebsiteProduct product = new WebsiteProduct();
         apply(product, fields);
         WebsiteProduct saved = repository.save(product);
@@ -58,6 +65,8 @@ public class WebsiteProductService {
         if (repository.existsBySlugAndIdNot(fields.slug(), id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "官网产品 URL 标识已存在");
         }
+        validateCategory(fields.categoryId());
+        validateImages(fields.heroMediaId(), fields.cardMediaId());
         apply(product, fields);
         WebsiteProduct saved = repository.save(product);
         auditLogService.log("WebsiteProduct", saved.getId(), saved.getName(), "WEBSITE_PRODUCT_UPDATE",
@@ -84,10 +93,36 @@ public class WebsiteProductService {
         return value != null && value.length() > max;
     }
 
+    private void validateCategory(Long categoryId) {
+        if (categoryId != null && categoryRepository.findByIdAndDeletedAtIsNull(categoryId).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "官网产品分类不存在或已删除");
+        }
+    }
+
+    private void validateImages(Long heroMediaId, Long cardMediaId) {
+        validateImage(heroMediaId);
+        if (cardMediaId != null && !cardMediaId.equals(heroMediaId)) {
+            validateImage(cardMediaId);
+        }
+    }
+
+    private void validateImage(Long mediaId) {
+        if (mediaId == null) return;
+        WebsiteMediaAsset media = mediaRepository.findByIdAndDeletedAtIsNull(mediaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "官网产品图片不存在或已删除"));
+        if (!"IMAGE".equals(media.getMediaType()) || "ARCHIVED".equals(media.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "官网产品只能选择未归档的官网图片");
+        }
+    }
+
     private static void apply(WebsiteProduct product, DraftFields fields) {
+        product.setCategoryId(fields.categoryId());
         product.setName(fields.name().trim());
         product.setNameEn(fields.nameEn());
         product.setPublicModel(fields.publicModel());
+        product.setHeroMediaId(fields.heroMediaId());
+        product.setCardMediaId(fields.cardMediaId());
         product.setSlug(fields.slug());
         product.setSummary(fields.summary());
         product.setSummaryEn(fields.summaryEn());
@@ -97,7 +132,8 @@ public class WebsiteProductService {
         product.setFeatured(Boolean.TRUE.equals(fields.featured()));
     }
 
-    public record DraftFields(String name, String nameEn, String publicModel, String slug,
+    public record DraftFields(Long categoryId, String name, String nameEn, String publicModel,
+                              Long heroMediaId, Long cardMediaId, String slug,
                               String summary, String summaryEn, String seoTitle,
                               String seoDescription, Integer sortOrder, Boolean featured) {
     }

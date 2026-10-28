@@ -21,6 +21,9 @@ public class WebsiteProduct {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "category_id")
+    private Long categoryId;
+
     @Column(nullable = false, length = 300)
     private String name;
 
@@ -29,6 +32,12 @@ public class WebsiteProduct {
 
     @Column(name = "public_model", length = 200)
     private String publicModel;
+
+    @Column(name = "hero_media_id")
+    private Long heroMediaId;
+
+    @Column(name = "card_media_id")
+    private Long cardMediaId;
 
     @Column(nullable = false, length = 200)
     private String slug;

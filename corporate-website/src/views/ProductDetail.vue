@@ -9,7 +9,8 @@
  */
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRoute } from 'vue-router'
-import { fetchProductDetail } from '../api/website'
+import DOMPurify from 'dompurify'
+import { fetchProductDetail, websiteProductMediaUrl } from '../api/website'
 import { apiBase } from '../api/http'
 import { setSeo, SITE_URL } from '../composables/useSeo'
 import { setSchema, createProductSchema } from '../composables/useSchema'
@@ -29,6 +30,22 @@ const activeImageIndex = ref(0)
 // 图库：优先 main_image → 其他展示类图片 → 分类默认图 → 全站 placeholder
 const galleryImages = computed(() => {
   if (!detail.value) return []
+  if (detail.value.product) {
+    const product = detail.value.product
+    const gallery = (detail.value.gallery || []).filter((item) => item.mediaId)
+    if (gallery.length) return gallery.map((item) => ({
+      id: item.id,
+      url: websiteProductMediaUrl(item.mediaId),
+      srcset: '',
+      fileName: item.altText || product.name,
+    }))
+    if (product.heroMediaId || product.cardMediaId) return [{
+      id: 'website-hero',
+      url: websiteProductMediaUrl(product.heroMediaId || product.cardMediaId),
+      srcset: '',
+      fileName: product.name,
+    }]
+  }
   const assets = detail.value.gallery || []
 
   const buildAssetUrl = (id, size) =>
@@ -87,7 +104,25 @@ function getCategoryFallbackImage(category) {
 
 const activeImage = computed(() => galleryImages.value[activeImageIndex.value] || galleryImages.value[0])
 
-const model = computed(() => detail.value?.model || {})
+const model = computed(() => {
+  if (!detail.value?.product) return detail.value?.model || {}
+  const product = detail.value.product
+  return {
+    name: product.name,
+    modelCode: product.publicModel,
+    equipmentCategory: product.category,
+    websiteSlug: product.slug,
+    websiteSummary: product.summary,
+    applicationTags: product.applicationTags,
+    containerTags: product.containerTags,
+    packagingProcessTags: product.processTags,
+    capacityLevel: product.capacityLevel,
+    ...detail.value.technicalParameters,
+  }
+})
+const nativeDescriptionHtml = computed(() => detail.value?.product && detail.value.descriptionHtml
+  ? DOMPurify.sanitize(detail.value.descriptionHtml)
+  : '')
 
 // 规格参数（基线）
 const specRows = computed(() => {
@@ -113,7 +148,7 @@ const specRows = computed(() => {
 
 const hasSpecs = computed(() => specRows.value.length > 0)
 
-const hasIntroduction = computed(() => model.value.introductionCn || model.value.applicableScope)
+const hasIntroduction = computed(() => nativeDescriptionHtml.value || model.value.introductionCn || model.value.applicableScope)
 const hasAdvantages = computed(() => model.value.equipmentAdvantages)
 const hasApplicable = computed(() =>
   model.value.applicableIndustry || model.value.applicableProduct ||
@@ -152,8 +187,10 @@ const variantCards = computed(() => (detail.value?.variants || []).map((variant)
     { label: '封口口径', value: variant.moldSizeLabel || variant.mouthSpec || variant.filmOrBoxSize },
     { label: '包装速度', value: variant.packagingSpeed },
     { label: '电源 / 功率', value: [variant.voltage, variant.power].filter(Boolean).join(' · ') },
-    { label: '设备尺寸', value: variant.deviceSize || variant.equipmentSizeSpec },
+    { label: '设备尺寸', value: variant.dimensions || variant.deviceSize || variant.equipmentSizeSpec },
   ].filter((item) => item.value),
+  variantName: variant.name || variant.variantName,
+  specKey: variant.publicSku || variant.specKey,
 })).filter((variant) => variant.variantName || variant.facts.length).slice(0, 6))
 
 const compatiblePackaging = computed(() => detail.value?.compatiblePackaging || [])
@@ -210,15 +247,22 @@ async function load() {
     } else {
       detail.value = data
       // 动态 SEO：基于产品名称和型号生成 title 和 description
-      const m = data.model || {}
+      const m = data.product ? {
+        name: data.product.name,
+        modelCode: data.product.publicModel,
+        equipmentCategory: data.product.category,
+        websiteSummary: data.product.summary,
+        introductionCn: data.product.summary,
+        defaultImage: null,
+      } : (data.model || {})
       const titleParts = [m.name, m.modelCode].filter(Boolean)
-      const seoTitle = titleParts.length > 0 ? titleParts.join('｜') : '产品详情'
-      const seoDesc = m.introductionCn
+      const seoTitle = data.product?.seoTitle || (titleParts.length > 0 ? titleParts.join('｜') : '产品详情')
+      const seoDesc = data.product?.seoDescription || (m.introductionCn
         ? m.introductionCn.slice(0, 150)
-        : `${m.name || '利强包装设备'}｜${m.equipmentCategory || '食品包装设备'}，支持非标定制与样品试封。`
+        : `${m.name || '利强包装设备'}｜${m.equipmentCategory || '食品包装设备'}，支持非标定制与样品试封。`)
       setSeo(seoTitle, seoDesc, {
         ogType: 'product',
-        ogImage: data.imageUrl,
+        ogImage: data.product?.heroMediaId ? websiteProductMediaUrl(data.product.heroMediaId) : data.imageUrl,
         canonical: `${SITE_URL}/products/${route.params.slug}`,
       })
       
@@ -230,7 +274,9 @@ async function load() {
         equipmentCategory: m.equipmentCategory,
         websiteSummary: m.websiteSummary,
         introductionCn: m.introductionCn,
-        defaultImage: m.defaultImage ? `${apiBase}${m.defaultImage}` : null,
+        defaultImage: data.product?.heroMediaId
+          ? websiteProductMediaUrl(data.product.heroMediaId)
+          : (m.defaultImage ? `${apiBase}${m.defaultImage}` : null),
         brand: company.value?.brandName || '利强包装',
         url: window.location.href
       })
@@ -362,6 +408,7 @@ watch(() => route.params.slug, load)
         <section v-if="hasIntroduction" id="introduction" class="detail-section">
           <div class="detail-section__heading"><span>OVERVIEW</span><h2>产品介绍</h2></div>
           <div class="detail-section__content">
+            <div v-if="nativeDescriptionHtml" class="detail-text" v-html="nativeDescriptionHtml"></div>
             <p v-if="model.introductionCn" class="detail-text">{{ model.introductionCn }}</p>
             <p v-if="model.applicableScope" class="detail-text">{{ model.applicableScope }}</p>
           </div>

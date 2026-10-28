@@ -11,9 +11,9 @@ const props = defineProps({
   product: { type: Object, required: true },
 })
 
-const link = computed(() => `/products/${props.product.websiteSlug || props.product.id}`)
+const link = computed(() => `/products/${props.product.websiteSlug || props.product.slug || props.product.id}`)
 const subtitle = computed(
-  () => props.product.productLineName || props.product.equipmentCategory || '包装设备'
+  () => props.product.productLineName || props.product.equipmentCategory || props.product.category || '包装设备'
 )
 </script>
 

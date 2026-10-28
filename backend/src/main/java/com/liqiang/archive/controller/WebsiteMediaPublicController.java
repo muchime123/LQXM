@@ -3,6 +3,7 @@ package com.liqiang.archive.controller;
 import com.liqiang.archive.entity.WebsiteMediaAsset;
 import com.liqiang.archive.repository.WebsiteBannerRepository;
 import com.liqiang.archive.repository.WebsiteMediaAssetRepository;
+import com.liqiang.archive.service.WebsiteProductMediaVisibilityService;
 import com.liqiang.archive.security.PublicApi;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -20,7 +21,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** Public media access is limited to images referenced by a currently active Banner. */
+/** Public media access requires an active Banner or published website product reference. */
 @RestController
 @RequestMapping("/api/website/media")
 @PublicApi
@@ -28,6 +29,7 @@ import java.nio.file.Path;
 public class WebsiteMediaPublicController {
     private final WebsiteMediaAssetRepository mediaRepository;
     private final WebsiteBannerRepository bannerRepository;
+    private final WebsiteProductMediaVisibilityService productMediaVisibility;
 
     @Value("${app.files.root}")
     private String fileRoot;
@@ -35,8 +37,11 @@ public class WebsiteMediaPublicController {
     @GetMapping("/{id}/content")
     public ResponseEntity<Resource> content(@PathVariable Long id) throws IOException {
         WebsiteMediaAsset media = mediaRepository.findByIdAndDeletedAtIsNull(id).orElse(null);
-        if (media == null || !"PUBLISHED".equals(media.getStatus()) || !"IMAGE".equals(media.getMediaType())
-                || !bannerRepository.existsActiveWebsiteMediaReference(id)) {
+        if (media == null || !"PUBLISHED".equals(media.getStatus()) || !"IMAGE".equals(media.getMediaType())) {
+            return ResponseEntity.notFound().build();
+        }
+        if (!bannerRepository.existsActiveWebsiteMediaReference(id)
+                && !productMediaVisibility.isReferencedByPublishedProduct(id)) {
             return ResponseEntity.notFound().build();
         }
         Path websiteRoot = Path.of(fileRoot).toAbsolutePath().normalize().resolve("website");

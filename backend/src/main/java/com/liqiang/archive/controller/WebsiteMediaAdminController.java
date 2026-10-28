@@ -40,9 +40,13 @@ public class WebsiteMediaAdminController {
 
     @GetMapping
     public Page<MediaView> list(@RequestParam(defaultValue = "0") int page,
-                                @RequestParam(defaultValue = "20") int size) {
-        return repository.findByDeletedAtIsNull(PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100)),
-                Sort.by(Sort.Direction.DESC, "id"))).map(MediaView::from);
+                                @RequestParam(defaultValue = "20") int size,
+                                @RequestParam(defaultValue = "false") boolean imageOnly) {
+        PageRequest pageable = PageRequest.of(Math.max(0, page), Math.max(1, Math.min(size, 100)),
+                Sort.by(Sort.Direction.DESC, "id"));
+        return (imageOnly
+                ? repository.findByDeletedAtIsNullAndMediaTypeAndStatusNot("IMAGE", "ARCHIVED", pageable)
+                : repository.findByDeletedAtIsNull(pageable)).map(MediaView::from);
     }
 
     @GetMapping("/{id}")

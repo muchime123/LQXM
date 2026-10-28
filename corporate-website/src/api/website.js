@@ -4,7 +4,7 @@
  * 不直接调用内部管理 API（/api/products 等）。
  */
 
-import { getJson, postJson, apiBase } from './http'
+import { getJson, postJson, apiBase } from './http.js'
 
 /**
  * 拉取首页聚合数据（公司信息 + 产品 + 里程碑 + 资质）。
@@ -16,14 +16,15 @@ export function fetchHome() {
 
 /**
  * 官网产品中心列表：分页 + 关键词 + 分类筛选。
- * @param {object} params { keyword, equipmentCategory, productLineName, page, size }
+ * @param {object} params { keyword, category, equipmentCategory, page, size }
  * @returns {Promise<PublicProductPage>}
  */
 export function fetchProducts(params = {}) {
   const query = new URLSearchParams()
   if (params.keyword) query.set('keyword', params.keyword)
-  if (params.equipmentCategory) query.set('equipmentCategory', params.equipmentCategory)
-  if (params.productLineName) query.set('productLineName', params.productLineName)
+  // The route keeps its historical equipmentCategory query for bookmarks;
+  // both website product readers accept the API parameter named category.
+  if (params.category || params.equipmentCategory) query.set('category', params.category || params.equipmentCategory)
   if (params.application) query.set('application', params.application)
   if (params.container) query.set('container', params.container)
   if (params.process) query.set('process', params.process)
@@ -104,6 +105,8 @@ export function fetchOfficialMediaAccounts() {
  * @returns {string} 图片 URL
  */
 export function productImageUrl(product, size = 640) {
+  const websiteMediaId = product.cardMediaId || product.heroMediaId
+  if (websiteMediaId) return websiteProductMediaUrl(websiteMediaId)
   return product.defaultImageAssetId
     ? `${apiBase}/api/file-assets/product_model/assets/${product.defaultImageAssetId}/thumbnail?size=${size}`
     : '/images/manual-sealer.jpg'
@@ -116,9 +119,15 @@ export function productImageUrl(product, size = 640) {
  * @returns {string} srcset 字符串，无图时返回空
  */
 export function productImageSrcSet(product) {
+  if (product.cardMediaId || product.heroMediaId) return ''
   if (!product.defaultImageAssetId) return ''
   const base = `${apiBase}/api/file-assets/product_model/assets/${product.defaultImageAssetId}/thumbnail?size=`
   return `${base}320 320w, ${base}640 640w, ${base}960 960w`
+}
+
+/** 官网独立媒体公开地址。 */
+export function websiteProductMediaUrl(mediaId) {
+  return `${apiBase}/api/website/media/${mediaId}/content`
 }
 
 /**

@@ -89,6 +89,16 @@ export const archiveNavItems: NavItem[] = [
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="15" width="18" height="5" rx="1.5"/><circle cx="8" cy="7.5" r="1.2"/></svg>',
         group: 'h3'
       },
+      // 「制程管理」：定义车间类别下「有哪些跟单节点」。与「生产参考工期」分开——
+      // 那边定「每个节点多少天」，这边定「节点是什么、什么顺序、哪些可按需」，两件事混在一页会互相干扰。
+      {
+        to: '/production-process-configs',
+        permission: 'manufacturing.template.manage',
+        label: '制程管理',
+        description: '维护封口机与其他机器两类车间的跟单节点：顺序、名称、按需工序关键词与进度表表头别名。保存即全站生效，改动前会给出受影响工单数。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="5" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/><path d="M7.2 12h9.6"/><path d="M12 7v10"/></svg>',
+        group: 'h3'
+      },
       // 2026-10-06 按 LQ 决定下线「车间执行」导航项与页面（/h3-production-execution）。留底 commit 23a0eda。
       {
         to: '/monthly-commission',
@@ -198,6 +208,14 @@ export const archiveNavItems: NavItem[] = [
         label: '官网产品草稿',
         description: '独立维护官网产品草稿，发布切换前不会改变官网展示。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 13h7"/></svg>',
+        group: 'marketing'
+      },
+      {
+        to: '/website/company-profile',
+        permission: 'website.manage',
+        label: '官网公司介绍草稿',
+        description: '独立维护官网对外介绍与联系方式，当前公开页面仍使用原内容。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 21V10l8-6 8 6v11"/><path d="M9 21v-7h6v7"/></svg>',
         group: 'marketing'
       },
       {
