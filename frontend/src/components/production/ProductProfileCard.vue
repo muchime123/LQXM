@@ -44,7 +44,6 @@
 
     <p class="caliber">
       样本只取<b>跟单记录</b>（{{ trackedCount }} 条），不取全部历史任务；一段＝相邻两个节点之间（或排产日→首节点）的自然日间隔。
-      <template v-if="applicationAnchors">其中 {{ applicationAnchors }} 段因缺排产日退到申请日，参考价值低于排产锚点。</template>
     </p>
 
     <div class="recent">
@@ -124,7 +123,6 @@ const sampleCount = computed(() => sampleReady.value
 const excludedCount = computed(() => sampleReady.value
   ? (samples.value?.orders ?? []).reduce((sum, order) => sum + order.stages.filter(s => !s.used).length, 0)
   : 0)
-const applicationAnchors = computed(() => samples.value?.summary.applicationAnchorCount ?? 0)
 const sampleHint = computed(() => props.sampleEnabled === false
   ? '读取样本统计需要 manufacturing.baseline.manage 权限'
   : samples.value
@@ -160,7 +158,6 @@ const actualHint = computed(() => {
   const parts = [`${value.actualSampleCount} 单走完`]
   if (value.actualP75Days != null) parts.push(`P75 ${value.actualP75Days.toFixed(1)}`)
   if (value.openOrderCount) parts.push(`${value.openOrderCount} 单未走完`)
-  if (value.applicationAnchorCount) parts.push(`${value.applicationAnchorCount} 单缺排产日已排除`)
   return parts.join(' · ')
 })
 

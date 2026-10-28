@@ -51,7 +51,7 @@ class ProductionTrackingTimeReviewUpdateTest {
             return work.get();
         });
         service = new ProductionTrackingService(jdbc, actors, idem, new ObjectMapper(),
-                currentUser(160L));
+                currentUser(160L), mock(AuditLogService.class));
         // 可见性校验（order(id)）：返回一行「能定位到工单」的壳，够让 order() 通过
         when(jdbc.query(anyString(), any(RowMapper.class), any(Object[].class)))
                 .thenReturn(List.of(new java.util.LinkedHashMap<>(java.util.Map.of("id", 16723L))));

@@ -17,6 +17,7 @@
         <el-button v-if="canFollowup" @click="roundTripInput?.click()">导入跟单表（回写）</el-button>
         <el-button @click="analysisVisible = true">生产分析</el-button>
         <el-button @click="weeklyReviewVisible = true">周复盘</el-button>
+        <el-button @click="nodeAnalyticsVisible = true">节点分析</el-button>
         <el-button :loading="exporting" @click="openExport">导出</el-button>
         <el-button @click="refreshTracking">刷新</el-button>
       </div>
@@ -185,7 +186,7 @@
           <small v-else-if="!row.stoppedAt && row.expectedFinishDate" class="muted"> {{ shortDate(row.expectedFinishDate) }}</small>
         </template>
       </el-table-column>
-      <el-table-column v-if="isListColumnVisible('stages')" label="跟单节点" min-width="380">
+      <el-table-column v-if="isListColumnVisible('stages')" label="跟单节点" min-width="440">
         <template #default="{ row }">
           <div class="list-stage-actions" :aria-label="`${row.stageDoneCount || 0}/${row.stageTotal || rowStages(row).length} 节点已完成`">
             <el-button v-for="stage in rowStages(row)" :key="stage.code" size="small" :type="stage.status === 'DONE' ? 'success' : stage.status === 'IN_PROGRESS' ? 'warning' : 'default'"
@@ -545,6 +546,7 @@
     <TrackingDetailDrawer v-model="detailVisible" :order-id="detailOrderId" :items="items" @saved="load()" />
     <ProductionTrackingAnalyticsDrawer v-model="analysisVisible" @open-order="openFromAnalysis" />
     <ProductionTrackingWeeklyReviewDrawer v-model="weeklyReviewVisible" @open-order="openFromAnalysis" />
+    <ProductionTrackingNodeAnalyticsDrawer v-model="nodeAnalyticsVisible" @open-order="openFromAnalysis" />
   </div>
 </template>
 
@@ -558,6 +560,7 @@ import ProductionTaskImportDialog from '@/components/production/ProductionTaskIm
 import TrackingDetailDrawer from '@/components/production/TrackingDetailDrawer.vue'
 import ProductionTrackingAnalyticsDrawer from './ProductionTrackingAnalyticsDrawer.vue'
 import ProductionTrackingWeeklyReviewDrawer from './ProductionTrackingWeeklyReviewDrawer.vue'
+import ProductionTrackingNodeAnalyticsDrawer from './ProductionTrackingNodeAnalyticsDrawer.vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import { isSourceUrgent } from '@/utils/trackingUrgency'
 import { TRACKING_ACTION_CODES, effectiveAction, trackingActionHint as actionHint, trackingActionLabel as actionLabel, trackingActionTone as actionTone } from '@/utils/trackingAction'
@@ -619,6 +622,7 @@ onUnmounted(() => { filterPanelObserver?.disconnect(); filterPanelObserver = nul
 const visibility = ref('ALL')
 const analysisVisible = ref(false)
 const weeklyReviewVisible = ref(false)
+const nodeAnalyticsVisible = ref(false)
 const route = useRoute()
 const router = useRouter()
 watch(() => route.query.analysis, value => { if (value === '1') analysisVisible.value = true }, { immediate: true })

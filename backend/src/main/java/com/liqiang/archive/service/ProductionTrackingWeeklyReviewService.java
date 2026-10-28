@@ -23,8 +23,8 @@ import java.util.Map;
  * 也支持 10.01-10.11 这类跨周的分段周期（月初分段、节假日合并都靠它）。
  * 区间作用在「当前有效车间预计完成日」上，与生产分析抽屉同一套口径。
  *
- * <p>⚠️ 未完工是**现状**而非历史快照：交期调整后任务会在区间之间移动，
- * 回看过往周期时那些数字会变（与生产分析抽屉的提示一致）。
+ * <p>⚠️ 本页卡片与下钻均为当前任务状态；交期调整或停产后历史周期数字会变化。
+ * 已固化的历史快照留在归档回看，不用于可下钻的实时周复盘。
  */
 @Service
 @RequiredArgsConstructor
@@ -32,6 +32,7 @@ public class ProductionTrackingWeeklyReviewService {
     private final ProductionTrackingAnalyticsService analytics;
 
     public Map<String, Object> review(String fromDate, String toDate, String workshop) {
+        // 下钻使用 analytics.orders 的实时行，卡片也必须实时取数；旧快照不能与当前明细混用。
         var result = analytics.analyzeUncut(fromDate, toDate, workshop);
         var totals = totals(result);
         var extensionReasons = ProductionTrackingReasonTaxonomy.aggregate(reasons(result, "extensionReasons"));

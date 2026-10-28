@@ -34,8 +34,8 @@
           <div v-if="effectiveAction(detail.order)" class="attention-item"><strong>{{ actionLabel(effectiveAction(detail.order)) }}</strong><span>{{ actionHint(detail.order) }}</span></div>
         </div>
 
-        <el-alert v-if="detail.order.stoppedAt" type="info" :closable="false" show-icon title="已停止生产跟单"
-          :description="`${detail.order.stoppedByName || '跟单员'} · ${formatTime(detail.order.stoppedAt)} · 原因：${detail.order.stoppedReason || '见跟单历史'}。仅本地跟单停止，氚云任务单保持原状。`" />
+        <el-alert v-if="detail.order.stoppedAt" type="info" :closable="false" show-icon title="生产已停止"
+          :description="`${detail.order.stoppedByName || '跟单员'} · ${formatTime(detail.order.stoppedAt)} · 原因：${detail.order.stoppedReason || '见跟单历史'}。停产期间暂不计入交期履约；如恢复生产，请恢复跟单。`" />
 
         <el-alert v-if="!detail.order.stoppedAt && detail.order.closedAt" type="success" :closable="false" show-icon title="跟单已结案（人工确认）"
           :description="`${detail.order.closedByName || '跟单员'} · ${formatTime(detail.order.closedAt)} · 说明：${detail.order.closedNote || '见跟单历史'}。状态按「结案优先」展示为「跟单已完成」，节点未补齐无需补充。`" />
@@ -210,7 +210,7 @@
       </template>
     </el-drawer>
     <LqDialog v-model="dispositionVisible" :title="dispositionStopped ? '标记不再生产' : '恢复生产跟单'" width="min(500px, 94vw)" mode="detail" :show-footer="true">
-      <p class="muted">{{ dispositionStopped ? '仅停止本项目的生产跟单，不修改氚云生产任务单。已有节点和记录会保留，并可日后恢复。' : '恢复后重新进入待跟单或跟单中，原有节点和历史继续保留。' }}</p>
+      <p class="muted">{{ dispositionStopped ? '确认该生产任务已停产。停产期间暂不计入交期履约；本项目保留节点与历史记录，不会回写氚云任务单，日后可恢复生产跟单。' : '恢复后重新进入生产交期统计及待跟单或跟单中，原有节点和历史继续保留。' }}</p>
       <el-alert v-if="dispositionStopped && detail?.order.actualFinishDate" type="warning" :closable="false" title="氚云已有报工完工日期，请核实是否属于误报或补录，并在原因中说明。" />
       <el-input v-model="dispositionReason" type="textarea" :rows="4" maxlength="500" show-word-limit :placeholder="dispositionStopped ? '请写明不再生产的具体原因及核实情况（必填）' : '请写明恢复生产的原因（必填）'" />
       <template #footer>
@@ -221,7 +221,7 @@
           :disabled="dispositionSaving || !dispositionReason.trim()"
           @click="saveDisposition"
         >
-          {{ dispositionStopped ? '确认停止跟单' : '确认恢复跟单' }}
+          {{ dispositionStopped ? '确认停产' : '确认恢复生产' }}
         </button>
       </template>
     </LqDialog>

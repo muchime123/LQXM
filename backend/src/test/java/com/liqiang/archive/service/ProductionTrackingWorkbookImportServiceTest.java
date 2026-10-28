@@ -27,11 +27,12 @@ class ProductionTrackingWorkbookImportServiceTest {
         try(var book=new XSSFWorkbook();var out=new ByteArrayOutputStream()) {
             var sheet=book.createSheet("封口机车间");
             var header=sheet.createRow(1);
+            // 2026-10-27 起封口机模板在「氧化/喷特氟龙」后多一列「物料配齐」，其后的列整体右移一位。
             String[] columns={"订单号","产品名称","规格","尺寸","数量","计划开工", "订单要求生产完成日期",
-                    "预计生产完成日期（延期时填写）","跟单阶段","","","","", "交付结果","延期原因","发货状态","业务员","备注"};
+                    "预计生产完成日期（延期时填写）","跟单阶段","","","","","", "交付结果","延期原因","发货状态","业务员","备注"};
             for(int i=0;i<columns.length;i++)header.createCell(i).setCellValue(columns[i]);
             var stages=sheet.createRow(2);
-            String[] names={"备料","模具生产","氧化/喷特氟龙","组装","入库"};
+            String[] names={"备料","模具生产","氧化/喷特氟龙","物料配齐","组装","入库"};
             for(int i=0;i<names.length;i++)stages.createCell(8+i).setCellValue(names[i]);
             var row=sheet.createRow(3);
             row.createCell(0).setCellValue("1234");
@@ -43,10 +44,11 @@ class ProductionTrackingWorkbookImportServiceTest {
             row.createCell(8).setCellValue("2026-10-03");
             row.createCell(9).setCellValue("2026-10-09");
             row.createCell(10).setCellValue("2026-10-11");
-            row.createCell(11).setCellValue("2026-10-15");
-            row.createCell(13).setCellValue("已交付");
-            row.createCell(14).setCellValue("氧化排期");
-            row.createCell(17).setCellValue("需要喷特氟龙");
+            row.createCell(11).setCellValue("2026-10-13");
+            row.createCell(12).setCellValue("2026-10-15");
+            row.createCell(14).setCellValue("已交付");
+            row.createCell(15).setCellValue("氧化排期");
+            row.createCell(18).setCellValue("需要喷特氟龙");
             var formulaRow=sheet.createRow(4);
             formulaRow.createCell(0).setCellValue("1235");
             formulaRow.createCell(1).setCellValue("封口机");
@@ -70,7 +72,11 @@ class ProductionTrackingWorkbookImportServiceTest {
         assertEquals("氧化排期",data.path("delayReason").asText());
         assertEquals("OXIDATION",data.path("milestones").get(2).path("code").asText());
         assertEquals("2026-10-11",data.path("milestones").get(2).path("completedDate").asText());
-        assertEquals("ASSEMBLY",data.path("milestones").get(3).path("code").asText());
+        // 新增的「物料配齐」按表头文字定位，后面的组装不被挤到别的列上。
+        assertEquals(ProductionTrackingPolicy.MATERIAL_READY,data.path("milestones").get(3).path("code").asText());
+        assertEquals("2026-10-13",data.path("milestones").get(3).path("completedDate").asText());
+        assertEquals("ASSEMBLY",data.path("milestones").get(4).path("code").asText());
+        assertEquals("2026-10-15",data.path("milestones").get(4).path("completedDate").asText());
         // 【同步范围 2026-10-10】这四类字段退出表格同步：payload 里不应再出现。
         for(String banned:List.of("plannedStartDate","deliveryResult","shipmentStatus","salesperson","remark",
                 "productionCycleDays"))

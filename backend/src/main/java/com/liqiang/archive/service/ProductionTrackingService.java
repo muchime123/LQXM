@@ -44,20 +44,42 @@ public class ProductionTrackingService {
             java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor();
     private static final Set<String> RISKS=Set.of("NONE","MATERIAL","DESIGN","CAPACITY","CUSTOMER","OTHER");
     private static final Set<String> STAGE_STATUSES=Set.of("PENDING","IN_PROGRESS","DONE");
+    private static final String KIND_CASE=ProductionTrackingPolicy.kindCase("p.production_line");
     private static final String STAGE_TOTAL_CASE=ProductionTrackingPolicy.stageTotalCase("p.production_line");
-    private static final String CONFIGURED_OXIDATION="(p.production_line LIKE '%封口%' AND "
-            +"((p.optional_configuration REGEXP '氧化|特氟龙|特富龙' "
-            +"AND p.optional_configuration NOT REGEXP '(不含|无需|不用|不需要|无)(氧化|特氟龙|特富龙)') "
-            +"OR (p.production_requirement REGEXP '氧化|特氟龙|特富龙' "
-            +"AND p.production_requirement NOT REGEXP '(不含|无需|不用|不需要|无)(氧化|特氟龙|特富龙)')))";
-    private static final String CONFIGURED_WOODEN_CRATE="(p.optional_configuration LIKE '%木箱%' "
-            +"AND p.optional_configuration NOT REGEXP '(不含|无需|不用|不需要|无)木箱')";
     /**
-     * 「按需工序」筛选白名单（顺序＝下拉顺序）。跟单员要的典型问题：「哪些单要走氧化/喷特氟龙」——
-     * 这两道工序不是每张单都有，靠可选配置或已登记的节点决定（见 {@link #needsOptionalStage}）。
+     * 源单文本「写明需要某道按需工序」的判据，关键词取自制程表（管理员可配）。
+     *
+     * <p>原先这里写死「氧化|特氟龙|特富龙」「木箱」两组正则，页面上新增的按需工序在 SQL 侧
+     * 永远是「不适用」，只有 Java 侧认得——两处口径立刻漂移。改为读表后新增按需节点即刻生效。
+     * 可选配置与生产要求<b>分别判断后取并集</b>：一处写明需要、另一处提到不需要时互不覆盖。
      */
-    static final List<String> OPTIONAL_STAGE_CODES=List.of(ProductionTrackingPolicy.OXIDATION,
-            ProductionTrackingPolicy.WOODEN_CRATE);
+    private static String optionalHitSql(String column) {
+        return "(COALESCE("+column+",'') REGEXP d.match_keywords "
+                +"AND (d.exclude_keywords IS NULL OR COALESCE("+column+",'') NOT REGEXP d.exclude_keywords))";
+    }
+    private static final String OPTIONAL_CONFIGURED_HIT="(d.match_keywords IS NOT NULL AND ("
+            +optionalHitSql("p.optional_configuration")+" OR "+optionalHitSql("p.production_requirement")+"))";
+    /** 指定按需工序：源单写明需要 ⇒ 本单要走它（不管有没有登记节点）。 */
+    private static String configuredOptionalSql(String code) {
+        return "EXISTS (SELECT 1 FROM production_tracking_stage_defs d WHERE d.enabled=1 AND d.optional=1 "
+                +"AND d.stage_code='"+code+"' AND d.workshop_kind="+KIND_CASE+" AND "+OPTIONAL_CONFIGURED_HIT+")";
+    }
+    /** 配置写明需要、但跟单员还没登记的按需工序道数：分母要加一，分子还没有 ⇒ 该单显示「差一个」。 */
+    static final String CONFIGURED_OPTIONAL_PENDING="(SELECT COUNT(*) FROM production_tracking_stage_defs d "
+            +"WHERE d.enabled=1 AND d.optional=1 AND d.workshop_kind="+KIND_CASE+" AND "+OPTIONAL_CONFIGURED_HIT+" "
+            +"AND NOT EXISTS (SELECT 1 FROM production_tracking_milestones m "
+            +"WHERE m.production_order_id=p.id AND m.stage_code=d.stage_code))";
+    /**
+     * 「按需工序」筛选白名单（顺序＝下拉顺序）：直接取制程表里启用且按需的节点。
+     * 原先写死氧化与木箱两个编码，页面上新增的按需工序进不了筛选；改为读制程表后自动跟随。
+     */
+    static List<String> optionalStageCodes() {
+        var out=new java.util.LinkedHashSet<String>();
+        for(var defs:ProductionTrackingStageCatalog.snapshot().values())
+            for(var def:defs)
+                if(def.enabled()&&def.optional())out.add(def.code());
+        return List.copyOf(out);
+    }
     /**
      * 「模具生产」跟进筛选的三档（顺序＝下拉顺序；10-21 跟单员需求）。
      *
@@ -88,16 +110,12 @@ public class ProductionTrackingService {
      * 但配置要求走氧化」的新单——那恰恰是跟单员想提前看到的；只看配置则会漏掉配置没写、
      * 跟单员实际已经登记过该节点的单。两者取并集。
      *
-     * <p>⚠️ 依赖 {@link #TRACKING_FROM} 的 {@code ms} 派生表，只能用在挂了该 FROM 的语句上
-     * （列表 / 导出 / filter-options 计数均已挂）。{@code CONFIGURED_OXIDATION} 自带「封口车间」条件
-     * ——氧化只在封口机的节点序列里（{@code ProductionTrackingPolicy.SEALER_STAGES}）。
+     * <p>⚠️ 依赖 {@code p} 别名（工单表），只能用在挂了 {@code p} 的语句上
+     * （列表 / 导出 / filter-options 计数均已挂）。
      */
     static String needsOptionalStage(String code) {
-        if(ProductionTrackingPolicy.OXIDATION.equals(code))
-            return "(COALESCE(ms.oxidation_count,0)>0 OR "+CONFIGURED_OXIDATION+")";
-        if(ProductionTrackingPolicy.WOODEN_CRATE.equals(code))
-            return "(COALESCE(ms.wooden_crate_count,0)>0 OR "+CONFIGURED_WOODEN_CRATE+")";
-        throw new IllegalArgumentException("按需工序筛选无效");
+        return "(EXISTS (SELECT 1 FROM production_tracking_milestones m WHERE m.production_order_id=p.id "
+                +"AND m.stage_code='"+code+"') OR "+configuredOptionalSql(code)+")";
     }
     /**
      * 节点分子/分母同源：必经节点 + 本单适用的「按需工序」（氧化/喷特氟龙）。
@@ -105,15 +123,16 @@ public class ProductionTrackingService {
      * 一旦该单真的登记了氧化，分母多 1、完成也就要求它做完。
      */
     static final String STAGE_DONE_CASE="CASE WHEN p.production_line LIKE '%封口%' "
-            +"THEN COALESCE(ms.sealer_done_count,0) ELSE COALESCE(ms.machine_done_count,0) END"
-            +"+COALESCE(ms.optional_done_count,0)";
+            +"THEN COALESCE(ms.sealer_done_count,0)+COALESCE(ms.sealer_optional_done_count,0) "
+            +"ELSE COALESCE(ms.machine_done_count,0)+COALESCE(ms.machine_optional_done_count,0) END";
     /**
-     * 列表「x/y 已完成」的分母：与 TRACKING_COMPLETE 右端同源（必经节点 + 本单适用的按需工序）。
-     * 少了它，走过氧化的单分子含 5 而分母只有 4 ⇒ 列表显示「5/4 已完成」。
+     * 列表「x/y 已完成」的分母：必经节点数 + 本单已登记的按需工序 + 配置写明需要但还没登记的。
+     * 少了第三项，走过氧化的单分子含 5 而分母只有 4 ⇒ 列表显示「5/4 已完成」。
      */
-    static final String STAGE_TOTAL_WITH_OPTIONAL="("+STAGE_TOTAL_CASE+")+COALESCE(ms.optional_count,0)"
-            +"+CASE WHEN "+CONFIGURED_OXIDATION+" AND COALESCE(ms.oxidation_count,0)=0 THEN 1 ELSE 0 END"
-            +"+CASE WHEN "+CONFIGURED_WOODEN_CRATE+" AND COALESCE(ms.wooden_crate_count,0)=0 THEN 1 ELSE 0 END";
+    static final String STAGE_TOTAL_WITH_OPTIONAL="("+STAGE_TOTAL_CASE+")"
+            +"+CASE WHEN p.production_line LIKE '%封口%' THEN COALESCE(ms.sealer_optional_count,0) "
+            +"ELSE COALESCE(ms.machine_optional_count,0) END"
+            +"+"+CONFIGURED_OPTIONAL_PENDING;
     static final String TRACKING_COMPLETE="("+STAGE_DONE_CASE+")="+STAGE_TOTAL_WITH_OPTIONAL;
     /** done 计数只数必经节点，按需工序单独统计，两者共用一个派生表。 */
     static final String TRACKING_FROM=" FROM production_orders p "
@@ -121,30 +140,40 @@ public class ProductionTrackingService {
             +"LEFT JOIN (SELECT MIN(id) id,name FROM employees WHERE status='ACTIVE' "
             +"AND name IN ('陈苏平','胡健') GROUP BY name) assigned "
             +"ON assigned.name=CASE WHEN p.production_line LIKE '%封口%' THEN '陈苏平' ELSE '胡健' END "
-            +"LEFT JOIN (SELECT production_order_id,"
-            +"SUM(stage_code IN ('MATERIAL','MOLD','ASSEMBLY','WAREHOUSE') AND stage_status='DONE') sealer_done_count,"
-            +"SUM(stage_code IN ('DRAWING','MATERIAL','SHEET_METAL','MOLD','ASSEMBLY','TESTING','WAREHOUSE') AND stage_status='DONE') machine_done_count,"
-            +"SUM(stage_code IN ('OXIDATION','WOODEN_CRATE')) optional_count,"
-            +"SUM(stage_code IN ('OXIDATION','WOODEN_CRATE') AND stage_status='DONE') optional_done_count,"
-            +"SUM(stage_code='OXIDATION') oxidation_count,"
-            +"SUM(stage_code='WOODEN_CRATE') wooden_crate_count,"
+            // ⚠️ 节点集合一律由制程表判定，不再写死 stage_code 列表：管理员在页面上加/停一个节点，
+            // 分子分母与下面所有筛选立即跟随。停用（enabled=0）的节点被 JOIN 排除 ⇒ 不进分母，
+            // 历史里程碑行原样保留（制程管理只允许停用有记录的节点，不允许删除）。
+            +"LEFT JOIN (SELECT m.production_order_id,"
+            // 必经节点与按需工序分开统计、并按车间类别分列：外层按 p.production_line 取对应那一列。
+            +"SUM(d.optional=0 AND d.workshop_kind='SEALER' AND m.stage_status='DONE') sealer_done_count,"
+            +"SUM(d.optional=0 AND d.workshop_kind='MACHINE' AND m.stage_status='DONE') machine_done_count,"
+            +"SUM(d.optional=1 AND d.workshop_kind='SEALER') sealer_optional_count,"
+            +"SUM(d.optional=1 AND d.workshop_kind='MACHINE') machine_optional_count,"
+            +"SUM(d.optional=1 AND d.workshop_kind='SEALER' AND m.stage_status='DONE') sealer_optional_done_count,"
+            +"SUM(d.optional=1 AND d.workshop_kind='MACHINE' AND m.stage_status='DONE') machine_optional_done_count,"
             // 「模具生产」跟进三态与「模具之后是否已推进」——见 {@link #MOLD_NODE_STATE}。
             // 同为同一 GROUP BY 上的聚合，不改变行使数，故统计卡/筛选项口径不受影响。
             // ⚠️ 三态必须用条件求和判优先级，不能用 MAX(stage_status)：字典序是 DONE<IN_PROGRESS<PENDING，
             // MAX 会把「待开始」取成最大，正好把已完成判成未开工。
-            +"SUM(stage_code='MOLD' AND stage_status='DONE') mold_done_count,"
-            +"SUM(stage_code='MOLD' AND stage_status='IN_PROGRESS') mold_working_count,"
-            // 模具之后的节点：封口机是氧化/组装/入库/木箱，机器是组装/调试/入库/木箱（钣金在模具之前）。
+            +"SUM(d.stage_code='MOLD' AND m.stage_status='DONE') mold_done_count,"
+            +"SUM(d.stage_code='MOLD' AND m.stage_status='IN_PROGRESS') mold_working_count,"
+            // 模具之后的节点＝制程序号大于模具的任一节点（不再列举具体编码，钣金在模具之前自然被排除）。
             // 只要其中任一节点 status<>'PENDING'，就说明这张单已经越过模具这一关。
-            +"SUM(stage_code IN ('OXIDATION','ASSEMBLY','WAREHOUSE','WOODEN_CRATE') AND stage_status<>'PENDING') later_sealer_count,"
-            +"SUM(stage_code IN ('ASSEMBLY','TESTING','WAREHOUSE','WOODEN_CRATE') AND stage_status<>'PENDING') later_machine_count,"
+            +"SUM(d.workshop_kind='SEALER' AND d.sort_no>COALESCE(mold.sort_no,0) "
+            +"AND m.stage_status<>'PENDING') later_sealer_count,"
+            +"SUM(d.workshop_kind='MACHINE' AND d.sort_no>COALESCE(mold.sort_no,0) "
+            +"AND m.stage_status<>'PENDING') later_machine_count,"
             // 「跟单员登记的入库时间」＝在「入库」节点填的完成日期；节点未完成时为空。
             // 该列是同一 GROUP BY 上的聚合，不会改变行使数，故统计卡/筛选项口径不受影响。
-            +"MAX(CASE WHEN stage_code='WAREHOUSE' AND stage_status='DONE' THEN completed_date END) warehouse_in_date,"
+            +"MAX(CASE WHEN d.stage_code='WAREHOUSE' AND m.stage_status='DONE' THEN m.completed_date END) warehouse_in_date,"
             // 「跟单是否已经开始」的真值＝该工单有没有任何跟单节点记录（见 NEVER_TRACKED）。
             // 同为同一 GROUP BY 上的聚合，不改变行使数。
             +"COUNT(*) node_count "
-            +"FROM production_tracking_milestones GROUP BY production_order_id) ms "
+            +"FROM production_tracking_milestones m "
+            +"JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code AND d.enabled=1 "
+            +"LEFT JOIN production_tracking_stage_defs mold ON mold.stage_code='MOLD' AND mold.enabled=1 "
+            +"AND mold.workshop_kind=d.workshop_kind "
+            +"GROUP BY m.production_order_id) ms "
             +"ON ms.production_order_id=p.id";
     /**
      * 采购入库关联：氚云生产任务单自身没有「入库时间」列，真正的入库时间落在采购入库明细的
@@ -472,13 +501,14 @@ public class ProductionTrackingService {
     private final IdempotencyService idem;
     private final ObjectMapper json;
     private final CurrentUserService users;
+    private final AuditLogService audit;
 
     public ProductionTrackingService(JdbcTemplate jdbc, ActorResolver actors,
             @Qualifier("idempotencyService") IdempotencyService idem,
             ObjectMapper json,
-            CurrentUserService users) {
+            CurrentUserService users, AuditLogService audit) {
         this.jdbc=jdbc; this.actors=actors; this.idem=idem; this.json=json;
-        this.users=users;
+        this.users=users; this.audit=audit;
     }
 
     public record State(LocalDate plannedStartDate, LocalDate forecastFinishDate, String riskCategory,
@@ -1256,7 +1286,7 @@ public class ProductionTrackingService {
         // 谓词依赖 TRACKING_FROM 的 ms 派生表 —— 列表/导出的 COUNT 与明细都挂了同一份 FROM。
         if(optionalStage!=null&&!optionalStage.isBlank()){
             String code=optionalStage.trim();
-            if(!OPTIONAL_STAGE_CODES.contains(code))throw new IllegalArgumentException("按需工序筛选无效");
+            if(!optionalStageCodes().contains(code))throw new IllegalArgumentException("按需工序筛选无效");
             where.append(" AND ").append(needsOptionalStage(code));
         }
         // 「模具生产」跟进筛选（三档可多选，取值固定枚举，白名单校验后内联）。
@@ -1495,11 +1525,13 @@ public class ProductionTrackingService {
             return TRACKING_ACTION_CODES.stream().map(code->Map.<String,Object>of("action",code,"count",
                     row.get(code) instanceof Number n?n.longValue():0L)).toList();
         });
+        // 按需工序计数按制程表逐个节点出一列：新增按需节点后筛选下拉与计数一起出现。
+        var optionalCodes=optionalStageCodes();
+        String optionalColumns=optionalCodes.isEmpty()?"0 AS none":optionalCodes.stream()
+                .map(code->"COALESCE(SUM("+needsOptionalStage(code)+"),0) `"+code+"`")
+                .collect(java.util.stream.Collectors.joining(","));
         java.util.concurrent.Future<List<Map<String,Object>>> optionalFuture=READ_POOL.submit(()->jdbc.queryForList(
-                "SELECT COALESCE(SUM("
-                +needsOptionalStage(ProductionTrackingPolicy.OXIDATION)+"),0) oxidation,COALESCE(SUM("
-                +needsOptionalStage(ProductionTrackingPolicy.WOODEN_CRATE)+"),0) wooden_crate"
-                +TRACKING_FROM+settled,params.toArray()));
+                "SELECT "+optionalColumns+TRACKING_FROM+settled,params.toArray()));
         // GROUP_CONCAT 的会话上限：只在当前连接生效，不影响其它连接；取值已是去重后的短文本。
         jdbc.execute("SET SESSION group_concat_max_len="+CONCAT_MAX_LEN);
         Map<String,Object> scanRow=jdbc.queryForList(scan,params.toArray()).stream().findFirst().orElse(Map.of());
@@ -1525,8 +1557,8 @@ public class ProductionTrackingService {
         // ⚠️ 不能用 getOrDefault(key,0L)：键存在但值为 null 时 getOrDefault 返回的是 null 而不是默认值，
         // 随后的 ((Number)null).longValue() 直接 NPE（2026-10-20 单测实测）。SQL 里虽有 COALESCE(SUM(...),0)，
         // 但那只能保证「没有匹配行」的场景；列名对不上、驱动返回 null 时仍会漏过来。故显式判空。
-        var optionalStageCounts=OPTIONAL_STAGE_CODES.stream().map(code->{
-            Object raw=optionalRow.get(ProductionTrackingPolicy.OXIDATION.equals(code)?"oxidation":"wooden_crate");
+        var optionalStageCounts=optionalCodes.stream().map(code->{
+            Object raw=optionalRow.get(code);
             long count=raw instanceof Number number?number.longValue():0L;
             return Map.<String,Object>of("code",code,"count",count);
         }).toList();
@@ -1701,7 +1733,7 @@ public class ProductionTrackingService {
             var codes=stageCodes(workshop);
             for(String code:codes){
                 var stage=milestones.get(code);
-                applicable.put(code,!ProductionTrackingPolicy.isOptionalStage(code)||stage!=null
+                applicable.put(code,!ProductionTrackingPolicy.isOptionalStage(code,workshop)||stage!=null
                         ||ProductionTrackingPolicy.configuredOptionalStage(code,
                                 (String)item.get("sourceOptionalConfiguration"),(String)item.get("sourceOrderRemark")));
                 if(stage!=null){
@@ -1777,7 +1809,7 @@ public class ProductionTrackingService {
         return Map.of("workshops",workshops);
     }
 
-    /** 单车间矩阵：按 Policy 的节点顺序枚举，首段锚点是「计划开工」，其余取上一节点。 */
+    /** 单车间矩阵：按 Policy 的节点顺序枚举，首段锚点是「排产日」（2026-10-28 A2 只认排产），其余取上一节点。 */
     static Map<String,Object> benchmarkWorkshop(String kind,String label,
             Map<String,Map<String,Object>> saved) {
         boolean sealer=BENCHMARK_SEALER.equals(kind);
@@ -1785,7 +1817,7 @@ public class ProductionTrackingService {
         String prev=null;
         for(String code:ProductionTrackingPolicy.stageCodes(sealer?"封口机":"全自动气调机")){
             var hit=saved.get(kind+"/"+code);
-            String prevLabel=prev==null?"计划开工":ProductionTrackingPolicy.stageLabel(prev,sealer);
+            String prevLabel=prev==null?"排产日":ProductionTrackingPolicy.stageLabel(prev,sealer);
             var row=new LinkedHashMap<String,Object>();
             row.put("stageCode",code);
             row.put("stageLabel",ProductionTrackingPolicy.stageLabel(code,sealer));
@@ -1844,6 +1876,7 @@ public class ProductionTrackingService {
 
             changed++;
         }
+        audit.log("NODE_BENCHMARK",0L,"通用参考","保存",changed+" 个节点（含删除）");
         return Map.of("changed",changed);
     }
 
@@ -1859,8 +1892,7 @@ public class ProductionTrackingService {
         return jdbc.queryForList("SELECT c.id AS taskConfigId,w.workshop_name AS workshopName,c.config_name AS configName,"
                 +"b.stage_code AS stageCode,b.typical_days AS typicalDays,b.sample_count AS sampleCount,"
                 +"b.p50_days AS p50Days,b.p75_days AS p75Days,b.excluded_count AS excludedCount,"
-                +"b.planned_anchor_count AS plannedAnchorCount,b.application_anchor_count AS applicationAnchorCount,"
-                +"b.application_p50_days AS applicationP50Days,b.application_p75_days AS applicationP75Days,"
+                +"b.planned_anchor_count AS plannedAnchorCount,"
                 +"b.zero_day_count AS zeroDayCount,"
                 +"b.published_source AS publishedSource,b.published_at AS publishedAt,"
                 +"b.baseline_note AS baselineNote,b.computed_at AS computedAt "
@@ -1874,11 +1906,12 @@ public class ProductionTrackingService {
     public record ProductBenchmarkSave(long taskConfigId,String stageCode,BigDecimal typicalDays) {}
 
     /**
-     * 一张历史任务在该产品下的样本原始记录：锚点（排产日优先：本地计划开工 → 氚云排产时间；都缺才退申请日）+ 各节点完成日期。
-     * **候选计算与样本明细同源**，避免两处口径漂移。
+     * 一张历史任务在该产品下的样本原始记录：锚点＝氚云排产时间（未排产的样本不推首段工期）+ 各节点完成日期。
+     * **候选计算与样本明细同源**，避免两处口径漂移。锚点口径已收敛为只认排产时间（2026-10-28 A2），
+     * 不再有「本地计划开工 / 申请日兜底」两档——实测这两档均无样本，保留只会造成口径分叉与死列。
      */
     private record OrderSample(long orderId,String orderNo,LocalDate submittedAt,LocalDate anchor,
-                               boolean plannedAnchor,Map<String,LocalDate> stageDays) {}
+                               Map<String,LocalDate> stageDays) {}
 
     /**
      * 取该产品（车间 + 产品名精确匹配）的**跟单记录**样本，按任务单提交时间排序。
@@ -1888,10 +1921,9 @@ public class ProductionTrackingService {
      */
     private List<OrderSample> loadOrderSamples(String workshop,String product) {
         var anchors=new HashMap<Long,LocalDate>();
-        var planned=new java.util.HashSet<Long>();
         var dates=new HashMap<Long,Map<String,LocalDate>>();
         var meta=new LinkedHashMap<Long,Object[]>();
-        // 生产周期只从氚云排产日起算；未排产的样本不推首段工期。
+        // 生产周期只从氚云排产日起算；未排产的样本不推首段工期（2026-10-28 A2：锚点只认排产时间）。
         jdbc.query("SELECT p.id,p.work_order_no,DATE(p.source_created_at),p.schedule_time,"
                 +"m.stage_code,m.completed_date "
                 +"FROM production_orders p "
@@ -1904,7 +1936,6 @@ public class ProductionTrackingService {
                     long id=r.getLong(1);
                     java.sql.Date submitted=r.getDate(3),sched=r.getDate(4),completed=r.getDate(6);
                     meta.putIfAbsent(id,new Object[]{r.getString(2),submitted==null?null:submitted.toLocalDate()});
-                    if(sched!=null)planned.add(id);
                     LocalDate anchor=sched==null?null:sched.toLocalDate();
                     anchors.put(id,anchor);
                     if(r.getString(5)!=null&&completed!=null)
@@ -1914,7 +1945,7 @@ public class ProductionTrackingService {
         for(var e:meta.entrySet()){
             Object[] m=e.getValue();
             out.add(new OrderSample(e.getKey(),(String)m[0],(LocalDate)m[1],anchors.get(e.getKey()),
-                    planned.contains(e.getKey()),dates.getOrDefault(e.getKey(),Map.of())));
+                    dates.getOrDefault(e.getKey(),Map.of())));
         }
         return out;
     }
@@ -1935,12 +1966,11 @@ public class ProductionTrackingService {
         var orders=loadOrderSamples(workshop,product);
         LocalDate today=LocalDate.now();
         var rows=new ArrayList<Map<String,Object>>();
-        int planned=0,application=0,none=0;
+        int scheduled=0,none=0;
         LocalDate from=null,to=null;
         for(OrderSample o:orders){
             if(o.anchor()==null)none++;
-            else if(o.plannedAnchor())planned++;
-            else application++;
+            else scheduled++;
             if(o.submittedAt()!=null){
                 if(from==null||o.submittedAt().isBefore(from))from=o.submittedAt();
                 if(to==null||o.submittedAt().isAfter(to))to=o.submittedAt();
@@ -1949,8 +1979,8 @@ public class ProductionTrackingService {
             LocalDate previous=o.anchor();
             for(String code:codes){
                 LocalDate day=o.stageDays().get(code);
-                // 按需工序没登记就不算一段（与候选计算同源：不适用不加分母）
-                if(ProductionTrackingPolicy.isOptionalStage(code)&&day==null)continue;
+                // 按需工序没登记就不算一段（与候选计算同源：不适用不加分母）；按类别精确判定
+                if(ProductionTrackingPolicy.isOptionalStage(code,workshop)&&day==null)continue;
                 var row=new LinkedHashMap<String,Object>();
                 row.put("stageCode",code);
                 if(day==null){
@@ -1958,7 +1988,7 @@ public class ProductionTrackingService {
                     stages.add(row);previous=day;continue;
                 }
                 if(previous==null){
-                    row.put("days",null);row.put("used",false);row.put("reason","缺锚点（无计划开工与申请日）");
+                    row.put("days",null);row.put("used",false);row.put("reason","缺锚点（无排产日）");
                     stages.add(row);previous=day;continue;
                 }
                 long gap=ChronoUnit.DAYS.between(previous,day);
@@ -1966,9 +1996,7 @@ public class ProductionTrackingService {
                 if(gap<0){row.put("used",false);row.put("reason","完成日期早于上一节点");}
                 else if(gap>60){row.put("used",false);row.put("reason","间隔超过 60 天");}
                 else if(day.isAfter(today)){row.put("used",false);row.put("reason","完成日期在未来");}
-                else if(code.equals(codes.getFirst())&&!o.plannedAnchor()){
-                    row.put("used",false);row.put("reason","首节点缺排产日，只计入申请日兜底");
-                }else{
+                else{
                     row.put("used",true);row.put("reason",null);
                     if(gap==0)row.put("zeroDay",true);
                 }
@@ -1979,14 +2007,13 @@ public class ProductionTrackingService {
             map.put("orderId",o.orderId());
             map.put("orderNo",o.orderNo());
             map.put("submittedAt",o.submittedAt());
-            map.put("anchorKind",o.anchor()==null?"NONE":o.plannedAnchor()?"PLANNED":"APPLICATION");
+            map.put("anchorKind",o.anchor()==null?"NONE":"SCHEDULED");
             map.put("stages",stages);
             rows.add(map);
         }
         var summary=new LinkedHashMap<String,Object>();
         summary.put("matchedOrders",orders.size());
-        summary.put("plannedAnchorCount",planned);
-        summary.put("applicationAnchorCount",application);
+        summary.put("scheduledAnchorCount",scheduled);
         summary.put("noAnchorCount",none);
         summary.put("spanFrom",from);
         summary.put("spanTo",to);
@@ -2010,8 +2037,7 @@ public class ProductionTrackingService {
      *       缺值的节点<b>不进和</b>，在 {@code missingStages} 里点名——宁可显示「3 天（缺备料）」，
      *       也不拿 0 冒充足额，否则配置缺口会被一个偏小的总数掩盖。</li>
      *   <li><b>历史实测</b>＝该产品跟单记录里「排产锚点 → 入库完成」的实际天数 P50/P75。
-     *       <b>只用排产锚点</b>（本地计划开工 / 氚云排产时间）：申请日兜底的单子把「等排产」
-     *       那段等待也算进去了，与排产日起算的口径不符，单独计数不进分位。</li>
+     *       <b>只用排产锚点</b>（氚云排产时间，2026-10-28 A2 收敛）：未排产的单无锚点、不计入。</li>
      * </ul>
      *
      * <p>末节点＝必经节点的最后一个（封口机与机器车间都是入库）；按需工序不参与——
@@ -2061,11 +2087,11 @@ public class ProductionTrackingService {
 
         String last=required.getLast();
         var leads=new ArrayList<Long>();
-        int openOrders=0,applicationAnchors=0,excluded=0;
+        int openOrders=0,noAnchor=0,excluded=0;
         LocalDate today=LocalDate.now();
         for(OrderSample o:loadOrderSamples(workshop,product)){
             LocalDate done=o.stageDays().get(last);
-            if(o.anchor()==null||!o.plannedAnchor()){applicationAnchors++;continue;}
+            if(o.anchor()==null){noAnchor++;continue;}
             if(done==null){openOrders++;continue;}
             long days=ChronoUnit.DAYS.between(o.anchor(),done);
             if(days<0||days>60||done.isAfter(today)){excluded++;continue;}
@@ -2092,7 +2118,7 @@ public class ProductionTrackingService {
         result.put("actualP75Days",percentile(leads,0.75));
         result.put("actualSampleCount",leads.size());
         result.put("openOrderCount",openOrders);
-        result.put("applicationAnchorCount",applicationAnchors);
+        result.put("noAnchorCount",noAnchor);
         result.put("excludedCount",excluded);
         return result;
     }
@@ -2180,22 +2206,19 @@ public class ProductionTrackingService {
         var codes=ProductionTrackingPolicy.stageCodes(workshop);
         var orders=loadOrderSamples(workshop,product);
         var samples=new LinkedHashMap<String,List<Long>>();
-        var applicationFallback=new HashMap<String,List<Long>>();
         var excluded=new HashMap<String,Integer>();
         var zeroDays=new HashMap<String,Integer>();
-        for(String code:codes){samples.put(code,new ArrayList<>());applicationFallback.put(code,new ArrayList<>());}
+        for(String code:codes){samples.put(code,new ArrayList<>());}
         LocalDate today=LocalDate.now();
         for(OrderSample o:orders){
             LocalDate previous=o.anchor();
             for(String code:codes){
                 LocalDate day=o.stageDays().get(code);
-                if(ProductionTrackingPolicy.isOptionalStage(code)&&day==null)continue;
+                if(ProductionTrackingPolicy.isOptionalStage(code,workshop)&&day==null)continue;
                 if(day!=null){
                     if(previous!=null){
                         long gap=ChronoUnit.DAYS.between(previous,day);
                         if(gap<0||gap>60||day.isAfter(today))excluded.merge(code,1,Integer::sum);
-                        else if(code.equals(codes.getFirst())&&!o.plannedAnchor())
-                            applicationFallback.get(code).add(gap);
                         else {
                             samples.get(code).add(gap);
                             if(gap==0)zeroDays.merge(code,1,Integer::sum);
@@ -2208,26 +2231,20 @@ public class ProductionTrackingService {
         for(String code:codes){
             var values=samples.get(code);
             values.sort(Long::compareTo);
-            var fallback=applicationFallback.get(code);
-            fallback.sort(Long::compareTo);
             jdbc.update("INSERT INTO production_tracking_product_benchmarks(task_config_id,stage_code,typical_days,"
-                    +"sample_count,p50_days,p75_days,excluded_count,planned_anchor_count,application_anchor_count,"
-                    +"application_p50_days,application_p75_days,zero_day_count,baseline_note,computed_at) "
-                    +"VALUES(?,?,NULL,?,?,?,?,?,?,?,?,?,'历史样本候选，待人工审核',CURDATE()) "
+                    +"sample_count,p50_days,p75_days,excluded_count,planned_anchor_count,zero_day_count,"
+                    +"baseline_note,computed_at) "
+                    +"VALUES(?,?,NULL,?,?,?,?,?,?,'历史样本候选，待人工审核',CURDATE()) "
                     +"ON DUPLICATE KEY UPDATE sample_count=VALUES(sample_count),p50_days=VALUES(p50_days),"
                     +"p75_days=VALUES(p75_days),excluded_count=VALUES(excluded_count),"
-                    +"planned_anchor_count=VALUES(planned_anchor_count),application_anchor_count=VALUES(application_anchor_count),"
-                    +"application_p50_days=VALUES(application_p50_days),application_p75_days=VALUES(application_p75_days),"
-                    +"                    zero_day_count=VALUES(zero_day_count),computed_at=CURDATE()",
+                    +"planned_anchor_count=VALUES(planned_anchor_count),zero_day_count=VALUES(zero_day_count),"
+                    +"computed_at=CURDATE()",
                     taskConfigId,code,values.size(),percentile(values,0.5),percentile(values,0.75),excluded.getOrDefault(code,0),
-                    code.equals(codes.getFirst())?values.size():0,fallback.size(),percentile(fallback,0.5),
-                    percentile(fallback,0.75),zeroDays.getOrDefault(code,0));
+                    code.equals(codes.getFirst())?values.size():0,zeroDays.getOrDefault(code,0));
         }
         return jdbc.queryForList("SELECT stage_code AS stageCode,sample_count AS sampleCount,p50_days AS p50Days,"
                 +"p75_days AS p75Days,excluded_count AS excludedCount,typical_days AS typicalDays,"
-                +"planned_anchor_count AS plannedAnchorCount,application_anchor_count AS applicationAnchorCount,"
-                +"application_p50_days AS applicationP50Days,application_p75_days AS applicationP75Days,"
-                +"zero_day_count AS zeroDayCount "
+                +"planned_anchor_count AS plannedAnchorCount,zero_day_count AS zeroDayCount "
                 +"FROM production_tracking_product_benchmarks WHERE task_config_id=? ORDER BY id",taskConfigId);
     }
 
@@ -2256,7 +2273,7 @@ public class ProductionTrackingService {
             jdbc.update("UPDATE production_tracking_product_benchmarks SET typical_days=NULL,published_source=NULL,"
                     +"published_at=NULL,baseline_note='已撤销发布，沿用车间基准' "
                     +"WHERE task_config_id=? AND stage_code=?",row.taskConfigId(),row.stageCode());
-
+            audit.log("PRODUCT_BENCHMARK",row.taskConfigId(),row.stageCode(),"撤销发布","typical_days 清空，参考日期回落车间基准");
             return;
         }
         jdbc.update("INSERT INTO production_tracking_product_benchmarks(task_config_id,stage_code,typical_days,"
@@ -2265,6 +2282,7 @@ public class ProductionTrackingService {
                 +"ON DUPLICATE KEY UPDATE typical_days=VALUES(typical_days),published_source='MANUAL',"
                 +"published_at=NOW(),baseline_note=VALUES(baseline_note),computed_at=CURDATE()",
                 row.taskConfigId(),row.stageCode(),row.typicalDays());
+        audit.log("PRODUCT_BENCHMARK",row.taskConfigId(),row.stageCode(),"发布","typical_days="+row.typicalDays()+" 天 (source=MANUAL)");
 
     }
 
@@ -2313,6 +2331,8 @@ public class ProductionTrackingService {
                 copied.add(code);
             }
         }
+        audit.log("PRODUCT_BENCHMARK",targetTaskConfigId,"copy-from:"+sourceTaskConfigId,"复制",
+                "从同车间产品复制 "+copied.size()+" 个节点（源发布 "+source.size()+" 个）");
         return Map.of("copied",copied,"sourcePublished",source.size(),"skipped",source.size()-copied.size());
     }
 
@@ -2333,6 +2353,7 @@ public class ProductionTrackingService {
                     +"published_source='P50',published_at=NOW(),"
                     +"baseline_note='按历史样本 P50 批量发布',computed_at=CURDATE() WHERE task_config_id=? AND stage_code=?",
                     row.get("p50Days"),taskConfigId,row.get("stageCode"));
+        if(!rows.isEmpty())audit.log("PRODUCT_BENCHMARK",taskConfigId,"产品基准","P50批量发布","按候选 P50 批量填充 "+rows.size()+" 个节点");
         return rows;
     }
 
@@ -2510,7 +2531,7 @@ public class ProductionTrackingService {
             for(String code:ProductionTrackingPolicy.stageCodes(workshop)){
                 var stage=new LinkedHashMap<String,Object>();
                 var milestone=milestones.get(code);
-                boolean optional=ProductionTrackingPolicy.isOptionalStage(code);
+                boolean optional=ProductionTrackingPolicy.isOptionalStage(code,workshop);
                 stage.put("code",code);
                 stage.put("label",ProductionTrackingPolicy.stageLabel(code,sealer));
                 stage.put("status",milestone!=null?milestone.get("stageStatus"):"PENDING");
@@ -2606,7 +2627,7 @@ public class ProductionTrackingService {
         boolean sealer=ProductionTrackingPolicy.isSealer((String)source.get("workshopType"));
         for(String code:codes){
             var item=new LinkedHashMap<String,Object>();
-            boolean optional=ProductionTrackingPolicy.isOptionalStage(code);
+            boolean optional=ProductionTrackingPolicy.isOptionalStage(code,(String)source.get("workshopType"));
             Optional<Map<String,Object>> savedRow=saved.stream().filter(s->code.equals(s.get("stageCode"))).findFirst();
             item.put("code",code);item.put("label",ProductionTrackingPolicy.stageLabel(code,sealer));
             item.put("optional",optional);

@@ -14,6 +14,8 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 
 /**
  * 周复盘响应的组织契约。
@@ -33,6 +35,13 @@ class ProductionTrackingWeeklyReviewServiceTest {
         when(analytics.analyzeUncut(eq(FROM), eq(TO), any())).thenReturn(emptyResult());
         assertEquals(Map.of("from", FROM, "to", TO, "days", 7L),
                 service.review(FROM, TO, "").get("period"));
+    }
+
+    @Test void historicalPeriodCardsUseTheSameCurrentRowsAsDrilldown() {
+        when(analytics.analyzeUncut(eq(FROM), eq(TO), any())).thenReturn(weekTwo());
+        var summary = summary(service.review(FROM, TO, ""));
+        assertEquals(3, summary.get("open"));
+        verify(analytics, never()).readSnapshot(any(), any(), any());
     }
 
     /** 卡片四数互斥闭合：应完成＝按期＋逾期＋未完工 —— 周报的「合计」就是这么加出来的。 */

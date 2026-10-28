@@ -1,5 +1,6 @@
 package com.liqiang.archive.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
@@ -41,7 +42,7 @@ class ProductionTrackingAnalyticsDrilldownColumnsTest {
     void setUp(){
         jdbc = mock(JdbcTemplate.class);
         tracking = mock(ProductionTrackingService.class);
-        service = new ProductionTrackingAnalyticsService(jdbc, tracking);
+        service = new ProductionTrackingAnalyticsService(jdbc, tracking, new ObjectMapper());
         ReflectionTestUtils.setField(service, "jdbc", jdbc);
         ReflectionTestUtils.setField(service, "tracking", tracking);
         // loadRows 往 visible() 返回的 StringBuilder 上续接条件，返回 null 会 NPE。

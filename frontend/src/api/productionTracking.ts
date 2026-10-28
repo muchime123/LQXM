@@ -449,7 +449,7 @@ export interface TrackingAnalyticsOrder {
   submittedDate: string | null
   baseline: string | null
   deliveredDate: string | null
-  status: 'ON_TIME' | 'LATE' | 'UNFINISHED' | 'CANCELLED' | 'MISSING_EXPECTED'
+  status: 'ON_TIME' | 'LATE' | 'UNFINISHED' | 'CANCELLED' | 'STOPPED' | 'MISSING_EXPECTED'
   overdueDays: number | null
   unfinishedOverdueDays: number | null
 }
@@ -520,6 +520,69 @@ export interface TrackingWeeklyReview {
 }
 export const fetchTrackingWeeklyReview = async (params: { fromDate?: string; toDate?: string; workshop?: string }) =>
   (await http.get<TrackingWeeklyReview>('/manufacturing/followups/weekly-review', { params })).data
+
+/** 历史周期快照：一个已固化的过去周期及其指标摘要（趋势看板用）。 */
+export interface TrackingWeeklyReviewHistoryItem {
+  periodFrom: string
+  periodTo: string
+  workshop: string | null
+  generatedAt: string
+  asOf: string | null
+  totals: TrackingWeeklyReviewSummary | null
+}
+export const fetchTrackingWeeklyReviewHistory = async (params: { workshop?: string }) =>
+  (await http.get<TrackingWeeklyReviewHistoryItem[]>('/manufacturing/followups/weekly-review/history', { params })).data
+
+/** 节点完成率分析：一个车间 × 一个节点（动态取自制程表）的完成情况。 */
+export interface TrackingNodeCompletionItem {
+  workshop: string
+  stage: string
+  stageName: string
+  involved: number
+  done: number
+  rate: number | null
+}
+export interface TrackingNodeAnalytics {
+  meta: { covered: number }
+  nodeCompletion: TrackingNodeCompletionItem[]
+  scheduleWait: { day: number; count: number }[]
+  scheduleWaitAnomalies: {
+    orderNo: string
+    productName: string
+    workshop: string
+    submitted: string | null
+    scheduled: string | null
+    waitDays: number
+  }[]
+}
+export const fetchTrackingNodeAnalytics = async () =>
+  (await http.get<TrackingNodeAnalytics>('/manufacturing/followups/analytics/nodes')).data
+
+/** 节点分析下钻：点某节点 / 某等待天数返回的对应工单清单行。 */
+export interface TrackingNodeAnalyticsOrder {
+  id: number
+  orderNo: string
+  productName: string
+  workshop: string
+  submittedDate: string | null
+  scheduleTime: string | null
+  waitDays: number
+  stageStatus: string | null
+  /** 基础列：业务员 / 产品规格 / 模具出数，与生产分析、周复盘下钻同源（缺失时 null，前端显示「—」）。 */
+  salesperson?: string | null
+  specification?: string | null
+  moldLayout?: string | null
+}
+export interface TrackingNodeOrdersPage {
+  items: TrackingNodeAnalyticsOrder[]
+  total: number
+  page: number
+  size: number
+}
+export const fetchTrackingNodeAnalyticsOrders = async (params: {
+  workshop?: string; stage?: string; status?: 'ALL' | 'DONE' | 'OPEN'
+  waitDays?: number; waitDaysMin?: number; page: number; size: number
+}) => (await http.get<TrackingNodeOrdersPage>('/manufacturing/followups/analytics/nodes/orders', { params })).data
 
 export const fetchTracking = async (params: Record<string, string | number | boolean>) =>
   (await http.get<{ items: TrackingOrder[]; total: number; page: number; size: number; visibility?: string }>('/manufacturing/followups', { params })).data
@@ -850,9 +913,6 @@ export interface TrackingProductBenchmarkRow {
   p75Days: number | null
   excludedCount: number | null
   plannedAnchorCount: number | null
-  applicationAnchorCount: number | null
-  applicationP50Days: number | null
-  applicationP75Days: number | null
   zeroDayCount: number | null
   baselineNote: string | null
   computedAt: string | null
@@ -873,6 +933,69 @@ export const applyTrackingProductBenchmarkP50 = async (taskConfigId: number) =>
   (await http.post<Array<{ stageCode: string; p50Days: number; sampleCount: number }>>(
     `/manufacturing/followups/product-node-benchmarks/${taskConfigId}/apply-p50`, {})).data
 
+/* ---------------- 制程节点管理（车间类别级） ---------------- */
+/*
+ * 节点序列原先硬编码在后端常量里，加一个节点要改代码 + 迁库 + 发版。
+ * 落表后在「生产参考工期」页维护：保存即刷新进程内快照，列表「已完成 x/y」的分母、
+ * 导出列、进度表表头都按这里的顺序走。
+ */
+
+export interface TrackingStageDef {
+  id: number
+  workshopKind: string
+  /** 内部编码；一经产生跟单记录不可修改。 */
+  stageCode: string
+  stageLabel: string
+  /** 制程顺序，升序。 */
+  sortNo: number
+  /** true＝按需工序：不计入完成分母，按关键词判定本单是否适用。 */
+  optional: boolean
+  matchKeywords: string | null
+  excludeKeywords: string | null
+  headerAliases: string | null
+  enabled: boolean
+  /** 已产生的跟单记录数；>0 时只能停用、不能删除。 */
+  usageCount: number
+}
+
+/** 改制程的影响面：多少在制单会被改写完成判定。 */
+export interface TrackingStageDefImpact {
+  workshopKind: string
+  openOrders: number
+  completedOrders: number
+  requiredStages: number
+}
+
+export interface TrackingStageDefInput {
+  kind: string
+  /** 仅新增时有效；编辑时编码不可改。 */
+  code?: string
+  label: string
+  optional?: boolean
+  matchKeywords?: string | null
+  excludeKeywords?: string | null
+  headerAliases?: string | null
+  enabled?: boolean
+}
+
+export const fetchTrackingStageDefs = async (kind: string) =>
+  (await http.get<TrackingStageDef[]>('/manufacturing/master/stage-defs', { params: { kind } })).data
+
+export const fetchTrackingStageDefsImpact = async (kind: string) =>
+  (await http.get<TrackingStageDefImpact>('/manufacturing/master/stage-defs/impact', { params: { kind } })).data
+
+export const createTrackingStageDef = async (payload: TrackingStageDefInput) =>
+  (await http.post<{ stageCode: string }>('/manufacturing/master/stage-defs', payload)).data
+
+export const updateTrackingStageDef = async (id: number, payload: TrackingStageDefInput) =>
+  (await http.put<{ id: number }>(`/manufacturing/master/stage-defs/${id}`, payload)).data
+
+export const moveTrackingStageDef = async (id: number, up: boolean) =>
+  (await http.post<{ id: number }>(`/manufacturing/master/stage-defs/${id}/move`, null, { params: { up } })).data
+
+export const deleteTrackingStageDef = async (id: number) =>
+  (await http.delete<{ id: number }>(`/manufacturing/master/stage-defs/${id}`)).data
+
 /** 样本明细里的一段：相邻两个节点（或锚点→首个节点）之间的自然日间隔。 */
 export interface ProductBenchmarkSampleStage {
   stageCode: string
@@ -887,8 +1010,8 @@ export interface ProductBenchmarkSampleOrder {
   orderId: number
   orderNo: string | null
   submittedAt: string | null
-  /** PLANNED＝以排产日为锚点（本地计划开工或氚云排产时间）；APPLICATION＝退到申请日；NONE＝无锚点，该单不计入样本。 */
-  anchorKind: 'PLANNED' | 'APPLICATION' | 'NONE'
+  /** SCHEDULED＝以氚云排产日为锚点；NONE＝无排产锚点，该单不计入样本（2026-10-28 A2 锚点只认排产）。 */
+  anchorKind: 'SCHEDULED' | 'NONE'
   stages: ProductBenchmarkSampleStage[]
 }
 export interface ProductBenchmarkSamples {
@@ -897,8 +1020,7 @@ export interface ProductBenchmarkSamples {
   stageCodes: string[]
   summary: {
     matchedOrders: number
-    plannedAnchorCount: number
-    applicationAnchorCount: number
+    scheduledAnchorCount: number
     noAnchorCount: number
     spanFrom: string | null
     spanTo: string | null
@@ -928,7 +1050,7 @@ export interface ProductDurationStage {
  * 产品生产工期（排产 → 入库完成）。两个数互为校验：
  * - referenceDays：各必经节点「生效参考值」之和，与跟单侧推算参考日期同源；
  * - actualP50Days：该产品跟单记录里真实走完的整体天数。
- * 口径差异要点：实测只用**排产锚点**的单，退到申请日的单不进分位（那段是等排产，不是生产）。
+ * 口径差异要点：实测只用**排产锚点**（2026-10-28 A2 收敛），未排产的单无锚点、不进分位。
  */
 export interface ProductDuration {
   taskConfigId: number
@@ -953,9 +1075,9 @@ export interface ProductDuration {
   actualP50Days: number | null
   actualP75Days: number | null
   actualSampleCount: number
-  /** 未走完（缺末节点完成日）／只用申请日锚点被排除／倒序或超 60 天被排除。 */
+  /** 未走完（缺末节点完成日）／无排产锚点被排除／倒序或超 60 天被排除。 */
   openOrderCount: number
-  applicationAnchorCount: number
+  noAnchorCount: number
   excludedCount: number
 }
 

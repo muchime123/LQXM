@@ -6,8 +6,7 @@
     <template v-else-if="data">
       <div class="summary">
         <span class="stat"><b>{{ data.summary.matchedOrders }}</b> 条跟单记录</span>
-        <span class="stat"><b>{{ data.summary.plannedAnchorCount }}</b> 条以车间排产日为锚点</span>
-        <span class="stat" :class="{ warn: data.summary.applicationAnchorCount > 0 }"><b>{{ data.summary.applicationAnchorCount }}</b> 条退到申请日</span>
+        <span class="stat"><b>{{ data.summary.scheduledAnchorCount }}</b> 条以氚云排产日为锚点</span>
         <span class="stat" :class="{ warn: data.summary.noAnchorCount > 0 }"><b>{{ data.summary.noAnchorCount }}</b> 条无锚点</span>
         <span v-if="data.summary.spanFrom" class="stat">跨度 {{ data.summary.spanFrom }} ~ {{ data.summary.spanTo }}</span>
       </div>
@@ -90,10 +89,10 @@ function cellClass(s: ProductBenchmarkSampleStage) {
   return s.used ? (s.zeroDay ? 'zero' : 'used') : 'excluded'
 }
 function anchorText(kind: string) {
-  return kind === 'PLANNED' ? '排产日' : kind === 'APPLICATION' ? '申请日兜底' : '无锚点'
+  return kind === 'SCHEDULED' ? '排产日' : '无锚点'
 }
 function anchorType(kind: string): 'success' | 'warning' | 'info' {
-  return kind === 'PLANNED' ? 'success' : kind === 'APPLICATION' ? 'warning' : 'info'
+  return kind === 'SCHEDULED' ? 'success' : 'info'
 }
 </script>
 

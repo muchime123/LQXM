@@ -33,12 +33,12 @@ class ProductionTrackingAnalyticsServiceTest {
         assertEquals(1,totals.get("onTime"));
         assertEquals(1,totals.get("overdue"));
         assertEquals(50.0,totals.get("onTimeRate"));
-        assertEquals(2,totals.get("open"));
+        assertEquals(1,totals.get("open"));
         assertEquals(1,totals.get("openOverdue"));
-        assertEquals(4,totals.get("dueTasks"));
-        assertEquals(50.0,totals.get("completionRate"));
-        assertEquals(25.0,totals.get("onTimeAchievementRate"));
-        assertEquals(1,totals.get("openDueToday"));
+        assertEquals(3,totals.get("dueTasks"));
+        assertEquals(66.7,totals.get("completionRate"));
+        assertEquals(33.3,totals.get("onTimeAchievementRate"));
+        assertEquals(0,totals.get("openDueToday"));
         assertEquals(1,totals.get("extended"));
         assertEquals(0,totals.get("extensionReasonMissing"));
         assertEquals(0,totals.get("overdueReasonMissing"));
@@ -126,7 +126,7 @@ class ProductionTrackingAnalyticsServiceTest {
     }
 
     @SuppressWarnings("unchecked")
-    @Test void cancelledIsExcludedButStoppedRemainsAndMonthsFollowExpectedDate(){
+    @Test void cancelledAndStoppedAreExcludedFromDeliveryRatesButCountedSeparately(){
         var rows=List.of(
                 new ProductionTrackingAnalyticsService.OrderRow(10,"A",d("2026-09-01"),null,d("2026-09-28"),
                         d("2026-10-08"),d("2026-10-08"),d("2026-10-15"),false,null,null,null,null,null,null),
@@ -136,15 +136,16 @@ class ProductionTrackingAnalyticsServiceTest {
                         null,d("2026-10-05"),null,false,true,null,null,null,null,null,null));
         var result=ProductionTrackingAnalyticsService.summarize(rows,TODAY);
         var totals=(Map<String,Object>)result.get("totals");
-        assertEquals(2,totals.get("dueTasks"));
+        assertEquals(1,totals.get("dueTasks"));
         assertEquals(1,totals.get("cancelled"));
         assertEquals(1,totals.get("stopped"));
         assertEquals(1,totals.get("overdue"));
-        assertEquals(1,totals.get("open"));
+        assertEquals(0,totals.get("open"));
         assertEquals("LATE",ProductionTrackingAnalyticsService.status(rows.get(0)));
-        assertEquals("UNFINISHED",ProductionTrackingAnalyticsService.status(rows.get(1)));
+        assertEquals("STOPPED",ProductionTrackingAnalyticsService.status(rows.get(1)));
         assertEquals(false,ProductionTrackingAnalyticsService.matches(rows.get(2),"dueTasks",null,TODAY));
-        assertEquals(true,ProductionTrackingAnalyticsService.matches(rows.get(1),"open",null,TODAY));
+        assertEquals(false,ProductionTrackingAnalyticsService.matches(rows.get(1),"open",null,TODAY));
+        assertEquals(true,ProductionTrackingAnalyticsService.matches(rows.get(1),"stopped",null,TODAY));
         var months=(List<Map<String,Object>>)result.get("months");
         assertEquals(1,months.size());
         assertEquals("2026-10",months.get(0).get("name"));

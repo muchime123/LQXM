@@ -35,7 +35,7 @@ class ProductionTrackingServiceTest {
 
     @Test
     void septemberOrdersAndPreviouslyTrackedOrdersAreVisible() {
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope(),mock(AuditLogService.class));
         var params=new ArrayList<>();
 
         String where=service.visible(params).toString();
@@ -77,7 +77,7 @@ class ProductionTrackingServiceTest {
     @Test
     void openTrackingStatusMeansNotYetDelivered() {
         var jdbc=mock(JdbcTemplate.class);
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         var filtered=ProductionTrackingService.filterForTest(service,"open");
         String openWhere=(String)filtered.get("where");
@@ -127,7 +127,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         doReturn(List.of("封口机")).when(jdbc).query(contains("SELECT production_line"),any(RowMapper.class),eq(7L));
         doReturn(List.of()).when(jdbc).query(contains("FROM employees"),any(RowMapper.class),eq("陈苏平"));
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         assertTrue(service.defaultAssignee(7L).isEmpty(),
                 "默认跟单员改名或停用时必须软降级为未分配，不能抛出 500");
@@ -137,7 +137,7 @@ class ProductionTrackingServiceTest {
     void candidatesSearchCustomerAndStayInTrackingScope() {
         var jdbc=mock(JdbcTemplate.class);
         doReturn(List.of()).when(jdbc).query(anyString(),any(RowMapper.class),any(),any(),any());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.candidates("客户",null);
 
@@ -157,7 +157,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var sqls=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(sqls.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list(null,null,"active",false,null,1,30);
         try { service.detail(7L); } catch (IllegalArgumentException expected) { /* 详情在无数据时抛错，SQL 仍需核对 */ }
@@ -190,7 +190,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list(null,null,"active",false,null,1,30);
         service.list(null,null,"complete",false,null,1,30);
@@ -216,7 +216,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list(null,null,"pending","overdue","已生效",false,null,1,30);
         var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
@@ -233,7 +233,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list(null,null,"all","time_attention","",false,"","2026-09",1,30);
 
@@ -268,7 +268,7 @@ class ProductionTrackingServiceTest {
             var jdbc=mock(JdbcTemplate.class);
             when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
             when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
             service.list(null,null,"all",entry.getKey(),"",false,"",1,30);
             var sql=org.mockito.ArgumentCaptor.forClass(String.class);
             verify(jdbc).queryForObject(sql.capture(),eq(Long.class),any(Object[].class));
@@ -284,7 +284,7 @@ class ProductionTrackingServiceTest {
         var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.summary();
         var summarySql=org.mockito.ArgumentCaptor.forClass(String.class);
@@ -307,14 +307,22 @@ class ProductionTrackingServiceTest {
     @Test
     void workshopStagePolicyIsTheSingleJavaSource() {
         assertEquals(8,ProductionTrackingPolicy.stageCodes("全自动气调机").size());
-        assertEquals(6,ProductionTrackingPolicy.stageCodes("封口机").size());
-        assertEquals(List.of("MATERIAL","MOLD","OXIDATION","ASSEMBLY","WAREHOUSE","WOODEN_CRATE"),
+        assertEquals(7,ProductionTrackingPolicy.stageCodes("封口机").size());
+        assertEquals(List.of("MATERIAL","MOLD","OXIDATION",ProductionTrackingPolicy.MATERIAL_READY,
+                        "ASSEMBLY","WAREHOUSE","WOODEN_CRATE"),
                 ProductionTrackingPolicy.stageCodes("封口机"));
-        assertEquals(4,ProductionTrackingPolicy.requiredStages("封口机").size());
+        assertEquals(5,ProductionTrackingPolicy.requiredStages("封口机").size());
         assertEquals(7,ProductionTrackingPolicy.requiredStages("全自动气调机").size());
         assertTrue(ProductionTrackingPolicy.isOptionalStage("OXIDATION"));
         assertTrue(ProductionTrackingPolicy.isOptionalStage("WOODEN_CRATE"));
         assertFalse(ProductionTrackingPolicy.isOptionalStage("ASSEMBLY"));
+        assertFalse(ProductionTrackingPolicy.isOptionalStage(ProductionTrackingPolicy.MATERIAL_READY),
+                "物料配齐是组装前的必经节点，不是按需工序");
+        assertEquals(List.of("MATERIAL","MOLD",ProductionTrackingPolicy.MATERIAL_READY,"ASSEMBLY","WAREHOUSE"),
+                ProductionTrackingPolicy.requiredStages("封口机"));
+        assertFalse(ProductionTrackingPolicy.stageCodes("全自动气调机")
+                        .contains(ProductionTrackingPolicy.MATERIAL_READY),
+                "物料配齐只挂在封口机序列，机器车间不启用");
         assertEquals("模具",ProductionTrackingPolicy.stageLabel("MOLD",false));
         assertEquals("模具生产",ProductionTrackingPolicy.stageLabel("MOLD",true));
         assertEquals("氧化/喷特氟龙",ProductionTrackingPolicy.stageLabel("OXIDATION",true));
@@ -325,8 +333,10 @@ class ProductionTrackingServiceTest {
         assertFalse(ProductionTrackingPolicy.configuredOptionalStage("OXIDATION","无需氧化"));
         assertTrue(ProductionTrackingPolicy.configuredOptionalStage("OXIDATION",null,"模具更换都需要特富龙"));
         assertFalse(ProductionTrackingPolicy.configuredOptionalStage("OXIDATION",null,"无需特富龙"));
-        // 完成判据的分母＝必经节点数，按需工序不计入，否则封口机会永远差一个节点完成不了。
-        assertEquals("CASE WHEN p.production_line LIKE '%封口%' THEN 4 ELSE 7 END",
+        // 完成判据的分母＝本车间类别「启用且必经」的节点数，直接查制程表（原先是写死的数字，
+        // 加一个节点就要改常量）；按需工序不计入，否则封口机会永远差一个节点完成不了。
+        assertEquals("(SELECT COUNT(*) FROM production_tracking_stage_defs d WHERE d.enabled=1 AND d.optional=0 "
+                        +"AND d.workshop_kind=CASE WHEN p.production_line LIKE '%封口%' THEN 'SEALER' ELSE 'MACHINE' END)",
                 ProductionTrackingPolicy.stageTotalCase("p.production_line"));
         assertEquals("陈苏平",ProductionTrackingPolicy.defaultAssigneeName("封口机"));
         assertEquals("胡健",ProductionTrackingPolicy.defaultAssigneeName("半自动气调机"));
@@ -339,6 +349,8 @@ class ProductionTrackingServiceTest {
         assertEquals("MOLD",ProductionTrackingPolicy.stageCodeOfLabel("模具生产"));
         assertEquals("MOLD",ProductionTrackingPolicy.stageCodeOfLabel("模具"));
         assertEquals("OXIDATION",ProductionTrackingPolicy.stageCodeOfLabel("氧化/喷特氟龙"));
+        assertEquals(ProductionTrackingPolicy.MATERIAL_READY,ProductionTrackingPolicy.stageCodeOfLabel("物料配齐"));
+        assertEquals(ProductionTrackingPolicy.MATERIAL_READY,ProductionTrackingPolicy.stageCodeOfLabel("物料齐套"));
         assertEquals("WOODEN_CRATE",ProductionTrackingPolicy.stageCodeOfLabel("木箱"));
         assertEquals("ASSEMBLY",ProductionTrackingPolicy.stageCodeOfLabel("组装"));
         assertEquals("WAREHOUSE",ProductionTrackingPolicy.stageCodeOfLabel("入库"));
@@ -352,14 +364,14 @@ class ProductionTrackingServiceTest {
     /** 详情进度分母＝必经节点 + 本单适用的按需工序；必经节点不能被当成「按需」重复计入。 */
     @Test
     void stageTotalCountsRequiredPlusApplicableOptionalOnly() {
-        assertEquals(5,ProductionTrackingService.stageTotal("封口机车间",sealerMilestones(true)),
-                "走了氧化的封口机单：4 个必经 + 1 个按需");
-        assertEquals(4,ProductionTrackingService.stageTotal("封口机车间",sealerMilestones(false)),
-                "没走氧化的封口机单不能被算成 5 个节点");
+        assertEquals(6,ProductionTrackingService.stageTotal("封口机车间",sealerMilestones(true)),
+                "走了氧化的封口机单：5 个必经（含物料配齐）+ 1 个按需");
+        assertEquals(5,ProductionTrackingService.stageTotal("封口机车间",sealerMilestones(false)),
+                "没走氧化的封口机单不能被算成 6 个节点");
         var withCrate=new ArrayList<>(sealerMilestones(false));
         withCrate.stream().filter(row->"WOODEN_CRATE".equals(row.get("code")))
                 .forEach(row->row.put("applicable",true));
-        assertEquals(5,ProductionTrackingService.stageTotal("封口机车间",withCrate),
+        assertEquals(6,ProductionTrackingService.stageTotal("封口机车间",withCrate),
                 "配置木箱时才把木箱计入节点总数");
         assertEquals(7,ProductionTrackingService.stageTotal("全自动气调机",List.of()),
                 "气调机没有按需工序，分母恒为 7");
@@ -387,9 +399,13 @@ class ProductionTrackingServiceTest {
                 "分子要含本单确实做完的按需工序："+ProductionTrackingService.STAGE_DONE_CASE);
         assertTrue(ProductionTrackingService.TRACKING_COMPLETE.contains("optional_count"),
                 "分母要含本单适用的按需工序："+ProductionTrackingService.TRACKING_COMPLETE);
+        // 节点集合必须来自制程表：写死编码列表会让页面上新增的节点永远不进分子分母。
         assertTrue(ProductionTrackingService.TRACKING_FROM.contains(
-                        "stage_code IN ('MATERIAL','MOLD','ASSEMBLY','WAREHOUSE') AND stage_status='DONE'"),
-                "封口机的必经节点计数不能把氧化算进去："+ProductionTrackingService.TRACKING_FROM);
+                        "JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code AND d.enabled=1"),
+                "完成计数必须按制程表判定："+ProductionTrackingService.TRACKING_FROM);
+        assertFalse(ProductionTrackingService.TRACKING_FROM.contains("'ASSEMBLY'")
+                        ||ProductionTrackingService.TRACKING_FROM.contains("'MATERIAL'"),
+                "SQL 里不能再出现写死的节点编码，否则新增节点不进分母："+ProductionTrackingService.TRACKING_FROM);
     }
 
     /** 跟单状态＝「有没有跟单节点记录」：节点有记录＝跟单中，一个都没有＝待跟单。 */
@@ -429,7 +445,7 @@ class ProductionTrackingServiceTest {
 
     @Test
     void supervisorScopeSeesAllFollowupsWithoutExtraFilter() {
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope(),mock(AuditLogService.class));
         var params=new ArrayList<>();
 
         String where=service.visible(params).toString();
@@ -441,7 +457,7 @@ class ProductionTrackingServiceTest {
 
     @Test
     void trackerScopeSeesOnlyWorkshopsAssignedToThem() {
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),tracker(160L));
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),tracker(160L),mock(AuditLogService.class));
         var params=new ArrayList<>();
 
         String where=service.visible(params).toString();
@@ -464,7 +480,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list(null,null,"all","all","",false,"",1,30);
 
@@ -489,7 +505,7 @@ class ProductionTrackingServiceTest {
         var sealer=ProductionTrackingService.benchmarkWorkshop("SEALER","封口机",saved);
         @SuppressWarnings("unchecked")
         var sealerStages=(List<Map<String,Object>>)sealer.get("stages");
-        assertEquals(ProductionTrackingPolicy.SEALER_STAGES.size(),sealerStages.size(),
+        assertEquals(ProductionTrackingPolicy.stageCodes("封口机").size(),sealerStages.size(),
                 "含氧化按需工序在内的全部节点都要列出："+sealerStages);
         assertEquals("计划开工 → 备料",sealerStages.get(0).get("intervalLabel"));
         assertEquals("备料 → 模具生产",sealerStages.get(1).get("intervalLabel"));
@@ -500,8 +516,8 @@ class ProductionTrackingServiceTest {
         var machine=ProductionTrackingService.benchmarkWorkshop("MACHINE","机器车间",saved);
         @SuppressWarnings("unchecked")
         var machineStages=(List<Map<String,Object>>)machine.get("stages");
-        assertEquals(ProductionTrackingPolicy.MACHINE_STAGES.size(),machineStages.size(),
-                "机器车间 7 个节点即使一条基准都没配也必须全部列出："+machineStages);
+        assertEquals(ProductionTrackingPolicy.stageCodes("全自动气调机").size(),machineStages.size(),
+                "机器车间全部节点即使一条基准都没配也必须全部列出："+machineStages);
         assertTrue(machineStages.stream().allMatch(stage->stage.get("typicalDays")==null));
     }
 
@@ -510,7 +526,7 @@ class ProductionTrackingServiceTest {
     void savingBenchmarksRejectsInvalidWorkshopStageAndRange() {
         var actors=mock(ActorResolver.class);
         when(actors.current()).thenReturn(new Actor(1L,"测试管理员"));
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),actors,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),actors,null,new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         assertTrue(assertThrows(IllegalArgumentException.class,()->service.saveNodeBenchmarks(List.of()))
                 .getMessage().contains("没有要保存"));
@@ -547,7 +563,7 @@ class ProductionTrackingServiceTest {
             return null;
         }).when(jdbc).query(anyString(),any(org.springframework.jdbc.core.RowCallbackHandler.class));
 
-        var service=new ProductionTrackingService(jdbc,mock(ActorResolver.class),null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,mock(ActorResolver.class),null,new ObjectMapper(),allScope(),mock(AuditLogService.class));
         var matrix=service.columnDefaultMatrix();
 
         @SuppressWarnings("unchecked")
@@ -573,7 +589,7 @@ class ProductionTrackingServiceTest {
     void savingColumnDefaultsRejectsInvalidDuplicateAndMissingVisibility() {
         var actors=mock(ActorResolver.class);
         when(actors.current()).thenReturn(new Actor(1L,"测试管理员"));
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),actors,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),actors,null,new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         assertTrue(assertThrows(IllegalArgumentException.class,()->service.saveColumnDefaults(List.of()))
                 .getMessage().contains("没有要保存"));
@@ -610,7 +626,7 @@ class ProductionTrackingServiceTest {
             return null;
         }).when(jdbc).query(anyString(),any(org.springframework.jdbc.core.RowCallbackHandler.class));
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of(7L));
-        var service=new ProductionTrackingService(jdbc,actors,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,actors,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         var result=service.saveColumnDefaults(
                 List.of(new ProductionTrackingService.ColumnDefaultSave("assignee",true)));
@@ -662,7 +678,7 @@ class ProductionTrackingServiceTest {
         row.put("inboundBeforeReport",null);
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         doReturn(List.of(row)).when(jdbc).queryForList(sql.capture(),any(Object[].class));
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         var result=service.dashboard();
 
@@ -752,7 +768,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list(null,null,"active",false,null,1,30);
         try { service.detail(7L); } catch (IllegalArgumentException expected) { /* 详情无数据抛错，SQL 仍需核对 */ }
@@ -838,7 +854,8 @@ class ProductionTrackingServiceTest {
         String days=ProductionTrackingService.DELIVERY_OVERDUE_DAYS;
 
         assertTrue(ProductionTrackingService.TRACKING_FROM.contains(
-                        "MAX(CASE WHEN stage_code='WAREHOUSE' AND stage_status='DONE' THEN completed_date END) warehouse_in_date"),
+                        "MAX(CASE WHEN d.stage_code='WAREHOUSE' AND m.stage_status='DONE' THEN m.completed_date END) "
+                                +"warehouse_in_date"),
                 "「跟单员记录的入库时间」＝入库节点的完成日期，必须从里程碑派生表取："+ProductionTrackingService.TRACKING_FROM);
         assertEquals("COALESCE(ms.warehouse_in_date,ib.first_in)",delivered,
                 "跟单员节点日期优先；未登记时才回退采购首次入库日期："+delivered);
@@ -869,7 +886,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list(null,null,"all","all","",false,"",1,30);
         try { service.detail(7L); } catch (IllegalArgumentException expected) { /* 详情无数据抛错，SQL 仍需核对 */ }
@@ -936,7 +953,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(new java.util.ArrayList<>());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list(null,null,"all","all","",false,"","","INBOUND_PENDING",1,30);
 
@@ -978,7 +995,7 @@ class ProductionTrackingServiceTest {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null,new ObjectMapper(),allScope(),mock(AuditLogService.class));
         service.list(null,null,"all","all","",false,"","","INBOUND_UNLOGGED",1,30);
         var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
         verify(jdbc).queryForObject(countSql.capture(),eq(Long.class),any(Object[].class));
@@ -997,7 +1014,7 @@ class ProductionTrackingServiceTest {
         var pageArgs=org.mockito.ArgumentCaptor.forClass(Object[].class);
         var pageSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(pageSql.capture(),any(RowMapper.class),pageArgs.capture())).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list(null,null,"all","all","",false,"","","all","","张三,李四","OVERDUE,ON_TIME",1,30);
 
@@ -1028,7 +1045,7 @@ class ProductionTrackingServiceTest {
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         var args=org.mockito.ArgumentCaptor.forClass(Object[].class);
         when(jdbc.query(sql.capture(),any(RowMapper.class),args.capture())).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
         var created=new ProductionTrackingService.DateRangeFilter("2026-09-01","2026-09-30",false);
         var empty=new ProductionTrackingService.DateRangeFilter("","",false);
 
@@ -1060,7 +1077,7 @@ class ProductionTrackingServiceTest {
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         var args=org.mockito.ArgumentCaptor.forClass(Object[].class);
         when(jdbc.query(sql.capture(),any(RowMapper.class),args.capture())).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
         var empty=new ProductionTrackingService.DateRangeFilter("","",false);
         var expected=new ProductionTrackingService.DateRangeFilter("2026-10-12","2026-10-18",false);
 
@@ -1093,7 +1110,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(sql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
         var empty=new ProductionTrackingService.DateRangeFilter("","",false);
 
         service.list("","","all","all","",false,"","","all","","","",empty,empty,empty,
@@ -1115,10 +1132,11 @@ class ProductionTrackingServiceTest {
             assertFalse(agg.contains("'MOLD'")||agg.contains("'SHEET_METAL'"),
                     "模具自身与模具之前的钣金都不能算「模具之后」（"+field+"）："+agg);
         }
-        assertTrue(from.contains("stage_code IN ('OXIDATION','ASSEMBLY','WAREHOUSE','WOODEN_CRATE')"),
-                "封口机的后置节点＝氧化/组装/入库/木箱："+from);
-        assertTrue(from.contains("stage_code IN ('ASSEMBLY','TESTING','WAREHOUSE','WOODEN_CRATE')"),
-                "机器车间的后置节点＝组装/调试/入库/木箱："+from);
+        // 「模具之后」按制程序号判定，不再列举后置节点编码（新增节点自动纳入）。
+        assertTrue(from.contains("d.sort_no>COALESCE(mold.sort_no,0)"),
+                "模具之后＝制程序号大于模具，不能写死后置节点列表："+from);
+        assertTrue(from.contains("LEFT JOIN production_tracking_stage_defs mold ON mold.stage_code='MOLD'"),
+                "模具的序号要按同一车间类别取，否则跨类别串了："+from);
 
         // 导出必须与列表同一段谓词（否则导出的行和页面上看到的行对不上）。
         service.exportRows("","","all","all","",false,"","","all","","","",empty,empty,empty,
@@ -1146,7 +1164,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),countArgs.capture())).thenReturn(0L);
         var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list("120×80","","all","all","",false,"","","all","",1,30);
 
@@ -1175,7 +1193,7 @@ class ProductionTrackingServiceTest {
         var scanSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.queryForList(scanSql.capture(),any(Object[].class))).thenReturn(List.of());
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         var options=service.filterOptions();
 
@@ -1196,7 +1214,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list(null,null,"all","all","",false,"",1,30);
         try { service.detail(7L); } catch (IllegalArgumentException expected) { /* 详情无数据抛错，SQL 仍需核对 */ }
@@ -1215,7 +1233,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForList(anyString(),eq(String.class),any(Object[].class))).thenReturn(List.of());
         var querySql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(querySql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.filterOptions();
 
@@ -1243,7 +1261,7 @@ class ProductionTrackingServiceTest {
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         var args=org.mockito.ArgumentCaptor.forClass(Object[].class);
         when(jdbc.query(sql.capture(),any(RowMapper.class),args.capture())).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.list("客户","封口机","open","time_overdue","",false,"7","2026-10","STALE_FOLLOWUP",2,30);
         service.exportRows("客户","封口机","open","time_overdue","",false,"7","2026-10","STALE_FOLLOWUP");
@@ -1279,7 +1297,7 @@ class ProductionTrackingServiceTest {
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
         var args=org.mockito.ArgumentCaptor.forClass(Object[].class);
         when(jdbc.query(sql.capture(),any(RowMapper.class),args.capture())).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null,new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         var listed=service.list("客户","封口机","all","all","",false,"","2026-10","any",1,30);
         var exported=service.exportRows("客户","封口机","all","all","",false,"","2026-10","any");
@@ -1327,7 +1345,7 @@ class ProductionTrackingServiceTest {
             when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
             var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
             when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
             service.list("","","all","all","",false,"","",/*action*/"all",/*countdown*/"",
                     /*salesperson*/"",/*deliveryResult*/"",created,created,created,
@@ -1345,7 +1363,7 @@ class ProductionTrackingServiceTest {
             var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
             when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
             when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
             service.list("","","all","all","",false,"","",/*action*/"all",/*countdown*/"",
                     /*salesperson*/"",/*deliveryResult*/"OVERDUE",created,created,created,
@@ -1363,7 +1381,7 @@ class ProductionTrackingServiceTest {
             var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
             when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
             when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
             service.list("","","all","all","",false,"","",/*action*/"all",/*countdown*/"delivered",
                     /*salesperson*/"",/*deliveryResult*/"",created,created,created,
@@ -1379,7 +1397,7 @@ class ProductionTrackingServiceTest {
             var countSql=org.mockito.ArgumentCaptor.forClass(String.class);
             when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
             when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+            var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
             service.exportRows("","","all","all","",false,"","",/*action*/"all");
 
@@ -1400,7 +1418,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(countSql.capture(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var rowSql=org.mockito.ArgumentCaptor.forClass(String.class);
         when(jdbc.query(rowSql.capture(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
         var created=new ProductionTrackingService.DateRangeFilter("","",false);
 
         service.list("","","all","all","",false,"","","all","","","",created,created,created,
@@ -1409,12 +1427,15 @@ class ProductionTrackingServiceTest {
                 false,"",created,"OXIDATION","");
 
         String predicate=ProductionTrackingService.needsOptionalStage("OXIDATION");
-        assertTrue(predicate.contains("ms.oxidation_count"),"要看该单有没有这道工序的节点记录："+predicate);
-        assertTrue(predicate.contains("特氟龙")&&predicate.contains("特富龙")&&predicate.contains("氧化")
+        assertTrue(predicate.contains("EXISTS (SELECT 1 FROM production_tracking_milestones m "
+                        +"WHERE m.production_order_id=p.id AND m.stage_code='OXIDATION')"),
+                "要看该单有没有这道工序的节点记录："+predicate);
+        // 关键词读制程表而不是写死在 SQL 里：页面上改了关键词、新增了按需工序都立即生效。
+        assertTrue(predicate.contains("production_tracking_stage_defs d")&&predicate.contains("d.match_keywords")
                         &&predicate.contains("p.production_requirement"),
-                "也要认源单可选配置或备注里写明的「氧化/特氟龙/特富龙」："+predicate);
-        assertTrue(predicate.contains("p.production_line LIKE '%封口%'"),
-                "氧化只存在于封口机的节点序列里，机器车间的单不该被筛出来："+predicate);
+                "也要认源单可选配置或备注里写明的需要，且关键词取自制程表："+predicate);
+        assertTrue(predicate.contains("d.workshop_kind=CASE WHEN p.production_line LIKE '%封口%'"),
+                "按需工序只在本车间类别的制程里生效，机器车间的单不该被筛出来："+predicate);
         for(String sql:List.of(countSql.getValue(),rowSql.getValue()))
             assertTrue(sql.contains(predicate),"列表与导出的 COUNT/明细都必须带同一段工序谓词："+sql);
 
@@ -1452,7 +1473,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForList(listSql.capture(),any(Object[].class)))
                 .thenReturn(List.<Map<String,Object>>of(nullRow));
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         var options=service.filterOptions();
 
@@ -1478,7 +1499,7 @@ class ProductionTrackingServiceTest {
         long matching=(long)ProductionTrackingService.EXPORT_MAX_ROWS+9;
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(matching);
         stubListRows(jdbc,exportFixtureRows(ProductionTrackingService.EXPORT_MAX_ROWS+1));
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         var result=service.exportRows("","","all","all","",false,"","","all");
 
@@ -1495,7 +1516,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class)))
                 .thenReturn((long)ProductionTrackingService.EXPORT_MAX_ROWS);
         stubListRows(jdbc,exportFixtureRows(ProductionTrackingService.EXPORT_MAX_ROWS));
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         var result=service.exportRows("","","all","all","",false,"","","all");
 
@@ -1536,7 +1557,7 @@ class ProductionTrackingServiceTest {
     void workbookPendingQueueFlagsRowsTheNewerVersionDidNotCover() {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.query(anyString(),any(RowMapper.class))).thenReturn(List.of());
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         service.workbookRows(false);
 
@@ -1554,7 +1575,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.queryForList(anyString())).thenReturn(List.of(
                 Map.of("s","PENDING","c",3),Map.of("s","REVIEW","c",1),
                 Map.of("s","ARCHIVED","c",5),Map.of("s","IMPORTED","c",400)));
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         var summary=service.workbookSummary();
 
@@ -1587,7 +1608,7 @@ class ProductionTrackingServiceTest {
         when(jdbc.query(anyString(),any(RowMapper.class),any(Object[].class))).thenReturn(List.of(
                 candidate(1L,"WO-5858","LQ750全自动多模具","全自动气调机车间","2026-10-07",2),
                 candidate(2L,"WO-9999","别的产品","封口机车间","2026-11-20",7)));
-        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(jdbc,null,null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         var scored=service.workbookCandidates(9L);
 
@@ -1600,7 +1621,7 @@ class ProductionTrackingServiceTest {
 
     @Test
     void batchWorkbookRejectsUnknownActionsAndOversizedBatches() {
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         assertThrows(IllegalArgumentException.class,()->service.batchResolveWorkbookRows(List.of(),"skip","k"));
         assertThrows(IllegalArgumentException.class,()->service.batchResolveWorkbookRows(List.of(1L),"unknown","k"));
@@ -1610,7 +1631,7 @@ class ProductionTrackingServiceTest {
 
     @Test
     void archiveRequiresAReasonBeforeTouchingTheRow() {
-        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope());
+        var service=new ProductionTrackingService(mock(JdbcTemplate.class),null,null,new ObjectMapper(),allScope(),mock(AuditLogService.class));
 
         assertThrows(IllegalArgumentException.class,()->service.archiveWorkbookRow(1L,"   ","k"));
     }
@@ -1622,7 +1643,7 @@ class ProductionTrackingServiceTest {
      */
     @Test
     void productOrderHistoryKeepsEveryStatusAndCountsOnlyRequiredStages() {
-        for (var expected : List.of(Map.entry("封口机车间", 4), Map.entry("全自动气调机车间", 7))) {
+        for (var expected : List.of(Map.entry("封口机车间", 5), Map.entry("全自动气调机车间", 7))) {
             String workshop = expected.getKey();
             int required = expected.getValue();
             var jdbc = mock(JdbcTemplate.class);
@@ -1633,11 +1654,11 @@ class ProductionTrackingServiceTest {
             doAnswer(inv -> { orderSqls.add(inv.getArgument(0)); return null; })
                     .when(jdbc).query(anyString(), any(org.springframework.jdbc.core.RowCallbackHandler.class), any(Object[].class));
 
-            var service = new ProductionTrackingService(jdbc, mock(ActorResolver.class), null, new ObjectMapper(), allScope());
+            var service = new ProductionTrackingService(jdbc, mock(ActorResolver.class), null, new ObjectMapper(),allScope(),mock(AuditLogService.class));
             var result = service.productOrderHistory(1L, "", 50);
 
             assertEquals(required, result.get("requiredStageCount"),
-                    workshop + " 的必经节点数必须与跟单分母同源（封口 4 / 机器 7）");
+                    workshop + " 的必经节点数必须与跟单分母同源（封口 5（含物料配齐）/ 机器 7）");
             String sql = orderSqls.getFirst();
             assertFalse(sql.contains("CANCELLED") || sql.contains("已取消"),
                     "明细不能排除任何状态：数字含草稿/已取消，明细也必须含，否则两处对不上：" + sql);

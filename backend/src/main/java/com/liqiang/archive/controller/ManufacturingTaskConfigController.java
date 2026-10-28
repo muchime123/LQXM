@@ -1,6 +1,7 @@
 package com.liqiang.archive.controller;
 
 import com.liqiang.archive.security.RequirePermission;
+import com.liqiang.archive.service.ProductionTrackingStageService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -22,9 +23,11 @@ import java.util.*;
 @RequirePermission("manufacturing.template.manage")
 public class ManufacturingTaskConfigController {
     private final JdbcTemplate jdbc;
+    private final ProductionTrackingStageService stages;
 
-    public ManufacturingTaskConfigController(JdbcTemplate jdbc) {
+    public ManufacturingTaskConfigController(JdbcTemplate jdbc,ProductionTrackingStageService stages) {
         this.jdbc = jdbc;
+        this.stages = stages;
     }
 
     /**
@@ -120,11 +123,14 @@ public class ManufacturingTaskConfigController {
     /** 车间列表。2026-10-23：移除 default_process_template_id（制程关联已下线）。 */
     @GetMapping("/workshops")
     public List<Map<String,Object>> workshops() {
-        return jdbc.queryForList("SELECT id,workshop_name AS workshopName,enabled,order_receiver_name AS orderReceiverName,warehouse_clerk_name AS warehouseClerkName FROM manufacturing_workshops ORDER BY enabled DESC,id");
+        // 2026-10-27：不再输出接单员/入库员（随工单走，工位责任人不属于车间档案），
+        // 也不再输出启用状态——任务在氚云下达，本表只是产品归属用的字典，启停没有业务含义。
+        return jdbc.queryForList("SELECT id,workshop_name AS workshopName "
+                +"FROM manufacturing_workshops ORDER BY id");
     }
 
-    public record WorkshopUpdate(String workshopName, Boolean enabled, String orderReceiverName,
-                                 String warehouseClerkName) {}
+    /** 2026-10-27：移除接单员/入库员与启用开关，车间只剩名称。 */
+    public record WorkshopUpdate(String workshopName) {}
 
     @PostMapping("/workshops")
     @Transactional
@@ -133,8 +139,8 @@ public class ManufacturingTaskConfigController {
         if(jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_workshops WHERE workshop_name=?",Integer.class,name)>0)
             throw new ResponseStatusException(HttpStatus.CONFLICT,"车间名称已存在");
         String externalId="MANUAL-"+UUID.randomUUID();
-        jdbc.update("INSERT INTO manufacturing_workshops(external_source,external_id,workshop_name,enabled,order_receiver_name,warehouse_clerk_name) VALUES('MANUAL',?,?,?,?,?)",
-                externalId,name,request.enabled()==null||request.enabled(),clean(request.orderReceiverName()),clean(request.warehouseClerkName()));
+        jdbc.update("INSERT INTO manufacturing_workshops(external_source,external_id,workshop_name) VALUES('MANUAL',?,?)",
+                externalId,name);
         return jdbc.queryForObject("SELECT id FROM manufacturing_workshops WHERE external_source='MANUAL' AND external_id=?",Long.class,externalId);
     }
 
@@ -147,8 +153,7 @@ public class ManufacturingTaskConfigController {
         String name=requiredName(request.workshopName(),"车间名称");
         if(jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_workshops WHERE workshop_name=? AND id<>?",Integer.class,name,id)>0)
             throw new ResponseStatusException(HttpStatus.CONFLICT,"车间名称已存在");
-        jdbc.update("UPDATE manufacturing_workshops SET workshop_name=?,enabled=?,order_receiver_name=?,warehouse_clerk_name=? WHERE id=?",
-                name,request.enabled()==null||request.enabled(),clean(request.orderReceiverName()),clean(request.warehouseClerkName()),id);
+        jdbc.update("UPDATE manufacturing_workshops SET workshop_name=? WHERE id=?",name,id);
         // 不再需要把新名字级联写回 manufacturing_task_config_items：V398 已删掉那儿的 workshop_name 副本，
         // 产品归属车间只有 workshop_id 一个真相，改名自动跟随，漏级联导致静默错配的可能性从根上消除。
         // （2026-10-23：不再级联写 manufacturing_process_templates——该表已随制造主数据清理下线。）
@@ -171,8 +176,8 @@ public class ManufacturingTaskConfigController {
         if(request.workshopId()==null) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"请选择生产车间");
         if(!Set.of("PRODUCT_NAME","OPTIONAL_CONFIG").contains(request.configType()))
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"请选择配置类型");
-        var workshops=jdbc.queryForList("SELECT workshop_name FROM manufacturing_workshops WHERE id=? AND enabled=1",request.workshopId());
-        if(workshops.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"车间不存在或已停用");
+        var workshops=jdbc.queryForList("SELECT workshop_name FROM manufacturing_workshops WHERE id=?",request.workshopId());
+        if(workshops.isEmpty()) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"车间不存在");
         if(jdbc.queryForObject("SELECT COUNT(*) FROM manufacturing_task_config_items WHERE workshop_id=? AND config_type=? AND config_name=?",Integer.class,request.workshopId(),request.configType(),name)>0)
             throw new ResponseStatusException(HttpStatus.CONFLICT,"该车间已存在同名配置");
         String externalId="MANUAL-"+UUID.randomUUID();
@@ -246,9 +251,54 @@ public class ManufacturingTaskConfigController {
         }
         jdbc.update("DELETE FROM manufacturing_task_config_items WHERE id=?",id);
     }
+    /* ==================== 制程节点管理（车间类别级） ==================== */
+    /*
+     * 节点序列原先硬编码在 ProductionTrackingPolicy，加一个节点要改常量 + 迁库 + 改测试 + 发版。
+     * 落表后在这里维护：保存即刷新进程内快照，列表 / 导出 / 筛选 / 日期推算立即按新制程走。
+     *
+     * ⚠️ 两条约束由 ProductionTrackingStageService 把关，违反时抛 IllegalArgumentException（→ 400）：
+     *   ① 节点编码不可修改（历史里程碑行与基准行都按编码关联）；
+     *   ② 已有跟单记录的节点只能停用、不能删除。
+     * 改制程会改写所有在制工单的「已完成 x/y」判定，页面保存前先调 /impact 给出受影响单数。
+     */
+
+    @GetMapping("/stage-defs")
+    public List<Map<String,Object>> listStageDefs(@RequestParam(defaultValue="SEALER") String kind) {
+        return stages.list(kind);
+    }
+
+    /** 改制程的影响面：多少在制单会被改写完成判定。 */
+    @GetMapping("/stage-defs/impact")
+    public Map<String,Object> stageDefsImpact(@RequestParam(defaultValue="SEALER") String kind) {
+        return stages.impact(kind);
+    }
+
+    @PostMapping("/stage-defs")
+    public Map<String,Object> createStageDef(@RequestBody ProductionTrackingStageService.StageSave request) {
+        return stages.create(request);
+    }
+
+    @PutMapping("/stage-defs/{id}")
+    public Map<String,Object> updateStageDef(@PathVariable long id,
+            @RequestBody ProductionTrackingStageService.StageSave request) {
+        return stages.update(id,request);
+    }
+
+    /** 上移/下移一位；{@code up=true} 上移。 */
+    @PostMapping("/stage-defs/{id}/move")
+    public Map<String,Object> moveStageDef(@PathVariable long id,@RequestParam(defaultValue="true") boolean up) {
+        stages.move(id,up);
+        return Map.of("id",id);
+    }
+
+    @DeleteMapping("/stage-defs/{id}")
+    public Map<String,Object> deleteStageDef(@PathVariable long id) {
+        stages.remove(id);
+        return Map.of("id",id);
+    }
+
     private String requiredName(String value,String label) {
         if(value==null||value.isBlank()||value.trim().length()>200) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"请填写有效"+label);
         return value.trim();
     }
-    private String clean(String value){return value==null||value.isBlank()?null:value.trim();}
 }

@@ -15,27 +15,12 @@
       <el-button @click="reset">清空</el-button>
       <p class="analysis-filter-note">按当前有效预计日期统计；交期调整后任务会重新归入对应区间，历史区间数量可能变化。实际完成日期不影响归属；缺少车间预计日期的任务单独核实。</p>
     </section>
-    <el-alert v-if="error" :title="error" type="error" :closable="false" />
-    <section v-if="drilldown" ref="drilldownPanel" class="analysis-section analysis-drilldown" aria-label="指标对应工单">
-      <div class="analysis-head"><div><h2>{{ drilldown.label }} · 对应工单 {{ drilldownTotal }} 单</h2><p>点击工单可打开生产跟单详情。</p></div><el-button @click="drilldown = null">收起</el-button></div>
-      <el-table v-loading="drilldownLoading" :data="drilldownItems" stripe empty-text="没有符合条件的工单" @row-click="openDrilldownOrder">
-        <el-table-column prop="orderNo" label="生产任务单" min-width="165"><template #default="{ row }"><button class="analysis-link" type="button" @click.stop="emit('open-order', row.id)">{{ row.orderNo }} ↗</button></template></el-table-column>
-        <el-table-column prop="productName" label="产品" min-width="150" show-overflow-tooltip />
-        <el-table-column label="业务员" width="100"><template #default="{ row }"><TrackingAnalyticsSalespersonCell :salesperson="row.salesperson" /></template></el-table-column>
-        <el-table-column label="产品规格 / 模具出数" min-width="240" show-overflow-tooltip><template #default="{ row }"><TrackingAnalyticsSpecCell :specification="row.specification" :mold-layout="row.moldLayout" /></template></el-table-column>
-        <el-table-column prop="workshop" label="车间" min-width="125" show-overflow-tooltip />
-        <el-table-column prop="submittedDate" label="提交日期" width="115" />
-        <el-table-column prop="baseline" label="当前预计" width="115" />
-        <el-table-column prop="deliveredDate" label="整单完工日" width="125" />
-        <el-table-column label="状态" width="115"><template #default="{ row }">{{ statusLabel(row.status) }}</template></el-table-column>
-        <el-table-column label="完工逾期" width="95"><template #default="{ row }">{{ row.overdueDays == null ? '—' : `${row.overdueDays} 天` }}</template></el-table-column>
-        <el-table-column label="未完工超期" width="110"><template #default="{ row }">{{ row.unfinishedOverdueDays == null ? '—' : `${row.unfinishedOverdueDays} 天` }}</template></el-table-column>
-      </el-table>
-      <el-pagination v-if="drilldownTotal > drilldownSize" v-model:current-page="drilldownPage" :page-size="drilldownSize" :total="drilldownTotal" layout="prev, pager, next, total" @current-change="loadDrilldown" />
-    </section>
+    <el-alert v-if="displayError" :title="displayError" type="error" :closable="false" />
+    <div class="analysis-layout">
+    <div class="analysis-main">
     <template v-if="data">
       <section class="analysis-cards" aria-label="核心指标">
-        <div><span>应完成任务 <el-tooltip content="当前有效预计日期落在范围内，且未确认取消；停止本地跟单仍计入。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('dueTasks','应完成任务')">{{ data.totals.dueTasks }} 单 ↗</button><small>其中已到期 {{ data.totals.matured }} 单</small></div>
+        <div><span>应完成任务 <el-tooltip content="当前有效预计日期落在范围内，已取消或已停产任务不计入。恢复生产后重新纳入。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('dueTasks','应完成任务')">{{ data.totals.dueTasks }} 单 ↗</button><small>其中已到期 {{ data.totals.matured }} 单</small></div>
         <div><span>已完工 <el-tooltip content="跟单员确认入库节点优先；尚未确认时，仅同任务编号下入库品名和单位均唯一、累计数量达到计划数，才自动推定整单完工。混合品名或单位需核实。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('delivered','已完工')">{{ data.totals.delivered }} 单 ↗</button><small>完工率 {{ percent(data.totals.completionRate) }}</small></div>
         <div><span>未完工 <el-tooltip content="尚无整单完工依据；首次或部分采购入库不算整单完工。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('open','未完工')">{{ data.totals.open }} 单 ↗</button><small>其中已超预计日期 {{ data.totals.openOverdue }} 单</small></div>
         <div><span>按期完工 <el-tooltip content="整单完工日期不晚于当前有效预计日期。按期达成率＝按期完工 ÷ 应完成任务。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('onTime','按期完工')">{{ data.totals.onTime }} 单 ↗</button><small>按期达成率 {{ percent(data.totals.onTimeAchievementRate) }}</small></div>
@@ -96,19 +81,39 @@
           <h3>核实记录中的原因原文</h3><ReasonList :items="data.overdueReasons" @select="reason => openDrilldown('overdueReason',`逾期原因：${reason}`,{reason})" />
         </section>
       </div>
-      <p class="analysis-definition">已确认取消 {{ data.totals.cancelled }} 单，不计入正常履约；停止本地跟单 {{ data.totals.stopped }} 单，仍计入有效任务。同权限、同车间另有 <button class="analysis-link" @click="openDrilldown('missingExpected','缺少车间预计日期')">{{ data.missingExpected }} 单缺少车间预计日期 ↗</button>，未纳入任何日期区间，需核实。未完工中：未到期 {{ data.totals.openNotDue }} 单、今天到期 {{ data.totals.openDueToday }} 单、已超期 {{ data.totals.openOverdue }} 单。当前统计按任务单数量，不按台数加权。</p>
+      <p class="analysis-definition">已确认取消 {{ data.totals.cancelled }} 单、<button class="analysis-link" @click="openDrilldown('stopped','已停产')">已停产 {{ data.totals.stopped }} 单 ↗</button>，均暂不计入正常履约；恢复生产后重新纳入。同权限、同车间另有 <button class="analysis-link" @click="openDrilldown('missingExpected','缺少车间预计日期')">{{ data.missingExpected }} 单缺少车间预计日期 ↗</button>，未纳入任何日期区间，需核实。未完工中：未到期 {{ data.totals.openNotDue }} 单、今天到期 {{ data.totals.openDueToday }} 单、已超期 {{ data.totals.openOverdue }} 单。当前统计按任务单数量，不按台数加权。</p>
     </template>
+    </div>
+    <aside class="analysis-drill-col">
+      <TrackingAnalyticsOrdersTable v-if="ddActive && drillState"
+        :items="ddItems" :total="ddTotal" :page="ddPage" :size="ddSize" :loading="ddLoading"
+        :title="`${drillState.label} · 对应工单 ${ddTotal} 单`"
+        @update:page="onPageChange" @open-order="id => emit('open-order', id)" @close="closeDrilldown">
+        <template #extra>
+          <el-table-column prop="submittedDate" label="提交日期" width="115" />
+          <el-table-column prop="baseline" label="当前预计" width="115" />
+          <el-table-column prop="deliveredDate" label="整单完工日" width="125" />
+          <el-table-column label="状态" width="115"><template #default="{ row }">{{ statusLabel(row.status) }}</template></el-table-column>
+          <el-table-column label="完工逾期" width="95"><template #default="{ row }">{{ row.overdueDays == null ? '—' : `${row.overdueDays} 天` }}</template></el-table-column>
+          <el-table-column label="未完工超期" width="110"><template #default="{ row }">{{ row.unfinishedOverdueDays == null ? '—' : `${row.unfinishedOverdueDays} 天` }}</template></el-table-column>
+        </template>
+      </TrackingAnalyticsOrdersTable>
+      <TrackingDrillEmpty v-else />
+    </aside>
+    </div>
   </main>
   </el-drawer>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { fetchTrackingAnalytics, fetchTrackingAnalyticsOrders, type TrackingAnalytics, type TrackingAnalyticsOrder, type TrackingAnalysisDateBasis } from '@/api/productionTracking'
 import ReasonList from '@/components/production/TrackingAnalysisReasonList.vue'
-// 下钻表与「生产跟单周复盘」共用同一个接口，故「业务员」「规格/模具」两格用同一份组件，避免同源不同显。
-import TrackingAnalyticsSalespersonCell from '@/components/production/TrackingAnalyticsSalespersonCell.vue'
-import TrackingAnalyticsSpecCell from '@/components/production/TrackingAnalyticsSpecCell.vue'
+import TrackingAnalyticsOrdersTable from '@/components/production/TrackingAnalyticsOrdersTable.vue'
+import TrackingDrillEmpty from '@/components/production/TrackingDrillEmpty.vue'
+import { useTrackingDrilldown } from '@/composables/tracking/useTrackingDrilldown'
+// percent / barWidth / statusLabel 与周复盘 / 节点分析共用同一份口径（见 utils/tracking/format.ts）。
+import { percent, barWidth, statusLabel } from '@/utils/tracking/format'
 
 const props=defineProps<{ modelValue: boolean }>()
 const emit=defineEmits<{ 'update:modelValue': [value: boolean]; 'open-order': [id: number] }>()
@@ -121,14 +126,10 @@ const workshopOptions=ref<string[]>([])
 const data=ref<TrackingAnalytics | null>(null)
 const loading=ref(false),error=ref('')
 type Drilldown={bucket:string;label:string;reason?:string;month?:string;workshop?:string}
-const drilldown=ref<Drilldown|null>(null)
-const drilldownPanel=ref<HTMLElement|null>(null)
-const drilldownItems=ref<TrackingAnalyticsOrder[]>([])
-const drilldownTotal=ref(0),drilldownPage=ref(1),drilldownSize=30,drilldownLoading=ref(false)
-let drilldownRequest=0
-const percent=(value:number|null)=>value===null?'样本不足':`${value.toFixed(1)}%`
-const statusLabel=(status:TrackingAnalyticsOrder['status'])=>({ON_TIME:'按期完工',LATE:'逾期完工',UNFINISHED:'未完工',CANCELLED:'已取消',MISSING_EXPECTED:'待核实交期'})[status]
-const barWidth=(count:number,total:number)=>`${total?count*100/total:0}%`
+const drillState=ref<Drilldown|null>(null)
+const { active: ddActive, items: ddItems, total: ddTotal, page: ddPage, size: ddSize,
+  loading: ddLoading, error: ddError, open, close, load: drillLoad, scrollIntoView } = useTrackingDrilldown<TrackingAnalyticsOrder>()
+const displayError=computed(()=> error.value || ddError.value)
 const riskNames:Record<string,string>={NONE:'无风险类别',MATERIAL:'物料',DESIGN:'设计',CAPACITY:'产能',CUSTOMER:'客户',OTHER:'其他',未记录:'未记录'}
 const riskItems=(items:{name:string;count:number}[])=>items.map(item=>({...item,value:item.name,name:riskNames[item.name] || item.name}))
 const coverageFacts=computed(()=>{const t=data.value?.totals;return t?[
@@ -137,7 +138,7 @@ const coverageFacts=computed(()=>{const t=data.value?.totals;return t?[
   {bucket:'openDueToday',label:'今天到期未完工',count:t.openDueToday},
   {bucket:'openNotDue',label:'未到期未完工',count:t.openNotDue},
   {bucket:'cancelled',label:'已确认取消',count:t.cancelled},
-  {bucket:'stopped',label:'停止本地跟单',count:t.stopped}
+  {bucket:'stopped',label:'已停产',count:t.stopped}
 ]:[]})
 /**
  * 「累计延后 N 天」原先是**独立卡片**，但它显示的是天数（`extensionDays`），
@@ -155,28 +156,22 @@ const overdueFacts=computed(()=>{const t=data.value?.totals;return t?[
   {bucket:'overdue8plus',label:'晚 8 天及以上',count:t.overdue8plus},
   {bucket:'overdueReasonMissing',label:'逾期原因未核实',count:t.overdueReasonMissing}
 ]:[]})
-async function openDrilldown(bucket:string,label:string,extra:Partial<Drilldown>={}){
-  drilldown.value={bucket,label,...extra}
-  drilldownPage.value=1
-  await loadDrilldown()
-  await nextTick()
-  drilldownPanel.value?.scrollIntoView({behavior:'smooth',block:'start'})
+/** 下钻请求：读取当前 drillState，分页共用同一份 loader。 */
+function drillLoader(page:number,size:number){
+  const d=drillState.value
+  return fetchTrackingAnalyticsOrders({fromDate:fromDate.value,toDate:toDate.value,dateBasis:dateBasis.value,
+    workshop:d?.workshop||workshop.value,month:d?.month,bucket:d?.bucket ?? '',reason:d?.reason,page,size})
 }
-async function loadDrilldown(){
-  if(!drilldown.value)return
-  const request=++drilldownRequest
-  drilldownLoading.value=true
-  try{
-    const result=await fetchTrackingAnalyticsOrders({fromDate:fromDate.value,toDate:toDate.value,dateBasis:dateBasis.value,
-      workshop:drilldown.value.workshop || workshop.value,month:drilldown.value.month,
-      bucket:drilldown.value.bucket,reason:drilldown.value.reason,page:drilldownPage.value,size:drilldownSize})
-    if(request===drilldownRequest){drilldownItems.value=result.items;drilldownTotal.value=result.total}
-  }catch(e){if(request===drilldownRequest)error.value=e instanceof Error?e.message:'工单清单加载失败'}
-  finally{if(request===drilldownRequest)drilldownLoading.value=false}
+function openDrilldown(bucket:string,label:string,extra:Partial<Drilldown>={}){
+  drillState.value={bucket,label,...extra}
+  open()
+  void drillLoad(drillLoader)
+  void scrollIntoView()
 }
-function openDrilldownOrder(row:TrackingAnalyticsOrder){emit('open-order',row.id)}
+function onPageChange(p:number){ ddPage.value=p; void drillLoad(drillLoader) }
+function closeDrilldown(){ drillState.value=null; close() }
 async function load(){
-  loading.value=true;error.value='';drilldown.value=null;++drilldownRequest
+  loading.value=true;error.value='';drillState.value=null;close()
   try{
     const result=await fetchTrackingAnalytics({fromDate:fromDate.value,toDate:toDate.value,workshop:workshop.value,dateBasis:dateBasis.value})
     data.value=result
@@ -195,7 +190,12 @@ watch(() => props.modelValue, open => { if(open) void load() }, { immediate: tru
 .section-head h2{margin:0;display:flex;align-items:center;gap:6px}
 .section-head .analysis-facts{margin-left:auto}
 .note-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid #94a3b8;border-radius:50%;font-size:11px;font-style:normal;color:#64748b;cursor:help;line-height:1;user-select:none}
-.note-icon:hover{color:#087c72;border-color:#087c72}.analysis-link{border:0;background:none;padding:0;color:#087c72;cursor:pointer;font:inherit;text-align:left}.analysis-link:hover{text-decoration:underline}.analysis-link.metric{font-size:27px;font-weight:700}.analysis-cards .warning .analysis-link.metric{color:#c45620}.analysis-drilldown{border-color:#80c7bf;background:#fbfefd;scroll-margin-top:8px}.analysis-drilldown :deep(.el-table__row){cursor:pointer}.analysis-drilldown .el-pagination{margin-top:14px;justify-content:flex-end}.analysis-two-columns{display:grid;grid-template-columns:1fr 1fr;gap:18px}.analysis-definition{margin:16px 2px;font-size:13px}@media(max-width:900px){.analysis-cards{grid-template-columns:repeat(2,1fr)}.analysis-two-columns{grid-template-columns:1fr}}@media(max-width:560px){.analysis-cards{grid-template-columns:1fr}}
+.note-icon:hover{color:#087c72;border-color:#087c72}.analysis-link{border:0;background:none;padding:0;color:#087c72;cursor:pointer;font:inherit;text-align:left}.analysis-link:hover{text-decoration:underline}.analysis-link.metric{font-size:27px;font-weight:700}.analysis-cards .warning .analysis-link.metric{color:#c45620}.analysis-two-columns{display:grid;grid-template-columns:1fr 1fr;gap:18px}.analysis-definition{margin:16px 2px;font-size:13px}@media(max-width:900px){.analysis-cards{grid-template-columns:repeat(2,1fr)}.analysis-two-columns{grid-template-columns:1fr}}@media(max-width:560px){.analysis-cards{grid-template-columns:1fr}}
 .analysis-filter .analysis-date-basis{width:225px}.analysis-filter-note{width:100%;margin:0;color:#64748b;font-size:13px;line-height:1.5}
+/* 两栏：左分析内容、右下钻列表 */
+.analysis-layout{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:18px;align-items:start}
+.analysis-main{min-width:0}
+.analysis-drill-col{min-width:0;align-self:start}
+@media(max-width:1000px){.analysis-layout{grid-template-columns:1fr}}
 .analysis-cards{grid-template-columns:repeat(6,minmax(0,1fr))}.analysis-cards>div:first-child{grid-column:span 2;background:#f0f9f7;border-color:#b9ded6}.analysis-cards>div:first-child .analysis-link.metric{font-size:32px}.workshop-chart{margin:10px 0 16px;padding:12px 14px;background:#f8fafb;border-radius:9px}.chart-row{display:grid;grid-template-columns:150px 1fr 55px;gap:10px;align-items:center;margin:9px 0;font-size:13px}.chart-track{display:flex;height:13px;border-radius:8px;background:#e9eef1;overflow:hidden}.chart-track b{background:#319c81}.chart-track em{background:#db9869}.chart-track i{background:#a7b4c1}.workshop-chart p{margin:10px 0 0;color:#319c81;font-size:12px}.workshop-chart p span{color:#db9869}.workshop-chart p em{color:#a7b4c1;font-style:normal}@media(max-width:1100px){.analysis-cards{grid-template-columns:repeat(2,minmax(0,1fr))}.analysis-cards>div:first-child{grid-column:span 2}}@media(max-width:700px){.chart-row{grid-template-columns:100px 1fr 45px}}@media(max-width:480px){.analysis-cards{grid-template-columns:1fr}.analysis-cards>div:first-child{grid-column:span 1}}
 </style>

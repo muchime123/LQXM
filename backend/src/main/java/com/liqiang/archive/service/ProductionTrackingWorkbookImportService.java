@@ -219,7 +219,8 @@ public class ProductionTrackingWorkbookImportService {
                 // ⇒ 落 production_tracking_state.forecast_finish_date。
                 // ⚠️ 它**不是**工单源数据 production_orders.expected_completion_date（车间填写的车间预计完成），勿混。
                 Integer forecastFinishColumn=optionalColumn(columns,"预计生产完成日期");
-                var stageColumns=stageColumns(sheet.getRow(2));
+                // 表头别名按本 sheet 的车间类别匹配：封口机写「模具生产」、机器车间写「模具」，各认各的。
+                var stageColumns=stageColumns(sheet.getRow(2),name);
                 for(String code:ProductionTrackingPolicy.requiredStages(name))
                     if(!stageColumns.containsKey(code))
                         throw new IllegalArgumentException(name+"的表头缺少「"
@@ -279,11 +280,11 @@ public class ProductionTrackingWorkbookImportService {
         return found;
     }
     /** 阶段列＝表头第 2 行里能识别出阶段名的那些列，按列序返回「节点码 → 列号」。 */
-    private static LinkedHashMap<String,Integer> stageColumns(Row stageRow){
+    private static LinkedHashMap<String,Integer> stageColumns(Row stageRow,String workshop){
         var found=new LinkedHashMap<String,Integer>();
         if(stageRow==null)return found;
         for(int c=0;c<stageRow.getLastCellNum();c++){
-            String code=ProductionTrackingPolicy.stageCodeOfLabel(cellText(stageRow,c));
+            String code=ProductionTrackingPolicy.stageCodeOfLabel(cellText(stageRow,c),workshop);
             if(code!=null)found.putIfAbsent(code,c);
         }
         return found;

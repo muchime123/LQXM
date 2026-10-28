@@ -162,6 +162,43 @@ public class ProductionTrackingController {
         return weekly.review(fromDate,toDate,workshop);
     }
 
+    /**
+     * 已固化的历史周期快照列表（趋势看板用）。过去周期首次查看时固化，
+     * 交期调整不再改变其周报数字；当前周期仍实时现算、不在此列。
+     */
+    @GetMapping("/weekly-review/history")
+    @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    public List<Map<String,Object>> weeklyReviewHistory(@RequestParam(defaultValue="") String workshop){
+        return analytics.listSnapshots(workshop);
+    }
+
+    /**
+     * 节点完成率分析视图（按车间 × 动态节点 + 排产等待分布与异常单）。
+     * 只统计跟单覆盖的单，可见性随 MANUFACTURING 数据范围收敛；不依赖氚云报工/入库时间。
+     */
+    @GetMapping("/analytics/nodes")
+    @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    public Map<String,Object> nodeAnalytics(){
+        return analytics.nodeAnalyticsView();
+    }
+
+    /**
+     * 节点分析下钻：点某节点 / 某等待天数时返回对应工单清单（分页）。
+     * 与生产分析、周复盘同一个交互模型——先看聚合，点了才展开明细。
+     */
+    @GetMapping("/analytics/nodes/orders")
+    @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    public Map<String,Object> nodeAnalyticsOrders(
+            @RequestParam(defaultValue="") String workshop,
+            @RequestParam(defaultValue="") String stage,
+            @RequestParam(defaultValue="ALL") String status,
+            @RequestParam(required=false) Integer waitDays,
+            @RequestParam(required=false) Integer waitDaysMin,
+            @RequestParam(defaultValue="1") int page,
+            @RequestParam(defaultValue="30") int size){
+        return analytics.nodeAnalyticsOrders(workshop,stage,status,waitDays,waitDaysMin,page,size);
+    }
+
     @GetMapping("/{id}")
     @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
     public Map<String,Object> detail(@PathVariable long id){return service.detail(id);}
@@ -446,9 +483,10 @@ public class ProductionTrackingController {
         return service.applyProductBenchmarkP50(taskConfigId);
     }
 
-    /** 样本明细（只读）：候选是怎么算出来的，用于发布前抽查。 */
+    /** 样本明细（只读）：候选是怎么算出来的，用于发布前抽查。
+     *  与 productOrderHistory/productDuration 同取 any-of：维护参考间隔或任务单字典的人都该能看候选来源。 */
     @GetMapping("/product-benchmark-samples/{taskConfigId}")
-    @RequirePermission("manufacturing.baseline.manage")
+    @RequirePermission({"manufacturing.baseline.manage","manufacturing.template.manage"})
     public Map<String,Object> productBenchmarkSamples(@PathVariable long taskConfigId){
         return service.productBenchmarkSamples(taskConfigId);
     }

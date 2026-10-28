@@ -25,12 +25,14 @@
 
 <script setup lang="ts">
 import type { TrackingReasonCategory } from '@/api/productionTracking'
+import { percent, barWidth } from '@/utils/tracking/format'
 
 /**
  * 周复盘看板的原因分类表（逾期、延期两块共用，只有下钻的 bucket 不同）。
  *
  * 【为什么单独抽出】两张表结构完全一样，区别只是下钻时用的 bucket 与总量；
  * 抽成一个组件，改样式只改一处，也避免「逾期表能下钻、延期表忘了接」这类漏接。
+ * percent / barWidth 与生产分析 / 节点分析共用 utils/tracking/format 口径，不在此重写第二份。
  */
 const props = defineProps<{
   items: TrackingReasonCategory[]
@@ -42,8 +44,6 @@ const props = defineProps<{
 
 const emit = defineEmits<{ select: [bucket: string, category: TrackingReasonCategory] }>()
 
-const percent = (value: number | null) => value === null ? '样本不足' : `${value.toFixed(1)}%`
-const barWidth = (count: number, total: number) => `${total ? count * 100 / total : 0}%`
 const select = (row: TrackingReasonCategory) => emit('select', props.bucket, row)
 </script>
 

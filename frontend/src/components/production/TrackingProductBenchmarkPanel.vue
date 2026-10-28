@@ -43,8 +43,8 @@
       <el-table-column label="历史候选" min-width="200">
         <template #default="{ row }">
           <div class="candidate-main">{{ row.sampleCount ? `P50 ${row.p50Days} / P75 ${row.p75Days} · ${row.sampleCount} 段` : '暂无可信候选' }}</div>
-          <small v-if="row.applicationAnchorCount || row.zeroDayCount || row.excludedCount" class="candidate-sub">
-            {{ [row.applicationAnchorCount && `申请日兜底 ${row.applicationAnchorCount} 段`, row.zeroDayCount && `零天 ${row.zeroDayCount}`, row.excludedCount && `排除 ${row.excludedCount}`].filter(Boolean).join(' · ') }}
+          <small v-if="row.zeroDayCount || row.excludedCount" class="candidate-sub">
+            {{ [row.zeroDayCount && `零天 ${row.zeroDayCount}`, row.excludedCount && `排除 ${row.excludedCount}`].filter(Boolean).join(' · ') }}
           </small>
         </template>
       </el-table-column>
@@ -107,7 +107,6 @@ interface StageRow {
   p50Days: number | null
   p75Days: number | null
   excludedCount: number
-  applicationAnchorCount: number
   zeroDayCount: number
 }
 
@@ -153,7 +152,6 @@ const stageRows = computed<StageRow[]>(() => {
       p50Days: value?.p50Days ?? null,
       p75Days: value?.p75Days ?? null,
       excludedCount: value?.excludedCount ?? 0,
-      applicationAnchorCount: value?.applicationAnchorCount ?? 0,
       zeroDayCount: value?.zeroDayCount ?? 0
     }
   })

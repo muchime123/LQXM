@@ -29,7 +29,7 @@ import static org.junit.jupiter.api.Assertions.*;
  *       而不是按 0 参与求和——否则「3 个节点没配」会显示成「工期 4 天」，偏小且看不出来。</li>
  *   <li><b>与跟单侧同源</b>：锚点 + 参考工期 必须等于链式推算出来的**末节点参考日期**。
  *       这条一旦破了，配置页显示 5 天、跟单详情推出来却是 7 天，两个页面各说各话。</li>
- *   <li><b>实测只用排产锚点</b>：退到申请日兜底的单不进分位（那段是「等排产」，不是生产），
+ *   <li><b>实测只用排产锚点</b>（2026-10-28 A2 收敛为只认排产）：未排产的单无锚点、不计入，
  *       样本数与独立 SQL 逐个产品对上。</li>
  * </ol>
  */
@@ -39,7 +39,7 @@ class ProductionTrackingDurationMysqlTest {
     @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void referenceDaysIsTheSumOfEffectiveStagesAndMatchesTheNodeChain() throws Exception {
         var jdbc = jdbc();
-        var service = new ProductionTrackingService(jdbc, null, null, new ObjectMapper(), null);
+        var service = new ProductionTrackingService(jdbc, null, null, new ObjectMapper(), null, null);
         var products = jdbc.queryForList("SELECT c.id AS id FROM manufacturing_task_config_items c "
                 + "JOIN manufacturing_workshops w ON w.id=c.workshop_id "
                 + "WHERE c.config_type='PRODUCT_NAME' AND w.workshop_name LIKE '%封口%' ORDER BY c.id LIMIT 5");
@@ -107,7 +107,7 @@ class ProductionTrackingDurationMysqlTest {
     @EnabledIfSystemProperty(named = "main.mysql", matches = "true")
     void actualDurationCountsOnlyScheduleAnchoredOrdersThatFinished() throws Exception {
         var jdbc = jdbc();
-        var service = new ProductionTrackingService(jdbc, null, null, new ObjectMapper(), null);
+        var service = new ProductionTrackingService(jdbc, null, null, new ObjectMapper(), null, null);
         var products = jdbc.queryForList("SELECT c.id AS id FROM manufacturing_task_config_items c "
                 + "JOIN manufacturing_workshops w ON w.id=c.workshop_id "
                 + "WHERE c.config_type='PRODUCT_NAME' AND w.workshop_name LIKE '%封口%' ORDER BY c.id LIMIT 5");
@@ -118,15 +118,15 @@ class ProductionTrackingDurationMysqlTest {
             String workshop = (String) result.get("workshopName");
             String name = (String) result.get("productName");
 
-            // 独立写一遍口径：排产锚点（计划开工 → 氚云排产时间，**不含申请日**）+ 入库完成 + 0~60 天 + 非未来
+            // 独立写一遍口径：排产锚点（氚云排产时间，2026-10-28 A2 收敛为只认排产）+ 入库完成 + 0~60 天 + 非未来
             Long samples = jdbc.queryForObject("SELECT COUNT(DISTINCT p.id) FROM production_orders p "
                     + "JOIN production_tracking_state t ON t.production_order_id=p.id "
                     + "JOIN production_tracking_milestones m ON m.production_order_id=p.id "
                     + "AND m.stage_code='WAREHOUSE' AND m.stage_status='DONE' AND m.completed_date IS NOT NULL "
                     + "WHERE p.production_line=? AND p.product_name=? "
                     + "AND (p.status IS NULL OR p.status NOT IN ('CANCELLED','CANCELED','已取消')) "
-                    + "AND COALESCE(t.planned_start_date,DATE(p.schedule_time)) IS NOT NULL "
-                    + "AND DATEDIFF(m.completed_date,COALESCE(t.planned_start_date,DATE(p.schedule_time))) BETWEEN 0 AND 60 "
+                    + "AND p.schedule_time IS NOT NULL "
+                    + "AND DATEDIFF(m.completed_date,DATE(p.schedule_time)) BETWEEN 0 AND 60 "
                     + "AND m.completed_date<=CURDATE()",
                     Long.class, workshop, name);
             assertEquals(samples.intValue(), ((Number) result.get("actualSampleCount")).intValue(),

@@ -1,5 +1,6 @@
 package com.liqiang.archive.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -46,6 +47,12 @@ public class ProductionTrackingAnalyticsService {
             +"AND q.running_quantity>=p2.required_quantity GROUP BY p2.id) iq ON iq.order_id=p.id";
     private final JdbcTemplate jdbc;
     private final ProductionTrackingService tracking;
+    private final ObjectMapper objectMapper;
+
+    /** 分析视图专用 FROM 前缀：p（工单）+ assigned（按车间分配跟单员），供 visible() 复用。 */
+    private static final String P_ASG_JOIN=" LEFT JOIN (SELECT MIN(id) id,name FROM employees "
+            +"WHERE status='ACTIVE' AND name IN ('陈苏平','胡健') GROUP BY name) assigned "
+            +"ON assigned.name=CASE WHEN p.production_line LIKE '%封口%' THEN '陈苏平' ELSE '胡健' END ";
 
     public Map<String,Object> analyze(String fromDate, String toDate, String workshop,String dateBasis) {
         var result=new LinkedHashMap<>(summarize(loadRows(fromDate,toDate,workshop,dateBasis).stream()
@@ -59,6 +66,7 @@ public class ProductionTrackingAnalyticsService {
         var params=new ArrayList<Object>();
         var where=tracking.visible(params);
         where.append(" AND ").append(EFFECTIVE_EXPECTED_DATE).append(" IS NULL")
+                .append(" AND t.stopped_at IS NULL")
                 .append(" AND (p.status IS NULL OR TRIM(p.status) NOT IN ('已取消','取消','已作废','作废','CANCELLED','CANCELED'))");
         if(workshop!=null&&!workshop.isBlank()){
             where.append(" AND COALESCE(NULLIF(p.production_line,''),'未分车间')=?");
@@ -98,7 +106,7 @@ public class ProductionTrackingAnalyticsService {
             entry.put("status",status(row));
             entry.put("overdueDays",row.delivered()!=null&&row.baseline()!=null&&row.delivered().isAfter(row.baseline())
                     ?ChronoUnit.DAYS.between(row.baseline(),row.delivered()):null);
-            entry.put("unfinishedOverdueDays",row.delivered()==null&&row.baseline()!=null&&row.baseline().isBefore(today)
+            entry.put("unfinishedOverdueDays",!row.stopped()&&row.delivered()==null&&row.baseline()!=null&&row.baseline().isBefore(today)
                     ?ChronoUnit.DAYS.between(row.baseline(),today):null);
             result.add(entry);
         }
@@ -123,9 +131,9 @@ public class ProductionTrackingAnalyticsService {
     static boolean matches(OrderRow row,String bucket,String reason,String reasonCategory,LocalDate today){
         if("total".equals(bucket))return true;
         if("cancelled".equals(bucket))return row.cancelled();
-        if("missingExpected".equals(bucket))return !row.cancelled()&&row.baseline()==null;
-        if("stopped".equals(bucket))return row.stopped();
-        if(row.cancelled())return false;
+        if("missingExpected".equals(bucket))return !row.cancelled()&&!row.stopped()&&row.baseline()==null;
+        if("stopped".equals(bucket))return row.stopped()&&!row.cancelled();
+        if(row.cancelled()||row.stopped())return false;
         boolean delivered=row.delivered()!=null,baseline=row.baseline()!=null;
         boolean extended=row.originalBaseline()!=null&&row.revisedBaseline()!=null
                 &&row.revisedBaseline().isAfter(row.originalBaseline());
@@ -171,9 +179,10 @@ public class ProductionTrackingAnalyticsService {
         };
     }
 
-    /** 分析状态互斥；停止本地跟单仍保留在生产履约集合中。 */
+    /** 停产任务单列，恢复生产后重新进入正常履约集合。 */
     static String status(OrderRow row){
         if(row.cancelled())return "CANCELLED";
+        if(row.stopped())return "STOPPED";
         if(row.baseline()==null)return "MISSING_EXPECTED";
         if(row.delivered()==null)return "UNFINISHED";
         return row.delivered().isAfter(row.baseline())?"LATE":"ON_TIME";
@@ -192,6 +201,79 @@ public class ProductionTrackingAnalyticsService {
         result.put("extensionReasons",rankAll(extensionReasonCounts(rows)));
         result.put("missingExpected",missingExpected(workshop));
         return result;
+    }
+
+    /**
+     * 周期快照：把当前计算的分析结果写入快照表，供历史周报回看。
+     *
+     * <p>幂等：同一 (period_from,period_to,workshop) 已有快照则跳过（靠唯一键 + ON DUPLICATE KEY UPDATE id=id），
+     * 保证「交期调整导致历史周期数字漂移」从部署起不再发生。
+     *
+     * <p>降级：快照表尚未创建（Flyway 未执行 V419）或序列化失败时，静默返回现算结果、不落库、不抛错，
+     * 保证现有周复盘功能不受影响；表建好后自动启用快照。
+     *
+     * @return 本次生效的分析结果（无既有快照时为现算并固化；有既有快照时通常不会走到本方法）
+     */
+    Map<String,Object> snapshotForPeriod(String fromDate,String toDate,String workshop,Long employeeId){
+        var result=analyzeUncut(fromDate,toDate,workshop);
+        LocalDate from=parseDate(fromDate), to=parseDate(toDate);
+        if(from==null||to==null)return result; // 缺周期不落快照
+        try{
+            String json=objectMapper.writeValueAsString(result);
+            jdbc.update("INSERT INTO production_tracking_analytics_snapshots"
+                    +"(period_from,period_to,workshop,snapshot_json,generated_by_employee_id) VALUES(?,?,?,?,?)"
+                    +" ON DUPLICATE KEY UPDATE id=id",from,to,blankToNull(workshop),json,employeeId);
+        }catch(Exception e){
+            return result; // 降级：不影响现有周复盘
+        }
+        return result;
+    }
+
+    /**
+     * 读取已固化的周期快照；无快照、或快照表未建/读取失败时返回 null（调用方据此回退现算）。
+     */
+    Map<String,Object> readSnapshot(String fromDate,String toDate,String workshop){
+        LocalDate from=parseDate(fromDate), to=parseDate(toDate);
+        if(from==null||to==null)return null;
+        try{
+            String json=jdbc.query("SELECT snapshot_json FROM production_tracking_analytics_snapshots"
+                    +" WHERE period_from=? AND period_to=? AND workshop<=>? LIMIT 1",
+                    rs->rs.next()?rs.getString(1):null,from,to,blankToNull(workshop));
+            if(json==null)return null;
+            @SuppressWarnings("unchecked")
+            Map<String,Object> m=objectMapper.readValue(json,Map.class);
+            return m;
+        }catch(Exception e){
+            return null; // 降级：表未建或读取失败视为无快照
+        }
+    }
+
+    /**
+     * 已固化的历史周期列表（含各周期 totals 摘要），供趋势看板使用。
+     * <p>快照表未建（迁移未执行）或读取失败时返回空列表，前端显示「暂无历史快照」。
+     */
+    public List<Map<String,Object>> listSnapshots(String workshop){
+        try{
+            return jdbc.query("SELECT period_from,period_to,workshop,generated_at,snapshot_json "
+                    +"FROM production_tracking_analytics_snapshots WHERE workshop<=>? "
+                    +"ORDER BY period_to DESC,period_from DESC",
+                    (rs,n)->{
+                        var row=new LinkedHashMap<String,Object>();
+                        row.put("periodFrom",rs.getDate("period_from").toLocalDate().toString());
+                        row.put("periodTo",rs.getDate("period_to").toLocalDate().toString());
+                        row.put("workshop",rs.getString("workshop"));
+                        row.put("generatedAt",rs.getTimestamp("generated_at").toLocalDateTime().toString());
+                        try{
+                            @SuppressWarnings("unchecked")
+                            Map<String,Object> snap=objectMapper.readValue(rs.getString("snapshot_json"),Map.class);
+                            row.put("asOf",snap.get("asOf"));
+                            row.put("totals",snap.get("totals"));
+                        }catch(Exception e){ /* 单条快照解析失败不影响整体列表 */ }
+                        return row;
+                    }, blankToNull(workshop));
+        }catch(Exception e){
+            return List.of();
+        }
     }
 
     private List<AnalysisItem> loadRows(String fromDate,String toDate,String workshop,String dateBasis){
@@ -276,7 +358,7 @@ public class ProductionTrackingAnalyticsService {
             totals.add(row,today);
             workshops.computeIfAbsent(row.workshop(),unused->new Bucket()).add(row,today);
             months.computeIfAbsent(row.baseline()==null?"未填写":row.baseline().toString().substring(0,7),unused->new Bucket()).add(row,today);
-            if(row.cancelled())continue;
+            if(row.cancelled()||row.stopped())continue;
             if(isExtended(row))count(riskReasons,firstText(row.riskCategory()));
         }
         var byWorkshop=new ArrayList<Map<String,Object>>();
@@ -305,7 +387,7 @@ public class ProductionTrackingAnalyticsService {
     static Map<String,Integer> extensionReasonCounts(List<OrderRow> rows){
         var counts=new TreeMap<String,Integer>();
         for(var row:rows){
-            if(row.cancelled())continue;
+            if(row.cancelled()||row.stopped())continue;
             if(isExtended(row))count(counts,firstText(row.delayReason(),row.commitmentReason()));
         }
         return counts;
@@ -314,7 +396,7 @@ public class ProductionTrackingAnalyticsService {
     static Map<String,Integer> overdueReasonCounts(List<OrderRow> rows){
         var counts=new TreeMap<String,Integer>();
         for(var row:rows){
-            if(row.cancelled())continue;
+            if(row.cancelled()||row.stopped())continue;
             if(row.delivered()!=null&&row.baseline()!=null&&row.delivered().isAfter(row.baseline()))
                 count(counts,firstText(row.overdueReason()));
         }
@@ -369,8 +451,8 @@ public class ProductionTrackingAnalyticsService {
         long overdueDays,openOverdueDays,extensionDays;
         void add(OrderRow row,LocalDate today){
             total++;
-            if(row.stopped())stopped++;
             if(row.cancelled()){cancelled++;return;}
+            if(row.stopped()){stopped++;return;}
             dueTasks++;
             if(row.baseline()!=null&&!row.baseline().isAfter(today))matured++;
             if(row.originalBaseline()!=null && row.revisedBaseline()!=null){
@@ -421,5 +503,135 @@ public class ProductionTrackingAnalyticsService {
             return m;
         }
         private static Double rate(long numerator,long denominator){return denominator==0?null:Math.round(numerator*1000.0/denominator)/10.0;}
+    }
+
+    /**
+     * 节点完成率分析视图：按车间（production_line）× 节点（动态取自制程表，含中文名）统计
+     * 每个节点的涉及单数/完成单数/完成率，另附排产等待分布与异常单（提交→排产 >3 天）。
+     * 口径与列表一致：只统计跟单覆盖的单（visible() 范围），并按 MANUFACTURING 数据范围收敛可见性；
+     * 不依赖氚云报工/入库时间。节点序列由制程表判定，不写死。
+     */
+    public Map<String,Object> nodeAnalyticsView(){
+        var params=new ArrayList<Object>();
+        var where=tracking.visible(params);
+        // 节点完成率：动态制程表 + 车间分组，按制程序号排序，不写死节点序列。
+        var nodeSql="SELECT COALESCE(NULLIF(p.production_line,''),'未分车间') workshop,"
+                +"d.stage_code stage,COALESCE(d.stage_label,d.stage_code) stageName,"
+                +"COUNT(DISTINCT p.id) involved,"
+                +"COUNT(DISTINCT CASE WHEN m.stage_status='DONE' THEN p.id END) done "
+                +"FROM production_orders p "+P_ASG_JOIN
+                +"JOIN production_tracking_milestones m ON m.production_order_id=p.id "
+                +"JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code AND d.enabled=1 "
+                +"AND d.workshop_kind=CASE WHEN p.production_line LIKE '%封口%' THEN 'SEALER' ELSE 'MACHINE' END "
+                +where+" GROUP BY workshop,d.stage_code,d.stage_label,d.sort_no ORDER BY workshop,d.sort_no";
+        List<Map<String,Object>> nodes=new ArrayList<>();
+        for(var row:jdbc.queryForList(nodeSql,params.toArray())){
+            long involved=((Number)row.get("involved")).longValue();
+            long done=((Number)row.get("done")).longValue();
+            var m=new LinkedHashMap<String,Object>();
+            m.put("workshop",row.get("workshop"));
+            m.put("stage",row.get("stage"));
+            m.put("stageName",row.get("stageName"));
+            m.put("involved",involved);
+            m.put("done",done);
+            m.put("rate",involved==0?null:Math.round(done*1000.0/involved)/10.0);
+            nodes.add(m);
+        }
+        // 排产等待分布（按单 DISTINCT，避免节点行放大）
+        var waitSql="SELECT t.days day,COUNT(*) cnt FROM (SELECT DISTINCT p.id,"
+                +"FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at))) days "
+                +"FROM production_orders p "+P_ASG_JOIN+where
+                +" AND p.schedule_time IS NOT NULL AND p.source_created_at IS NOT NULL) t "
+                +"GROUP BY t.days ORDER BY t.days";
+        List<Map<String,Object>> wait=new ArrayList<>();
+        for(var row:jdbc.queryForList(waitSql,params.toArray())){
+            var m=new LinkedHashMap<String,Object>();
+            m.put("day",row.get("day"));
+            m.put("count",row.get("cnt"));
+            wait.add(m);
+        }
+        // 排产等待异常单（>3 天）
+        var anomSql="SELECT p.work_order_no orderNo,COALESCE(NULLIF(p.product_name,''),'') productName,"
+                +"COALESCE(NULLIF(p.production_line,''),'未分车间') workshop,"
+                +"DATE(p.source_created_at) submitted,DATE(p.schedule_time) scheduled,"
+                +"FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at))) waitDays "
+                +"FROM production_orders p "+P_ASG_JOIN+where
+                +" AND p.schedule_time IS NOT NULL AND p.source_created_at IS NOT NULL "
+                +"AND FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at)))>3 "
+                +"ORDER BY waitDays DESC LIMIT 50";
+        List<Map<String,Object>> anomalies=jdbc.queryForList(anomSql,params.toArray());
+        // 覆盖单数（跟单范围且确有节点）
+        long covered=0L;
+        try{
+            Long cnt=jdbc.queryForObject("SELECT COUNT(DISTINCT p.id) FROM production_orders p "+P_ASG_JOIN
+                    +"JOIN production_tracking_milestones m ON m.production_order_id=p.id "+where,
+                    Long.class,params.toArray());
+            covered=cnt==null?0:cnt;
+        }catch(Exception e){ /* 降级：覆盖单数统计失败不阻断视图 */ covered=0; }
+        var result=new LinkedHashMap<String,Object>();
+        result.put("meta",Map.of("covered",covered));
+        result.put("nodeCompletion",nodes);
+        result.put("scheduleWait",wait);
+        result.put("scheduleWaitAnomalies",anomalies);
+        return result;
+    }
+
+    /**
+     * 节点分析下钻：给「点某节点」「点某等待天数」提供对应的工单清单（分页）。
+     * 与生产分析/周复盘的下钻同一种交互：先看聚合，点了才展开明细，不默认平铺。
+     * 两种模式：
+     *  - 节点下钻：传入 workshop+stage（+status ALL/DONE/OPEN），列出该车间该节点涉及的单及其节点状态；
+     *  - 等待下钻：waitDays 传精确天数（=），或 waitDaysMin 传下限（>=，用于「>3 天」这类概览卡），按单去重。
+     * 范围与列表一致（visible()），不依赖氚云报工/入库时间。
+     */
+    public Map<String,Object> nodeAnalyticsOrders(String workshop,String stage,String status,Integer waitDays,Integer waitDaysMin,int page,int size){
+        var base=new ArrayList<Object>();
+        var where=tracking.visible(base);
+        int pno=Math.max(1,page);
+        int lim=Math.max(1,Math.min(size,100));
+        boolean byNode=stage!=null&&!stage.isBlank();
+        boolean byWait=waitDays!=null||waitDaysMin!=null;
+        String cols="SELECT p.id id,p.work_order_no orderNo,p.product_name productName,"
+                +"COALESCE(NULLIF(p.production_line,''),'未分车间') workshop,"
+                +"DATE(p.source_created_at) submittedDate,DATE(p.schedule_time) scheduleTime,"
+                +"FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at))) waitDays,"
+                +(byNode?"m.stage_status stageStatus":"NULL stageStatus")+","
+                // 基础列：业务员 / 产品规格 / 模具出数。三者只做下钻展示，缺失时为 null（前端显示「—」）。
+                // 与生产分析 / 周复盘下钻逐字同源（见 loadRows SELECT 的 salesperson/specification/mold_layout），
+                // 让三抽屉下钻表的「工单基本信息」列渲染一致，不重写第二套口径。
+                +"p.salesperson_name salesperson,"
+                +"CONCAT_WS(' / ',p.box_size,p.box_shape,p.box_material) specification,"
+                +"p.mold_layout moldLayout";
+        String from,whereTail="";
+        var p=new ArrayList<Object>(base);
+        if(byWait){
+            from="FROM production_orders p "+P_ASG_JOIN
+                    +"JOIN (SELECT DISTINCT production_order_id FROM production_tracking_milestones) m ON m.production_order_id=p.id "
+                    +where+" AND p.schedule_time IS NOT NULL AND p.source_created_at IS NOT NULL "
+                    +"AND FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at)))"
+                    +(waitDays!=null?"=? ":">=? ");
+            p.add(waitDays!=null?waitDays:waitDaysMin);
+        } else {
+            from="FROM production_orders p "+P_ASG_JOIN
+                    +"JOIN production_tracking_milestones m ON m.production_order_id=p.id "
+                    +"JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code AND d.enabled=1 "
+                    +"AND d.workshop_kind=CASE WHEN p.production_line LIKE '%封口%' THEN 'SEALER' ELSE 'MACHINE' END "
+                    +where;
+            // stage_code 过滤必须放在 visible() 之后，参数顺序才能与 SQL 中的 `?` 一致；
+            // 若放在 JOIN ON 里，跟单员数据范围（SELF/DEPARTMENT）非空参数时 stage 会被错位绑定 → 节点下钻返回 0
+            whereTail="AND m.stage_code=? ";p.add(stage);
+            if(status!=null&&!"ALL".equalsIgnoreCase(status)&&!status.isBlank()){
+                whereTail+="AND m.stage_status=? ";p.add("DONE".equalsIgnoreCase(status)?"DONE":"OPEN");
+            }
+        }
+        if(workshop!=null&&!workshop.isBlank()&&!"未分车间".equals(workshop)){whereTail+="AND p.production_line=? ";p.add(workshop);}
+        else if("未分车间".equals(workshop)){whereTail+="AND (p.production_line IS NULL OR p.production_line='') ";}
+        Long t=jdbc.queryForObject("SELECT COUNT(*) "+from+whereTail,Long.class,p.toArray());
+        long total=t==null?0:t;
+        p.add(lim);p.add((pno-1)*lim);
+        List<Map<String,Object>> items=jdbc.queryForList(cols+" "+from+whereTail+" ORDER BY p.id DESC LIMIT ? OFFSET ?",p.toArray());
+        var r=new LinkedHashMap<String,Object>();
+        r.put("items",items);r.put("total",total);r.put("page",pno);r.put("size",lim);
+        return r;
     }
 }

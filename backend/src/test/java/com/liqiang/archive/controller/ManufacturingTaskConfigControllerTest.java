@@ -38,7 +38,8 @@ import static org.mockito.Mockito.*;
  */
 class ManufacturingTaskConfigControllerTest {
     private final JdbcTemplate jdbc=mock(JdbcTemplate.class);
-    private final ManufacturingTaskConfigController controller=new ManufacturingTaskConfigController(jdbc);
+    private final ManufacturingTaskConfigController controller=new ManufacturingTaskConfigController(jdbc,
+            new com.liqiang.archive.service.ProductionTrackingStageService(jdbc, mock(com.liqiang.archive.service.AuditLogService.class)));
 
     private static Map<String,Object> row(Object... kv) {
         var m=new LinkedHashMap<String,Object>();
@@ -132,8 +133,14 @@ class ManufacturingTaskConfigControllerTest {
 
     @Test
     void createWritesOnlyIdentityColumnsWithoutActive() {
-        when(jdbc.queryForList(contains("FROM manufacturing_workshops WHERE id=? AND enabled=1"),any(Object[].class)))
-                .thenReturn(List.of(row("workshop_name","封口机车间")));
+        // 2026-10-27 车间去掉启停概念：新增配置只要求车间存在，不再校验 enabled=1。
+        var ws=org.mockito.ArgumentCaptor.forClass(String.class);
+        when(jdbc.queryForList(ws.capture(),any(Object[].class)))
+                .thenAnswer(inv -> String.valueOf((Object) inv.getArgument(0))
+                        .contains("FROM manufacturing_workshops WHERE id=?")
+                        ? List.of(row("workshop_name","封口机车间")) : List.of());
+        assertFalse(ws.getAllValues().stream().anyMatch(s -> s.contains("enabled")),
+                "车间不再有启用状态，新增配置不许再按 enabled 过滤");
         when(jdbc.queryForObject(contains("SELECT COUNT(*) FROM manufacturing_task_config_items WHERE workshop_id"),
                 eq(Integer.class),any(Object[].class))).thenReturn(0);
         when(jdbc.queryForObject(contains("SELECT id FROM manufacturing_task_config_items WHERE external_source='MANUAL'"),

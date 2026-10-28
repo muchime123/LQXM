@@ -54,10 +54,15 @@ const COUNTDOWN_FILTER_OPTIONS = [
  * 取值是固定工序码，与列表/导出的后端白名单一一对应；空串＝不筛。
  * 口径＝源单可选配置或备注写明需要这道工序，或已有该节点的跟单记录（后端 needsOptionalStage 唯一源）。
  */
-const OPTIONAL_STAGE_OPTIONS = [
-  { value: 'OXIDATION', label: '需要氧化 / 喷特氟龙' },
-  { value: 'WOODEN_CRATE', label: '需要木箱' }
-]
+/**
+ * 已知工序的中文名兜底：后端没返回（老版本）或前端还没收录时直接显示编码。
+ * 下拉的**取值与顺序一律以后端制程为准**——页面上新增的按需工序会直接出现在下拉里，
+ * 不需要前端再同步改一份常量（2026-10-27 制程配置化）。
+ */
+const OPTIONAL_STAGE_LABELS: Record<string, string> = {
+  OXIDATION: '需要氧化 / 喷特氟龙',
+  WOODEN_CRATE: '需要木箱'
+}
 /**
  * 「模具生产」跟进筛选（10-21 跟单员需求：跟进模具生产有没有完成）。
  * 三档可多选，共同前提是**模具之后没有任何节点跟进**——后面一旦动了，说明这张单已越过模具这一关，不再筛出。
@@ -133,14 +138,17 @@ export function useTrackingFilters(options: { onChange: () => void }) {
    * 数字必然等于点进去的条数；后端未升级时没有这个字段，则只显示工序名、不显示数字。
    */
   const optionalStageOptions = computed(() => {
-    const counts = new Map((filterOptions.value.optionalStageCounts || []).map(item => [item.code, item.count]))
-    return OPTIONAL_STAGE_OPTIONS.map(option => {
-      const count = counts.get(option.value)
-      return { ...option, label: count === undefined ? option.label : `${option.label}（${count}）` }
-    })
+    const counts = filterOptions.value.optionalStageCounts || []
+    if (counts.length) {
+      return counts.map(item => ({
+        value: item.code,
+        label: `${OPTIONAL_STAGE_LABELS[item.code] ?? item.code}（${item.count}）`
+      }))
+    }
+    return Object.entries(OPTIONAL_STAGE_LABELS).map(([value, label]) => ({ value, label }))
   })
   function optionalStageLabel(value: string) {
-    return OPTIONAL_STAGE_OPTIONS.find(option => option.value === value)?.label || value
+    return OPTIONAL_STAGE_LABELS[value] || value
   }
   function moldStageLabel(value: string) {
     return MOLD_STAGE_OPTIONS.find(option => option.value === value)?.label || value

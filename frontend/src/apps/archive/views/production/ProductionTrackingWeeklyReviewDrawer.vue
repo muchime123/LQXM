@@ -20,30 +20,10 @@
     <p class="weekly-note">统计口径与「生产交期达成分析」完全一致，按当前有效车间预计完成日期归集；
       交期调整后任务会在周期之间移动，回看过往周期时数字会随之变化。周期支持自然周，也支持 10.01-10.11 这类月初分段。</p>
 
-    <el-alert v-if="error" :title="error" type="error" :closable="false" />
+    <el-alert v-if="displayError" :title="displayError" type="error" :closable="false" />
 
-    <section v-if="drilldown" ref="drilldownPanel" class="weekly-section weekly-drilldown" aria-label="指标对应工单">
-      <div class="section-head">
-        <div><h2>{{ drilldown.label }} · 对应工单 {{ drilldownTotal }} 单</h2><p>点击工单可打开生产跟单详情。</p></div>
-        <el-button @click="closeDrilldown">收起</el-button>
-      </div>
-      <el-table v-loading="drilldownLoading" :data="drilldownItems" stripe empty-text="没有符合条件的工单" @row-click="openDrilldownOrder">
-        <el-table-column label="生产任务单" min-width="170">
-          <template #default="{ row }"><button class="weekly-link" @click.stop="openDrilldownOrder(row)">{{ row.orderNo }} ↗</button></template>
-        </el-table-column>
-        <el-table-column prop="productName" label="产品" min-width="150" show-overflow-tooltip />
-        <el-table-column label="业务员" width="100"><template #default="{ row }"><TrackingAnalyticsSalespersonCell :salesperson="row.salesperson" /></template></el-table-column>
-        <el-table-column label="产品规格 / 模具出数" min-width="240" show-overflow-tooltip><template #default="{ row }"><TrackingAnalyticsSpecCell :specification="row.specification" :mold-layout="row.moldLayout" /></template></el-table-column>
-        <el-table-column prop="workshop" label="车间" min-width="125" show-overflow-tooltip />
-        <el-table-column prop="baseline" label="当前预计" width="115" />
-        <el-table-column prop="deliveredDate" label="整单完工日" width="125" />
-        <el-table-column label="状态" width="110"><template #default="{ row }">{{ statusLabel(row.status) }}</template></el-table-column>
-        <el-table-column label="完工逾期" width="95"><template #default="{ row }">{{ row.overdueDays == null ? '—' : `${row.overdueDays} 天` }}</template></el-table-column>
-        <el-table-column label="未完工超期" width="110"><template #default="{ row }">{{ row.unfinishedOverdueDays == null ? '—' : `${row.unfinishedOverdueDays} 天` }}</template></el-table-column>
-      </el-table>
-      <el-pagination v-if="drilldownTotal > drilldownSize" v-model:current-page="drilldownPage" :page-size="drilldownSize"
-        :total="drilldownTotal" layout="prev, pager, next, total" @current-change="loadDrilldown" />
-    </section>
+    <div class="review-layout">
+    <div class="review-main">
 
     <template v-if="data">
       <section class="weekly-section">
@@ -56,7 +36,7 @@
         </MetricGrid>
         <p class="weekly-definition">应完成＝按期完工＋逾期＋未完工，三者互斥；已确认取消
           <button class="weekly-link" @click="openDrilldown('cancelled', '已确认取消')">{{ data.summary.cancelled }} 单</button>不计入履约，
-          停止本地跟单 {{ data.summary.stopped }} 单仍计入有效任务。
+          <button class="weekly-link" @click="openDrilldown('stopped', '已停产')">已停产 {{ data.summary.stopped }} 单</button>暂不计入履约，恢复生产后重新纳入。
           另有 <button class="weekly-link" @click="openDrilldown('missingExpected', '缺少车间预计日期')">{{ data.summary.missingExpected }} 单</button>缺少车间预计日期，未纳入任何周期。</p>
       </section>
 
@@ -119,16 +99,36 @@
         <p class="weekly-definition">这段文字由系统按本周期数据自动生成，可直接选中后贴进周报；目标与对策仍需跟单员补充。</p>
       </section>
     </template>
+    <TrackingReviewHistory :workshop="workshop" />
+    </div>
+    <aside class="review-drill-col">
+      <TrackingAnalyticsOrdersTable v-if="ddActive && drillState"
+        :items="ddItems" :total="ddTotal" :page="ddPage" :size="ddSize" :loading="ddLoading"
+        :title="`${drillState.label} · 对应工单 ${ddTotal} 单`"
+        @update:page="onPageChange" @open-order="id => emit('open-order', id)" @close="closeDrilldown">
+        <template #extra>
+          <el-table-column prop="baseline" label="当前预计" width="115" />
+          <el-table-column prop="deliveredDate" label="整单完工日" width="125" />
+          <el-table-column label="状态" width="110"><template #default="{ row }">{{ statusLabel(row.status) }}</template></el-table-column>
+          <el-table-column label="完工逾期" width="95"><template #default="{ row }">{{ row.overdueDays == null ? '—' : `${row.overdueDays} 天` }}</template></el-table-column>
+          <el-table-column label="未完工超期" width="110"><template #default="{ row }">{{ row.unfinishedOverdueDays == null ? '—' : `${row.unfinishedOverdueDays} 天` }}</template></el-table-column>
+        </template>
+      </TrackingAnalyticsOrdersTable>
+      <TrackingDrillEmpty v-else />
+    </aside>
+    </div>
   </main>
   </el-drawer>
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import MetricCard from '@/components/common/MetricCard.vue'
 import MetricGrid from '@/components/common/MetricGrid.vue'
 import ReasonTable from '@/components/production/TrackingWeeklyReasonTable.vue'
-// 与「生产交期达成分析」共用同一份下钻列组件：两边读的是同一个接口，展示也不能分叉。
+import TrackingReviewHistory from '@/components/production/TrackingReviewHistory.vue'
+import TrackingAnalyticsOrdersTable from '@/components/production/TrackingAnalyticsOrdersTable.vue'
+import TrackingDrillEmpty from '@/components/production/TrackingDrillEmpty.vue'
 import TrackingAnalyticsSalespersonCell from '@/components/production/TrackingAnalyticsSalespersonCell.vue'
 import TrackingAnalyticsSpecCell from '@/components/production/TrackingAnalyticsSpecCell.vue'
 import {
@@ -136,6 +136,9 @@ import {
   type TrackingAnalyticsOrder, type TrackingWeeklyReview
 } from '@/api/productionTracking'
 import { isoWeek, weekRange } from '@/utils/tracking/week'
+import { useTrackingDrilldown } from '@/composables/tracking/useTrackingDrilldown'
+// percent / barWidth / statusLabel 与生产分析 / 节点分析共用同一份口径（见 utils/tracking/format.ts）。
+import { percent, barWidth, statusLabel } from '@/utils/tracking/format'
 
 /**
  * 跟单周复盘：与「生产分析」同一个抽屉形态（size 90%），挂在「周复盘」按钮下。
@@ -175,11 +178,7 @@ const periodLabel = computed(() => {
   return `${fromDate.value.slice(5).replace('-', '.')} - ${toDate.value.slice(5).replace('-', '.')}（${week.year} 年第 ${week.week} 周）`
 })
 
-const percent = (value: number | null) => value === null ? '样本不足' : `${value.toFixed(1)}%`
-const barWidth = (count: number, total: number) => `${total ? count * 100 / total : 0}%`
 const levelBucket = (key: string) => key === 'MINOR' ? 'overdue1to3' : key === 'MEDIUM' ? 'overdue4to7' : 'overdue8plus'
-const statusLabel = (status: TrackingAnalyticsOrder['status']) =>
-  ({ ON_TIME: '按期完工', LATE: '逾期完工', UNFINISHED: '未完工', CANCELLED: '已取消', MISSING_EXPECTED: '待核实交期' })[status]
 
 const overdueHint = computed(() => {
   const summary = data.value?.summary
@@ -218,40 +217,33 @@ function topReasons(items: { key: string; label: string }[]) {
 }
 
 type Drilldown = { bucket: string; label: string; reasonCategory?: string }
-const drilldown = ref<Drilldown | null>(null)
-const drilldownPanel = ref<HTMLElement | null>(null)
-const drilldownItems = ref<TrackingAnalyticsOrder[]>([])
-const drilldownTotal = ref(0), drilldownPage = ref(1), drilldownSize = 30, drilldownLoading = ref(false)
-let drilldownRequest = 0
+const drillState = ref<Drilldown | null>(null)
+const { active: ddActive, items: ddItems, total: ddTotal, page: ddPage, size: ddSize,
+  loading: ddLoading, error: ddError, open, close, load: drillLoad, scrollIntoView } = useTrackingDrilldown<TrackingAnalyticsOrder>()
+const displayError = computed(() => error.value || ddError.value)
 
-async function openDrilldown(bucket: string, label: string, extra: Partial<Drilldown> = {}) {
-  drilldown.value = { bucket, label, ...extra }
-  drilldownPage.value = 1
-  await loadDrilldown()
-  await nextTick()
-  drilldownPanel.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+/** 下钻请求：读取当前 drillState，分页共用同一份 loader。 */
+function drillLoader(page: number, size: number) {
+  const d = drillState.value
+  return fetchTrackingAnalyticsOrders({
+    fromDate: fromDate.value, toDate: toDate.value, workshop: workshop.value,
+    bucket: d?.bucket ?? '', reasonCategory: d?.reasonCategory,
+    page, size
+  })
+}
+function openDrilldown(bucket: string, label: string, extra: Partial<Drilldown> = {}) {
+  drillState.value = { bucket, label, ...extra }
+  open()
+  void drillLoad(drillLoader)
+  void scrollIntoView()
 }
 function openReasonDrilldown(bucket: string, category: { key: string; label: string }) {
-  void openDrilldown(bucket, `${category.label}`, { reasonCategory: category.key })
+  openDrilldown(bucket, `${category.label}`, { reasonCategory: category.key })
 }
-function closeDrilldown() { drilldown.value = null; ++drilldownRequest }
+function onPageChange(p: number) { ddPage.value = p; void drillLoad(drillLoader) }
+function closeDrilldown() { drillState.value = null; close() }
 /** 点工单直接开跟单详情 —— 与生产分析抽屉同一条链路，不再让用户复制任务号去搜。 */
 function openDrilldownOrder(row: TrackingAnalyticsOrder) { emit('open-order', row.id) }
-
-async function loadDrilldown() {
-  if (!drilldown.value) return
-  const request = ++drilldownRequest
-  drilldownLoading.value = true
-  try {
-    const result = await fetchTrackingAnalyticsOrders({
-      fromDate: fromDate.value, toDate: toDate.value, workshop: workshop.value,
-      bucket: drilldown.value.bucket, reasonCategory: drilldown.value.reasonCategory,
-      page: drilldownPage.value, size: drilldownSize
-    })
-    if (request === drilldownRequest) { drilldownItems.value = result.items; drilldownTotal.value = result.total }
-  } catch (e) { if (request === drilldownRequest) error.value = e instanceof Error ? e.message : '工单清单加载失败' }
-  finally { if (request === drilldownRequest) drilldownLoading.value = false }
-}
 
 /** 未完工清单：周报第四节要能直接看到是哪几单，故随周期一起取前 20 条。 */
 const openItems = ref<TrackingAnalyticsOrder[]>([])
@@ -272,7 +264,7 @@ async function loadOpenItems() {
 
 async function load() {
   loading.value = true; error.value = ''
-  drilldown.value = null; ++drilldownRequest
+  drillState.value = null; close()
   try {
     data.value = await fetchTrackingWeeklyReview({
       fromDate: fromDate.value, toDate: toDate.value, workshop: workshop.value
@@ -313,12 +305,14 @@ watch(() => props.modelValue, open => { if (open) void load() }, { immediate: tr
 .section-head p { margin: 4px 0 0; color: #64748b; font-size: 13px; }
 .weekly-link { border: 0; background: none; padding: 0; color: #087c72; cursor: pointer; font: inherit; text-align: left; }
 .weekly-link:hover { text-decoration: underline; }
-.weekly-drilldown { border-color: #80c7bf; background: #fbfefd; scroll-margin-top: 8px; }
-.weekly-drilldown :deep(.el-table__row) { cursor: pointer; }
-.weekly-drilldown .el-pagination { margin-top: 14px; justify-content: flex-end; }
 .rate-cell { display: flex; align-items: center; gap: 10px; }
 .rate-track { flex: 1; min-width: 80px; height: 8px; border-radius: 6px; background: #e9eef1; overflow: hidden; }
 .rate-track b { display: block; height: 100%; background: #db9869; }
 .summary-text { margin: 0; font-size: 15px; line-height: 1.8; }
 @media (max-width: 700px) { .weekly-filter .el-date-editor, .weekly-filter .el-select { width: calc(50% - 4px); } }
+/* 两栏：左复盘内容、右下钻列表 */
+.review-layout{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:18px;align-items:start}
+.review-main{min-width:0}
+.review-drill-col{min-width:0;align-self:start}
+@media(max-width:1000px){.review-layout{grid-template-columns:1fr}}
 </style>

@@ -9,6 +9,9 @@
           <p class="caliber-note">样本只取跟单记录。产品参考工期为排产至入库各必经节点的生效天数逐段取整后相加；实测 P50 只取有排产锚点且走完的跟单，申请日兜底的单不计入。</p>
           <p class="caliber-note">产品和可选配置来自氚云任务单字典，本地只读；产品没有启用状态。点击统计数字可查看车间及产品分布。</p>
         </el-popover>
+        <!-- 车间管理收敛为弹窗（2026-10-27）：车间只是产品归属用的字典，不值得常驻页面底部；
+             任务下达在氚云进行，这里只维护车间名单。 -->
+        <el-button @click="workshopVisible = true">车间管理</el-button>
         <!-- 通用节点参考工期（原生产跟单页的「基准设置」）迁到这里：产品参考优先、通用参考兜底，
              两个入口放在同一页，避免「判据散落在两个页面」。 -->
         <el-button v-if="canManageBaseline" @click="baselineVisible = true">通用参考设置</el-button>
@@ -80,13 +83,11 @@
       </section>
     </div>
 
-    <!-- 车间基础数据：2026-10-23 随制造主数据清理从「制程与工序管理」页迁入（该页已下线）。
-         车间保留，默认制程等制程关联概念已移除。 -->
-    <section class="workshop-section"><ManufacturingWorkshopPanel /></section>
-
     <ProductOrderHistoryDrawer v-model="orderDrawerVisible" :task-config-id="selectedProduct?.id ?? null"
       :product-name="selectedProduct?.configName ?? ''" @open-order="openTrackingOrder" />
     <CoverageBreakdownDrawer v-model="coverageDrawerVisible" :initial-filter="coverageFilter" @pick="pickCoverageRow" />
+    <!-- 车间管理弹窗：产品归属用的字典，页头按钮进入。 -->
+    <ManufacturingWorkshopPanel v-model="workshopVisible" />
     <!-- 通用参考：产品级参考的兜底值。保存后重载矩阵，右栏「通用参考」列与产品表「已发布节点」当场跟着变。 -->
     <TrackingGeneralBaselineDialog v-model="baselineVisible" @saved="onGeneralBaselineSaved" />
     <!-- 跟单详情：与生产跟单页同一个抽屉组件，在本页打开而不跳转。保存后刷新本页统计（节点进度会影响已发布/覆盖率）。 -->
@@ -123,6 +124,8 @@ const { can } = useCurrentUser()
 const canManageBaseline = computed(() => can('manufacturing.baseline.manage'))
 /** 通用参考设置弹窗（原生产跟单页「基准设置」）。 */
 const baselineVisible = ref(false)
+/** 车间管理弹窗（2026-10-27 从页底常驻面板收敛而来）。 */
+const workshopVisible = ref(false)
 /** 通用参考保存后：矩阵（右栏「通用参考」列）与已发布节点数都要重算，直接整页重载最省心。 */
 async function onGeneralBaselineSaved() { await loadBenchmarks(); await loadProductDurations() }
 
@@ -362,7 +365,6 @@ button.stat:hover b { color: var(--color-primary, #0f766e); }
 .duration-panel { position: sticky; top: 16px; display: grid; gap: 12px; min-width: 0; }
 
 .duration-panel { position: static; }
-.workshop-section { background: var(--color-surface, #fff); border: 1px solid var(--color-border, #e2e8f0); border-radius: var(--radius-2xl, 12px); padding: 12px; box-shadow: var(--shadow-sm, 0 1px 3px rgba(0,0,0,.04)); }
 @media (max-width: 900px) {
   .layout { grid-template-columns: 1fr; }
   .layout > :nth-child(2), .duration-panel { grid-column: 1; }
