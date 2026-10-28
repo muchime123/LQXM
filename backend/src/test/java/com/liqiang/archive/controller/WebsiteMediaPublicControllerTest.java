@@ -3,6 +3,7 @@ package com.liqiang.archive.controller;
 import com.liqiang.archive.entity.WebsiteMediaAsset;
 import com.liqiang.archive.repository.WebsiteBannerRepository;
 import com.liqiang.archive.repository.WebsiteMediaAssetRepository;
+import com.liqiang.archive.service.WebsiteProductMediaVisibilityService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import org.springframework.test.util.ReflectionTestUtils;
@@ -25,10 +26,12 @@ class WebsiteMediaPublicControllerTest {
     Path root;
 
     @Test
-    void onlyActiveBannerMayExposePublishedWebsiteImage() throws Exception {
+    void onlyActiveBannerOrPublishedProductMayExposePublishedWebsiteImage() throws Exception {
         WebsiteMediaAssetRepository mediaRepository = mock(WebsiteMediaAssetRepository.class);
         WebsiteBannerRepository bannerRepository = mock(WebsiteBannerRepository.class);
-        WebsiteMediaPublicController controller = new WebsiteMediaPublicController(mediaRepository, bannerRepository);
+        WebsiteProductMediaVisibilityService productVisibility = mock(WebsiteProductMediaVisibilityService.class);
+        WebsiteMediaPublicController controller = new WebsiteMediaPublicController(
+                mediaRepository, bannerRepository, productVisibility);
         ReflectionTestUtils.setField(controller, "fileRoot", root.toString());
         Path image = root.resolve("website/images/banner.png");
         Files.createDirectories(image.getParent());
@@ -40,6 +43,7 @@ class WebsiteMediaPublicControllerTest {
         media.setStatus("DRAFT");
         when(mediaRepository.findByIdAndDeletedAtIsNull(1L)).thenReturn(Optional.of(media));
         when(bannerRepository.existsActiveWebsiteMediaReference(1L)).thenReturn(true);
+        when(productVisibility.isReferencedByPublishedProduct(1L)).thenReturn(true);
 
         MockMvc mvc = MockMvcBuilders.standaloneSetup(controller).build();
         mvc.perform(get("/api/website/media/1/content")).andExpect(status().isNotFound());
@@ -50,6 +54,8 @@ class WebsiteMediaPublicControllerTest {
                 .andExpect(content().bytes(new byte[]{1, 2, 3}))
                 .andExpect(header().string("X-Content-Type-Options", "nosniff"));
         when(bannerRepository.existsActiveWebsiteMediaReference(1L)).thenReturn(false);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
+        when(productVisibility.isReferencedByPublishedProduct(1L)).thenReturn(false);
         mvc.perform(get("/api/website/media/1/content")).andExpect(status().isNotFound());
     }
 }
