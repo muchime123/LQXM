@@ -1,6 +1,9 @@
 # --- 打包产物 ---
 *.zip
 *.sql.gz
+*.tar.gz
+/*.sql
+tools/classes/
 
 # --- IDE ---
 .idea/
