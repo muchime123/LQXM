@@ -99,7 +99,8 @@
         <p class="weekly-definition">这段文字由系统按本周期数据自动生成，可直接选中后贴进周报；目标与对策仍需跟单员补充。</p>
       </section>
     </template>
-    <TrackingReviewHistory :workshop="workshop" />
+    <!-- 历史归档入口暂不展示：快照链路未接通，展示只会让「回溯结果」被误当作历史归档。
+         TrackingReviewHistory 组件、相关接口与快照表均保留，待归档机制落地后再挂回。 -->
     </div>
     <aside class="review-drill-col">
       <TrackingAnalyticsOrdersTable v-if="ddActive && drillState"
@@ -126,7 +127,6 @@ import { computed, ref, watch } from 'vue'
 import MetricCard from '@/components/common/MetricCard.vue'
 import MetricGrid from '@/components/common/MetricGrid.vue'
 import ReasonTable from '@/components/production/TrackingWeeklyReasonTable.vue'
-import TrackingReviewHistory from '@/components/production/TrackingReviewHistory.vue'
 import TrackingAnalyticsOrdersTable from '@/components/production/TrackingAnalyticsOrdersTable.vue'
 import TrackingDrillEmpty from '@/components/production/TrackingDrillEmpty.vue'
 import TrackingAnalyticsSalespersonCell from '@/components/production/TrackingAnalyticsSalespersonCell.vue'

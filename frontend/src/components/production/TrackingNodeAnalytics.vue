@@ -9,9 +9,9 @@
           <small>跟单覆盖、有节点记录</small>
         </div>
         <div class="overview-block accent">
-          <span class="overview-label">排产等待 &gt;3 天</span>
-          <button class="overview-value" type="button" @click="drillWaitRange('排产等待 >3 天', 4)">{{ waitOver3 ?? '—' }}<em>单</em> ↗</button>
-          <small>提交→排产超过 3 天</small>
+          <span class="overview-label">排产等待 3 天及以上</span>
+          <button class="overview-value" type="button" @click="drillWaitRange('排产等待 3 天及以上', 3)">{{ waitThreePlus ?? '—' }}<em>单</em> ↗</button>
+          <small>提交→排产 3 天及以上</small>
         </div>
         <p class="overview-hint">点左栏图表（节点条形 / 排产等待柱）下钻任务清单，点任务行打开跟单详情</p>
       </section>
@@ -102,10 +102,13 @@ const waitBuckets = computed(() => {
 
 const waitChartHeight = computed(() => Math.max(200, waitBuckets.value.length * 30 + 50))
 
-/** 排产等待 >3 天的单数（由逐天分布累加），供概览卡点击下钻。 */
-const waitOver3 = computed(() => {
+/**
+ * 排产等待 3 天及以上的单数（由逐天分布累加）。
+ * 口径与分布图的合并柱（day >= 3）、下钻条件（waitDaysMin=3）保持一致，避免两处数字对不上。
+ */
+const waitThreePlus = computed(() => {
   const wait = data.value?.scheduleWait ?? []
-  return wait.filter(x => x.day > 3).reduce((s, x) => s + x.count, 0)
+  return wait.filter(x => x.day >= 3).reduce((s, x) => s + x.count, 0)
 })
 
 type Drilldown =

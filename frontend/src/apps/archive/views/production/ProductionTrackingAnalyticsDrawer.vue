@@ -7,9 +7,9 @@
     </header>
     <section class="analysis-filter" aria-label="分析范围">
       <strong>预计完成日期范围</strong>
-      <el-date-picker v-model="fromDate" type="date" value-format="YYYY-MM-DD" :placeholder="datePlaceholder('起')" clearable />
+      <el-date-picker v-model="fromDate" type="date" value-format="YYYY-MM-DD" placeholder="预计完成时间起" clearable />
       <span>至</span>
-      <el-date-picker v-model="toDate" type="date" value-format="YYYY-MM-DD" :placeholder="datePlaceholder('止')" clearable />
+      <el-date-picker v-model="toDate" type="date" value-format="YYYY-MM-DD" placeholder="预计完成时间止" clearable />
       <el-select v-model="workshop" clearable filterable placeholder="全部车间"><el-option v-for="name in workshopOptions" :key="name" :label="name" :value="name" /></el-select>
       <el-button type="primary" @click="load">分析</el-button>
       <el-button @click="reset">清空</el-button>
@@ -118,10 +118,8 @@ import { percent, barWidth, statusLabel } from '@/utils/tracking/format'
 const props=defineProps<{ modelValue: boolean }>()
 const emit=defineEmits<{ 'update:modelValue': [value: boolean]; 'open-order': [id: number] }>()
 const fromDate=ref(''),toDate=ref(''),workshop=ref('')
+/** 日期口径只有「预计完成日期」一种；提交 / 入库 / 期间三种口径暂未开放，故不留分支。 */
 const dateBasis=ref<TrackingAnalysisDateBasis>('baseline')
-const datePlaceholder=(edge:'起'|'止')=>({
-  submitted:'提交',inbound:'入库',active:'期间',baseline:'预计完成'
-})[dateBasis.value]+'时间'+edge
 const workshopOptions=ref<string[]>([])
 const data=ref<TrackingAnalytics | null>(null)
 const loading=ref(false),error=ref('')
@@ -179,7 +177,7 @@ async function load(){
   }catch(e){error.value=e instanceof Error?e.message:'分析数据加载失败'}
   finally{loading.value=false}
 }
-function reset(){fromDate.value='';toDate.value='';workshop.value='';dateBasis.value='baseline';void load()}
+function reset(){fromDate.value='';toDate.value='';workshop.value='';void load()}
 watch(() => props.modelValue, open => { if(open) void load() }, { immediate: true })
 </script>
 
@@ -191,7 +189,7 @@ watch(() => props.modelValue, open => { if(open) void load() }, { immediate: tru
 .section-head .analysis-facts{margin-left:auto}
 .note-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid #94a3b8;border-radius:50%;font-size:11px;font-style:normal;color:#64748b;cursor:help;line-height:1;user-select:none}
 .note-icon:hover{color:#087c72;border-color:#087c72}.analysis-link{border:0;background:none;padding:0;color:#087c72;cursor:pointer;font:inherit;text-align:left}.analysis-link:hover{text-decoration:underline}.analysis-link.metric{font-size:27px;font-weight:700}.analysis-cards .warning .analysis-link.metric{color:#c45620}.analysis-two-columns{display:grid;grid-template-columns:1fr 1fr;gap:18px}.analysis-definition{margin:16px 2px;font-size:13px}@media(max-width:900px){.analysis-cards{grid-template-columns:repeat(2,1fr)}.analysis-two-columns{grid-template-columns:1fr}}@media(max-width:560px){.analysis-cards{grid-template-columns:1fr}}
-.analysis-filter .analysis-date-basis{width:225px}.analysis-filter-note{width:100%;margin:0;color:#64748b;font-size:13px;line-height:1.5}
+.analysis-filter-note{width:100%;margin:0;color:#64748b;font-size:13px;line-height:1.5}
 /* 两栏：左分析内容、右下钻列表 */
 .analysis-layout{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:18px;align-items:start}
 .analysis-main{min-width:0}

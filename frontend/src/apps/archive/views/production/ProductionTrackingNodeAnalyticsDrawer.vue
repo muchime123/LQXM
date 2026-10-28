@@ -2,7 +2,7 @@
   <el-drawer :model-value="modelValue" size="90%" :with-header="false" append-to-body @update:model-value="emit('update:modelValue', $event)">
   <main class="tracking-node-analytics">
     <header class="node-head">
-      <div><h1>节点完成率 · 排产等待分析</h1><p>按跟单员跟单覆盖的任务统计各节点完成情况与排产等待。节点动态取自制程表，各车间各自展示，不写死序列。</p></div>
+      <div><h1>节点完成率 · 排产等待分析</h1><p>按跟单员跟单覆盖的任务统计各节点完成情况与排产等待。节点动态取自制程表，各车间各自展示，不写死序列。<strong>节点完成率是已有节点记录中的完成比例，只说明记录情况，不代表生产瓶颈或全部任务进度。</strong></p></div>
       <div class="node-head-actions"><el-button @click="refresh">刷新数据</el-button><el-button aria-label="关闭节点分析" @click="emit('update:modelValue', false)">关闭</el-button></div>
     </header>
     <TrackingNodeAnalytics ref="contentRef" @open-order="id => emit('open-order', id)" />
