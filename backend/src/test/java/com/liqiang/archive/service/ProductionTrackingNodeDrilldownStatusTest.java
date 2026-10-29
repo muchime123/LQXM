@@ -102,11 +102,65 @@ class ProductionTrackingNodeDrilldownStatusTest {
     }
 
     /** 等待天数下钻走另一条分支，节点状态筛选对它无效 —— 钉住两者不会互相串条件。 */
+    /**
+     * 「当前超期」必须是<b>整单级</b>状态：只用「当前有效预计日期」（车间 forecast 优先），
+     * 且只在<b>整单仍在产</b>时才算 —— 完成信号取自跟单结案 {@code closed_at} 与
+     * 「最后适用节点已完成」{@code TRACKING_COMPLETE}。
+     *
+     * <p>这里刻意钉死「不再用 {@code p.actual_completion_date}」：那列对这批工单常年不回填，
+     * SCGD20260005428 七个节点全 DONE、入库也 DONE，它依然是 NULL，
+     * 于是已完工的历史单被当成未完工，超期天数还随日期一天天累加。
+     */
     @Test
-    void waitDrilldownIgnoresNodeStatus(){
-        String sql = call(null, "OPEN", 3).sql();
-        assertTrue(sql.contains(">=?"), "等待下钻按下限匹配：" + sql);
-        assertFalse(sql.contains("m.stage_status"), "等待下钻不应引入节点状态条件：" + sql);
+    void openOverdueUsesTrackingCompletionAndCurrentEffectiveBaseline(){
+        String sql = call("OPEN").sql();
+        assertTrue(sql.contains("COALESCE(t.forecast_finish_date,p.expected_completion_date) expectedDate"),
+                "当前预计应与生产分析同源（车间 forecast 优先），不用源单 expected_completion_date：" + sql);
+        assertTrue(sql.contains("t.closed_at"), "整单完成必须认跟单结案：" + sql);
+        assertTrue(sql.contains("machine_done_count"),
+                "整单完成必须复用「最后适用节点已完成」判据 TRACKING_COMPLETE（含按需节点计数）：" + sql);
+        assertFalse(sql.contains("p.actual_completion_date IS NULL"),
+                "不得再用源单整单完工日判当前超期：" + sql);
     }
 
+    /** 节点<b>状态</b>筛选（DONE / PENDING / IN_PROGRESS）与整单完成是两个维度，不许混用。 */
+    @Test
+    void nodeStatusFilterStillJudgedByMilestoneStatus(){
+        Captured open = call("OPEN");
+        assertTrue(open.sql().contains("COALESCE(m.stage_status,'')<>?"),
+                "节点状态筛选仍按里程碑实际状态取值判定：" + open.sql());
+    }
+
+    /** 停产 / 取消必须挡在<b>所有</b>节点查询之外（节点完成率 / 等待分布 / 异常单），不是只在下钻里过滤。 */
+    @Test
+    void stoppedAndCancelledAreExcludedFromEveryNodeQuery(){
+        service.nodeAnalyticsView();
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        verify(jdbc, org.mockito.Mockito.atLeastOnce()).queryForList(sql.capture(), any(Object[].class));
+        var all = sql.getAllValues();
+        assertFalse(all.isEmpty(), "视图至少应查一次明细");
+        for (String one : all) {
+            assertTrue(one.contains("t.stopped_at IS NULL"), "查询缺少停产过滤：" + one);
+            assertTrue(one.contains("已取消"), "查询缺少取消过滤：" + one);
+        }
+    }
+
+    /**
+     * 等待天数下钻走另一条分支，不该挂上「某个节点」的维度条件。
+     *
+     * <p>取 WHERE 段的锚点只能用等待下钻特有的 JOIN：整体 SQL 里 {@code m.stage_status} 也会出现
+     * （{@code TRACKING_COMPLETE} 依赖的 ms 派生表，用于判断整单是否仍在产，不是节点筛选），
+     * 而 mock 环境下 {@code visible()} 返回空，主查询没有自己的 " WHERE " 可定位。
+     */
+    @Test
+    void waitDrilldownAppliesNoNodeDimensionCondition(){
+        Captured wait = call(null, "OPEN", 3);
+        String anchor = "JOIN (SELECT DISTINCT production_order_id FROM production_tracking_milestones) m ON m.production_order_id=p.id";
+        assertTrue(wait.sql().contains(anchor), "应走等待下钻的 JOIN：" + wait.sql());
+        String tail = wait.sql().substring(wait.sql().indexOf(anchor));
+        assertTrue(tail.contains(">=?"), "等待下钻按下限匹配：" + tail);
+        assertTrue(tail.contains("t.stopped_at IS NULL"), "等待下钻同样要排除停产：" + tail);
+        assertFalse(tail.contains("m.stage_code=?"), "等待下钻不应带单个节点的过滤：" + tail);
+        assertFalse(tail.contains("m.stage_status"), "等待下钻不应引入节点状态条件：" + tail);
+    }
 }

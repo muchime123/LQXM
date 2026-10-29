@@ -49,10 +49,35 @@ public class ProductionTrackingAnalyticsService {
     private final ProductionTrackingService tracking;
     private final ObjectMapper objectMapper;
 
-    /** 分析视图专用 FROM 前缀：p（工单）+ assigned（按车间分配跟单员），供 visible() 复用。 */
-    private static final String P_ASG_JOIN=" LEFT JOIN (SELECT MIN(id) id,name FROM employees "
-            +"WHERE status='ACTIVE' AND name IN ('陈苏平','胡健') GROUP BY name) assigned "
-            +"ON assigned.name=CASE WHEN p.production_line LIKE '%封口%' THEN '陈苏平' ELSE '胡健' END ";
+    /**
+     * 节点分析的<b>参与范围</b>：未停止、未取消。
+     *
+     * <p>停产任务<b>不进入</b>覆盖任务数 / 节点完成率 / 排产等待分布与任何下钻；
+     * 既不删除节点记录、也不改原单的停产状态 —— 恢复生产（撤销 stopped_at）后任务自动回到统计里。
+     * 取消名单与生产分析 {@code cancelled} 判据同名，避免两处各写一份。
+     */
+    private static final String ACTIVE_SCOPE=" AND t.stopped_at IS NULL "
+            +"AND (p.status IS NULL OR TRIM(p.status) NOT IN ('已取消','取消','已作废','作废','CANCELLED','CANCELED'))";
+
+    /**
+     * 整单是否<b>仍在产</b>（＝还没被跟单判定为完成），取 1 表示仍在产。
+     *
+     * <p>优先级与生产跟单列表完全一致（同一个 {@code TRACKING_STATUS_CASE} 的前两级）：
+     * ① 停产 / 取消 —— 已由 {@link #ACTIVE_SCOPE} 排除；
+     * ② 跟单员主动结案（{@code closed_at}，语义见 {@code ClosureRequest}：主动确认结束，与停止互斥）；
+     * ③ 本单<b>最后适用节点</b>已完成 —— 直接复用 {@code TRACKING_COMPLETE}，它把「必选节点 + 本单适用的按需节点」
+     *    （有记录的，或源单配置写明需要的）都算进分母，因此入库之后还要做木箱的单<b>不会被提前判成完工</b>。
+     *
+     * <p>刻意<b>不看</b> {@code p.actual_completion_date}：那是源单字段，这批工单常年不回填
+     * （SCGD20260005428 七个节点全 DONE、入库也是 DONE，该列依然为空），
+     * 用它判完工会把已完工的历史单算成「当前超期」并随日期一直累加。
+     * 也刻意<b>不把「已登记入库」当作无条件完工信号</b>：那等于给木箱这类后置按需节点开一条绕过捷径。
+     *
+     * <p>「仍在产」是<b>跟单维度</b>的状态，不等于「车间还在加工」：源单已填整单完工日但节点没登记齐的单也会落在里面
+     * （当前 26 单里有 24 单如此）。它们是<b>待跟单员核实</b>的对象，不是系统认定的生产逾期。
+     */
+    private static final String OPEN_TRACKING="CASE WHEN t.closed_at IS NOT NULL THEN 0 "
+            +"WHEN "+ProductionTrackingService.TRACKING_COMPLETE+" THEN 0 ELSE 1 END";
 
     public Map<String,Object> analyze(String fromDate, String toDate, String workshop,String dateBasis) {
         var result=new LinkedHashMap<>(summarize(loadRows(fromDate,toDate,workshop,dateBasis).stream()
@@ -563,11 +588,15 @@ public class ProductionTrackingAnalyticsService {
                 +"d.stage_code stage,COALESCE(d.stage_label,d.stage_code) stageName,"
                 +"COUNT(DISTINCT p.id) involved,"
                 +"COUNT(DISTINCT CASE WHEN m.stage_status='DONE' THEN p.id END) done "
-                +"FROM production_orders p "+P_ASG_JOIN
-                +"JOIN production_tracking_milestones m ON m.production_order_id=p.id "
+                // FROM 直接复用生产跟单的统一 FROM：它自带 t（跟单状态行：stopped_at/closed_at/forecast_finish_date）
+                // 与 ms（按单聚合的节点计数派生表），TRACKING_COMPLETE 才能复用同一份判据；
+                // 这两个派生表都对 p.id 一对一，不会让 COUNT(DISTINCT p.id) 变大。
+                +ProductionTrackingService.TRACKING_FROM
+                +" JOIN production_tracking_milestones m ON m.production_order_id=p.id "
                 +"JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code AND d.enabled=1 "
                 +"AND d.workshop_kind=CASE WHEN p.production_line LIKE '%封口%' THEN 'SEALER' ELSE 'MACHINE' END "
-                +where+" GROUP BY workshop,d.stage_code,d.stage_label,d.sort_no ORDER BY workshop,d.sort_no";
+                +where+ACTIVE_SCOPE
+                +" GROUP BY workshop,d.stage_code,d.stage_label,d.sort_no ORDER BY workshop,d.sort_no";
         List<Map<String,Object>> nodes=new ArrayList<>();
         for(var row:jdbc.queryForList(nodeSql,params.toArray())){
             long involved=((Number)row.get("involved")).longValue();
@@ -582,11 +611,13 @@ public class ProductionTrackingAnalyticsService {
             nodes.add(m);
         }
         // 排产等待分布（按单 DISTINCT，避免节点行放大）
-        var waitSql="SELECT t.days day,COUNT(*) cnt FROM (SELECT DISTINCT p.id,"
+        // 外层子查询别名用 w 而不是 t：t 在生产跟单的统一 FROM 里已经是**跟单状态行**的别名，
+        // 同名会让 `t.stopped_at` 指到这个天数子查询上去，停产过滤直接失效（且 MySQL 报列不存在）。
+        var waitSql="SELECT w.days day,COUNT(*) cnt FROM (SELECT DISTINCT p.id,"
                 +"FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at))) days "
-                +"FROM production_orders p "+P_ASG_JOIN+where
-                +" AND p.schedule_time IS NOT NULL AND p.source_created_at IS NOT NULL) t "
-                +"GROUP BY t.days ORDER BY t.days";
+                +ProductionTrackingService.TRACKING_FROM+where+ACTIVE_SCOPE
+                +" AND p.schedule_time IS NOT NULL AND p.source_created_at IS NOT NULL) w "
+                +"GROUP BY w.days ORDER BY w.days";
         List<Map<String,Object>> wait=new ArrayList<>();
         for(var row:jdbc.queryForList(waitSql,params.toArray())){
             var m=new LinkedHashMap<String,Object>();
@@ -599,7 +630,7 @@ public class ProductionTrackingAnalyticsService {
                 +"COALESCE(NULLIF(p.production_line,''),'未分车间') workshop,"
                 +"DATE(p.source_created_at) submitted,DATE(p.schedule_time) scheduled,"
                 +"FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at))) waitDays "
-                +"FROM production_orders p "+P_ASG_JOIN+where
+                +ProductionTrackingService.TRACKING_FROM+where+ACTIVE_SCOPE
                 +" AND p.schedule_time IS NOT NULL AND p.source_created_at IS NOT NULL "
                 +"AND FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at)))>3 "
                 +"ORDER BY waitDays DESC LIMIT 50";
@@ -607,8 +638,9 @@ public class ProductionTrackingAnalyticsService {
         // 覆盖单数（跟单范围且确有节点）
         long covered=0L;
         try{
-            Long cnt=jdbc.queryForObject("SELECT COUNT(DISTINCT p.id) FROM production_orders p "+P_ASG_JOIN
-                    +"JOIN production_tracking_milestones m ON m.production_order_id=p.id "+where,
+            Long cnt=jdbc.queryForObject("SELECT COUNT(DISTINCT p.id) "
+                    +ProductionTrackingService.TRACKING_FROM
+                    +" JOIN production_tracking_milestones m ON m.production_order_id=p.id "+where+ACTIVE_SCOPE,
                     Long.class,params.toArray());
             covered=cnt==null?0:cnt;
         }catch(Exception e){ /* 降级：覆盖单数统计失败不阻断视图 */ covered=0; }
@@ -640,12 +672,16 @@ public class ProductionTrackingAnalyticsService {
                 +"DATE(p.source_created_at) submittedDate,DATE(p.schedule_time) scheduleTime,"
                 +"FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at))) waitDays,"
                 +(byNode?"m.stage_status stageStatus":"NULL stageStatus")+","
-                // 交期两列：与周复盘下钻同一口径 —— 「当前超期」只对**尚未整单完工**且预计完成日已过的单计算，
-                // 已完工单置 NULL（否则历史完工单会永远显示超期，把真正要处理的单淹掉）。
-                +"DATE(p.expected_completion_date) expectedDate,"
-                +"CASE WHEN p.actual_completion_date IS NULL AND p.expected_completion_date IS NOT NULL "
-                +"AND DATE(p.expected_completion_date)<CURDATE() "
-                +"THEN DATEDIFF(CURDATE(),DATE(p.expected_completion_date)) END openOverdueDays,"
+                // 交期两列：预计日期用全站唯一的「当前有效预计」（车间 forecast 优先），不直接用源单的 expected_completion_date，
+                // 否则同一个单在这个抽屉和生产分析里会按两个日期判断是否超期。
+                +EFFECTIVE_EXPECTED_DATE+" expectedDate,"
+                // 「当前超期」只对**仍在产**（未被跟单判定完成）且当前有效预计已过的单计算：
+                // 已完成 / 已结案 / 已停产的单都是 NULL —— 停产单已被 ACTIVE_SCOPE 挡在结果外，这里不用重复判。
+                // 早前这里用 p.actual_completion_date 判完工件，而该源单字段常年不回填（SCGD20260005428 节点全完成、入库也 DONE 仍为空），
+                // 于是「入库都已登记的历史完工单」被当成未完工，超期天数还随日期一天天累加。
+                +"CASE WHEN "+OPEN_TRACKING+"=1 AND "+EFFECTIVE_EXPECTED_DATE+" IS NOT NULL "
+                +"AND "+EFFECTIVE_EXPECTED_DATE+"<CURDATE() "
+                +"THEN DATEDIFF(CURDATE(),"+EFFECTIVE_EXPECTED_DATE+") END openOverdueDays,"
                 // 基础列：业务员 / 产品规格 / 模具出数。三者只做下钻展示，缺失时为 null（前端显示「—」）。
                 // 与生产分析 / 周复盘下钻逐字同源（见 loadRows SELECT 的 salesperson/specification/mold_layout），
                 // 让三抽屉下钻表的「工单基本信息」列渲染一致，不重写第二套口径。
@@ -655,18 +691,18 @@ public class ProductionTrackingAnalyticsService {
         String from,whereTail="";
         var p=new ArrayList<Object>(base);
         if(byWait){
-            from="FROM production_orders p "+P_ASG_JOIN
-                    +"JOIN (SELECT DISTINCT production_order_id FROM production_tracking_milestones) m ON m.production_order_id=p.id "
-                    +where+" AND p.schedule_time IS NOT NULL AND p.source_created_at IS NOT NULL "
+            from=ProductionTrackingService.TRACKING_FROM
+                    +" JOIN (SELECT DISTINCT production_order_id FROM production_tracking_milestones) m ON m.production_order_id=p.id "
+                    +where+ACTIVE_SCOPE+" AND p.schedule_time IS NOT NULL AND p.source_created_at IS NOT NULL "
                     +"AND FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at)))"
                     +(waitDays!=null?"=? ":">=? ");
             p.add(waitDays!=null?waitDays:waitDaysMin);
         } else {
-            from="FROM production_orders p "+P_ASG_JOIN
-                    +"JOIN production_tracking_milestones m ON m.production_order_id=p.id "
+            from=ProductionTrackingService.TRACKING_FROM
+                    +" JOIN production_tracking_milestones m ON m.production_order_id=p.id "
                     +"JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code AND d.enabled=1 "
                     +"AND d.workshop_kind=CASE WHEN p.production_line LIKE '%封口%' THEN 'SEALER' ELSE 'MACHINE' END "
-                    +where;
+                    +where+ACTIVE_SCOPE;
             // stage_code 过滤必须放在 visible() 之后，参数顺序才能与 SQL 中的 `?` 一致；
             // 若放在 JOIN ON 里，跟单员数据范围（SELF/DEPARTMENT）非空参数时 stage 会被错位绑定 → 节点下钻返回 0
             whereTail="AND m.stage_code=? ";p.add(stage);
