@@ -13,25 +13,24 @@
       <el-select v-model="workshop" clearable filterable placeholder="全部车间"><el-option v-for="name in workshopOptions" :key="name" :label="name" :value="name" /></el-select>
       <el-button type="primary" @click="load">分析</el-button>
       <el-button @click="reset">清空</el-button>
-      <p class="analysis-filter-note">按当前有效预计日期统计；交期调整后任务会重新归入对应区间，历史区间数量可能变化。实际完成日期不影响归属；缺少车间预计日期的任务单独核实。</p>
+      <p class="analysis-filter-note">按当前有效车间预计完成日期归集任务，统计按任务单数量、不按台数加权。<el-tooltip content="交期调整后任务会重新归入对应区间，历史区间数量可能变化；实际完成日期不影响归属；缺少车间预计日期的任务未纳入任何日期区间，可在「进度与数据核实」中单独查看。"><span class="note-icon" tabindex="0">ⓘ</span></el-tooltip></p>
     </section>
     <el-alert v-if="displayError" :title="displayError" type="error" :closable="false" />
     <div class="analysis-layout">
     <div class="analysis-main">
     <template v-if="data">
       <section class="analysis-cards" aria-label="核心指标">
-        <div><span>应完成任务 <el-tooltip content="当前有效预计日期落在范围内，已取消或已停产任务不计入。恢复生产后重新纳入。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('dueTasks','应完成任务')">{{ data.totals.dueTasks }} 单 ↗</button><small>其中已到期 {{ data.totals.matured }} 单</small></div>
-        <div><span>已完工 <el-tooltip content="跟单员确认入库节点优先；尚未确认时，仅同任务编号下入库品名和单位均唯一、累计数量达到计划数，才自动推定整单完工。混合品名或单位需核实。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('delivered','已完工')">{{ data.totals.delivered }} 单 ↗</button><small>完工率 {{ percent(data.totals.completionRate) }}</small></div>
+        <div><span>应完成任务 <el-tooltip content="当前有效预计日期落在范围内，已取消或已停产任务不计入，恢复生产后重新纳入。三种状态互斥：应完成＝按期＋逾期＋未完工。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('dueTasks','应完成任务')">{{ data.totals.dueTasks }} 单 ↗</button></div>
+        <div><span>已完工 <el-tooltip content="跟单员确认入库节点优先；尚未确认时，仅同任务编号下入库品名和单位均唯一、累计数量达到计划数，才自动推定整单完工。混合品名或单位需核实。完工率＝（按期＋逾期）÷应完成任务；已完工准交率＝按期完工÷已完工。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('delivered','已完工')">{{ data.totals.delivered }} 单 ↗</button><small>完工率 {{ percent(data.totals.completionRate) }}</small><small>已完工准交率 {{ percent(data.totals.completedOnTimeRate) }}</small></div>
         <div><span>未完工 <el-tooltip content="尚无整单完工依据；首次或部分采购入库不算整单完工。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('open','未完工')">{{ data.totals.open }} 单 ↗</button><small>其中已超预计日期 {{ data.totals.openOverdue }} 单</small></div>
         <div><span>按期完工 <el-tooltip content="整单完工日期不晚于当前有效预计日期。按期达成率＝按期完工 ÷ 应完成任务。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('onTime','按期完工')">{{ data.totals.onTime }} 单 ↗</button><small>按期达成率 {{ percent(data.totals.onTimeAchievementRate) }}</small></div>
         <div class="warning"><span>逾期完工 <el-tooltip content="整单完工日期晚于当前有效预计日期；未完工不会计入。"><span class="note-icon">ⓘ</span></el-tooltip></span><button class="analysis-link metric" @click="openDrilldown('overdue','逾期完工')">{{ data.totals.overdue }} 单 ↗</button><small>仅计已经完工的任务</small></div>
       </section>
-      <p class="analysis-definition">完工率＝（按期完工＋逾期完工）÷应完成任务；按期达成率＝按期完工÷应完成任务；已完工准交率＝按期完工÷已完工任务（当前 {{ percent(data.totals.completedOnTimeRate) }}）。三种状态互斥，应完成＝按期＋逾期＋未完工。</p>
       <p v-if="!toDate || toDate > data.asOf" class="analysis-definition">所选范围包含未来交期，当前统计是进度快照，不能直接当作最终考核结果。</p>
       <section class="analysis-section">
         <h2>进度与数据核实</h2>
         <div class="analysis-facts">
-          <button v-for="fact in coverageFacts" :key="fact.bucket" type="button" @click="openDrilldown(fact.bucket,fact.label)">{{ fact.label }} {{ fact.count }} 单 ↗</button>
+          <button v-for="fact in coverageFacts" :key="fact.bucket" type="button" :title="fact.title" @click="openDrilldown(fact.bucket,fact.label)">{{ fact.label }} {{ fact.count }} 单 ↗</button>
         </div>
       </section>
       <section class="analysis-section">
@@ -71,7 +70,7 @@
             <h2>协商改期<el-tooltip placement="top" content="与源任务的原车间预计日期比较；没有原车间预计日期时暂不判定改期。"><span class="note-icon" tabindex="0">ⓘ</span></el-tooltip></h2>
             <div class="analysis-facts"><button v-for="fact in extensionFacts" :key="fact.bucket" @click="openDrilldown(fact.bucket,fact.label)">{{ fact.label }} {{ fact.count }} {{ fact.unit }} ↗<small v-if="fact.note">（{{ fact.note }}）</small></button></div>
           </div>
-          <h3>记录的延后原因</h3><ReasonList :items="data.extensionReasons" @select="reason => openDrilldown('extensionReason',`延后原因：${reason}`,{reason})" /><h3>风险类别</h3><ReasonList :items="riskItems(data.riskCategories)" @select="reason => openDrilldown('riskCategory',`风险类别：${riskNames[reason] || reason}`,{reason})" />
+          <h3>记录的延后原因<span class="rank-note">仅显示单数最多的前 12 种原因</span></h3><ReasonList :items="data.extensionReasons" @select="reason => openDrilldown('extensionReason',`延后原因：${reason}`,{reason})" /><h3>风险类别</h3><ReasonList :items="riskItems(data.riskCategories)" @select="reason => openDrilldown('riskCategory',`风险类别：${riskNames[reason] || reason}`,{reason})" />
         </section>
         <section class="analysis-section">
           <div class="section-head">
@@ -81,7 +80,6 @@
           <h3>核实记录中的原因原文</h3><ReasonList :items="data.overdueReasons" @select="reason => openDrilldown('overdueReason',`逾期原因：${reason}`,{reason})" />
         </section>
       </div>
-      <p class="analysis-definition">已确认取消 {{ data.totals.cancelled }} 单、<button class="analysis-link" @click="openDrilldown('stopped','已停产')">已停产 {{ data.totals.stopped }} 单 ↗</button>，均暂不计入正常履约；恢复生产后重新纳入。同权限、同车间另有 <button class="analysis-link" @click="openDrilldown('missingExpected','缺少车间预计日期')">{{ data.missingExpected }} 单缺少车间预计日期 ↗</button>，未纳入任何日期区间，需核实。未完工中：未到期 {{ data.totals.openNotDue }} 单、今天到期 {{ data.totals.openDueToday }} 单、已超期 {{ data.totals.openOverdue }} 单。当前统计按任务单数量，不按台数加权。</p>
     </template>
     </div>
     <aside class="analysis-drill-col">
@@ -130,13 +128,15 @@ const { active: ddActive, items: ddItems, total: ddTotal, page: ddPage, size: dd
 const displayError=computed(()=> error.value || ddError.value)
 const riskNames:Record<string,string>={NONE:'无风险类别',MATERIAL:'物料',DESIGN:'设计',CAPACITY:'产能',CUSTOMER:'客户',OTHER:'其他',未记录:'未记录'}
 const riskItems=(items:{name:string;count:number}[])=>items.map(item=>({...item,value:item.name,name:riskNames[item.name] || item.name}))
+/** 数据核实 chips：底部口径段落删除后，这里成为这些计数的唯一出口；取消 / 停产的「不计入正常履约」说明以 title 呈现。 */
 const coverageFacts=computed(()=>{const t=data.value?.totals;return t?[
   {bucket:'matured',label:'已到期任务',count:t.matured},
   {bucket:'openOverdue',label:'超期未完工',count:t.openOverdue},
   {bucket:'openDueToday',label:'今天到期未完工',count:t.openDueToday},
   {bucket:'openNotDue',label:'未到期未完工',count:t.openNotDue},
-  {bucket:'cancelled',label:'已确认取消',count:t.cancelled},
-  {bucket:'stopped',label:'已停产',count:t.stopped}
+  {bucket:'cancelled',label:'已确认取消',count:t.cancelled,title:'不计入正常履约'},
+  {bucket:'stopped',label:'已停产',count:t.stopped,title:'暂不计入正常履约，恢复生产后重新纳入'},
+  {bucket:'missingExpected',label:'缺少车间预计日期',count:data.value?.missingExpected ?? 0,title:'未纳入任何日期区间，需核实'}
 ]:[]})
 /**
  * 「累计延后 N 天」原先是**独立卡片**，但它显示的是天数（`extensionDays`），
@@ -182,13 +182,15 @@ watch(() => props.modelValue, open => { if(open) void load() }, { immediate: tru
 </script>
 
 <style scoped>
-.tracking-analysis{padding:8px 12px 28px;color:#263448}.analysis-head,.analysis-filter{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.analysis-head-actions{display:flex;gap:8px}.analysis-head h1{margin:8px 0;font-size:24px}.analysis-head p,.analysis-section p,.analysis-definition{color:#64748b;line-height:1.6}.analysis-filter{justify-content:flex-start;background:#f7f9fc;padding:16px;border:1px solid #e3e8ef;border-radius:10px;margin:20px 0}.analysis-filter .el-date-editor{width:170px}.analysis-filter .el-select{width:190px}.analysis-cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.analysis-cards>div,.analysis-section{border:1px solid #e3e8ef;border-radius:12px;background:white;padding:18px}.analysis-cards>div{display:flex;flex-direction:column;gap:10px}.analysis-cards span{color:#64748b}.analysis-cards strong{font-size:27px;color:#127b71}.analysis-cards .warning strong{color:#c45620}.analysis-cards small,.analysis-section small{color:#64748b}.analysis-section{margin-top:18px}.analysis-section h2{font-size:18px;margin:0 0 10px}.analysis-section h3{font-size:15px;margin:20px 0 8px}.analysis-facts{display:flex;flex-wrap:wrap;gap:8px}.analysis-facts button{background:#f3f6fa;padding:8px 12px;border:0;border-radius:7px;cursor:pointer;color:#276477}.analysis-facts button:hover{background:#e7f5f3;color:#087c72}
+.tracking-analysis{padding:8px 12px 28px;color:#263448}.analysis-head,.analysis-filter{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.analysis-head-actions{display:flex;gap:8px}.analysis-head h1{margin:8px 0;font-size:24px}.analysis-head p,.analysis-section p,.analysis-definition{color:#64748b;line-height:1.6}.analysis-filter{justify-content:flex-start;background:#f7f9fc;padding:16px;border:1px solid #e3e8ef;border-radius:10px;margin:20px 0}.analysis-filter .el-date-editor{width:170px}.analysis-filter .el-select{width:190px}/* 卡片栅格列数只在此处定义一次（6 列 + 首卡跨 2，见下方 1100px 断点），此前的 4 列定义已被覆盖、删除。 */
+.analysis-cards{display:grid;gap:14px}.analysis-cards>div,.analysis-section{border:1px solid #e3e8ef;border-radius:12px;background:white;padding:18px}.analysis-cards>div{display:flex;flex-direction:column;gap:10px}.analysis-cards span{color:#64748b}.analysis-cards strong{font-size:27px;color:#127b71}.analysis-cards .warning strong{color:#c45620}.analysis-cards small,.analysis-section small{color:#64748b}.analysis-section{margin-top:18px}.analysis-section h2{font-size:18px;margin:0 0 10px}.analysis-section h3{font-size:15px;margin:20px 0 8px}.analysis-section h3 .rank-note{font-size:12px;font-weight:400;color:#94a3b8;margin-left:8px}.analysis-facts{display:flex;flex-wrap:wrap;gap:8px}.analysis-facts button{background:#f3f6fa;padding:8px 12px;border:0;border-radius:7px;cursor:pointer;color:#276477}.analysis-facts button:hover{background:#e7f5f3;color:#087c72}
 /* 分区头：标题在左，下钻按钮靠右；说明文字收进标题旁的 ⓘ，悬停显示。 */
 .section-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px}
 .section-head h2{margin:0;display:flex;align-items:center;gap:6px}
 .section-head .analysis-facts{margin-left:auto}
 .note-icon{display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border:1px solid #94a3b8;border-radius:50%;font-size:11px;font-style:normal;color:#64748b;cursor:help;line-height:1;user-select:none}
-.note-icon:hover{color:#087c72;border-color:#087c72}.analysis-link{border:0;background:none;padding:0;color:#087c72;cursor:pointer;font:inherit;text-align:left}.analysis-link:hover{text-decoration:underline}.analysis-link.metric{font-size:27px;font-weight:700}.analysis-cards .warning .analysis-link.metric{color:#c45620}.analysis-two-columns{display:grid;grid-template-columns:1fr 1fr;gap:18px}.analysis-definition{margin:16px 2px;font-size:13px}@media(max-width:900px){.analysis-cards{grid-template-columns:repeat(2,1fr)}.analysis-two-columns{grid-template-columns:1fr}}@media(max-width:560px){.analysis-cards{grid-template-columns:1fr}}
+.note-icon:hover{color:#087c72;border-color:#087c72}.analysis-link{border:0;background:none;padding:0;color:#087c72;cursor:pointer;font:inherit;text-align:left}.analysis-link:hover{text-decoration:underline}.analysis-link.metric{font-size:27px;font-weight:700}.analysis-cards .warning .analysis-link.metric{color:#c45620}.analysis-two-columns{display:grid;grid-template-columns:1fr 1fr;gap:18px}.analysis-definition{margin:16px 2px;font-size:13px}/* 900px 档只保留两栏区块塌缩；卡片 2 列的规则由下方 1100px 断点统一生效，原先重复的定义已删除。 */
+@media(max-width:900px){.analysis-two-columns{grid-template-columns:1fr}}@media(max-width:560px){.analysis-cards{grid-template-columns:1fr}}
 .analysis-filter-note{width:100%;margin:0;color:#64748b;font-size:13px;line-height:1.5}
 /* 两栏：左分析内容、右下钻列表 */
 .analysis-layout{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:18px;align-items:start}
