@@ -27,12 +27,12 @@
 
     <template v-if="data">
       <section class="weekly-section">
-        <h2>一、本周数据汇总</h2>
+        <h2>一、本周期数据汇总</h2>
         <MetricGrid :columns="4" density="compact">
-          <MetricCard title="本周需完成" :value="data.summary.dueTasks" unit="单" tone="primary" hint="按当前有效车间预计完成日期落在本周期" :clickable="true" @click="openDrilldown('dueTasks', '本周需完成')" />
-          <MetricCard title="本周按期完工" :value="data.summary.onTime" unit="单" tone="success" :hint="`按期完工率 ${percent(data.summary.onTimeAchievementRate)}`" :clickable="true" @click="openDrilldown('onTime', '本周按期完工')" />
-          <MetricCard title="本周逾期" :value="data.summary.overdue" unit="单" tone="danger" :hint="overdueHint" :clickable="true" @click="openDrilldown('overdue', '本周逾期')" />
-          <MetricCard title="未完工" :value="data.summary.open" unit="单" tone="warning" :hint="openHint" :clickable="true" @click="openDrilldown('open', '未完工')" />
+          <MetricCard title="本周期需完成" :value="data.summary.dueTasks" unit="单" tone="primary" hint="按当前有效车间预计完成日期落在本周期" :clickable="true" @click="openDrilldown('dueTasks', '本周期需完成')" />
+          <MetricCard title="本周期按期完工" :value="data.summary.onTime" unit="单" tone="success" :hint="`按期完工率 ${percent(data.summary.onTimeAchievementRate)}`" :clickable="true" @click="openDrilldown('onTime', '本周期按期完工')" />
+          <MetricCard title="本周期逾期" :value="data.summary.overdue" unit="单" tone="danger" :hint="overdueHint" :clickable="true" @click="openDrilldown('overdue', '本周期逾期')" />
+          <MetricCard title="本周期未完工" :value="data.summary.open" unit="单" tone="warning" :hint="openHint" :clickable="true" @click="openDrilldown('open', '本周期未完工')" />
         </MetricGrid>
         <p class="weekly-definition">应完成＝按期完工＋逾期＋未完工，三者互斥；已确认取消
           <button class="weekly-link" @click="openDrilldown('cancelled', '已确认取消')">{{ data.summary.cancelled }} 单</button>不计入履约，
@@ -41,7 +41,7 @@
       </section>
 
       <section class="weekly-section">
-        <h2>二、本周订单逾期问题复盘（{{ data.overdueTotal }} 单）</h2>
+        <h2>二、本周期订单逾期问题复盘（{{ data.overdueTotal }} 单）</h2>
         <h3>（一）按逾期天数分类</h3>
         <el-table :data="data.overdueLevels" stripe empty-text="本周期没有逾期完工">
           <el-table-column label="逾期等级" width="130">
@@ -65,7 +65,7 @@
       </section>
 
       <section class="weekly-section">
-        <h2>三、本周订单延期问题复盘（{{ data.extensionTotal }} 单）</h2>
+        <h2>三、本周期订单延期问题复盘（{{ data.extensionTotal }} 单）</h2>
         <ReasonTable :items="data.extensionReasons" :total="data.extensionTotal" bucket="extensionReasonCategory"
           empty-text="本周期没有协商延后的任务" @select="openReasonDrilldown" />
         <p class="weekly-definition">延期＝跟单员与车间 / 业务员协商后，把车间预计完成日期往后调过（累计
@@ -74,29 +74,34 @@
       </section>
 
       <section class="weekly-section">
-        <h2>四、下周重点跟进 · 未完工 {{ data.summary.open }} 单</h2>
+        <h2>四、本周期未完工任务 · 后续重点跟进（{{ data.summary.open }} 单）</h2>
+        <!-- 清单只取前 20 条，不另外加分页：数量提示必须写明，否则标题上的「共 N 单」会与表格行数对不上。 -->
+        <p v-if="openTruncated" class="weekly-definition">当前展示 {{ openItems.length }} 条，共 {{ data!.summary.open }} 单，按紧急程度排序（已超期在前、超期天数多的在前）。</p>
         <el-table v-loading="openLoading" :data="openItems" stripe empty-text="本周期没有未完工任务" @row-click="openDrilldownOrder">
-          <el-table-column label="生产任务单" min-width="170">
+          <el-table-column label="生产任务单" min-width="160">
             <template #default="{ row }"><button class="weekly-link" @click.stop="openDrilldownOrder(row)">{{ row.orderNo }} ↗</button></template>
           </el-table-column>
-          <el-table-column prop="productName" label="产品" min-width="150" show-overflow-tooltip />
-          <el-table-column label="业务员" width="100"><template #default="{ row }"><TrackingAnalyticsSalespersonCell :salesperson="row.salesperson" /></template></el-table-column>
-          <el-table-column label="产品规格 / 模具出数" min-width="240" show-overflow-tooltip><template #default="{ row }"><TrackingAnalyticsSpecCell :specification="row.specification" :mold-layout="row.moldLayout" /></template></el-table-column>
-          <el-table-column prop="workshop" label="车间" min-width="125" show-overflow-tooltip />
+          <el-table-column prop="productName" label="产品" min-width="130" show-overflow-tooltip />
           <el-table-column prop="baseline" label="当前预计" width="115" />
-          <el-table-column label="当前超期" width="110">
+          <el-table-column label="当前超期" width="115">
             <template #default="{ row }">{{ row.unfinishedOverdueDays == null ? '未到期' : `已超 ${row.unfinishedOverdueDays} 天` }}</template>
           </el-table-column>
+          <el-table-column prop="workshop" label="车间" min-width="110" show-overflow-tooltip />
+          <el-table-column label="业务员" width="100"><template #default="{ row }"><TrackingAnalyticsSalespersonCell :salesperson="row.salesperson" /></template></el-table-column>
+          <el-table-column label="产品规格 / 模具出数" min-width="180" show-overflow-tooltip><template #default="{ row }"><TrackingAnalyticsSpecCell :specification="row.specification" :mold-layout="row.moldLayout" /></template></el-table-column>
         </el-table>
         <p class="weekly-definition">其中已超预计日期
           <button class="weekly-link" @click="openDrilldown('openOverdue', '未完工且已超期')">{{ data.summary.openOverdue }} 单</button>，
-          累计超期 {{ data.summary.openOverdueDays }} 天 —— 这是下周要先处理的部分。</p>
+          累计超期 {{ data.summary.openOverdueDays }} 天 —— 这是后续要先处理的部分。</p>
       </section>
 
       <section class="weekly-section weekly-summary">
-        <h2>五、本周总结</h2>
-        <p class="summary-text">{{ summaryText }}</p>
-        <p class="weekly-definition">这段文字由系统按本周期数据自动生成，可直接选中后贴进周报；目标与对策仍需跟单员补充。</p>
+        <h2>五、本周期总结</h2>
+        <div class="summary-bar">
+          <p class="summary-text">{{ summaryText }}</p>
+          <el-button class="summary-copy" size="small" @click="copySummary">{{ copyHint || '复制' }}</el-button>
+        </div>
+        <p class="weekly-definition">这段文字由系统按本周期数据自动生成，可点「复制」直接贴进周报；目标与对策仍需跟单员补充。</p>
       </section>
     </template>
     <!-- 历史归档入口暂不展示：快照链路未接通，展示只会让「回溯结果」被误当作历史归档。
@@ -108,11 +113,12 @@
         :title="`${drillState.label} · 对应工单 ${ddTotal} 单`"
         @update:page="onPageChange" @open-order="id => emit('open-order', id)" @close="closeDrilldown">
         <template #extra>
+          <!-- 「完工逾期」与「未完工超期」在后端口径上互斥（已完工才有 overdueDays，未完工才有 unfinishedOverdueDays），
+               合并为一列「逾期情况」，与生产分析抽屉保持一致：「晚N天」＝已完工晚于预计，「超N天」＝未完工且已超预计。 -->
           <el-table-column prop="baseline" label="当前预计" width="115" />
-          <el-table-column prop="deliveredDate" label="整单完工日" width="125" />
           <el-table-column label="状态" width="110"><template #default="{ row }">{{ statusLabel(row.status) }}</template></el-table-column>
-          <el-table-column label="完工逾期" width="95"><template #default="{ row }">{{ row.overdueDays == null ? '—' : `${row.overdueDays} 天` }}</template></el-table-column>
-          <el-table-column label="未完工超期" width="110"><template #default="{ row }">{{ row.unfinishedOverdueDays == null ? '—' : `${row.unfinishedOverdueDays} 天` }}</template></el-table-column>
+          <el-table-column label="逾期情况" width="95"><template #default="{ row }">{{ row.overdueDays != null ? `晚${row.overdueDays}天` : row.unfinishedOverdueDays != null ? `超${row.unfinishedOverdueDays}天` : '—' }}</template></el-table-column>
+          <el-table-column prop="deliveredDate" label="整单完工日" width="125" />
         </template>
       </TrackingAnalyticsOrdersTable>
       <TrackingDrillEmpty v-else />
@@ -178,6 +184,24 @@ const periodLabel = computed(() => {
   return `${fromDate.value.slice(5).replace('-', '.')} - ${toDate.value.slice(5).replace('-', '.')}（${week.year} 年第 ${week.week} 周）`
 })
 
+/**
+ * 总结里要写完整起止日期。
+ * 【为什么不能写「本周」】默认打开的是上周，且支持 10.01-10.11 这类月初分段周期；
+ * 写死「本周」时，回看历史周期得到的句子贴进周报会把上一周的数据说成这一周。
+ */
+const periodText = computed(() => {
+  if (!fromDate.value || !toDate.value) return '未设定周期'
+  const [fy, fm, fd] = fromDate.value.split('-')
+  const [ty, tm, td] = toDate.value.split('-')
+  const head = `${fy}年${Number(fm)}月${Number(fd)}日`
+  if (fromDate.value === toDate.value) return head
+  return fy === ty ? `${head}至${Number(tm)}月${Number(td)}日` : `${head}至${ty}年${Number(tm)}月${Number(td)}日`
+})
+
+/** 严重逾期完工（8 天以上）单数，供总结直接引用。 */
+const severeOverdue = computed(() =>
+  (data.value?.overdueLevels ?? []).find(level => level.key === 'SEVERE')?.count ?? 0)
+
 const levelBucket = (key: string) => key === 'MINOR' ? 'overdue1to3' : key === 'MEDIUM' ? 'overdue4to7' : 'overdue8plus'
 
 const overdueHint = computed(() => {
@@ -192,28 +216,49 @@ const openHint = computed(() => {
 })
 
 /**
- * 总结文字：按周报的写法把本周期数据串成一句话。
- * 只陈述数据，不下结论 —— 「下周重点跟进改善」这类对策仍留给跟单员写。
+ * 总结文字：按周报的写法把本周期数据串成一段话，可直接贴进周报。
+ *
+ * 【只陈述数据，不下结论】「物料问题导致延期」「车间管理不到位」这类因果判断不在数据里，
+ * 一律不生成 —— 目标与对策仍留给跟单员写。
+ *
+ * 【为什么超期要写「截至 X」】未完工超期是**截至统计当天**的状态，不是该周期结束时的状态。
+ * 回看几个月前的周期时，那批单子是后来才陆续超期的，写「本周期超期 N 单」会把今天的状态
+ * 错记到历史周期头上。
  */
 const summaryText = computed(() => {
   if (!data.value) return ''
-  const { dueTasks, overdue, open, onTimeAchievementRate, extended } = data.value.summary
-  if (!dueTasks) return `${periodLabel.value}：区间内没有应交的生产任务。`
-  let text = `本周需完成订单 ${dueTasks} 单，按期完工率 ${percent(onTimeAchievementRate)}。`
+  const { dueTasks, onTime, overdue, open, openOverdue, onTimeAchievementRate, extended } = data.value.summary
+  if (!dueTasks) return `${periodText.value}：区间内没有应交的生产任务。`
+  let text = `${periodText.value}，预计应完成生产任务 ${dueTasks} 单，其中按期完工 ${onTime} 单、`
+    + `逾期完工 ${overdue} 单、未完工 ${open} 单，按期达成率 ${percent(onTimeAchievementRate)}。`
+  if (open) {
+    text += `未完工任务中，截至 ${data.value.asOf} 已有 ${openOverdue} 单超过当前预计完成日期`
+    text += openOverdue ? `，需优先核实处理。` : `。`
+  }
+  if (severeOverdue.value) text += `本周期严重逾期完工（逾期 8 天以上）${severeOverdue.value} 单。`
   if (!overdue && !extended) return `${text}本周期无逾期、无延期。`
+  // 原因类别是词典归纳出的既有结论，属于「数据中有明确依据」，可以陈述；不做因果推断。
   const named = [...new Set([
     ...topReasons(data.value.overdueReasons), ...topReasons(data.value.extensionReasons)
   ])].slice(0, 3)
-  let tail = overdue ? `存在 ${overdue} 单逾期` : ''
-  if (extended) tail += tail ? `、${extended} 单延期` : `${extended} 单延期`
-  if (named.length) tail += `，主要为${named.join('、')}`
-  text += tail + '。'
-  if (open) text += `另有 ${open} 单未完工，需下周继续跟进。`
+  if (named.length) text += `逾期与延期原因主要集中在${named.join('、')}。`
   return text
 })
 /** 排名最前的原因类别；「原因未记录 / 其他原因」不算原因，只作提示。 */
 function topReasons(items: { key: string; label: string }[]) {
   return items.filter(item => item.key !== 'UNRECORDED' && item.key !== 'OTHER').slice(0, 2).map(item => item.label.replace('原因', ''))
+}
+
+/** 复制结果提示：按钮上就地反馈，复制失败时保留手动选中的退路。 */
+const copyHint = ref('')
+async function copySummary() {
+  try {
+    await navigator.clipboard.writeText(summaryText.value)
+    copyHint.value = '已复制'
+  } catch {
+    copyHint.value = '复制失败，请手动选中'
+  }
+  setTimeout(() => { copyHint.value = '' }, 2000)
 }
 
 type Drilldown = { bucket: string; label: string; reasonCategory?: string }
@@ -248,6 +293,8 @@ function openDrilldownOrder(row: TrackingAnalyticsOrder) { emit('open-order', ro
 /** 未完工清单：周报第四节要能直接看到是哪几单，故随周期一起取前 20 条。 */
 const openItems = ref<TrackingAnalyticsOrder[]>([])
 const openLoading = ref(false)
+/** 清单只取前 20 条而标题写的是总数，两者不一致时必须明说，否则会被当成「清单就是全部」。 */
+const openTruncated = computed(() => (data.value?.summary.open ?? 0) > openItems.value.length)
 let openRequest = 0
 async function loadOpenItems() {
   const request = ++openRequest
@@ -309,6 +356,9 @@ watch(() => props.modelValue, open => { if (open) void load() }, { immediate: tr
 .rate-track { flex: 1; min-width: 80px; height: 8px; border-radius: 6px; background: #e9eef1; overflow: hidden; }
 .rate-track b { display: block; height: 100%; background: #db9869; }
 .summary-text { margin: 0; font-size: 15px; line-height: 1.8; }
+.summary-bar { display: flex; align-items: flex-start; gap: 12px; }
+.summary-bar .summary-text { flex: 1; min-width: 0; }
+.summary-copy { flex: none; }
 @media (max-width: 700px) { .weekly-filter .el-date-editor, .weekly-filter .el-select { width: calc(50% - 4px); } }
 /* 两栏：左复盘内容、右下钻列表 */
 .review-layout{display:grid;grid-template-columns:minmax(0,5fr) minmax(0,7fr);gap:18px;align-items:start}
