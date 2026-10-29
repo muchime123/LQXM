@@ -147,8 +147,10 @@ public class ProductionTrackingController {
             @RequestParam(defaultValue="") String reason,
             @RequestParam(defaultValue="") String reasonCategory,
             @RequestParam(defaultValue="1") int page,
-            @RequestParam(defaultValue="30") int size){
-        return analytics.orders(fromDate,toDate,workshop,dateBasis,month,bucket,reason,reasonCategory,page,size);
+            @RequestParam(defaultValue="30") int size,
+            /** 可选排序：留空＝沿用既有顺序；目前仅周复盘「未完工清单」传 openUrgency。 */
+            @RequestParam(defaultValue="") String sort){
+        return analytics.orders(fromDate,toDate,workshop,dateBasis,month,bucket,reason,reasonCategory,page,size,sort);
     }
 
     /**

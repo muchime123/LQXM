@@ -302,7 +302,8 @@ async function loadOpenItems() {
   try {
     const result = await fetchTrackingAnalyticsOrders({
       fromDate: fromDate.value, toDate: toDate.value, workshop: workshop.value,
-      bucket: 'open', page: 1, size: 20
+      // 排序必须由后端在切片前完成：先取全量再取页，前端重排当前页只会把「最近创建的 20 条」换个顺序。
+      bucket: 'open', sort: 'openUrgency', page: 1, size: 20
     })
     if (request === openRequest) openItems.value = result.items
   } catch { if (request === openRequest) openItems.value = [] }

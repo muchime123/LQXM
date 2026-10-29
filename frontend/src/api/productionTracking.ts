@@ -458,6 +458,12 @@ export const fetchTrackingAnalyticsOrders = async (params: {
   bucket: string; reason?: string
   /** 按原因**类别**下钻（组装 / 入库 / 工期 / 业务员 / 配件 / 模具 …），取值是后端词典的固定 key。 */
   reasonCategory?: string
+  /**
+   * 可选排序：留空沿用既有顺序。
+   * 目前只有周复盘第四节「未完工清单」传 'openUrgency' —— 已超期在前、超期天数多的在前，
+   * 其余按预计完成日期由近及远。其他下钻一律不传，避免影响既有默认顺序。
+   */
+  sort?: string
   page: number; size: number
 }) => (await http.get<{ items: TrackingAnalyticsOrder[]; total: number; page: number; size: number }>(
   '/manufacturing/followups/analytics/orders', { params }

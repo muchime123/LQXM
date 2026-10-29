@@ -77,10 +77,17 @@ public class ProductionTrackingAnalyticsService {
         return count==null?0:count;
     }
 
+    /** 不带排序的下钻走这里：沿用既有顺序，其他所有指标的默认排序不受影响。 */
     public Map<String,Object> orders(String fromDate,String toDate,String workshop,String dateBasis,String month,
                                      String bucket,String reason,String reasonCategory,int page,int size){
+        return orders(fromDate,toDate,workshop,dateBasis,month,bucket,reason,reasonCategory,page,size,null);
+    }
+
+    public Map<String,Object> orders(String fromDate,String toDate,String workshop,String dateBasis,String month,
+                                     String bucket,String reason,String reasonCategory,int page,int size,String sort){
         if(page<1||size<1||size>100)throw new IllegalArgumentException("分页范围无效");
         if(!BUCKETS.contains(bucket))throw new IllegalArgumentException("分析指标无效");
+        if(sort!=null&&!sort.isBlank()&&!SORTS.contains(sort))throw new IllegalArgumentException("排序方式无效");
         if(month!=null&&!month.isBlank()&&!month.matches("\\d{4}-(0[1-9]|1[0-2])|未填写"))
             throw new IllegalArgumentException("预计完成月份无效");
         // 类别下钻：类别是词典里的固定取值，白名单校验后才用于比较，避免把任意文本当作原因原文匹配。
@@ -91,10 +98,13 @@ public class ProductionTrackingAnalyticsService {
         var selected=loadRows(fromDate,toDate,workshop,dateBasis,"missingExpected".equals(bucket)).stream()
                 .filter(item->month==null||month.isBlank()||month.equals(item.row().baseline()==null?"未填写":item.row().baseline().toString().substring(0,7)))
                 .filter(item->matches(item.row(),bucket,reason,reasonCategory,today)).toList();
+        // 排序必须发生在切片**之前**：这里是先取全量再按 offset 取页，若只在前端重排已拿到的 20 条，
+        // 得到的只是「最近创建的 20 张单」换个顺序，真正超期最久的老单根本不在这批数据里。
+        var ordered="openUrgency".equals(sort)?selected.stream().sorted(openUrgency(today)).toList():selected;
         long offset=(long)(page-1)*size;
         var result=new ArrayList<Map<String,Object>>();
-        for(long i=offset;i<Math.min(offset+size,selected.size());i++){
-            var item=selected.get((int)i);var row=item.row();
+        for(long i=offset;i<Math.min(offset+size,ordered.size());i++){
+            var item=ordered.get((int)i);var row=item.row();
             var entry=new LinkedHashMap<String,Object>();
             entry.put("id",row.id());entry.put("orderNo",item.orderNo());entry.put("productName",item.productName());
             // 下钻列表用：业务员 / 产品规格 / 模具出数。三者都只做展示，缺失时为 null（前端显示「—」）。
@@ -110,7 +120,41 @@ public class ProductionTrackingAnalyticsService {
                     ?ChronoUnit.DAYS.between(row.baseline(),today):null);
             result.add(entry);
         }
-        return Map.of("items",result,"total",selected.size(),"page",page,"size",size);
+        return Map.of("items",result,"total",ordered.size(),"page",page,"size",size);
+    }
+
+    /** 可选排序白名单：只有显式传入才生效，其余下钻沿用既有顺序（见不带 sort 的重载）。 */
+    private static final java.util.Set<String> SORTS=java.util.Set.of("openUrgency");
+
+    /**
+     * 周复盘「未完工清单」专用排序，仅在显式传入 {@code sort=openUrgency} 时使用。
+     *
+     * <p>【顺序】① 已超期的未完工优先 → ② 超期天数多的在前 → ③ 未到期按预计完成日期由近及远
+     * → ④ 预计日期相同（或无预计日期）按工单 id 倒序。
+     *
+     * <p>【为什么单独开一个排序项而不是改默认顺序】这个接口同时承担生产分析等其他指标的下钻，
+     * 改默认顺序会影响它们；周复盘第四节要的是「先处理哪几单」，故只给它单独启用。
+     */
+    private static java.util.Comparator<AnalysisItem> openUrgency(LocalDate today){
+        java.util.Comparator<AnalysisItem> byBaseline=java.util.Comparator.comparing(
+                item->item.row().baseline(),
+                java.util.Comparator.nullsLast(java.util.Comparator.<LocalDate>naturalOrder()));
+        return (a,b)->{
+            Integer oa=openOverdueDays(a.row(),today),ob=openOverdueDays(b.row(),today);
+            // 天数相同时必须继续往下走兜底规则，不能直接判 a 在前 —— 否则 compare(a,b) 与 compare(b,a)
+            // 会同时返回 -1，违反比较器的反对称约定，列表变长后 TimSort 会直接抛异常。
+            if(oa!=null&&ob!=null){ if(!oa.equals(ob))return Integer.compare(ob,oa); }
+            else if(oa!=null)return -1;
+            else if(ob!=null)return 1;
+            int byDate=byBaseline.compare(a,b);
+            return byDate!=0?byDate:Long.compare(b.row().id(),a.row().id());
+        };
+    }
+
+    /** 未完工任务截至 today 已超期的天数；未超期（未到期 / 已完工 / 已停产 / 无预计日期）返回 null。 */
+    private static Integer openOverdueDays(OrderRow row,LocalDate today){
+        return !row.stopped()&&row.delivered()==null&&row.baseline()!=null&&row.baseline().isBefore(today)
+                ?(int)ChronoUnit.DAYS.between(row.baseline(),today):null;
     }
 
     /** 包可见，供一致性测试穷尽遍历（新增 bucket 时测试自动覆盖，不必另抄一份名单）。 */
