@@ -664,8 +664,12 @@ public class ProductionTrackingAnalyticsService {
             // stage_code 过滤必须放在 visible() 之后，参数顺序才能与 SQL 中的 `?` 一致；
             // 若放在 JOIN ON 里，跟单员数据范围（SELF/DEPARTMENT）非空参数时 stage 会被错位绑定 → 节点下钻返回 0
             whereTail="AND m.stage_code=? ";p.add(stage);
+            // 「未完成」按 <> 'DONE' 判定，不写成 = 'OPEN'：里程碑的实际状态是 DONE / PENDING / IN_PROGRESS
+            // （V369 建表 NOT NULL DEFAULT 'PENDING'），库内从不存在 'OPEN' —— 旧写法让「未完成」筛选恒返回 0 条。
+            // COALESCE 只是防御性兜底（该列 NOT NULL，正常情况下不会命中 NULL 分支）。
             if(status!=null&&!"ALL".equalsIgnoreCase(status)&&!status.isBlank()){
-                whereTail+="AND m.stage_status=? ";p.add("DONE".equalsIgnoreCase(status)?"DONE":"OPEN");
+                if("DONE".equalsIgnoreCase(status)){whereTail+="AND m.stage_status=? ";p.add("DONE");}
+                else{whereTail+="AND COALESCE(m.stage_status,'')<>? ";p.add("DONE");}
             }
         }
         if(workshop!=null&&!workshop.isBlank()&&!"未分车间".equals(workshop)){whereTail+="AND p.production_line=? ";p.add(workshop);}

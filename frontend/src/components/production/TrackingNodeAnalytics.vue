@@ -46,7 +46,7 @@
               <el-table-column prop="scheduleTime" label="排产" width="105" />
               <el-table-column prop="waitDays" label="等待(天)" width="85" align="right" />
               <el-table-column v-if="drillState.type === 'node'" prop="stageStatus" label="该节点" width="105">
-                <template #default="{ row }">{{ row.stageStatus === 'DONE' ? '已完成' : row.stageStatus === 'OPEN' ? '未完成' : '—' }}</template>
+                <template #default="{ row }">{{ row.stageStatus === 'DONE' ? '已完成' : '未完成' }}</template>
               </el-table-column>
             </template>
           </TrackingAnalyticsOrdersTable>
@@ -120,6 +120,8 @@ const { active: ddActive, items: ddItems, total: ddTotal, page: ddPage, size: dd
   loading: ddLoading, error: ddError, open, close, load: drillLoad, scrollIntoView } = useTrackingDrilldown<TrackingNodeAnalyticsOrder>()
 const displayError = computed(() => error.value || ddError.value)
 const nodeStatus = ref<'ALL' | 'DONE' | 'OPEN'>('ALL')
+// 'OPEN' 只是「未完成」的语义标签，不是里程碑里的真实状态值：后端按 <> 'DONE' 判定
+// （实际状态为 DONE / PENDING / IN_PROGRESS），所以这里不能再按 status === 'OPEN' 去渲染。
 const statusOptions = [
   { value: 'ALL', label: '全部' }, { value: 'DONE', label: '已完成' }, { value: 'OPEN', label: '未完成' }
 ] as const
@@ -137,6 +139,8 @@ function drillLoader(page: number, size: number) {
 function setNodeStatus(value: 'ALL' | 'DONE' | 'OPEN') { nodeStatus.value = value; ddPage.value = 1; void drillLoad(drillLoader) }
 function onPageChange(p: number) { ddPage.value = p; void drillLoad(drillLoader) }
 function closeDrilldown() { drillState.value = null; close() }
+/** 抽屉关闭时清空下钻：下次打开不残留上一次的节点筛选与清单（含节点状态筛选回到「全部」）。 */
+function clearDrilldown() { drillState.value = null; nodeStatus.value = 'ALL'; close() }
 /** 按等待天数下限下钻（用于分布图合并组 / 概览卡）。 */
 function drillWaitRange(label: string, minDays: number) {
   drillState.value = { type: 'waitMin', waitDaysMin: minDays, label }; open(); void drillLoad(drillLoader); void scrollIntoView()
@@ -157,6 +161,8 @@ async function load() {
   try {
     data.value = await fetchTrackingNodeAnalytics()
     await renderAll()
+    // 刷新后若右侧已展开下钻，必须按新数据重查一次：否则左图是新的、右表还是上一次的结果且不刷新。
+    if (drillState.value) await drillLoad(drillLoader)
   } catch (e) { error.value = e instanceof Error ? e.message : '分析加载失败' }
   finally { loading.value = false }
 }
@@ -234,7 +240,7 @@ onBeforeUnmount(() => {
   charts.forEach(c => c.dispose()); charts.clear()
   resizeObserver?.disconnect(); resizeObserver = null
 })
-defineExpose({ load })
+defineExpose({ load, clearDrilldown })
 </script>
 
 <style scoped>

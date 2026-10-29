@@ -25,7 +25,11 @@ const contentRef = ref<InstanceType<typeof TrackingNodeAnalytics> | null>(null)
 function refresh() { void contentRef.value?.load() }
 
 // 与生产分析 / 周复盘抽屉一致：每次打开都重新取数，避免拿旧数据当当前结论。
-watch(() => props.modelValue, open => { if (open) void refresh() }, { immediate: true })
+// 关闭时清空下钻，避免下次打开残留上一次的节点筛选与清单。
+watch(() => props.modelValue, open => {
+  if (open) void refresh()
+  else contentRef.value?.clearDrilldown()
+}, { immediate: true })
 </script>
 
 <style scoped>
