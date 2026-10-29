@@ -88,12 +88,14 @@
         :title="`${drillState.label} · 对应工单 ${ddTotal} 单`"
         @update:page="onPageChange" @open-order="id => emit('open-order', id)" @close="closeDrilldown">
         <template #extra>
-          <el-table-column prop="submittedDate" label="提交日期" width="115" />
+          <!-- 「完工逾期」与「未完工超期」两列按后端口径互斥（已完工才有 overdueDays，未完工才有 unfinishedOverdueDays），
+               合并为一列「逾期情况」：「晚N天」＝已完工晚于预计，「超N天」＝未完工且已超预计，其余显示「—」。
+               列序按阅读优先级排列：当前预计 / 状态 / 逾期情况 尽量落在初始可见区，提交日期与整单完工日允许横向滚动查看。 -->
           <el-table-column prop="baseline" label="当前预计" width="115" />
-          <el-table-column prop="deliveredDate" label="整单完工日" width="125" />
           <el-table-column label="状态" width="115"><template #default="{ row }">{{ statusLabel(row.status) }}</template></el-table-column>
-          <el-table-column label="完工逾期" width="95"><template #default="{ row }">{{ row.overdueDays == null ? '—' : `${row.overdueDays} 天` }}</template></el-table-column>
-          <el-table-column label="未完工超期" width="110"><template #default="{ row }">{{ row.unfinishedOverdueDays == null ? '—' : `${row.unfinishedOverdueDays} 天` }}</template></el-table-column>
+          <el-table-column label="逾期情况" width="95"><template #default="{ row }">{{ row.overdueDays != null ? `晚${row.overdueDays}天` : row.unfinishedOverdueDays != null ? `超${row.unfinishedOverdueDays}天` : '—' }}</template></el-table-column>
+          <el-table-column prop="submittedDate" label="提交日期" width="115" />
+          <el-table-column prop="deliveredDate" label="整单完工日" width="125" />
         </template>
       </TrackingAnalyticsOrdersTable>
       <TrackingDrillEmpty v-else />
