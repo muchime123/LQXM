@@ -11,20 +11,23 @@
         <div class="overview-block accent">
           <span class="overview-label">排产等待 3 天及以上</span>
           <button class="overview-value" type="button" @click="drillWaitRange('排产等待 3 天及以上', 3)">{{ waitThreePlus ?? '—' }}<em>单</em> ↗</button>
-          <small>提交→排产 3 天及以上</small>
+          <!-- 这是「提交→排产」的历史等待分布，绝大多数是早就完工的单：不写明会被当成当前待办数。 -->
+          <small>提交→排产 ≥3 天（含已完工任务，不是当前待办数）</small>
         </div>
-        <p class="overview-hint">点左栏图表（节点条形 / 排产等待柱）下钻任务清单，点任务行打开跟单详情</p>
+        <p class="overview-hint">统计范围：当前跟单覆盖的全部任务（含已完工），不按周期筛选 —— 节点完成率是「已记录节点的完成比例」，不代表在制进度。点左栏图表（节点条形 / 排产等待柱）下钻任务清单，点任务行打开跟单详情</p>
       </section>
 
       <div class="node-charts">
         <template v-for="(g, i) in byWorkshop" :key="g.workshop">
           <section class="node-section">
-            <div class="section-head"><h3>{{ g.workshop }} · 节点完成率</h3><span class="node-tip">点击节点查看任务</span></div>
+            <div class="section-head"><h3>{{ g.workshop }} · 节点完成率 · 样本 {{ g.sample }} 单</h3><span class="node-tip">点击节点查看任务</span></div>
             <div class="chart" :ref="(el:any) => setChartEl('node' + i, el as HTMLElement)" aria-label="节点完成率" />
           </section>
         </template>
         <section class="node-section">
           <div class="section-head"><h3>排产等待分布（提交→排产，天）</h3><span class="node-tip">点击柱形查看任务</span></div>
+          <!-- 有排产时间才进分布：缺失排产时间的单被静默排除，不写会让「覆盖任务」数与分布基数对不上。 -->
+          <p class="section-note">分布基数 {{ waitCovered }} 单（覆盖任务 {{ data?.meta.covered ?? '—' }} 单）<template v-if="waitMissing">，另有 {{ waitMissing }} 单无排产时间未计入</template>。</p>
           <div ref="waitEl" class="chart" :style="{ height: `${waitChartHeight}px` }" aria-label="排产等待分布" />
         </section>
       </div>
@@ -42,6 +45,11 @@
               </div>
             </template>
             <template #extra>
+              <!-- 交期两列放在最前：清单里先要能看出哪单已经超期，提交/排产属于过程信息，靠后。 -->
+              <el-table-column prop="expectedDate" label="当前预计" width="115" />
+              <el-table-column label="当前超期" width="110">
+                <template #default="{ row }">{{ row.openOverdueDays == null ? '—' : `已超 ${row.openOverdueDays} 天` }}</template>
+              </el-table-column>
               <el-table-column prop="submittedDate" label="提交" width="105" />
               <el-table-column prop="scheduleTime" label="排产" width="105" />
               <el-table-column prop="waitDays" label="等待(天)" width="85" align="right" />
@@ -79,17 +87,20 @@ const charts = new Map<string, ECharts>()
 let echartsPromise: Promise<typeof import('echarts')> | null = null
 let resizeObserver: ResizeObserver | null = null
 
+/**
+ * 按车间分组，并给出该车间的样本量（＝该车间节点里最大的 involved）。
+ * 排序改为**按样本量降序**：1 单的车间与 625 单的车间此前占同样宽的图块，
+ * 而只有 1 单的车间的完成率全是 100%，容易被当成同样有代表性的结论。
+ */
 const byWorkshop = computed(() => {
-  const groups: { workshop: string; items: TrackingNodeCompletionItem[] }[] = []
+  const groups: { workshop: string; items: TrackingNodeCompletionItem[]; sample: number }[] = []
   for (const it of data.value?.nodeCompletion ?? []) {
     let g = groups.find(x => x.workshop === it.workshop)
-    if (!g) { g = { workshop: it.workshop, items: [] }; groups.push(g) }
+    if (!g) { g = { workshop: it.workshop, items: [], sample: 0 }; groups.push(g) }
     g.items.push(it)
+    g.sample = Math.max(g.sample, it.involved)
   }
-  return groups.sort((a, b) => {
-    const priority = (name: string) => name.includes('封口机') ? 0 : 1
-    return priority(a.workshop) - priority(b.workshop) || a.workshop.localeCompare(b.workshop, 'zh-CN')
-  })
+  return groups.sort((a, b) => b.sample - a.sample || a.workshop.localeCompare(b.workshop, 'zh-CN'))
 })
 
 /** 排产等待聚合桶：0–2 天逐天列出，3 天及以上合并为一组（避免冗长的稀疏柱）。 */
@@ -110,6 +121,13 @@ const waitThreePlus = computed(() => {
   const wait = data.value?.scheduleWait ?? []
   return wait.filter(x => x.day >= 3).reduce((s, x) => s + x.count, 0)
 })
+
+/**
+ * 分布基数：只有「提交时间与排产时间都不为空」的单才进分布，被排除的单此前无任何提示，
+ * 于是「覆盖任务 N 单」与分布各柱之和对不上，容易被当成漏统计。
+ */
+const waitCovered = computed(() => (data.value?.scheduleWait ?? []).reduce((s, x) => s + x.count, 0))
+const waitMissing = computed(() => Math.max(0, (data.value?.meta.covered ?? 0) - waitCovered.value))
 
 type Drilldown =
   | { type: 'node'; workshop: string; stage: string; stageName: string; label: string }
@@ -199,12 +217,18 @@ async function renderAll() {
 const tealGradient = { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#3cc3b5' }, { offset: 1, color: '#127b71' }] }
 const warnGradient = { type: 'linear', x: 0, y: 0, x2: 1, y2: 0, colorStops: [{ offset: 0, color: '#e99a68' }, { offset: 1, color: '#c45620' }] }
 
-function nodeOption(g: { workshop: string; items: TrackingNodeCompletionItem[] }) {
+function nodeOption(g: { workshop: string; items: TrackingNodeCompletionItem[]; sample: number }) {
   const items = g.items
   return {
     tooltip: { trigger: 'item', triggerOn: 'mousemove|click', renderMode: 'richText', confine: true,
       formatter: function (p: any) {
-        return p.name + ': ' + p.data.done + '/' + p.data.involved + ' 单 · ' + p.data.rate + '%'
+        // 按需节点（如「氧化/喷特氟龙」）只有部分任务涉及，involved 远小于车间样本量：
+        // 完成率看着最低，但柱长只编码百分比，不写清楚会被误读成「最差的环节」。
+        const partial = p.data.involved < p.data.sample
+          ? '<br/>该节点仅 ' + p.data.involved + ' 单涉及（车间样本 ' + p.data.sample + ' 单），不覆盖全部任务'
+          : ''
+        return p.name + ': 已完成 ' + p.data.done + ' / 涉及 ' + p.data.involved + ' 单 · ' + p.data.rate + '%'
+          + '<br/>含历史已完工单，不代表在制进度' + partial
       } },
     grid: { left: 46, right: 84, top: 8, bottom: 6, containLabel: true },
     xAxis: { type: 'value', max: 100, axisLabel: { formatter: '{value}%', color: '#94a3b8' }, axisLine: { show: false }, axisTick: { show: false }, splitLine: { lineStyle: { color: '#eef2f7' } } },
@@ -213,7 +237,7 @@ function nodeOption(g: { workshop: string; items: TrackingNodeCompletionItem[] }
     series: [{
       type: 'bar', barWidth: 16, barBorderRadius: [0, 8, 8, 0],
       itemStyle: { color: tealGradient },
-      data: items.map(x => ({ name: x.stageName, value: x.rate ?? 0, done: x.done, involved: x.involved, rate: x.rate, workshop: g.workshop, stage: x.stage, stageName: x.stageName })),
+      data: items.map(x => ({ name: x.stageName, value: x.rate ?? 0, done: x.done, involved: x.involved, rate: x.rate, sample: g.sample, workshop: g.workshop, stage: x.stage, stageName: x.stageName })),
       label: { show: true, position: 'right', color: '#334155', formatter: function (p: any) {
         return p.data.done + '/' + p.data.involved + ' · ' + p.data.rate + '%'
       } }
@@ -269,6 +293,8 @@ defineExpose({ load, clearDrilldown })
 .section-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
 .section-head p { margin: 4px 0 0; color: #64748b; font-size: 12px; }
 .node-tip { color: #94a3b8; font-size: 12px; }
+/* 图表口径补充说明：基数、排除范围这类「为什么两个数字对不上」的说明 */
+.section-note { margin: -4px 0 8px; color: #8a97a8; font-size: 12px; }
 
 /* 下钻面板内的状态筛选工具条 */
 .status-filter { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }

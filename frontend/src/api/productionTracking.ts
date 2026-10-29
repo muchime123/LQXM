@@ -574,6 +574,10 @@ export interface TrackingNodeAnalyticsOrder {
   scheduleTime: string | null
   waitDays: number
   stageStatus: string | null
+  /** 当前预计完成日期（车间预计，可能已被延期改过）。 */
+  expectedDate: string | null
+  /** 当前超期天数：仅「尚未整单完工且预计完成日已过」时为正数，已完工/未到期为 null。 */
+  openOverdueDays: number | null
   /** 基础列：业务员 / 产品规格 / 模具出数，与生产分析、周复盘下钻同源（缺失时 null，前端显示「—」）。 */
   salesperson?: string | null
   specification?: string | null

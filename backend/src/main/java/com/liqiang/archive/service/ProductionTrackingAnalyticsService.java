@@ -640,6 +640,12 @@ public class ProductionTrackingAnalyticsService {
                 +"DATE(p.source_created_at) submittedDate,DATE(p.schedule_time) scheduleTime,"
                 +"FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at))) waitDays,"
                 +(byNode?"m.stage_status stageStatus":"NULL stageStatus")+","
+                // 交期两列：与周复盘下钻同一口径 —— 「当前超期」只对**尚未整单完工**且预计完成日已过的单计算，
+                // 已完工单置 NULL（否则历史完工单会永远显示超期，把真正要处理的单淹掉）。
+                +"DATE(p.expected_completion_date) expectedDate,"
+                +"CASE WHEN p.actual_completion_date IS NULL AND p.expected_completion_date IS NOT NULL "
+                +"AND DATE(p.expected_completion_date)<CURDATE() "
+                +"THEN DATEDIFF(CURDATE(),DATE(p.expected_completion_date)) END openOverdueDays,"
                 // 基础列：业务员 / 产品规格 / 模具出数。三者只做下钻展示，缺失时为 null（前端显示「—」）。
                 // 与生产分析 / 周复盘下钻逐字同源（见 loadRows SELECT 的 salesperson/specification/mold_layout），
                 // 让三抽屉下钻表的「工单基本信息」列渲染一致，不重写第二套口径。
