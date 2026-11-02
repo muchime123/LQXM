@@ -57,6 +57,7 @@ export function useTrackingDrilldown<T>(opts?: { size?: number }) {
     active.value = false
     ++request
     items.value = []
+    extra.value = {}
   }
 
   /** 执行一次加载；loader 由调用方构造（已捕获其下钻对象）。错误写入内部 error，不向上抛。 */
@@ -68,6 +69,7 @@ export function useTrackingDrilldown<T>(opts?: { size?: number }) {
       if (req === request) {
         items.value = result.items
         total.value = result.total
+        extra.value = result.extra ?? {}
         error.value = ''
       }
     } catch (e) {
@@ -83,5 +85,5 @@ export function useTrackingDrilldown<T>(opts?: { size?: number }) {
     panel.value?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
   }
 
-  return { active, items, total, page, size, loading, error, panel, open, close, load, scrollIntoView }
+  return { active, items, total, page, size, loading, error, panel, extra, open, close, load, scrollIntoView }
 }

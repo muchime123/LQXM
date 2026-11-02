@@ -85,14 +85,21 @@
     <aside class="analysis-drill-col">
       <TrackingAnalyticsOrdersTable v-if="ddActive && drillState"
         :items="ddItems" :total="ddTotal" :page="ddPage" :size="ddSize" :loading="ddLoading"
-        :title="`${drillState.label} · 对应工单 ${ddTotal} 单`"
-        @update:page="onPageChange" @open-order="id => emit('open-order', id)" @close="closeDrilldown">
+        :title="`${drillState.label} · 对应工单 ${ddTotal} 单${statusFilter.length ? '（已按状态筛选）' : ''}`"
+        @update:page="onPageChange" @open-order="id => emit('open-order', id)" @close="closeDrilldown"
+        @filter-change="onFilterChange">
         <template #extra>
           <!-- 「完工逾期」与「未完工超期」两列按后端口径互斥（已完工才有 overdueDays，未完工才有 unfinishedOverdueDays），
                合并为一列「逾期情况」：「晚N天」＝已完工晚于预计，「超N天」＝未完工且已超预计，其余显示「—」。
                列序按阅读优先级排列：当前预计 / 状态 / 逾期情况 尽量落在初始可见区，提交日期与整单完工日允许横向滚动查看。 -->
           <el-table-column prop="baseline" label="当前预计" width="115" />
-          <el-table-column label="状态" width="115"><template #default="{ row }">{{ statusLabel(row.status) }}</template></el-table-column>
+          <!-- 状态列表头筛选：**不写 filter-method** —— 数据是服务端分页的，前端过滤只作用于当前页，
+               会出现「标题 200 单、表里 8 行、翻页又回到全量」。勾选值经 filter-change 上抛到抽屉，
+               由 drillLoader 带 status 重新请求；条数与选项来自同一响应的 statusFacets。 -->
+          <el-table-column label="状态" width="140" column-key="status" :filters="statusFilterOptions"
+            :filtered-value="statusFilter" filter-multiple>
+            <template #default="{ row }">{{ statusLabel(row.status) }}</template>
+          </el-table-column>
           <el-table-column label="逾期情况" width="95"><template #default="{ row }">{{ row.overdueDays != null ? `晚${row.overdueDays}天` : row.unfinishedOverdueDays != null ? `超${row.unfinishedOverdueDays}天` : '—' }}</template></el-table-column>
           <el-table-column prop="submittedDate" label="提交日期" width="115" />
           <el-table-column prop="deliveredDate" label="整单完工日" width="125" />
@@ -126,7 +133,18 @@ const loading=ref(false),error=ref('')
 type Drilldown={bucket:string;label:string;reason?:string;month?:string;workshop?:string}
 const drillState=ref<Drilldown|null>(null)
 const { active: ddActive, items: ddItems, total: ddTotal, page: ddPage, size: ddSize,
-  loading: ddLoading, error: ddError, open, close, load: drillLoad, scrollIntoView } = useTrackingDrilldown<TrackingAnalyticsOrder>()
+  loading: ddLoading, error: ddError, extra: ddExtra, open, close, load: drillLoad,
+  scrollIntoView } = useTrackingDrilldown<TrackingAnalyticsOrder>()
+/**
+ * 「状态」列表头筛选的勾选项。列表是服务端分页的，故筛选**必须**回到后端：
+ * 这里只持有勾选值，取数在 drillLoader 里拼成逗号分隔的 status，回显交给列的 filtered-value。
+ */
+const statusFilter=ref<TrackingAnalyticsOrder['status'][]>([])
+/** 选项与条数来自本次下钻响应的 statusFacets（未加状态筛选时的分布），故勾一项后其它项不会全部变 0。 */
+const statusFilterOptions=computed(()=>{
+  const facets=ddExtra.value.statusFacets as { value: TrackingAnalyticsOrder['status']; count: number }[] | undefined
+  return (facets ?? []).map(facet=>({ text: `${statusLabel(facet.value)} · ${facet.count} 单`, value: facet.value }))
+})
 const displayError=computed(()=> error.value || ddError.value)
 const riskNames:Record<string,string>={NONE:'无风险类别',MATERIAL:'物料',DESIGN:'设计',CAPACITY:'产能',CUSTOMER:'客户',OTHER:'其他',未记录:'未记录'}
 const riskItems=(items:{name:string;count:number}[])=>items.map(item=>({...item,value:item.name,name:riskNames[item.name] || item.name}))
@@ -156,22 +174,32 @@ const overdueFacts=computed(()=>{const t=data.value?.totals;return t?[
   {bucket:'overdue8plus',label:'晚 8 天及以上',count:t.overdue8plus},
   {bucket:'overdueReasonMissing',label:'逾期原因未核实',count:t.overdueReasonMissing}
 ]:[]})
-/** 下钻请求：读取当前 drillState，分页共用同一份 loader。 */
+/** 下钻请求：读取当前 drillState 与状态筛选，分页共用同一份 loader。 */
 function drillLoader(page:number,size:number){
   const d=drillState.value
   return fetchTrackingAnalyticsOrders({fromDate:fromDate.value,toDate:toDate.value,dateBasis:dateBasis.value,
-    workshop:d?.workshop||workshop.value,month:d?.month,bucket:d?.bucket ?? '',reason:d?.reason,page,size})
+    workshop:d?.workshop||workshop.value,month:d?.month,bucket:d?.bucket ?? '',reason:d?.reason,
+    status:statusFilter.value.join(','),page,size})
 }
 function openDrilldown(bucket:string,label:string,extra:Partial<Drilldown>={}){
   drillState.value={bucket,label,...extra}
+  // 换指标＝换一批单，状态筛选不继承：否则用户点了新指标却看到「筛完为空」的列表。
+  statusFilter.value=[]
   open()
   void drillLoad(drillLoader)
   void scrollIntoView()
 }
 function onPageChange(p:number){ ddPage.value=p; void drillLoad(drillLoader) }
-function closeDrilldown(){ drillState.value=null; close() }
+/** 表头筛选（目前只有状态列）：回到第 1 页重新取数，分页与 total 跟着筛选一起变。 */
+function onFilterChange(filters:Record<string,string[]>){
+  if(!Object.prototype.hasOwnProperty.call(filters,'status'))return
+  statusFilter.value=(filters.status ?? []) as TrackingAnalyticsOrder['status'][]
+  ddPage.value=1
+  void drillLoad(drillLoader)
+}
+function closeDrilldown(){ drillState.value=null; statusFilter.value=[]; close() }
 async function load(){
-  loading.value=true;error.value='';drillState.value=null;close()
+  loading.value=true;error.value='';drillState.value=null;statusFilter.value=[];close()
   try{
     const result=await fetchTrackingAnalytics({fromDate:fromDate.value,toDate:toDate.value,workshop:workshop.value,dateBasis:dateBasis.value})
     data.value=result
