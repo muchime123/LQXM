@@ -52,8 +52,11 @@ export function useTrackingListCompletion(options: {
           const requested = listCompletionTarget(row, listCompletionStageCode.value)
           const stage = stages.find(item => item.code === requested?.code)
           if (!stage || stage.status === 'DONE' || !requested || requested.status === 'DONE') { failed.push(`${row.orderNo}（节点已变化）`); continue }
+          // 登记完成时必须清掉人工预计日期/原因：后端拒绝「DONE + manualReferenceDate」
+          // （已完成节点以实际完成日期为准），与详情抽屉 onStageStatusChange 的清空行为保持一致。
           const changed = stages.map(item => item.code === stage.code
             ? { ...item, status: 'DONE' as const, completedDate: listCompletionDate.value,
+              manualReferenceDate: null, manualReferenceReason: null,
               note: listCompletionStageCode.value ? listCompletionNote.value.trim() || item.note : item.note } : item)
           const validationError = stageValidationError(changed)
           if (validationError) { failed.push(`${row.orderNo}（${validationError}）`); continue }

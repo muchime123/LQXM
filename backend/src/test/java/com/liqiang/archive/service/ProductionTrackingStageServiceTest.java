@@ -63,7 +63,7 @@ class ProductionTrackingStageServiceTest {
         // 已有 12 条跟单记录
         doReturn(12).when(jdbc).queryForObject(anyString(),eq(Integer.class),any(Object[].class));
         var thrown=assertThrows(IllegalArgumentException.class,() -> service.remove(3L));
-        assertTrue(thrown.getMessage().contains("停用"),"应引导改为停用而不是直接删："+thrown.getMessage());
+        assertTrue(thrown.getMessage().contains("移出车间默认流程"),"应保留历史记录："+thrown.getMessage());
     }
 
     /** create/update 里的重名与重编码检查都返回 0（无冲突），以便走到后面的业务校验。 */

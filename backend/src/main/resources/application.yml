@@ -60,6 +60,9 @@ app:
   website:
     # 官网产品数据源切换门闩；内容及媒体完成审核前保持 legacy。
     product-source: ${APP_WEBSITE_PRODUCT_SOURCE:legacy}
+    company-source: ${APP_WEBSITE_COMPANY_SOURCE:native}
+    credentials-native-enabled: ${APP_WEBSITE_CREDENTIALS_NATIVE_ENABLED:false}
+    ip-native-enabled: ${APP_WEBSITE_IP_NATIVE_ENABLED:false}
   dingtalk:
     # 是否启用钉钉集成。未启用时所有同步端点返回 503 + 中文提示，避免启动时误连。
     enabled: ${DINGTALK_ENABLED:true}

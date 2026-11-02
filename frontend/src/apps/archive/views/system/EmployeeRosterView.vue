@@ -56,6 +56,7 @@
         :key="`${selectedEmployeeId ?? 'none'}-${detailRefreshKey}`"
         :employee-id="selectedEmployeeId"
         :filter-options="filterOptions"
+        :can-manage="canManageEmployee"
         @edit="openEditFromPanel"
         @delete="confirmDelete"
       />
@@ -180,7 +181,22 @@ import { useListPagination } from '@/composables/list/useListPagination'
 import { fetchDepartments, type DepartmentItem } from '@/api/employees/departments'
 import { askConfirm } from '@/composables/ui/useConfirmDialog'
 import { notify } from '@/composables/ui/useToast'
+import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import type { EmployeeDetail, EmployeeFilterOptions, EmployeePayload, EmployeeSummary } from '@/types/employee'
+
+// ========== 权限 ==========
+/**
+ * 员工档案写权限：`system.employee.manage`。
+ *
+ * <p>与后端 `EmployeeController` 类级 `@RequirePermission("system.employee.manage")`
+ * 及本页路由 `routes.ts:247` 的 `meta.permission` 三者同口径。
+ *
+ * <p>此前本页渲染 `EmployeeDetailPanel` 时**完全没有传** `can-manage`，
+ * 而该 prop 默认为 `true`，等于漏传即放行。现已把默认值改为 `false`，
+ * 这里按口径**显式传入**，管理员能力不变。
+ */
+const { can } = useCurrentUser()
+const canManageEmployee = computed(() => can('system.employee.manage'))
 
 // ========== 筛选 / 分页 ==========
 const route = useRoute()

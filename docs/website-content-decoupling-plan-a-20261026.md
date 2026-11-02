@@ -12,7 +12,11 @@ Flyway V409 `drop_certificate_website_publishing_fields` 已在 `product_archive
 
 新官网表只存对外内容，不建立指向 `product_models`、`product_assets`、`packaging_*`、`company_*`、`certificates` 等内部表的外键。来源 ID 仅可记录在一次性迁移映射表中，不参与公开查询。内部档案更新与删除不触发官网写入；将来复制档案必须由 `website.manage` 用户显式发起并审核。
 
-建议新增：`website_media_assets`；`website_product_categories`、`website_products`、`website_product_variants`、`website_product_media`；`website_packaging_items`、`website_packaging_variants`、`website_molds`；`website_company_profiles`、`website_company_milestones`、`website_social_links`、`website_credentials`、`website_ip_items`。官网适配关联表先不创建：现有三套内部适配表均为 0 行，需先确认新官网是否保留适配展示；若保留，关系只能指向官网记录。
+建议新增：`website_media_assets`；`website_product_categories`、`website_products`、`website_product_variants`、`website_product_media`；`website_packaging_items`、`website_packaging_variants`；`website_company_profiles`、`website_company_milestones`、`website_social_links`、`website_credentials`、`website_ip_items`。官网适配关联表先不创建：现有三套内部适配表均为 0 行，需先确认新官网是否保留设备与包材适配展示；若保留，关系只能指向官网记录。
+
+2026-10-29 决策：客户只需了解设备与包材，不再建设独立的官网模具目录或 `website_molds` 表。内部模具台账继续保留。旧官网 `/molds` 地址跳转包材页；不迁移模具档案，也不将模具 ID 带入官网新模型。
+
+现有 Banner、页面区块和公司介绍中仍有历史模具宣传文案。前台暂时不展示这些旧文案或卡片，原记录保留，后续由官网内容负责人在独立后台审核并改写；不通过数据库脚本批量改写宣传内容。
 
 产品表含独立 slug、中文/英文展示名、摘要、正文、公开分类、SEO、发布状态/时间、排序、精选和主图媒体 ID。规格表含明确可筛选字段及受控 JSON 技术参数；不复制内部备注。媒体表含官网专用 `storage_key`、SHA-256、尺寸/时长、alt 文本、状态和审计字段。公开媒体只允许已发布内容引用；草稿预览走授权接口。
 
@@ -57,3 +61,27 @@ Banner 3/4/5 的图片已复制到官网专用目录并登记为草稿。当前�
 后续增加只读 `GET /api/website/admin/company-profile/readiness` 和页面「发布前检查」。检查独立草稿是否存在、公开名称、主营业务、至少一个联系方式和地址，以及 Logo 是否为已发布的官网图片且真实文件位于官网目录；英文名称、品牌名称和成立日期列为待审阅项。接口仍要求 `website.manage`，检查结果只供人工审核，不执行发布或数据源切换。定向后端测试覆盖缺失草稿、Logo 状态与路径、正常官网文件及 HTTP 403/200 权限行为；前端类型检查已通过。V423 仍未执行。
 
 增加受 `website.manage` 保护的只读 `GET /api/website/admin/company-profile/parity`。该接口仅逐项比较当前公开公司资料的 20 个白名单字段与独立草稿，并返回存在性和差异数量；后台「对拍公开字段」展示两侧值以供人工审阅。它不读取或返回内部财务及附件字段，不自动复制数据，不改变当前公开接口。Logo 文件归属与状态由发布前检查单独核验；旧公司资料没有同口径官网 Logo 字段，不能仅凭 20 项文字相同宣布切换就绪。
+
+公司资料公开查询现支持独立配置 `APP_WEBSITE_COMPANY_SOURCE=legacy|native`，默认 `legacy`。在 `native` 下，首页和 `/company-detail` 的公司字段只读取 `website_company_profiles` 中状态为 `PUBLISHED` 的记录；没有已发布记录时返回空，不回退内部档案。此配置与产品数据源配置相互独立。本轮仅建立读取分支及契约测试，未设置 `native`、未发布草稿、未执行 V423，也未改动现有公开页面数据。
+
+公司介绍另有显式 `POST /api/website/admin/company-profile/publish`：仅 `website.manage` 可调用，重新执行发布前检查，阻碍项存在时返回 409；通过后单事务设置 `PUBLISHED` 与发布时间并写审计，重复调用不会重复写入。后台发布按钮须先检查并再次确认。此处完成的是发布能力代码；是否影响公开页面取决于部署环境的 `APP_WEBSITE_COMPANY_SOURCE`，正式启用前必须先核验实际配置、草稿对拍和媒体。尚未调用发布接口，也未执行 V423。
+
+官网公司资料公开 DTO 增加可空 `logoMediaId`：旧来源返回空，独立来源返回官网媒体 ID。官网首页和关于页的结构化数据优先使用 `/api/website/media/{id}/content` 作为 Logo URL。媒体公开接口仅在图片本身已发布、文件处于官网目录，并被已发布公司介绍（或原有有效 Banner、已发布产品）引用时提供内容；草稿引用不会公开。该变更只是补齐未来独立来源的 Logo 读取链，默认 `legacy` 来源不变。
+
+## 官网发展历程独立内容进展
+
+新增 V424 `website_company_milestones`，仅建官网历程表，不自动复制内部 `company_milestones`。官网后台 `/website/company-milestones` 通过 `website.manage` 管理草稿的新增、编辑、明确发布和软归档，操作写审计；已发布记录不能通过草稿接口覆盖。公开 `/home` 的历程和 `/milestones` 在 `APP_WEBSITE_COMPANY_SOURCE=native` 时只读取官网表中未归档的已发布记录；默认 `legacy` 路径保持原行为。切换前必须逐项核对现有公开历程并建立独立草稿。V424 尚未执行，未复制、发布或归档真实数据。
+
+增加只读 `/api/website/admin/company-milestones/parity` 和后台「对拍公开历程」。仅比较内部 `website_enabled=true` 的现有公开记录与官网未归档记录，按年份、标题、描述逐字匹配，并按实例逐条消费，避免重复内容被一条官网记录错误地全部抵消。结果分别标明已发布匹配、草稿匹配、缺失和官网侧多余/不同记录；只向 `website.manage` 返回，且不复制、发布或修改数据。公开来源切换前需审核全部差异，尤其是已发布匹配数，而不是只看草稿匹配。
+
+增加只读 `/api/website/admin/company-content/cutover-readiness` 和后台「检查公司内容切换」。汇总公司介绍是否已发布、字段与旧公开响应是否一致、Logo 文件及媒体是否可公开、旧公开历程是否逐条有官网已发布匹配，以及官网侧有无额外已发布历程。任何阻碍都会使 `ready=false`；草稿匹配只作为提醒，不计入已发布匹配。该报告仅评估公司介绍和历程，不代表官网产品、包材、资质等其他模块已具备切换条件；也不会自动切换 `APP_WEBSITE_COMPANY_SOURCE`。
+
+## 官网官方链接独立内容进展
+
+新增 V425 `website_social_links`，官网官方账号链接有独立的草稿、发布、排序与软归档数据；不从内部 `media_accounts` 自动复制。后台 `/website/social-links` 通过 `website.manage` 管理，保存时仅接受 HTTP/HTTPS 公开 URL。公开 `/official-media-accounts` 在 `APP_WEBSITE_COMPANY_SOURCE=native` 时只读取官网已发布、未归档链接，并保持原有 `id/platform/accountName/link` 响应形状；默认 `legacy` 行为不变。V425 尚未执行，当前内部账号和官网展示都未更改。
+
+官方链接对拍现已补齐：`GET /api/website/admin/social-links/parity` 仅在 `website.manage` 下比较旧公开账号与官网未归档链接，按平台、账号名称和链接逐条匹配，区分已发布、草稿、缺失与官网额外记录。公司内容切换检查也已纳入官方链接：缺少已发布匹配或多出已发布链接都会阻止 `ready=true`，草稿匹配只作提醒。对拍不会写入或自动同步账号数据；V425 仍未执行。
+
+增加只读 `GET /api/website/admin/company-content/preview`，供拥有 `website.manage` 的管理员查看 `native` 公司来源将返回的公开 DTO：已发布公司介绍、发展历程和官方链接。预览复用公开接口的字段映射，不读取内部公司资料或自媒体账号；没有已发布公司介绍时返回 `company: null`。后台「预览独立来源响应」只展示该结果，不改变 `APP_WEBSITE_COMPANY_SOURCE`、发布状态或任何业务数据。此预览是字段级核对，实际官网页面仍需单独做视觉与链接验收。
+
+2026-10-28 复查官网关于页发现：资质和知识产权当前由 `corporate-website/src/data/qualifications.js` 维护，未读取内部档案，不能按旧接口审计直接复制内部证书；是否改为数据库 CMS 要以现有静态展示为迁移基线。另发现发展历程接口返回空数组时，关于页会显示四条写死的示例历程。首页响应现提供 `companySource`（`legacy|native`），关于页在 `native` 且无历程时显示空状态，防止示例内容掩盖独立数据缺失；`legacy` 的既有空数据展示保持不变。

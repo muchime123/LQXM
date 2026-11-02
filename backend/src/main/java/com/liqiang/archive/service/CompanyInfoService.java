@@ -8,8 +8,10 @@ import com.liqiang.archive.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -246,9 +248,8 @@ public class CompanyInfoService {
         if (article.getStatus() == null) {
             article.setStatus("published");
         }
-        if (article.getWebsiteVisible() == null) {
-            article.setWebsiteVisible(false);
-        }
+        // 官网知识库已退出现行页面；新内部文章不能再通过旧标记进入公开接口。
+        article.setWebsiteVisible(false);
         KnowledgeArticle saved = kbArticleRepo.save(article);
         auditLogService.log("KnowledgeArticle", saved.getId(), saved.getTitle(),
                 "KB_ARTICLE_CREATE", "创建知识库文章 " + saved.getTitle());
@@ -267,7 +268,7 @@ public class CompanyInfoService {
         existing.setSource(article.getSource());
         existing.setSortOrder(article.getSortOrder());
         existing.setStatus(article.getStatus());
-        existing.setWebsiteVisible(Boolean.TRUE.equals(article.getWebsiteVisible()));
+        // 保留历史公开标记，避免普通内部编辑意外改变旧接口可见性。
         KnowledgeArticle saved = kbArticleRepo.save(existing);
         auditLogService.log("KnowledgeArticle", saved.getId(), saved.getTitle(),
                 "KB_ARTICLE_UPDATE", "更新知识库文章 " + saved.getTitle());
@@ -278,6 +279,9 @@ public class CompanyInfoService {
     public void deleteKbArticle(Long id) {
         KnowledgeArticle existing = kbArticleRepo.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("文章不存在: " + id));
+        if (Boolean.TRUE.equals(existing.getWebsiteVisible())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "旧公开接口仍引用此文章，暂不能删除");
+        }
         kbArticleRepo.deleteById(id);
         auditLogService.log("KnowledgeArticle", id, existing.getTitle(),
                 "KB_ARTICLE_DELETE", "删除知识库文章 " + existing.getTitle());

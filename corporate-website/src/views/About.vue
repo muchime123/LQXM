@@ -8,11 +8,12 @@
  * - CTA：跳转到资质页和联系页
  */
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick, computed, watchEffect } from 'vue'
-import { fetchHome } from '../api/website'
-import { certifications, patents } from '../data/qualifications'
+import { fetchHome, websiteProductMediaUrl } from '../api/website'
+import { displayMilestones as resolveDisplayMilestones } from '../utils/milestoneDisplay'
+import { useWebsiteIpItems } from '../composables/useWebsiteIpItems'
+import { nativeCredentialsEnabled, useWebsiteCredentials } from '../composables/useWebsiteCredentials'
 import { useCompany } from '../composables/useCompany'
 import { usePageSections } from '../composables/usePageSections'
-import { useCmsPreview } from '../composables/useCmsPreview'
 import { useOfficialMedia } from '../composables/useOfficialMedia'
 import { useCopy } from '../composables/useCopy'
 import { useAMap } from '../composables/useAMap'
@@ -27,48 +28,48 @@ const error = ref(null)
 const { company } = useCompany()
 const { findByPlatform } = useOfficialMedia()
 const { copyText } = useCopy()
+const { credentials: certifications, loadError: credentialsError, load: loadCredentials } = useWebsiteCredentials()
+const { items: patents, load: loadIpItems } = useWebsiteIpItems()
 
-/* 关于页区块标题/描述：优先编辑器内存草稿，其次后台「页面内容」配置。
+/* 关于页区块标题/描述：优先后台「页面内容」配置。
    使用 usePageSections 提供的 sectionRows / isEnabled 统一实现。 */
 const pageSections = usePageSections('ABOUT')
-const cmsPreview = useCmsPreview('ABOUT')
 const sectionEnabled = (key) => pageSections.isEnabled(key)
 const sectionRows = (key) => pageSections.sectionRows(key)
 const aboutHeadings = computed(() => {
   const s = (key) => pageSections.section(key)
-  const d = (key) => cmsPreview.draft(key)
   return {
     hero: {
-      title: d('hero').title || s('hero')?.title || '',
-      description: d('hero').subtitle || s('hero')?.subtitle || '了解利强的企业定位、制造能力、发展历程，以及公开展示的资质认证与知识产权成果。',
-      image: d('hero').imageUrl || s('hero')?.imageUrl || '',
+      title: s('hero')?.title || '',
+      description: s('hero')?.subtitle || '了解利强的企业定位、制造能力、发展历程，以及公开展示的资质认证与知识产权成果。',
+      image: s('hero')?.imageUrl || '',
     },
     intro: {
-      title: d('intro').title || s('intro')?.title || '从包装设备制造出发，<br />把模具与耗材一起考虑',
-      description: d('intro').subtitle || s('intro')?.subtitle || '从包装设备制造出发，把模具与耗材一起考虑',
-      image: d('intro').imageUrl || s('intro')?.imageUrl || '/images/factory.webp',
+      title: s('intro')?.title && !s('intro').title.includes('模具') ? s('intro').title : '从包装设备制造出发，<br />把包材适配一起考虑',
+      description: s('intro')?.subtitle && !s('intro').subtitle.includes('模具') ? s('intro').subtitle : '从包装设备制造出发，把包材适配一起考虑',
+      image: s('intro')?.imageUrl || '/images/factory.webp',
     },
     manufacturing: {
-      title: d('manufacturing').title || s('manufacturing')?.title || '厂房设备',
-      description: d('manufacturing').subtitle || s('manufacturing')?.subtitle || '通过生产、装配与调试现场，展示设备从制造到交付验证的主要环节。',
-      image: d('manufacturing').imageUrl || s('manufacturing')?.imageUrl || '/images/workshop.webp',
+      title: s('manufacturing')?.title || '厂房设备',
+      description: s('manufacturing')?.subtitle || '通过生产、装配与调试现场，展示设备从制造到交付验证的主要环节。',
+      image: s('manufacturing')?.imageUrl || '/images/workshop.webp',
     },
     credentials: {
-      title: d('credentials').title || s('credentials')?.title || '企业荣誉与资质认证',
-      description: d('credentials').subtitle || s('credentials')?.subtitle || '',
+      title: s('credentials')?.title || '企业荣誉与资质认证',
+      description: s('credentials')?.subtitle || '',
     },
     patents: {
-      title: d('patents').title || s('patents')?.title || '专利与知识产权',
-      description: d('patents').subtitle || s('patents')?.subtitle || '',
+      title: s('patents')?.title || '专利与知识产权',
+      description: s('patents')?.subtitle || '',
     },
     contact: {
-      title: d('contact').title || s('contact')?.title || '联系利强',
-      description: d('contact').subtitle || s('contact')?.subtitle || '您可以直接电话、邮件或通过官方账号联系我们；方案和样品需求请使用全站咨询弹窗提交。',
+      title: s('contact')?.title || '联系利强',
+      description: s('contact')?.subtitle || '您可以直接电话、邮件或通过官方账号联系我们；方案和样品需求请使用全站咨询弹窗提交。',
     },
   }
 })
 
-/* Intro 辅图（结构化内容，支持编辑器中编辑） */
+/* Intro 辅图（已保存的结构化内容） */
 const introImageError = ref(false)
 const introSecondary = computed(() => {
   const rows = sectionRows('intro')
@@ -117,10 +118,11 @@ const visibleManufacturingGallery = computed(() => {
 })
 
 const milestones = ref([])
+const companyContentSource = ref('unknown')
 const productCount = ref(0)
-/* 资质与知识产权为官网自有展示内容，见 src/data/qualifications.js */
-const certificationCount = computed(() => certifications.length)
-const patentCount = computed(() => patents.length)
+/* 资质与知识产权均为官网自有展示内容。 */
+const certificationCount = computed(() => certifications.value.length)
+const patentCount = computed(() => patents.value.length)
 const certificationCarousel = ref(null)
 const patentCarousel = ref(null)
 
@@ -128,12 +130,14 @@ function scrollShowcase(target, direction) {
   target.value?.scrollBy({ left: direction * target.value.clientWidth * 0.82, behavior: 'smooth' })
 }
 
-const contactPhone = computed(() => company.value?.phone || '4009008878')
+const legacyFallback = (value, fallback) => value || (companyContentSource.value === 'legacy' ? fallback : '')
+const contactPhone = computed(() => legacyFallback(company.value?.phone, '4009008878'))
 const contactPhoneText = computed(() => contactPhone.value.replace(/(\d{4})(\d{3})(\d{4})/, '$1 $2 $3'))
-const contactEmail = computed(() => company.value?.email || '768963166@qq.com')
-const contactAddress = computed(() => company.value?.factoryAddress || company.value?.officeAddress || company.value?.registeredAddress || '浙江省温州市瓯海区新桥街道新桥创新路85号')
+const contactEmail = computed(() => legacyFallback(company.value?.email, '768963166@qq.com'))
+const contactAddress = computed(() => legacyFallback(company.value?.factoryAddress || company.value?.officeAddress || company.value?.registeredAddress, '浙江省温州市瓯海区新桥街道新桥创新路85号'))
 const douyinAccount = computed(() => findByPlatform('抖音'))
-const contactMapLink = computed(() => `https://www.amap.com/search?query=${encodeURIComponent(`${companyName.value} ${contactAddress.value}`)}`)
+const contactMapLink = computed(() => contactAddress.value
+  ? `https://www.amap.com/search?query=${encodeURIComponent(`${companyName.value} ${contactAddress.value}`)}` : '')
 
 const { load: loadAMap, geocode, placeSearch, hasKey: hasAMapKey } = useAMap()
 const contactMapRef = ref(null)
@@ -145,6 +149,7 @@ let contactMapWindowResize = null
 let contactMapResizeTimers = []
 
 async function initContactMap() {
+  if (!contactAddress.value) return
   contactMapLoading.value = true
   if (!hasAMapKey) {
     contactMapError.value = true
@@ -199,7 +204,8 @@ watchEffect(() => {
   if (company.value) {
     const lb = createLocalBusinessSchema({
       ...company.value,
-      logo: company.value.logoFileName ? `/images/${company.value.logoFileName}` : null,
+      logo: company.value.logoMediaId ? websiteProductMediaUrl(company.value.logoMediaId)
+        : company.value.logoFileName ? `/images/${company.value.logoFileName}` : null,
     })
     if (lb) setSchema(lb)
   }
@@ -213,6 +219,7 @@ async function load() {
        资质与知识产权取自官网本地数据，company 由 useCompany 单例提供（App.vue 已加载）。 */
     const data = await fetchHome()
     milestones.value = data.milestones || []
+    companyContentSource.value = data.companySource || 'legacy'
     productCount.value = data.productCount || 0
   } catch (err) {
     error.value = err
@@ -222,31 +229,29 @@ async function load() {
   }
 }
 
-const companyName = computed(() => company.value?.companyName || '浙江利强包装科技有限公司')
-const companyNameEn = computed(() => company.value?.companyNameEn || 'ZHEJIANG LIQIANG PACKAGING TECHNOLOGY')
-const mainBusiness = computed(() => company.value?.mainBusiness || '封口机、气调包装机、真空包装机、热收缩设备、包装容器、封口膜、模具及配件')
-const advantages = computed(() => company.value?.advantages || '设备 + 耗材 + 模具一体化；支持定制；响应快；可提供样品测试与方案建议')
+const companyName = computed(() => legacyFallback(company.value?.companyName, '浙江利强包装科技有限公司'))
+const companyNameEn = computed(() => legacyFallback(company.value?.companyNameEn, 'ZHEJIANG LIQIANG PACKAGING TECHNOLOGY'))
+const mainBusiness = computed(() => {
+  const value = company.value?.mainBusiness
+  return value && !value.includes('模具') ? value : legacyFallback(null, '封口机、气调包装机、真空包装机、热收缩设备、包装容器及封口膜')
+})
+const advantages = computed(() => {
+  const value = company.value?.advantages
+  return value && !value.includes('模具') ? value : legacyFallback(null, '设备与包材配套；支持定制；响应快；可提供样品测试与方案建议')
+})
 const establishmentDate = computed(() => {
   const d = company.value?.establishmentDate
-  if (!d) return '2013'
+  if (!d) return legacyFallback(null, '2013')
   const date = new Date(d)
   return isNaN(date) ? d : date.getFullYear()
 })
 const yearsOfExperience = computed(() => {
   const y = parseInt(establishmentDate.value)
-  if (isNaN(y)) return '10+'
+  if (isNaN(y)) return '—'
   return new Date().getFullYear() - y + '年'
 })
 
-const legalRep = computed(() => company.value?.legalRepresentative || '于士强')
-const registeredCapital = computed(() => company.value?.registeredCapital || '1000万元人民币')
-const socialCode = computed(() => company.value?.unifiedSocialCode || '9133030207622289XP')
 const enterpriseScale = computed(() => company.value?.enterpriseScale || '')
-const factoryAddress = computed(() =>
-  company.value?.factoryAddress || company.value?.registeredAddress || company.value?.officeAddress ||
-  '浙江省温州市瓯海区新桥街道新桥创新路85号'
-)
-const website = computed(() => company.value?.website || 'http://www.liqiangbz.com/')
 
 /* 优势解析（用分号/顿号/逗号切分） */
 const advantageList = computed(() => {
@@ -278,26 +283,17 @@ const businessList = computed(() => {
 /* 统计数据 */
 const stats = computed(() => [
   { label: '行业经验', value: yearsOfExperience.value },
-  { label: '产品系列', value: productCount.value ? `${productCount.value}+` : '10+' },
+  { label: '产品系列', value: productCount.value ? `${productCount.value}+` : legacyFallback(null, '10+') || '—' },
   { label: '客户覆盖', value: '全国' },
-  { label: '资质认证', value: certificationCount.value ? `${certificationCount.value}+` : '27+' },
+  { label: '官网展示资质', value: certificationCount.value || '—' },
 ])
 
-/* 若里程碑为空，提供默认展示数据（可在管理后台 Company > 里程碑维护后替换） */
-const displayMilestones = computed(() => {
-  if (milestones.value.length > 0) {
-    return [...milestones.value].sort((a, b) => (a.year || 0) - (b.year || 0))
-  }
-  return [
-    { year: 2013, title: '品牌创立', description: '利强包装正式注册，专注食品包装设备研发与制造。' },
-    { year: 2018, title: '产品升级', description: '推出台式气调保鲜包装系列，切入锁鲜包装赛道。' },
-    { year: 2021, title: '产线拓展', description: '部署自动化产线与非标定制能力，覆盖大中型客户。' },
-    { year: 2024, title: '服务升级', description: '建立客户服务体系，支持样品试封与长期技术服务。' },
-  ]
-})
+const displayMilestones = computed(() => resolveDisplayMilestones(milestones.value, companyContentSource.value))
 
-onMounted(() => {
-  load()
+onMounted(async () => {
+  await load()
+  loadCredentials()
+  loadIpItems()
   pageSections.load()
   initContactMap()
 })
@@ -319,8 +315,6 @@ onBeforeUnmount(() => {
     <!-- Hero -->
     <PageHero
       v-if="sectionEnabled('hero')"
-      data-cms-page="ABOUT"
-      data-cms-section="hero"
       eyebrow="ABOUT LIQIANG"
       :description="aboutHeadings.hero.description"
       :image="aboutHeadings.hero.image"
@@ -342,7 +336,7 @@ onBeforeUnmount(() => {
     </PageHero>
 
     <!-- 公司简介 + 主营业务 -->
-    <section v-if="sectionEnabled('intro')" class="section about-intro" data-cms-page="ABOUT" data-cms-section="intro">
+    <section v-if="sectionEnabled('intro')" class="section about-intro">
       <div class="about-profile">
         <div class="about-profile__copy reveal" v-reveal>
           <p class="eyebrow dark"><span></span> WHO WE ARE</p>
@@ -366,7 +360,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- 制造实力（首页 #manufacturing 锚点跳转目标） -->
-    <section v-if="sectionEnabled('manufacturing')" class="section about-manufacturing" id="manufacturing" data-cms-page="ABOUT" data-cms-section="manufacturing">
+    <section v-if="sectionEnabled('manufacturing')" class="section about-manufacturing" id="manufacturing">
       <SectionHeading
         eyebrow="MANUFACTURING"
         :title="aboutHeadings.manufacturing.title"
@@ -455,7 +449,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- 企业资质（首页 TrustBar 与 /credentials 路由的锚点目标） -->
-    <section v-if="sectionEnabled('credentials')" class="section about-credentials section--alt" id="credentials" data-cms-page="ABOUT" data-cms-section="credentials" data-cms-source="static">
+    <section v-if="sectionEnabled('credentials')" class="section about-credentials section--alt" id="credentials">
       <SectionHeading
         eyebrow="CERTIFICATIONS"
         :title="aboutHeadings.credentials.title"
@@ -493,7 +487,7 @@ onBeforeUnmount(() => {
             </div>
           </article>
         </template>
-        <template v-else>
+        <template v-else-if="!nativeCredentialsEnabled && !credentialsError">
           <div class="cert-thumb placeholder-thumb" v-for="n in 6" :key="n">
             <div class="cert-thumb__badge">
               <AppIcon name="shield" :size="22" />
@@ -504,11 +498,12 @@ onBeforeUnmount(() => {
             </div>
           </div>
         </template>
+        <p v-else class="patents-empty">{{ credentialsError ? '官网资质暂时无法加载，请稍后再试。' : '暂无已公开的官网资质。' }}</p>
       </div>
     </section>
 
     <!-- 专利与知识产权 -->
-    <section v-if="sectionEnabled('patents')" class="section about-patents" id="patents" data-cms-page="ABOUT" data-cms-section="patents" data-cms-source="static">
+    <section v-if="sectionEnabled('patents')" class="section about-patents" id="patents">
       <SectionHeading
         eyebrow="PATENTS &amp; IP"
         :title="aboutHeadings.patents.title"
@@ -551,7 +546,7 @@ onBeforeUnmount(() => {
     </section>
 
     <!-- 联系信息整合：咨询表单由全站弹窗承担，此处只保留长期有效的企业联系方式与位置。 -->
-    <section v-if="sectionEnabled('contact')" id="contact" class="section about-contact section--alt" data-cms-page="ABOUT" data-cms-section="contact" data-cms-source="company">
+    <section v-if="sectionEnabled('contact')" id="contact" class="section about-contact section--alt">
       <SectionHeading
         eyebrow="CONTACT LIQIANG"
         :title="aboutHeadings.contact.title"
@@ -559,28 +554,28 @@ onBeforeUnmount(() => {
       />
       <div class="about-contact-layout">
         <div class="about-contact-grid">
-          <article>
+          <article v-if="contactPhone">
           <AppIcon name="phone" :size="22" />
           <span>咨询电话</span>
           <strong>{{ contactPhoneText }}</strong>
           <small>工作日 08:30–17:30</small>
           <button type="button" @click="copyText(contactPhone)">复制电话 →</button>
           </article>
-          <article>
+          <article v-if="contactEmail">
           <AppIcon name="mail" :size="22" />
           <span>商务邮箱</span>
           <strong>{{ contactEmail }}</strong>
           <small>用于商务合作与资料往来</small>
           <button type="button" @click="copyText(contactEmail)">复制邮箱 →</button>
           </article>
-          <article>
+          <article v-if="contactAddress">
           <AppIcon name="location" :size="22" />
           <span>公司地址</span>
           <strong>{{ contactAddress }}</strong>
           <small>{{ companyName }}</small>
           <a :href="contactMapLink" target="_blank" rel="noopener noreferrer">查看路线 →</a>
           </article>
-          <article>
+          <article v-if="douyinAccount || companyContentSource === 'legacy'">
           <AppIcon name="douyin" :size="22" />
           <span>官方抖音</span>
           <strong>{{ douyinAccount?.accountName || '利强科技' }}</strong>
@@ -588,7 +583,7 @@ onBeforeUnmount(() => {
           <a v-if="douyinAccount?.link" :href="douyinAccount.link" target="_blank" rel="noopener noreferrer">前往抖音 →</a>
           </article>
         </div>
-        <div class="about-contact-map">
+        <div v-if="contactAddress" class="about-contact-map">
           <div class="about-contact-map__viewport">
             <div ref="contactMapRef" class="about-contact-map__surface"></div>
             <div v-if="contactMapLoading" class="about-contact-map__status">地图加载中…</div>

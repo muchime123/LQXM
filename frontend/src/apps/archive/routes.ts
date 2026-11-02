@@ -73,15 +73,7 @@ export const archiveRoutes: RouteRecordRaw[] = [
   // ---- 官网运营 ----
   {
     path: '/website/dashboard',
-    name: 'websiteDashboard',
-    component: () => import('@/apps/archive/views/marketing/WebsiteDashboardView.vue'),
-    meta: { title: '官网工作台', layout: 'list', permission: 'website.manage', group: 'marketing' }
-  },
-  {
-    path: '/website/visual-editor',
-    name: 'websiteVisualEditor',
-    component: () => import('@/apps/archive/views/marketing/WebsiteVisualEditorView.vue'),
-    meta: { title: '可视化编辑器', layout: 'workspace', permission: 'website.manage', group: 'marketing' }
+    redirect: '/website/solutions'
   },
   {
     path: '/website/inquiries',
@@ -108,10 +100,40 @@ export const archiveRoutes: RouteRecordRaw[] = [
     meta: { title: '官网产品草稿', layout: 'list', permission: 'website.manage', group: 'marketing' }
   },
   {
+    path: '/website/packaging',
+    name: 'websitePackaging',
+    component: () => import('@/apps/archive/views/marketing/WebsitePackagingView.vue'),
+    meta: { title: '官网包材草稿', layout: 'list', permission: 'website.manage', group: 'marketing' }
+  },
+  {
+    path: '/website/credentials',
+    name: 'websiteCredentials',
+    component: () => import('@/apps/archive/views/marketing/WebsiteCredentialsView.vue'),
+    meta: { title: '官网资质', layout: 'list', permission: 'website.manage', group: 'marketing' }
+  },
+  {
+    path: '/website/ip-items',
+    name: 'websiteIpItems',
+    component: () => import('@/apps/archive/views/marketing/WebsiteIpItemsView.vue'),
+    meta: { title: '官网知识产权', layout: 'list', permission: 'website.manage', group: 'marketing' }
+  },
+  {
     path: '/website/company-profile',
     name: 'websiteCompanyProfile',
     component: () => import('@/apps/archive/views/marketing/WebsiteCompanyProfileView.vue'),
     meta: { title: '官网公司介绍草稿', layout: 'list', permission: 'website.manage', group: 'marketing' }
+  },
+  {
+    path: '/website/company-milestones',
+    name: 'websiteCompanyMilestones',
+    component: () => import('@/apps/archive/views/marketing/WebsiteCompanyMilestonesView.vue'),
+    meta: { title: '官网发展历程', layout: 'list', permission: 'website.manage', group: 'marketing' }
+  },
+  {
+    path: '/website/social-links',
+    name: 'websiteSocialLinks',
+    component: () => import('@/apps/archive/views/marketing/WebsiteSocialLinksView.vue'),
+    meta: { title: '官网官方链接', layout: 'list', permission: 'website.manage', group: 'marketing' }
   },
   {
     path: '/website/media',

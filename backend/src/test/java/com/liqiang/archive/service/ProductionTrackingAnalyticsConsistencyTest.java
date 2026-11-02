@@ -85,7 +85,7 @@ class ProductionTrackingAnalyticsConsistencyTest {
                 // 6 已取消 —— 排除出履约分母
                 row(6,"2026-09-01","2026-10-15",null,null,"2026-10-15","2026-10-10",
                         false,true,null,null,null,null,"2026-10-10",null),
-                // 7 停止本地跟单但未取消，基准已过 → 计入应完成与逾期未完工
+                // 7 生产任务停止，基准已过 → 暂时排除履约分母；恢复生产后重新纳入
                 row(7,"2026-09-01","2026-10-10",null,null,"2026-10-10",null,
                         true,false,null,null,null,null,null,null),
                 // 8 基准 = 今天
@@ -156,14 +156,14 @@ class ProductionTrackingAnalyticsConsistencyTest {
     /** 各分支互斥且闭合：分之和必须等于分母。 */
     @Test void branchesAreMutuallyExclusiveAndClosed(){
         var t=totals(sampleRows());
-        long total=num(t,"total"),cancelled=num(t,"cancelled"),dueTasks=num(t,"dueTasks");
+        long total=num(t,"total"),cancelled=num(t,"cancelled"),stopped=num(t,"stopped"),dueTasks=num(t,"dueTasks");
         long delivered=num(t,"delivered"),open=num(t,"open");
         long comparable=num(t,"comparable"),onTime=num(t,"onTime"),overdue=num(t,"overdue");
         long deliveredNoBaseline=num(t,"deliveredNoBaseline");
         long openOverdue=num(t,"openOverdue"),openDueToday=num(t,"openDueToday");
         long openNotDue=num(t,"openNotDue"),openNoBaseline=num(t,"openNoBaseline");
 
-        assertEquals(cancelled+dueTasks,total,"总数 = 已取消 + 应完成");
+        assertEquals(cancelled+stopped+dueTasks,total,"总数 = 已取消 + 停止生产 + 应完成");
         assertEquals(delivered+open,dueTasks,"应完成 = 已完工 + 未完工");
         assertEquals(onTime+overdue+deliveredNoBaseline,delivered,"已完工三分支互斥且闭合");
         assertEquals(onTime+overdue,comparable,"可比样本 = 按期 + 逾期");
@@ -186,11 +186,11 @@ class ProductionTrackingAnalyticsConsistencyTest {
     /** 三个主指标的计算式：分母是应完成 / 已完工，不是总数。 */
     @Test void headlineRatesUseDueTasksAndDeliveredAsDenominators(){
         var t=totals(sampleRows());
-        // 14 应完成、7 已完工、2 按期 → 50.0 / 14.3 / 28.6
-        assertEquals(14,num(t,"dueTasks"));
+        // 13 应完成、7 已完工、2 按期；停止生产的 1 单不进分母。
+        assertEquals(13,num(t,"dueTasks"));
         assertEquals(7,num(t,"delivered"));
-        assertEquals(50.0,((Number)t.get("completionRate")).doubleValue());
-        assertEquals(14.3,((Number)t.get("onTimeAchievementRate")).doubleValue());
+        assertEquals(53.8,((Number)t.get("completionRate")).doubleValue());
+        assertEquals(15.4,((Number)t.get("onTimeAchievementRate")).doubleValue());
         assertEquals(28.6,((Number)t.get("completedOnTimeRate")).doubleValue());
     }
 

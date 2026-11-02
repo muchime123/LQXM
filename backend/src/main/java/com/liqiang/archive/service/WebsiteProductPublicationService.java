@@ -3,9 +3,11 @@ package com.liqiang.archive.service;
 import com.liqiang.archive.entity.WebsiteMediaAsset;
 import com.liqiang.archive.entity.WebsiteProduct;
 import com.liqiang.archive.entity.WebsiteProductCategory;
+import com.liqiang.archive.entity.WebsiteProductVariant;
 import com.liqiang.archive.repository.WebsiteMediaAssetRepository;
 import com.liqiang.archive.repository.WebsiteProductCategoryRepository;
 import com.liqiang.archive.repository.WebsiteProductRepository;
+import com.liqiang.archive.repository.WebsiteProductVariantRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -17,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
+import java.util.List;
 
 /** Explicit, audited publication. No archive data is read or synchronized. */
 @Service
@@ -25,6 +28,7 @@ public class WebsiteProductPublicationService {
     private final WebsiteMediaAssetRepository media;
     private final WebsiteProductCategoryRepository categories;
     private final WebsiteProductRepository products;
+    private final WebsiteProductVariantRepository variants;
     private final WebsiteProductPublicationReadinessService readiness;
     private final AuditLogService audit;
 
@@ -73,15 +77,31 @@ public class WebsiteProductPublicationService {
     public WebsiteProduct publishProduct(Long id) {
         WebsiteProduct product = products.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "官网产品不存在"));
-        if ("PUBLISHED".equals(product.getStatus())) return product;
+        if ("PUBLISHED".equals(product.getStatus())) {
+            publishDraftVariants(product);
+            return product;
+        }
         if (!"DRAFT".equals(product.getStatus())) throw new ResponseStatusException(HttpStatus.CONFLICT, "只有草稿产品可以发布");
         var check = readiness.check(id);
         if (!check.ready()) throw new ResponseStatusException(HttpStatus.CONFLICT,
                 "官网产品未达到发布条件：" + String.join("；", check.blockers()));
+        publishDraftVariants(product);
         product.setStatus("PUBLISHED");
         product.setPublishedAt(LocalDateTime.now());
         WebsiteProduct saved = products.save(product);
         audit.log("WebsiteProduct", id, saved.getName(), "WEBSITE_PRODUCT_PUBLISH", "发布官网产品");
         return saved;
+    }
+
+    private void publishDraftVariants(WebsiteProduct product) {
+        List<WebsiteProductVariant> drafts = variants
+                .findByProductIdAndDeletedAtIsNullOrderBySortOrderAscIdAsc(product.getId()).stream()
+                .filter(variant -> "DRAFT".equals(variant.getStatus()))
+                .toList();
+        if (drafts.isEmpty()) return;
+        drafts.forEach(variant -> variant.setStatus("PUBLISHED"));
+        variants.saveAll(drafts);
+        audit.log("WebsiteProduct", product.getId(), product.getName(),
+                "WEBSITE_PRODUCT_VARIANTS_PUBLISH", "发布官网产品规格 " + drafts.size() + " 条");
     }
 }

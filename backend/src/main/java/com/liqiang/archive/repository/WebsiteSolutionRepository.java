@@ -19,6 +19,10 @@ public interface WebsiteSolutionRepository extends JpaRepository<WebsiteSolution
 
     Optional<WebsiteSolution> findBySlugAndWebsiteEnabledTrue(String slug);
 
-    /** 已发布到官网的解决方案/文章数量（官网工作台统计用）。 */
-    long countByWebsiteEnabledTrue();
+    boolean existsByWebsiteEnabledTrueAndCoverImageUrl(String coverImageUrl);
+
+    boolean existsByWebsiteEnabledTrueAndContentHtmlContaining(String mediaUrl);
+
+    boolean existsByWebsiteEnabledTrueAndContentSectionsContaining(String mediaUrl);
+
 }

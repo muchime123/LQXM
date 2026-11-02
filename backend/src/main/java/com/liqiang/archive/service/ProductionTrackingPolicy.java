@@ -30,12 +30,12 @@ final class ProductionTrackingPolicy {
 
     /** 全部节点（含按需工序），按制程顺序；顺序即节点条展示顺序与链式推算顺序。 */
     static List<String> stageCodes(String workshop) {
-        return ProductionTrackingStageCatalog.enabled(kindOf(workshop)).stream()
+        return ProductionTrackingStageCatalog.defaultFlow(kindOf(workshop)).stream()
                 .map(ProductionTrackingStageCatalog.StageDef::code).toList();
     }
     /** 必经节点＝全部节点去掉按需工序；「跟单完成」只看必经节点。 */
     static List<String> requiredStages(String workshop) {
-        return ProductionTrackingStageCatalog.enabled(kindOf(workshop)).stream()
+        return ProductionTrackingStageCatalog.defaultFlow(kindOf(workshop)).stream()
                 .filter(def->!def.optional()).map(ProductionTrackingStageCatalog.StageDef::code).toList();
     }
     /**
@@ -50,7 +50,7 @@ final class ProductionTrackingPolicy {
         return false;
     }
     static boolean isOptionalStage(String code,String workshop) {
-        return ProductionTrackingStageCatalog.enabled(kindOf(workshop)).stream()
+        return ProductionTrackingStageCatalog.defaultFlow(kindOf(workshop)).stream()
                 .anyMatch(def->def.code().equals(code)&&def.optional());
     }
     /** 可选配置或任务单备注写明需要该按需工序时，即使尚无跟单记录也应出现该节点。 */
@@ -123,7 +123,7 @@ final class ProductionTrackingPolicy {
      * 管理员在页面上加节点，分母自动跟随。制程表十几行、有索引，标量子查询的开销可忽略。
      */
     static String stageTotalCase(String productionLineColumn) {
-        return "(SELECT COUNT(*) FROM production_tracking_stage_defs d WHERE d.enabled=1 AND d.optional=0 "
+        return "(SELECT COUNT(*) FROM production_tracking_stage_defs d WHERE d.enabled=1 AND d.default_included=1 AND d.optional=0 "
                 +"AND d.workshop_kind="+kindCase(productionLineColumn)+")";
     }
 }

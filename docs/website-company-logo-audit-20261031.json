@@ -1,0 +1,12 @@
+{
+  "read_only": true,
+  "source_company_id": 2,
+  "source_logo_filename": null,
+  "profile": {
+    "id": 1,
+    "status": "DRAFT",
+    "logo_media_id": null
+  },
+  "candidates": [],
+  "website_media_matches": []
+}

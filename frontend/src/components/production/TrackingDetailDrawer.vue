@@ -62,9 +62,12 @@
           </button>
           <div v-else class="metric"><span>采购入库时间（仅供对照）</span><strong>尚无采购入库</strong><small v-if="detail.order.actualFinishDate" class="muted">报工后尚未入库，不据此判定未完工</small><el-button v-if="detail.order.actualFinishDate" link type="info" size="small" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" @click="openTimeReview('WAREHOUSING', reviewOf(detail.order, 'WAREHOUSING'))">{{ reviewOf(detail.order, 'WAREHOUSING') ? '修改暂缓入库安排' : '记录暂缓入库安排（可选）' }}</el-button></div>
         </div>
-        <el-collapse v-if="detail.order.sourceOptionalConfiguration?.trim() || detail.order.sourceOrderRemark?.trim()" v-model="sourceOrderPanels" class="source-order-remark">
+        <el-collapse v-if="detail.order.sourceOptionalConfiguration?.trim() || detail.order.sourceOrderRemark?.trim() || detail.order.extraMoldRequired?.trim()" v-model="sourceOrderPanels" class="source-order-remark">
           <el-collapse-item title="任务单配置与原始备注" name="source">
-            <p v-if="detail.order.sourceOptionalConfiguration?.trim()"><strong>可选配置：</strong>{{ detail.order.sourceOptionalConfiguration }}</p>
+            <div class="source-order-remark-inline">
+              <p v-if="detail.order.extraMoldRequired?.trim()"><strong>是否需要额外模具：</strong>{{ detail.order.extraMoldRequired }}</p>
+              <p v-if="detail.order.sourceOptionalConfiguration?.trim()"><strong>可选配置：</strong>{{ detail.order.sourceOptionalConfiguration }}</p>
+            </div>
             <p v-if="detail.order.sourceOrderRemark?.trim()"><strong>备注：</strong>{{ detail.order.sourceOrderRemark }}</p>
           </el-collapse-item>
         </el-collapse>
@@ -77,6 +80,13 @@
               <el-button v-if="canFollowup && !detail.order.stoppedAt && currentStage" size="small" type="primary" plain @click="quickCompleteCurrentStage">今天完成{{ currentStage.label }}</el-button>
             </div>
           </header>
+          <p v-if="processSnapshot && processSnapshot.sourceKind !== 'NOT_CAPTURED'" class="process-version-note">
+            本单制程：{{ processSnapshot.sourceKind === 'PUBLISHED' ? `产品模板 V${processSnapshot.templateVersion}` : '旧制程快照' }}
+            · {{ processSnapshot.nodes.length }} 个节点
+            <span v-if="processSnapshot.nodes.some(node => node.applicability === 'PENDING_REVIEW')"> · 条件节点待核实</span>
+            <el-button v-if="canManageProcess" link size="small" @click="processDialogVisible = true">调整本单制程</el-button>
+          </p>
+          <p v-else-if="canManageProcess" class="process-version-note"><el-button link size="small" @click="processDialogVisible = true">建立本单制程快照</el-button></p>
           <div v-if="referencePressure && !detail.order.stoppedAt && !detail.order.closedAt && !detail.order.deliveredDate" class="reference-pressure" role="status">
             <strong>参考进度晚于车间交期 {{ referencePressure.days }} 天</strong>
             <span>{{ referencePressure.stageLabel }}节点参考完成 {{ referencePressure.referenceDate }}，当前车间交期 {{ detail.schedule.deadline }}。请与车间核实能否提前关键节点；目标完成日期仅供协调。</span>
@@ -118,8 +128,13 @@
                   </span>
                 </span>
                 <span class="cell-target">{{ stage.status === 'DONE' ? '已完成' : stage.targetDate || '—' }}</span>
-                <el-date-picker v-model="stage.completedDate" type="date" value-format="YYYY-MM-DD" size="small" clearable placeholder="完成日期" :disabled="!canFollowup || Boolean(detail.order.stoppedAt) || stage.status !== 'DONE'" class="cell-date" />
-                <el-input v-model="stage.note" size="small" maxlength="500" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" :placeholder="stageOverdue(stage) ? '超参考日期，建议记录原因（可选）' : '节点备注（可选）'" class="cell-note" />
+                <div class="cell-date-group">
+                  <el-date-picker v-model="stage.completedDate" type="date" value-format="YYYY-MM-DD" size="small" clearable placeholder="完成日期" :disabled="!canFollowup || Boolean(detail.order.stoppedAt) || stage.status !== 'DONE' || stage.completionSource === 'NO_DATE'" class="cell-date" @change="onCompletedDateChange(stage)" />
+                  <el-checkbox v-if="stage.status === 'DONE'" :model-value="stage.completionSource === 'NO_DATE'" size="small"
+                    :disabled="!canFollowup || Boolean(detail.order.stoppedAt)"
+                    @change="onNoDateToggle(stage, $event)">日期未知</el-checkbox>
+                </div>
+                <el-input v-model="stage.note" size="small" maxlength="500" :disabled="!canFollowup || Boolean(detail.order.stoppedAt)" :placeholder="stage.completionSource === 'NO_DATE' ? '填写日期未知的核实依据（必填）' : stageOverdue(stage) ? '超参考日期，建议记录原因（可选）' : '节点备注（可选）'" class="cell-note" />
                 <div class="cell-history">
                 <el-button v-if="canFollowup && !detail.order.stoppedAt && gapStages.some(gap => gap.code === stage.code) && stage.status !== 'DONE'" link type="warning" size="small" @click="recordStageSequenceReason(stage)">核实顺序</el-button>
                   <el-button link type="primary" size="small" :disabled="!stageRecordCount(stage.code)" @click="toggleStage(stage.code)">{{ expandedStages.has(stage.code) ? '收起历史' : `历史(${stageRecordCount(stage.code)})` }}</el-button>
@@ -225,17 +240,36 @@
         </button>
       </template>
     </LqDialog>
-    <LqDialog v-model="closureVisible" :title="closureClosing ? '确认跟单结案' : '撤销跟单结案'" width="min(520px, 94vw)" mode="detail" :show-footer="true">
-      <p class="muted">{{ closureClosing ? '跟单员主动确认结束，状态按「结案优先」展示为「跟单已完成」，节点是否齐全不再强制要求；后续可以撤销结案恢复按节点进度派生。仅本地跟单结案，氚云任务单与节点记录保持原状。' : '撤销后状态按节点进度重新派生：节点齐全仍为「跟单已完成」，缺节点则回退为「跟单中」或「待跟单」。' }}</p>
+    <LqDialog v-model="closureVisible" :title="closureClosing ? '确认跟单结案' : '撤销跟单结案'" width="min(720px, 94vw)" mode="detail" :show-footer="true">
+      <p class="muted">{{ closureClosing ? '请先核实本单制程中尚未确认的节点。已完成但日期未知时只记录完成事实和依据，不补造日期。' : '撤销后状态按节点进度重新派生，已有节点记录保留。' }}</p>
       <el-alert v-if="closureClosing && !detail?.order.deliveredDate" type="warning" :closable="false" title="该任务尚未登记交付（入库），请在结案说明中写明实际情况与核实结果（不少于 6 字）。" />
+      <div v-if="closureClosing && closureNodes.length" class="closure-node-list">
+        <strong>待确认节点 · {{ closureNodes.length }} 项</strong>
+        <div v-for="row in closureNodes" :key="row.code" class="closure-node-row">
+          <span>{{ row.label }}</span>
+          <el-select v-model="row.result" placeholder="请选择结论" clearable>
+            <el-option label="已完成，有真实日期" value="DONE_WITH_DATE" />
+            <el-option label="已完成，日期未知" value="DONE_NO_DATE" />
+            <el-option label="本单不适用" value="NOT_APPLICABLE" />
+            <el-option label="适用但无法确认" value="APPLICABLE" />
+          </el-select>
+          <el-date-picker v-if="row.result === 'DONE_WITH_DATE'" v-model="row.completedDate" type="date"
+            value-format="YYYY-MM-DD" placeholder="真实完成日期" />
+          <el-input v-else-if="row.result" v-model="row.note" maxlength="300" placeholder="核实依据（异常结论必填）" />
+        </div>
+        <el-alert v-if="closureHasAbnormal && !canAbnormalClosure" type="warning" :closable="false"
+          title="日期未知、不适用或无法确认需要异常结案权限，请联系管理员。" />
+        <el-input v-if="closureHasAbnormal" v-model="closureAbnormalReason" type="textarea" :rows="2"
+          maxlength="500" show-word-limit placeholder="异常结案原因与核实过程（至少 6 字）" />
+      </div>
       <el-input v-model="closureNote" type="textarea" :rows="4" maxlength="500" show-word-limit :placeholder="closureClosing ? '请写明结案说明，例如：配件任务无需走全部工序；交付已核实；本任务不适用某些节点…（必填）' : '请写明撤销结案的原因（必填）'" />
       <template #footer>
         <button type="button" :disabled="closureSaving" @click="closureVisible = false">取消</button>
         <button
           type="button"
           :class="closureClosing ? 'success' : 'primary'"
-          :disabled="closureSaving || !closureNote.trim() || (closureClosing && !detail?.order.deliveredDate && closureNote.trim().length < 6)"
-          @click="saveClosure"
+          :disabled="closureSaving || !closureNote.trim() || (closureClosing && !detail?.order.deliveredDate && closureNote.trim().length < 6) || (closureClosing && !closureReady)"
+          @click="submitClosure"
         >
           {{ closureClosing ? '确认结案' : '确认撤销' }}
         </button>
@@ -290,6 +324,8 @@
     <!-- 通用节点参考工期（原「基准设置」）已于 2026-10-22 迁到「生产产品与工期管理」页右上角，
          本页只负责按推算结果显示参考完成日期，不再承担配置入口。 -->
     <TrackingSourceDetailDrawer v-model="purchaseDetailVisible" kind="purchase" :loading="purchaseDetailLoading" :data="purchaseDetailData" :error="purchaseDetailError" />
+    <TrackingOrderProcessDialog v-model="processDialogVisible" :order-id="props.orderId ?? null"
+      :workshop="detail?.order.workshopType ?? null" @saved="onProcessSaved" />
   </div>
 </template>
 
@@ -306,9 +342,12 @@
  * 产品页没有列表顺序，不传即可。
  */
 import { computed, ref, watch } from 'vue'
+import { http } from '@/api/http'
 import { EditPen } from '@element-plus/icons-vue'
 import type { TrackingMilestone, TrackingOrder } from '@/api/productionTracking'
+import type { TrackingClosureNodeConfirmation } from '@/api/productionTracking'
 import TrackingSourceDetailDrawer from '@/components/production/TrackingSourceDetailDrawer.vue'
+import TrackingOrderProcessDialog from '@/components/production/TrackingOrderProcessDialog.vue'
 import LqDialog from '@/components/common/LqDialog.vue'
 import ProductionSalesTracePanel from '@/components/production/ProductionSalesTracePanel.vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
@@ -339,13 +378,62 @@ const emit = defineEmits<{ 'update:modelValue': [boolean]; saved: [] }>()
 
 const auth = useCurrentUser()
 const canFollowup = computed(() => auth.can('manufacturing.followup'))
+const canManageProcess = computed(() => auth.can('manufacturing.template.manage'))
+const canAbnormalClosure = computed(() => auth.can('manufacturing.followup.abnormal'))
+const processDialogVisible = ref(false)
 const sourceOrderPanels = ref(['source'])
+interface ProcessSnapshot { sourceKind: string; templateVersion?: number | null; nodes: { code: string; label: string; applicability: string }[] }
+const processSnapshot = ref<ProcessSnapshot | null>(null)
+interface ClosureDraft { code: string; label: string; result: TrackingClosureNodeConfirmation['result'] | ''; completedDate: string | null; note: string }
+const closureNodes = ref<ClosureDraft[]>([])
+const closureAbnormalReason = ref('')
+// 三种「无法自证」的结论都要 manufacturing.followup.abnormal —— 必须与后端 ABNORMAL_RESULTS 保持一致。
+// 漏掉任何一个，界面就不会要求填整体原因、也不会挡住没权限的人，提交时才会被后端拦下。
+const closureHasAbnormal = computed(() => closureNodes.value.some(row =>
+  row.result === 'NOT_APPLICABLE' || row.result === 'APPLICABLE' || row.result === 'DONE_NO_DATE'))
+const closureReady = computed(() => closureNodes.value.every(row => row.result &&
+  (row.result === 'DONE_WITH_DATE' ? Boolean(row.completedDate) : row.note.trim().length >= 4))
+  && (!closureHasAbnormal.value || (canAbnormalClosure.value && closureAbnormalReason.value.trim().length >= 6)))
+function submitClosure() {
+  if (closureClosing.value && !closureReady.value) return
+  const confirmed: TrackingClosureNodeConfirmation[] = closureClosing.value
+    ? closureNodes.value.filter(row => row.result).map(row => ({
+      code: row.code, result: row.result as TrackingClosureNodeConfirmation['result'],
+      completedDate: row.result === 'DONE_WITH_DATE' ? row.completedDate : null,
+      note: row.note.trim() || null,
+    })) : []
+  void saveClosure(confirmed, closureHasAbnormal.value ? closureAbnormalReason.value.trim() : null)
+}
+watch(() => [props.orderId, props.modelValue] as const, async ([id, visible]) => {
+  processSnapshot.value = null
+  if (!id || !visible) return
+  try {
+    processSnapshot.value = (await http.get<ProcessSnapshot>(`/manufacturing/tracking-processes/orders/${id}/snapshot`)).data
+  } catch { /* 兼容迁移尚未启用或旧服务版本；原跟单详情仍可正常使用。 */ }
+}, { immediate: true })
+async function onProcessSaved() {
+  if (!props.orderId) return
+  processSnapshot.value = (await http.get<ProcessSnapshot>(
+    `/manufacturing/tracking-processes/orders/${props.orderId}/snapshot`)).data
+  loadOrder(props.orderId)
+  emit('saved')
+}
 function canEditManualReference(stage: TrackingMilestone) {
   return canFollowup.value && Boolean(detail.value?.order.scheduleTime) && !detail.value?.order.stoppedAt
     && stage.status !== 'DONE' && (!stage.optional || stage.applicable)
 }
 function onManualDateChange(stage: TrackingMilestone) {
   if (!stage.manualReferenceDate) stage.manualReferenceReason = null
+}
+// 填入真实完成日期即不再是「完成但日期未知」，清除来源标记。
+function onCompletedDateChange(stage: TrackingMilestone) {
+  if (stage.completedDate) stage.completionSource = null
+}
+// 勾选「日期未知」：标记来源并清空日期；取消勾选：回到普通已完成节点。
+function onNoDateToggle(stage: TrackingMilestone, checked: boolean | string | number) {
+  const on = Boolean(checked)
+  stage.completionSource = on ? 'NO_DATE' : null
+  if (on) stage.completedDate = null
 }
 
 const {
@@ -363,6 +451,15 @@ const {
   quickCompleteCurrentStage, resetStageDraft, recordStageSequenceReason, openDelayDialog, saveDelay, save, saveAndNext,
   openTimeReview, saveTimeReview, openDisposition, saveDisposition, openClosure, saveClosure, onStageStatusChange
 } = useTrackingDetail({ items: () => props.items, reload: async () => { emit('saved') } })
+watch([closureVisible, processSnapshot], ([visible]) => {
+  if (!visible || !closureClosing.value) return
+  const stages = new Map(milestones.value.map(stage => [stage.code, stage]))
+  closureNodes.value = (processSnapshot.value?.nodes ?? [])
+    .filter(node => node.applicability !== 'NOT_APPLICABLE'
+      && (node.applicability === 'PENDING_REVIEW' || stages.get(node.code)?.status !== 'DONE'))
+    .map(node => ({ code: node.code, label: node.label, result: '', completedDate: null, note: '' }))
+  closureAbnormalReason.value = ''
+})
 
 function referenceTargetDelay(stage: TrackingMilestone) {
   if (stage.status === 'DONE' || (stage.optional && !stage.applicable) || !detail.value?.order.scheduleTime) return 0
@@ -434,6 +531,9 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .detail-content h3 { margin: 0; color: #101828; font-size: 15px; font-weight: 600; line-height: 1.4; }
 .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .stage-quick-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.process-version-note { margin: 0 0 10px; color: var(--color-text-secondary); font-size: 12px; }
+.closure-node-list { display: grid; gap: 9px; margin: 12px 0; }
+.closure-node-row { display: grid; grid-template-columns: 120px minmax(150px, 1fr) minmax(180px, 1.2fr); align-items: center; gap: 8px; }
 .pending-change-count { color: #b54708; font-weight: 600; }
 .attention-list { display: flex; gap: 8px; flex-wrap: wrap; }
 .attention-item { display: flex; align-items: baseline; gap: 6px; padding: 7px 10px; border-radius: 6px; background: #fffaeb; font-size: 12.5px; line-height: 1.5; color: #78551d; }
@@ -442,6 +542,8 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .attention-item--urgent strong { color: #b42318; }
 .source-order-remark { border: none; }
 .source-order-remark p { margin: 0 0 8px; padding: 8px 12px; background: #f8fafc; border-radius: 6px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; }
+.source-order-remark .source-order-remark-inline { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 8px; }
+.source-order-remark .source-order-remark-inline > p { margin: 0; }
 .source-order-remark :deep(.el-collapse-item__header) { height: 36px; border-bottom: none; font-size: 12.5px; color: #667085; }
 .source-order-remark :deep(.el-collapse-item__wrap) { border-bottom: none; }
 .summary-block { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
@@ -510,6 +612,8 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .row-name { font-size: 13.5px; font-weight: 600; color: #101828; overflow-wrap: anywhere; }
 .cell-status { width: 112px; }
 .cell-date { width: 132px; }
+.cell-date-group { display: grid; gap: 2px; }
+.cell-date-group :deep(.el-checkbox) { height: 18px; font-size: 11px; }
 .cell-reference { font-size: 13px; color: #475467; display: flex; flex-direction: column; gap: 2px; line-height: 1.4; min-width: 0; }
 .reference-pressure { display: flex; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; margin-bottom: 10px; padding: 9px 11px; border: 1px solid #fecdca; border-radius: 7px; background: #fff6f5; color: #912018; font-size: 12.5px; line-height: 1.5; }
 .baseline-hint { color: #b54708; cursor: help; font-size: 13px; }

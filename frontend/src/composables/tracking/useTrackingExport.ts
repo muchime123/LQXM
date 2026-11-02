@@ -17,8 +17,8 @@
  */
 import { computed, ref, watch } from 'vue'
 import type { Ref } from 'vue'
-import { ElMessage } from 'element-plus'
-import { fetchTrackingExport } from '@/api/productionTracking'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { fetchTrackingExport, fetchTrackingExportColumnDefaults, saveTrackingExportColumnDefaults } from '@/api/productionTracking'
 import type { TrackingOrder, TrackingStageProgress } from '@/api/productionTracking'
 import { currentCompletionDate, deliveryOutcomeText, deliveryOutcomeTone, formatMinute, productSize, productionCountdown, reviewOtherReasonsText, reviewReasonText, shortDate, shortOrderNo, shortWorkshop, stageNotesText, trackingStatusText } from '@/utils/tracking/rules'
 import { effectiveLeadDaysCellText } from '@/utils/trackingDateGuard'
@@ -72,7 +72,8 @@ const PRODUCT_COMPOSITE_KEY = 'product'
 /** 网页版并入产品格的三个 Excel 专属列。只勾了它们也要把产品补上，否则弹窗「已选 N 列」与实际导出对不上。 */
 const PRODUCT_MERGED_KEYS = ['quantity', 'specification', 'moldLayout']
 export const EXPORT_COLUMNS: ExportColumn[] = [
-  // 任务号：网页版与列表一致只留末 4 位（shortOrderNo），业务员名挂在下一行（省一列）；
+  // 任务号：网页版与列表一致只留末 4 位（shortOrderNo），业务员名挂在下一行（省一列，像产品格那样多字段合一）；
+  // 无论是否单独勾选「业务员」，只要勾了任务号就一起带出（10-30 LQ：选任务号即可）。
   // xlsx 保留全号供导回匹配，业务员仍是独立列（label 必须是「任务号」——导回按它认列）。
   {
     key: 'orderNo',
@@ -80,7 +81,7 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
     source: 'h3',
     htmlLabel: '任务号 / 业务员',
     value: row => row.orderNo || '',
-    htmlValue: (row, selected) => ({ text: shortOrderNo(row.orderNo), sub: selected.has('salesperson') ? row.salespersonNameSnapshot || '' : '' })
+    htmlValue: row => ({ text: shortOrderNo(row.orderNo), sub: row.salespersonNameSnapshot || '' })
   },
   // 产品：网页版是**一个整体字段**（10-15 LQ 定稿）——名称 + 数量徽标 +「规格尺寸段 / 模具排布」副行，
   // 永远在同一格里，不因勾选而拆开（数量/规格/模具在网页格式下也不出现在选择器里）。
@@ -114,7 +115,9 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
   { key: 'stoppedAt', label: '停止跟单时间', source: 'manual', value: row => formatMinute(row.stoppedAt), htmlValue: row => shortDate(formatMinute(row.stoppedAt)) },
   { key: 'stoppedByName', label: '停止跟单操作人', source: 'manual', value: row => row.stoppedByName || '' },
   { key: 'customer', label: '客户', source: 'h3', value: row => row.customerNameSnapshot || '' },
-  { key: 'salesperson', label: '业务员', source: 'h3', value: row => row.salespersonNameSnapshot || '', htmlMergedInto: 'orderNo' },
+  // 业务员：网页版并入任务号格的下一行（excelOnly ⇒ 网页格式不在选择器里露面，勾任务号即带出，像产品组成部分）；
+  // Excel 里仍是独立列，供线下改表与导回。
+  { key: 'salesperson', label: '业务员', source: 'h3', value: row => row.salespersonNameSnapshot || '', htmlMergedInto: 'orderNo', excelOnly: true },
   // 数量：网页版并入产品格的徽标（excelOnly ⇒ 网页格式不在选择器里露面）。
   { key: 'quantity', label: '数量', source: 'h3', value: row => `${row.plannedQuantity ?? ''}${row.unit || ''}`, htmlMergedInto: 'product', excelOnly: true },
   // 日期类（10-14 LQ）：网页版统一省年份只到 MM-DD，与列表 shortDate 同口径；xlsx 仍全量。
@@ -174,7 +177,12 @@ export const EXPORT_COLUMNS: ExportColumn[] = [
   { key: 'lastFollowupAt', label: '最近跟进', source: 'derived', value: row => formatMinute(row.lastFollowupAt), htmlValue: row => shortDate(formatMinute(row.lastFollowupAt)) },
   { key: 'remark', label: '跟单备注', source: 'manual', value: row => row.remark || '' },
   { key: 'sourceOptionalConfiguration', label: '生产任务单可选配置', source: 'h3', value: row => row.sourceOptionalConfiguration || '' },
-  { key: 'sourceOrderRemark', label: '生产任务单备注', source: 'h3', value: row => row.sourceOrderRemark || '' }
+  { key: 'extraMoldRequired', label: '是否需要额外模具', source: 'h3', value: row => row.extraMoldRequired || '' },
+  { key: 'sourceOrderRemark', label: '生产任务单备注', source: 'h3', value: row => row.sourceOrderRemark || '',
+    // 仅在网页版 HTML 导出里按「额外模具为是」才显示备注：避免暴露非额外模具单的备注。
+    // 注意只改 htmlValue（HTML 专属）——value() 还被 Excel 导出与导回写库共用，
+    // 若改 value() 会在「否」时把空白导回、误清空 production_orders.production_requirement。
+    htmlValue: row => (row.extraMoldRequired || '').trim() === '是' ? (row.sourceOrderRemark || '') : '' }
 ]
 
 // 网页版默认列宽按列 key 收窄（日期列 60 / 带副行的列 90 / 跟单节点 60）：
@@ -218,6 +226,13 @@ const CORE_EXPORT_COLUMN_KEYS = ['orderNo', 'product', 'quantity', 'specificatio
   'expectedFinishDate', 'delayReason', 'overdueReason', 'stages']
 
 /**
+ * 「默认字段」预设（10-30 LQ：把原来的「只导核心字段」改成可配置的默认字段）。
+ * 管理员没配过全站默认时就用这一套 —— 与改造前点「只导核心字段」的勾选完全一致；
+ * 管理员配过后由全站默认（production_tracking_export_column_defaults）接管。
+ */
+export const DEFAULT_EXPORT_COLUMN_KEYS = [...CORE_EXPORT_COLUMN_KEYS]
+
+/**
  * 勾选记忆：只保留仍存在的列；旧存档缺少的新列可在弹窗中自行勾选。
  *
  * ⚠️ 记忆结构升过版（v1＝纯 key 数组 → v2＝`{version,keys}`）。为什么必须升：
@@ -239,16 +254,16 @@ const ALL_EXPORT_COLUMN_KEYS = EXPORT_COLUMNS.map(column => column.key)
 function restoreExportColumns(): string[] {
   try {
     const raw = localStorage.getItem(EXPORT_COLUMNS_STORAGE_KEY)
-    if (!raw) return [...ALL_EXPORT_COLUMN_KEYS]
+    if (!raw) return [...DEFAULT_EXPORT_COLUMN_KEYS]
     const parsed = JSON.parse(raw) as unknown
     const legacy = Array.isArray(parsed)
     const saved = legacy ? parsed : (parsed as { keys?: unknown } | null)?.keys
     const list = Array.isArray(saved) ? saved.filter((key): key is string => typeof key === 'string') : []
     const valid = list.filter(key => ALL_EXPORT_COLUMN_KEYS.includes(key))
-    if (!valid.length) return [...ALL_EXPORT_COLUMN_KEYS]
+    if (!valid.length) return [...DEFAULT_EXPORT_COLUMN_KEYS]
     if (legacy) return [...new Set([...valid, ...EXPORT_COLUMNS_ADDED_IN_V2.filter(key => ALL_EXPORT_COLUMN_KEYS.includes(key))])]
     return [...new Set(valid)]
-  } catch { return [...ALL_EXPORT_COLUMN_KEYS] }
+  } catch { return [...DEFAULT_EXPORT_COLUMN_KEYS] }
 }
 
 /** 导出分组：xlsx 与网页两条输出**共用这一份数据**（列定义、车间分组、节点展开都只在这里做一次）。 */
@@ -270,6 +285,8 @@ export function useTrackingExport(options: {
   visibility: Ref<string>
   /** 打开导出弹窗时列表里选中的行（用于「导出选中」）。 */
   selectedIds: () => number[]
+  /** 是否具备「存为全站默认字段」权限（manufacturing.listcolumns.manage）。由页面注入，本模块不碰登录态。 */
+  canManage?: () => boolean
 }) {
   const exportVisible = ref(false)
   const exporting = ref(false)
@@ -310,7 +327,7 @@ export function useTrackingExport(options: {
       + 'Excel 里产品名称、数量、规格、模具排布各自成列，可按需勾选。')
 
   function openExport() {
-    if (!exportColumns.value.length) exportColumns.value = [...ALL_EXPORT_COLUMN_KEYS]
+    if (!exportColumns.value.length) exportColumns.value = [...effectiveDefaultExportColumns()]
     ensureProductForHtml()
     exportSelectedIds.value = options.selectedIds()
     exportScope.value = exportSelectedIds.value.length ? 'selected' : 'filtered'
@@ -326,8 +343,57 @@ export function useTrackingExport(options: {
       ? exportColumns.value.filter(key => !visibleKeys.includes(key))
       : [...new Set([...exportColumns.value, ...visibleKeys])]
   }
-  function applyExportPreset(preset: 'list' | 'core') {
-    exportColumns.value = preset === 'core' ? [...CORE_EXPORT_COLUMN_KEYS] : [...ALL_EXPORT_COLUMN_KEYS]
+  /**
+   * 「默认字段」＝管理员存的全站默认；没配过则回落代码兜底的「核心字段」。
+   * 生效链与本机勾选的关系：本机勾过 ⇒ 用本机；没勾过 ⇒ 加载/应用时套用全站默认。
+   */
+  const serverDefaultSelected = ref<string[] | null>(null)
+  const savingExportDefaults = ref(false)
+  const canManageExportDefaults = computed(() => options.canManage?.() ?? false)
+  /** 本机是否存过自己的导出勾选。存过＝个人优先，全站默认不再套用。 */
+  function hasLocalExportOverride() {
+    try { return localStorage.getItem(EXPORT_COLUMNS_STORAGE_KEY) !== null } catch { return false }
+  }
+  /** 当前生效的「默认字段」＝全站默认优先，读不到则代码兜底核心字段。 */
+  function effectiveDefaultExportColumns(): string[] {
+    return serverDefaultSelected.value ?? [...DEFAULT_EXPORT_COLUMN_KEYS]
+  }
+  /**
+   * 拉取全站默认字段。**只在「本机没自己勾过」时套用**——个人勾选优先于全站默认。
+   * 读失败（无权限 / 后端未升级）时静默退回核心字段，不弹错、不阻断导出。
+   */
+  async function loadExportColumnDefaults() {
+    try {
+      const res = await fetchTrackingExportColumnDefaults()
+      const selected = (res.columns || []).filter(column => column.selected)
+        .map(column => column.columnKey).filter(key => ALL_EXPORT_COLUMN_KEYS.includes(key))
+      serverDefaultSelected.value = selected
+      if (!hasLocalExportOverride()) exportColumns.value = [...selected]
+    } catch { serverDefaultSelected.value = null }
+  }
+  /** 应用「默认字段」预设（管理员的全站默认，未配置则核心字段）。 */
+  function applyExportPreset(preset: 'default' | 'list') {
+    exportColumns.value = preset === 'default' ? [...effectiveDefaultExportColumns()] : [...ALL_EXPORT_COLUMN_KEYS]
+  }
+  /** 把当前勾选存为全站默认字段（仅管理员）。全量提交：未选中的列显式写 0，才能表达「全不选」。 */
+  async function saveGlobalExportDefaults() {
+    const keys = [...exportColumns.value]
+    try {
+      await ElMessageBox.confirm(
+        `将把当前勾选的 ${keys.length} 个字段存为全站默认：没自己改过导出字段的员工，下次打开导出弹窗就按这套预选。`,
+        '设为默认字段', { type: 'warning' })
+    } catch { return }
+    savingExportDefaults.value = true
+    try {
+      await saveTrackingExportColumnDefaults(
+        ALL_EXPORT_COLUMN_KEYS.map(key => ({ columnKey: key, selected: keys.includes(key) })))
+      serverDefaultSelected.value = keys.filter(key => ALL_EXPORT_COLUMN_KEYS.includes(key))
+      // 本机同时改为「跟随全站默认」：否则刚设完默认的管理员自己还挂着一份旧勾选，看着像没生效。
+      try { localStorage.removeItem(EXPORT_COLUMNS_STORAGE_KEY) } catch { /* 隐私模式等：仅本次会话生效 */ }
+      ElMessage.success(`已存为默认字段（${serverDefaultSelected.value.length} 列）`)
+    } catch (error) {
+      ElMessage.error(error instanceof Error ? error.message : '保存默认字段失败')
+    } finally { savingExportDefaults.value = false }
   }
 
   /**
@@ -447,6 +513,7 @@ export function useTrackingExport(options: {
   return {
     exportVisible, exporting, exportScope, exportSelectedIds, exportColumns, exportFormat,
     visibleExportColumns, EXPORT_COLUMN_GROUPS, exportSelectionSummary, allExportSelected, exportFormatHint,
-    openExport, toggleAllExportColumns, applyExportPreset, doExport
+    openExport, toggleAllExportColumns, applyExportPreset, doExport,
+    loadExportColumnDefaults, saveGlobalExportDefaults, canManageExportDefaults, savingExportDefaults
   }
 }

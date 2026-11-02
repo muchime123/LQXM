@@ -1,0 +1,17 @@
+{
+  "read_only": true,
+  "ready_for_source_switch": true,
+  "profile_status": "PUBLISHED",
+  "public_field_differences": [],
+  "source_milestones": 3,
+  "published_milestones": 3,
+  "milestone_fields_match": true,
+  "source_social_links": 0,
+  "published_social_links": 0,
+  "logo_media_id": 147,
+  "logo_file_hash_matches": true,
+  "publication_audit_counts": {
+    "WEBSITE_COMPANY_MILESTONE_PUBLISH": 3,
+    "WEBSITE_COMPANY_PROFILE_PUBLISH": 1
+  }
+}

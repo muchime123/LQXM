@@ -50,3 +50,9 @@
 .packaging-record-card button.record-action { width: 100%; border-right: 0; border-bottom: 0; border-left: 0; background: transparent; font-family: inherit; cursor: pointer; }
 .record-action span { transition: transform var(--dur) var(--ease); }
 .record-action:hover span { transform: translateX(4px); }
+.packaging-variant-list { margin-top: var(--space-4); border-top: 1px solid var(--line); padding-top: var(--space-3); }
+.packaging-variant-list summary { cursor: pointer; color: var(--blue); font-size: var(--text-sm); font-weight: var(--font-semibold); }
+.packaging-variant-list ul { max-height: 280px; overflow: auto; margin: var(--space-3) 0 0; padding: 0; list-style: none; }
+.packaging-variant-list li { display: grid; gap: 3px; padding: var(--space-3) 0; border-top: 1px solid var(--line); }
+.packaging-variant-list li strong { color: var(--ink); font-size: var(--text-sm); }
+.packaging-variant-list li span { color: var(--muted); font-size: var(--text-xs); }

@@ -68,6 +68,7 @@
             :task-config-id="selectedProduct.id"
             :product-name="selectedProduct.configName"
             :workshop-name="selectedProduct.workshopName"
+            :same-name-count="selectedProduct.sameNameCount"
             :matrix="matrix"
             :rows="benchmarkRows"
             :peers="peerProducts"
@@ -113,7 +114,7 @@ import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 
 /** externalSource='MANUAL' 表示本地补录。没有 active：产品与可选配置都是氚云任务单下拉字典的镜像。 */
 interface ConfigRow { id: number; workshopId: number; configName: string; workshopName: string; configType: string; externalSource: string; historicalTaskCount: number; trackedTaskCount: number; sameNameCount: number }
-interface WorkshopRow { id: number; workshopName: string; enabled: boolean }
+interface WorkshopRow { id: number; workshopName: string }
 interface Coverage { total: number; trackedTotal: number; productMatched: number; benchmarkMatched: number }
 
 const refreshing = ref(false)
@@ -239,7 +240,6 @@ const workshopCards = computed<WorkshopCard[]>(() => workshops.value.map(w => {
   return {
     id: w.id,
     workshopName: w.workshopName,
-    enabled: w.enabled,
     productCount: mine.filter(c => c.configType === 'PRODUCT_NAME').length,
     configCount: mine.filter(c => c.configType !== 'PRODUCT_NAME').length
   }
@@ -265,10 +265,10 @@ const matchClass = computed(() => {
   return coverage.value.productMatched < coverage.value.total ? 'warn' : 'ok'
 })
 
-/** 默认落到第一条启用产线，避免首屏空白。 */
+/** 车间不区分启用状态；默认选择排序后的第一条，避免首屏空白。 */
 watch(workshopCards, cards => {
   if (selectedWorkshopId.value == null || !cards.some(c => c.id === selectedWorkshopId.value)) {
-    selectedWorkshopId.value = (cards.find(c => c.enabled) ?? cards[0])?.id ?? null
+    selectedWorkshopId.value = cards[0]?.id ?? null
   }
 }, { immediate: true })
 

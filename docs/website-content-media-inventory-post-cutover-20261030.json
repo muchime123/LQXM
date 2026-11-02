@@ -1,0 +1,258 @@
+{
+  "read_only": true,
+  "schema": "product_archive",
+  "counts": {
+    "banners": 3,
+    "page_sections": 20,
+    "solutions": 9,
+    "records_with_internal_archive_media": 0,
+    "unique_internal_archive_urls": 0,
+    "unresolved_or_ambiguous_files": 0,
+    "sources_without_verified_website_copy": 0,
+    "referenced_website_media": 9,
+    "unavailable_referenced_website_media": 0
+  },
+  "records": [
+    {
+      "kind": "banner",
+      "id": 2,
+      "references": []
+    },
+    {
+      "kind": "banner",
+      "id": 4,
+      "references": [
+        {
+          "field": "website_media_id",
+          "kind": "website_media",
+          "url": "/api/website/media/2/content"
+        }
+      ]
+    },
+    {
+      "kind": "banner",
+      "id": 5,
+      "references": [
+        {
+          "field": "website_media_id",
+          "kind": "website_media",
+          "url": "/api/website/media/3/content"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 1,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 2,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 3,
+      "references": [
+        {
+          "field": "content",
+          "kind": "website_media",
+          "url": "/api/website/media/143/content"
+        },
+        {
+          "field": "content",
+          "kind": "website_media",
+          "url": "/api/website/media/142/content"
+        },
+        {
+          "field": "content",
+          "kind": "website_media",
+          "url": "/api/website/media/141/content"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 4,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 5,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 6,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 7,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 8,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "website_media",
+          "url": "/api/website/media/145/content"
+        },
+        {
+          "field": "content",
+          "kind": "website_media",
+          "url": "/api/website/media/143/content"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 9,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "website_media",
+          "url": "/api/website/media/142/content"
+        },
+        {
+          "field": "content",
+          "kind": "website_media",
+          "url": "/api/website/media/143/content"
+        },
+        {
+          "field": "content",
+          "kind": "website_media",
+          "url": "/api/website/media/141/content"
+        },
+        {
+          "field": "content",
+          "kind": "website_media",
+          "url": "/api/website/media/140/content"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 10,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 11,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 12,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 13,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 14,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "website_media",
+          "url": "/api/website/media/144/content"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 15,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 16,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "website_media",
+          "url": "/api/website/media/146/content"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 17,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 18,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 19,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "website_media",
+          "url": "/api/website/media/145/content"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 20,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 1,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 2,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 3,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 4,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 11,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 12,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 13,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 14,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 15,
+      "references": []
+    }
+  ],
+  "source_files": [],
+  "unavailable_website_media_ids": [],
+  "note": "Only effective active Banner images are counted; external URLs require manual review."
+}

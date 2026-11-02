@@ -33,12 +33,16 @@ final class ProductionTrackingStageCatalog {
      * @param aliases         进度表表头别名（除 {@code label} 之外还要认的写法）
      */
     record StageDef(String kind,String code,String label,int sortNo,boolean optional,
-                    String matchKeywords,String excludeKeywords,List<String> aliases,boolean enabled,
+                    String matchKeywords,String excludeKeywords,List<String> aliases,boolean enabled,boolean defaultIncluded,
                     Pattern match,Pattern exclude) {
         StageDef(String kind,String code,String label,int sortNo,boolean optional,
                  String matchKeywords,String excludeKeywords,List<String> aliases,boolean enabled) {
+            this(kind,code,label,sortNo,optional,matchKeywords,excludeKeywords,aliases,enabled,enabled);
+        }
+        StageDef(String kind,String code,String label,int sortNo,boolean optional,
+                 String matchKeywords,String excludeKeywords,List<String> aliases,boolean enabled,boolean defaultIncluded) {
             this(kind,code,label,sortNo,optional,matchKeywords,excludeKeywords,
-                    aliases==null||aliases.isEmpty()?List.of():List.copyOf(aliases),enabled,
+                    aliases==null||aliases.isEmpty()?List.of():List.copyOf(aliases),enabled,defaultIncluded,
                     compile(matchKeywords),compile(excludeKeywords));
         }
         private static Pattern compile(String regex) {
@@ -60,6 +64,10 @@ final class ProductionTrackingStageCatalog {
     static Map<String,List<StageDef>> snapshot() {return BY_KIND;}
     static List<StageDef> enabled(String kind) {
         return BY_KIND.getOrDefault(kind,List.of()).stream().filter(StageDef::enabled).toList();
+    }
+    static List<StageDef> defaultFlow(String kind) {
+        return BY_KIND.getOrDefault(kind,List.of()).stream()
+                .filter(def->def.enabled()&&def.defaultIncluded()).toList();
     }
     /** 含已停用的全部定义（管理页要能看见并重新启用）。 */
     static List<StageDef> all(String kind) {return BY_KIND.getOrDefault(kind,List.of());}

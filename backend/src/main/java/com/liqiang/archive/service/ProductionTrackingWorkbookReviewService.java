@@ -115,7 +115,8 @@ public class ProductionTrackingWorkbookReviewService {
             long version=((Number)before.get("version")).longValue();
             if(version!=expectedVersion)
                 throw new ResponseStatusException(HttpStatus.CONFLICT,"跟单已更新，请重新核对差异");
-            var beforeStages=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note "
+            var beforeStages=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,"
+                    +"applicability,applicability_note,completion_source "
                     +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",orderId);
             var proposed=differences(orderId,String.valueOf(source.get("payload_json")),before);
             var available=new HashMap<String,Difference>();
@@ -126,7 +127,8 @@ public class ProductionTrackingWorkbookReviewService {
             jdbc.update("UPDATE production_tracking_state SET version=?,last_followup_at=NOW() WHERE production_order_id=?",
                     version+1,orderId);
             var after=state(orderId,false);
-            var afterStages=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note "
+            var afterStages=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,"
+                    +"applicability,applicability_note,completion_source "
                     +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",orderId);
             var selected=new HashSet<>(selectedKeys);
             String appliedLabels=String.join("、",selectedKeys.stream().map(f->available.get(f).label()).toList());
@@ -174,13 +176,15 @@ public class ProductionTrackingWorkbookReviewService {
             return;
         }
         long version=((Number)before.get("version")).longValue();
-        var beforeStages=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note "
+        var beforeStages=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,"
+                +"applicability,applicability_note,completion_source "
                 +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",orderId);
         applyChanges(orderId,changes);
         jdbc.update("UPDATE production_tracking_state SET version=?,last_followup_at=NOW() WHERE production_order_id=?",
                 version+1,orderId);
         var after=state(orderId,false);
-        var afterStages=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note "
+        var afterStages=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,"
+                +"applicability,applicability_note,completion_source "
                 +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",orderId);
         String content="更新车间进度表："+String.join("、",changes.stream().map(Difference::label).toList());
         jdbc.update("INSERT INTO production_tracking_entries(production_order_id,version,content,before_json,after_json,"

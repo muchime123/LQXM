@@ -77,19 +77,16 @@
         <h2>四、本周期未完工任务 · 后续重点跟进（{{ data.summary.open }} 单）</h2>
         <!-- 清单只取前 20 条，不另外加分页：数量提示必须写明，否则标题上的「共 N 单」会与表格行数对不上。 -->
         <p v-if="openTruncated" class="weekly-definition">当前展示 {{ openItems.length }} 条，共 {{ data!.summary.open }} 单，按紧急程度排序（已超期在前、超期天数多的在前）。</p>
-        <el-table v-loading="openLoading" :data="openItems" stripe empty-text="本周期没有未完工任务" @row-click="openDrilldownOrder">
-          <el-table-column label="生产任务单" min-width="160">
-            <template #default="{ row }"><button class="weekly-link" @click.stop="openDrilldownOrder(row)">{{ row.orderNo }} ↗</button></template>
-          </el-table-column>
-          <el-table-column prop="productName" label="产品" min-width="130" show-overflow-tooltip />
-          <el-table-column prop="baseline" label="当前预计" width="115" />
-          <el-table-column label="当前超期" width="115">
-            <template #default="{ row }">{{ row.unfinishedOverdueDays == null ? '未到期' : `已超 ${row.unfinishedOverdueDays} 天` }}</template>
-          </el-table-column>
-          <el-table-column prop="workshop" label="车间" min-width="110" show-overflow-tooltip />
-          <el-table-column label="业务员" width="100"><template #default="{ row }"><TrackingAnalyticsSalespersonCell :salesperson="row.salesperson" /></template></el-table-column>
-          <el-table-column label="产品规格 / 模具出数" min-width="180" show-overflow-tooltip><template #default="{ row }"><TrackingAnalyticsSpecCell :specification="row.specification" :mold-layout="row.moldLayout" /></template></el-table-column>
-        </el-table>
+        <TrackingAnalyticsOrdersTable embedded :items="openItems" :total="openItems.length" :page="1" :size="20"
+          :loading="openLoading" title="本周期未完工任务" empty-text="本周期没有未完工任务"
+          @open-order="id => emit('open-order', id)">
+          <template #extra>
+            <el-table-column prop="baseline" label="当前预计" width="115" />
+            <el-table-column label="当前超期" width="115">
+              <template #default="{ row }">{{ row.unfinishedOverdueDays == null ? '未到期' : `已超 ${row.unfinishedOverdueDays} 天` }}</template>
+            </el-table-column>
+          </template>
+        </TrackingAnalyticsOrdersTable>
         <p class="weekly-definition">其中已超预计日期
           <button class="weekly-link" @click="openDrilldown('openOverdue', '未完工且已超期')">{{ data.summary.openOverdue }} 单</button>，
           累计超期 {{ data.summary.openOverdueDays }} 天 —— 这是后续要先处理的部分。</p>
@@ -135,8 +132,6 @@ import MetricGrid from '@/components/common/MetricGrid.vue'
 import ReasonTable from '@/components/production/TrackingWeeklyReasonTable.vue'
 import TrackingAnalyticsOrdersTable from '@/components/production/TrackingAnalyticsOrdersTable.vue'
 import TrackingDrillEmpty from '@/components/production/TrackingDrillEmpty.vue'
-import TrackingAnalyticsSalespersonCell from '@/components/production/TrackingAnalyticsSalespersonCell.vue'
-import TrackingAnalyticsSpecCell from '@/components/production/TrackingAnalyticsSpecCell.vue'
 import {
   fetchTrackingAnalyticsOrders, fetchTrackingWeeklyReview,
   type TrackingAnalyticsOrder, type TrackingWeeklyReview
@@ -287,9 +282,6 @@ function openReasonDrilldown(bucket: string, category: { key: string; label: str
 }
 function onPageChange(p: number) { ddPage.value = p; void drillLoad(drillLoader) }
 function closeDrilldown() { drillState.value = null; close() }
-/** 点工单直接开跟单详情 —— 与生产分析抽屉同一条链路，不再让用户复制任务号去搜。 */
-function openDrilldownOrder(row: TrackingAnalyticsOrder) { emit('open-order', row.id) }
-
 /** 未完工清单：周报第四节要能直接看到是哪几单，故随周期一起取前 20 条。 */
 const openItems = ref<TrackingAnalyticsOrder[]>([])
 const openLoading = ref(false)

@@ -3,6 +3,7 @@
     class="operation-log-page"
     title="操作日志"
     description="关键增删改操作审计记录。点击行首箭头查看变更摘要。"
+    show-header
     :busy="loading"
     content-label="操作日志列表"
   >
@@ -17,6 +18,7 @@
         :fields="toolbarFields"
         :field-values="filters"
         :batch-enabled="false"
+        :clear-visible="hasActiveFilters"
         @search="applyFilters"
         @filter-change="handleToolbarFilterChange"
         @clear="handleResetFilters"
@@ -219,16 +221,20 @@ loadList()
 </script>
 
 <style scoped>
+/* 变更摘要代码块：仅此页面使用的展示组件，保留页面级样式。
+   值与令牌完全等价的属性一律走令牌（B5-B3 视觉规范）；
+   12px / 14px / 320px 无对应令牌，属页面专属布局值，保留字面量。 */
 .changes-pre {
   margin: 4px 12px;
   padding: 12px 14px;
   max-height: 320px;
   overflow: auto;
   background: var(--color-surface-alt);
-  border: 1px solid var(--color-border-light, #e2e8f0);
-  border-radius: 8px;
-  font-size: 12px;
-  line-height: 1.6;
+  /* 原写法带死回退 #e2e8f0（与令牌实际值 #e5e7eb 不一致），令牌已存在，删除回退 */
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-loose);
   white-space: pre-wrap;
   word-break: break-all;
 }

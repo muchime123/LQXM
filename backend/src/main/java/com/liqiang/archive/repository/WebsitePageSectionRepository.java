@@ -22,4 +22,8 @@ public interface WebsitePageSectionRepository extends JpaRepository<WebsitePageS
 
     /** 管理端列表：列出未删除的全部区块（sort 升序）。 */
     List<WebsitePageSection> findByDeletedAtIsNullOrderByPageKeyAscSortOrderAscIdAsc();
+
+    boolean existsByPageKeyNotAndEnabledTrueAndDeletedAtIsNullAndImageUrl(String excludedPageKey, String imageUrl);
+
+    boolean existsByPageKeyNotAndEnabledTrueAndDeletedAtIsNullAndContentContaining(String excludedPageKey, String mediaUrl);
 }

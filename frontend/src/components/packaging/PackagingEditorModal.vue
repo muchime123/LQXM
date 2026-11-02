@@ -198,7 +198,7 @@ required
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { createPackagingModel, fetchPackagingModel, updatePackagingModel } from '@/api/packaging'
 import LqDialog from '../common/LqDialog.vue'
 import {
@@ -247,11 +247,58 @@ const form = reactive({
   status: '在售',
   tags: '',
   remark: '',
-  sortOrder: 0
-  ,
+  sortOrder: 0,
   websiteEnabled: false,
-  websiteSortOrder: 0
+  websiteSortOrder: 0,
+  /** 主图文件名：由素材面板维护，保存时随包材原样回写后端 */
+  defaultImage: ''
 })
+
+type PackagingModelForm = typeof form
+
+/** 表单默认值：新增入口的起点，也是识别「用户是否改过某字段」的基准 */
+function buildDefaultForm(): PackagingModelForm {
+  return {
+    name: '',
+    nameEn: '',
+    modelCode: '',
+    packagingKind: '',
+    filmForm: '',
+    shapeType: '',
+    material: '',
+    colorStyle: '',
+    capacityMl: '',
+    applicable: '',
+    advantages: '',
+    moq: '',
+    unitPrice: '',
+    leadTime: '',
+    customizable: false,
+    status: '在售',
+    tags: '',
+    remark: '',
+    sortOrder: 0,
+    websiteEnabled: false,
+    websiteSortOrder: 0,
+    defaultImage: ''
+  }
+}
+
+function sameValue(a: unknown, b: unknown) {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+}
+
+/** 异步回填：只覆盖用户尚未修改（仍等于默认值）的字段 */
+function mergeLoadedForm(loaded: Record<string, unknown>) {
+  const defaults = buildDefaultForm() as Record<string, unknown>
+  const patch: Record<string, unknown> = {}
+  for (const key of Object.keys(defaults)) {
+    if (sameValue(form[key as keyof PackagingModelForm], defaults[key])) {
+      patch[key] = loaded[key] ?? defaults[key]
+    }
+  }
+  Object.assign(form, patch)
+}
 
 const isSmallScreen = computed(() => typeof window !== 'undefined' && window.innerWidth <= 760)
 
@@ -286,18 +333,47 @@ function scrollTo(id: string) {
   document.getElementById(`packaging-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
+/**
+ * 提交载荷：**只**包含下方白名单里的业务字段。
+ *
+ * <p>与后端 `PackagingService.updateModel` / `createModel` 逐字段对照：
+ * 后端按 `existing.setXxx(dto.getXxx())` 白名单赋值，共 22 个业务字段，
+ * 与 `EDITABLE_MODEL_FIELDS` 一一对应；`variants` / `assets` 走各自独立端点，
+ * 不属于本保存载荷，因此白名单中也不包含它们。
+ */
+const EDITABLE_MODEL_FIELDS = [
+  'name',
+  'nameEn',
+  'modelCode',
+  'packagingKind',
+  'filmForm',
+  'shapeType',
+  'material',
+  'colorStyle',
+  'capacityMl',
+  'applicable',
+  'advantages',
+  'moq',
+  'unitPrice',
+  'leadTime',
+  'customizable',
+  'status',
+  'tags',
+  'remark',
+  'sortOrder',
+  'websiteEnabled',
+  'websiteSortOrder',
+  'defaultImage'
+] as const
+
 function cleanPayload() {
   return Object.fromEntries(
-    Object.entries(form).map(([key, value]) => [
-      key,
-      key === 'packagingKind'
-        ? normalizeKindKey(String(value || '').trim())
-        : key === 'shapeType'
-          ? normalizeShapeKey(String(value || '').trim())
-          : typeof value === 'string'
-            ? value.trim()
-            : value
-    ])
+    EDITABLE_MODEL_FIELDS.map(key => {
+      const raw = form[key]
+      if (key === 'packagingKind') return [key, normalizeKindKey(String(raw || '').trim())]
+      if (key === 'shapeType') return [key, normalizeShapeKey(String(raw || '').trim())]
+      return [key, typeof raw === 'string' ? raw.trim() : raw]
+    })
   )
 }
 
@@ -321,13 +397,27 @@ async function save() {
   }
 }
 
+/** 组件已卸载：卸载后到达的响应一律丢弃，不再写表单、不再弹提示 */
+let disposed = false
+onUnmounted(() => (disposed = true))
+
 onMounted(async () => {
   if (props.modelId) {
-    const detail = await fetchPackagingModel(props.modelId)
-    Object.assign(form, detail.model)
-    form.packagingKind = normalizeKindKey(form.packagingKind)
-    form.shapeType = normalizeShapeKey(form.shapeType)
-    dirty.value = false
+    // 请求期间 modelId 可能被切走，或组件可能已被父级 v-if 卸载 —— 记下本次请求针对的对象
+    const requestedId = props.modelId
+    try {
+      const detail = await fetchPackagingModel(requestedId)
+      // 旧响应（已卸载 / 已切换到另一个包材）直接丢弃
+      if (disposed || props.modelId !== requestedId) return
+      // 只回填用户尚未动过的字段，避免覆盖加载窗口内的输入
+      mergeLoadedForm((detail.model ?? {}) as unknown as Record<string, unknown>)
+      form.packagingKind = normalizeKindKey(form.packagingKind)
+      form.shapeType = normalizeShapeKey(form.shapeType)
+      dirty.value = false
+    } catch (error) {
+      if (disposed || props.modelId !== requestedId) return
+      notify.errorWithDetail('加载包材详情失败', error)
+    }
   }
   await nextTick()
   bodyRef.value?.addEventListener('scroll', () => {

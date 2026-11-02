@@ -5,28 +5,25 @@ import PageHero from '../components/common/PageHero.vue'
 import SiteCTA from '../components/common/SiteCTA.vue'
 import { fetchSolutions } from '../api/website'
 import { usePageSections } from '../composables/usePageSections'
-import { useCmsPreview } from '../composables/useCmsPreview'
 
 const route = useRoute()
 const router = useRouter()
 const pageSections = usePageSections('SOLUTIONS')
-const cmsPreview = useCmsPreview('SOLUTIONS')
 const sectionEnabled = (key) => pageSections.isEnabled(key)
 const pageContent = computed(() => {
   const s = (key) => pageSections.section(key)
-  const d = (key) => cmsPreview.draft(key)
   return {
     hero: {
-      title: d('hero').title || s('hero')?.title || '从应用场景出发，找到可借鉴的包装方案',
-      description: d('hero').subtitle || s('hero')?.subtitle || '按产品与应用场景进入，查看问题诊断、工艺判断与设备选型参考。',
-      image: d('hero').imageUrl || s('hero')?.imageUrl || '',
+      title: s('hero')?.title || '从应用场景出发，找到可借鉴的包装方案',
+      description: s('hero')?.subtitle || '按产品与应用场景进入，查看问题诊断、工艺判断与设备选型参考。',
+      image: s('hero')?.imageUrl || '',
     },
     scenes: {
-      title: d('scenes').title || s('scenes')?.title || '按应用场景查找',
-      description: d('scenes').subtitle || s('scenes')?.subtitle || '先选择与您接近的产品和生产环境，再查看该场景下的工艺判断与实用内容。这里不是另一份设备目录。',
+      title: s('scenes')?.title || '按应用场景查找',
+      description: s('scenes')?.subtitle || '先选择与您接近的产品和生产环境，再查看该场景下的工艺判断与实用内容。这里不是另一份设备目录。',
     },
     articles: {
-      title: d('articles').title || s('articles')?.title || '实用方案内容',
+      title: s('articles')?.title || '实用方案内容',
     },
   }
 })
@@ -132,8 +129,6 @@ onMounted(() => Promise.all([loadCmsContent(), pageSections.load()]))
   <main class="solutions-page">
     <PageHero
       v-if="sectionEnabled('hero')"
-      data-cms-page="SOLUTIONS"
-      data-cms-section="hero"
       eyebrow="PACKAGING SOLUTIONS"
       :description="pageContent.hero.description"
       :image="pageContent.hero.image"
@@ -146,7 +141,7 @@ onMounted(() => Promise.all([loadCmsContent(), pageSections.load()]))
     <section v-if="sectionEnabled('scenes') || sectionEnabled('articles')" id="solution-library" class="solution-library">
       <template v-if="hasContent">
         <header class="solution-library__header">
-          <div v-if="sectionEnabled('scenes') && productionScenes.length" data-cms-page="SOLUTIONS" data-cms-section="scenes" data-cms-source="solution">
+          <div v-if="sectionEnabled('scenes') && productionScenes.length">
             <p class="eyebrow dark"><span></span> FIND BY APPLICATION</p>
             <h2>{{ pageContent.scenes.title }}</h2>
           </div>
@@ -160,7 +155,7 @@ onMounted(() => Promise.all([loadCmsContent(), pageSections.load()]))
           <button type="button" class="solution-scene-context__clear" @click="selectCategory('全部内容')">返回全部场景</button>
         </div>
 
-        <div v-if="sectionEnabled('scenes') && productionScenes.length" class="solution-scenes" aria-label="按应用场景筛选方案" data-cms-page="SOLUTIONS" data-cms-section="scenes" data-cms-source="solution">
+        <div v-if="sectionEnabled('scenes') && productionScenes.length" class="solution-scenes" aria-label="按应用场景筛选方案">
           <button
             v-for="scene in productionScenes"
             :key="scene.id"
@@ -180,7 +175,7 @@ onMounted(() => Promise.all([loadCmsContent(), pageSections.load()]))
           </button>
         </div>
 
-        <section v-if="sectionEnabled('articles') && articles.length" id="solution-content" class="solution-content-index" data-cms-page="SOLUTIONS" data-cms-section="articles" data-cms-source="solution">
+        <section v-if="sectionEnabled('articles') && articles.length" id="solution-content" class="solution-content-index">
           <header class="solution-content-index__header">
             <div>
               <p class="eyebrow dark"><span></span> KNOWLEDGE &amp; GUIDES</p>

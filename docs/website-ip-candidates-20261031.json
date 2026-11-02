@@ -1,0 +1,84 @@
+{
+  "read_only": true,
+  "total_records": 44,
+  "active_records": 44,
+  "asset_status_counts": {
+    "ACTIVE": 38,
+    "EXPIRED": 2,
+    "PENDING": 4
+  },
+  "legal_status_counts": {
+    "正常有效": 33,
+    "版权另行管理": 2,
+    "已失效": 2,
+    "未生效/待授权": 5,
+    "专利权有效": 1,
+    "null": 1
+  },
+  "static_card_candidates": [
+    {
+      "static_name": "气调保鲜包装机",
+      "exact_name_match_ids": [
+        10
+      ],
+      "possible_name_match_ids": [
+        10,
+        11
+      ],
+      "possible_matches": [
+        {
+          "id": 10,
+          "name": "气调保鲜包装机",
+          "category": "专利",
+          "asset_status": "ACTIVE",
+          "legal_status": "正常有效",
+          "number_present": true,
+          "applicant_present": true,
+          "certificate_file_present": true
+        },
+        {
+          "id": 11,
+          "name": "全自动连续式气调保鲜包装机",
+          "category": "专利",
+          "asset_status": "ACTIVE",
+          "legal_status": "正常有效",
+          "number_present": true,
+          "applicant_present": true,
+          "certificate_file_present": true
+        }
+      ]
+    },
+    {
+      "static_name": "连续式封口机",
+      "exact_name_match_ids": [],
+      "possible_name_match_ids": [
+        18
+      ],
+      "possible_matches": [
+        {
+          "id": 18,
+          "name": "封口机",
+          "category": "专利",
+          "asset_status": "ACTIVE",
+          "legal_status": "正常有效",
+          "number_present": true,
+          "applicant_present": true,
+          "certificate_file_present": false
+        }
+      ]
+    },
+    {
+      "static_name": "真空包装机",
+      "exact_name_match_ids": [],
+      "possible_name_match_ids": [],
+      "possible_matches": []
+    },
+    {
+      "static_name": "包装设备控制软件",
+      "exact_name_match_ids": [],
+      "possible_name_match_ids": [],
+      "possible_matches": []
+    }
+  ],
+  "mapping_verified": false
+}

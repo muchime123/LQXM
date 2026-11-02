@@ -1,0 +1,18 @@
+{
+  "source": "corporate-website\\src\\data\\qualifications.js",
+  "static_ids": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "source_count": 4,
+  "table_exists": false,
+  "target_count_before": null,
+  "ready": false,
+  "blockers": [
+    "V436 website_ip_items table is not deployed"
+  ],
+  "applied": false,
+  "publication_changed": false
+}

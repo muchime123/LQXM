@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <title>B7-B1c MoldFormDialog 表单生命周期夹具</title>
+  </head>
+  <body>
+    <!--
+      B7-B1c 夹具：直接挂载真实业务组件 MoldFormDialog。
+
+      为什么不挂整页：缺陷位于该组件自身的「异步回填」与「校验态」，
+      挂整页会被主从布局的 DOM 深度与列表渲染掩盖，也难以精确控制
+      「打开 / 关闭 / 切换模具」三个入口。夹具只替换父级，组件与
+      Element Plus 均为真实实现。
+
+      不连接后端：所有 /api 请求由用例通过 page.route 拦截返回固定夹具数据，
+      因此不存在任何写入副作用。
+    -->
+    <div id="e2e-app"></div>
+    <script type="module" src="./mold-form-dialog-harness.ts"></script>
+  </body>
+</html>

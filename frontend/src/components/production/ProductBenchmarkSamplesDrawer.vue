@@ -15,6 +15,32 @@
         绿色＝计入候选；灰色＝被排除（悬停看原因）；黄色＝间隔 0 天（同一天完成），发布前请抽查是否为批量补录。
         命中数为 0 通常意味着该产品还没有跟单记录，或车间名／产品名与氚云生产任务单不一致。
       </p>
+      <el-table v-if="data.stageCodes.length && data.summary.stageQuality" :data="data.stageCodes" size="small" border class="quality-table">
+        <el-table-column label="节点" min-width="110">
+          <template #default="{ row }">{{ stageLabels[row] || row }}</template>
+        </el-table-column>
+        <el-table-column label="有效" width="72" align="right">
+          <template #default="{ row }">{{ data.summary.stageQuality[row]?.usable ?? 0 }}</template>
+        </el-table-column>
+        <el-table-column label="缺日期" width="82" align="right">
+          <template #default="{ row }">{{ data.summary.stageQuality[row]?.missingDate ?? 0 }}</template>
+        </el-table-column>
+        <el-table-column label="无排产日" width="90" align="right">
+          <template #default="{ row }">{{ data.summary.stageQuality[row]?.noAnchor ?? 0 }}</template>
+        </el-table-column>
+        <el-table-column label="日期倒序" width="90" align="right">
+          <template #default="{ row }">{{ data.summary.stageQuality[row]?.reversedDate ?? 0 }}</template>
+        </el-table-column>
+        <el-table-column label="超过60天" width="94" align="right">
+          <template #default="{ row }">{{ data.summary.stageQuality[row]?.over60Days ?? 0 }}</template>
+        </el-table-column>
+        <el-table-column label="未来日期" width="90" align="right">
+          <template #default="{ row }">{{ data.summary.stageQuality[row]?.futureDate ?? 0 }}</template>
+        </el-table-column>
+        <el-table-column label="零天" width="72" align="right">
+          <template #default="{ row }">{{ data.summary.stageQuality[row]?.zeroDay ?? 0 }}</template>
+        </el-table-column>
+      </el-table>
       <el-empty v-if="!data.orders.length" :image-size="70" description="没有命中的跟单记录：请核对车间名与产品名，或该产品尚未在进度表里出现过" />
       <el-table v-else :data="data.orders" size="small" stripe border max-height="calc(100vh - 250px)">
         <el-table-column label="任务单号" min-width="150" fixed>

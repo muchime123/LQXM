@@ -31,7 +31,7 @@
         :selected-count="selectedIds.size"
         :models-count="inquiries.length"
         :is-all-selected="isAllPageSelected"
-        @search="loadInquiries"
+        @search="handleKeywordSearch"
         @filter-change="handleFilterChange"
         @clear="resetFilters"
         @toggle-batch-mode="toggleBatchMode"
@@ -316,6 +316,16 @@ const toolbarFieldValues = computed(() => ({
   status: filters.status
 }))
 
+/**
+ * 关键词搜索：与其它筛选入口一致，**先回到第 1 页再请求**。
+ *
+ * <p>此前 `@search` 直接绑 `loadInquiries`，翻到第 3 页后再输入关键词会继续请求第 3 页，
+ * 结果要么空列表、要么看不出数据已变。统一走「改条件 → 复位页码 → 请求」。
+ */
+function handleKeywordSearch() {
+  pagination.resetPage()
+  loadInquiries()
+}
 function handleFilterChange(key: string, value: unknown) {
   if (key === 'status') filters.status = (value as '' | InquiryStatusFilter) || ''
   pagination.resetPage()

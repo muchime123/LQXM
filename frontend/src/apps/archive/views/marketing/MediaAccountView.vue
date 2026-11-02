@@ -174,10 +174,20 @@
         </el-table-column>
         <el-table-column label="操作" fixed="right" width="280" align="center">
           <template #default="{ row }">
-            <button type="button" class="row-btn accent" @click="quickAddUpdate(row)">＋更新</button>
+            <!-- 写操作与顶部「新建账号 / 导入」同口径：`media.manage`。
+                 「详情」是读操作，对只读用户保留。 -->
+            <!-- 写操作与顶部「新建账号 / 导入」同口径：`media.manage`。
+                 「详情」是读操作，对只读用户保留。 -->
+            <button v-if="canManageMedia" type="button" class="row-btn accent" @click="quickAddUpdate(row)">
+              ＋更新
+            </button>
             <button type="button" class="row-btn" @click="openDetail(row)">详情</button>
-            <button type="button" class="row-btn" @click="openEditor(row)">编辑</button>
-            <button type="button" class="row-btn danger" @click="removeAccount(row)">删除</button>
+            <button v-if="canManageMedia" type="button" class="row-btn" @click="openEditor(row)">
+              编辑
+            </button>
+            <button v-if="canManageMedia" type="button" class="row-btn danger" @click="removeAccount(row)">
+              删除
+            </button>
           </template>
         </el-table-column>
       </LqTable>

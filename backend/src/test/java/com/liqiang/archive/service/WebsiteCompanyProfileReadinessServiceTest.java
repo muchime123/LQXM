@@ -29,7 +29,7 @@ class WebsiteCompanyProfileReadinessServiceTest {
     }
 
     @Test
-    void draftLogoOrInternalPathBlocksButPublishedWebsiteFilePasses() throws Exception {
+    void draftLogoWithWebsiteFilePassesButInternalPathBlocks() throws Exception {
         var profiles = mock(WebsiteCompanyProfileRepository.class);
         var media = mock(WebsiteMediaAssetRepository.class);
         var service = new WebsiteCompanyProfileReadinessService(profiles, media);
@@ -48,7 +48,6 @@ class WebsiteCompanyProfileReadinessServiceTest {
         when(media.findByIdAndDeletedAtIsNull(5L)).thenReturn(Optional.of(logo));
 
         assertFalse(service.check().ready());
-        logo.setStatus("PUBLISHED");
         logo.setStorageKey("company/logo.png");
         assertFalse(service.check().ready());
         Path file = files.resolve("website/images/logo.png");
@@ -58,5 +57,7 @@ class WebsiteCompanyProfileReadinessServiceTest {
         var result = service.check();
         assertTrue(result.ready());
         assertTrue(result.warnings().stream().anyMatch(item -> item.contains("英文")));
+        logo.setStatus("ARCHIVED");
+        assertFalse(service.check().ready());
     }
 }

@@ -38,6 +38,7 @@ export const LIST_COLUMN_DEFS: Array<{ key: string, label: string }> = [
   { key: 'countdown', label: '生产倒计时' },
   { key: 'completion', label: '完工 / 入库' },
   { key: 'deliveryResult', label: '生产交付结果' },
+  { key: 'extraMoldRequired', label: '是否需要额外模具' },
   { key: 'stages', label: '跟单节点' },
   { key: 'timeSignals', label: '时间核实' },
   { key: 'salesTrace', label: '销售去向' },

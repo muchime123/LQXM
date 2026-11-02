@@ -1,0 +1,62 @@
+{
+  "applied": true,
+  "inserted_draft_media": 0,
+  "mapped": 9,
+  "public_references_changed": false,
+  "mapping": [
+    {
+      "legacy_url": "/api/files/company?encoded=MjAyNjA3MDYxNjE4MzM5NzNfZWI1ZWU5NzhlZWZjMjQ0YzUyNjdkYzIzNWFiYjUzYWIt5ou36LSdXzIwMjYwODIwMTQ0MDQ3MTEwLmpwZw",
+      "website_media_id": 140,
+      "storage_key": "website/images/1f0afad09890bd9054931d415152cc6a1cad810ab68baf1e7df3323e1c3e054d.jpg",
+      "status": "DRAFT"
+    },
+    {
+      "legacy_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgxKV8yMDI2MDgyMDA5MTEzODQwNC5wbmc",
+      "website_media_id": 3,
+      "storage_key": "website/images/d4df1f129689737dd3c3b457b0d61da0983d5af7d554c4d9ae96fca10af8acb4.png",
+      "status": "DRAFT"
+    },
+    {
+      "legacy_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgyKV8yMDI2MDgyMDA5MTEzODczNy5wbmc",
+      "website_media_id": 2,
+      "storage_key": "website/images/b0004abd6d401569c6787488bde196308cc61278c02a1e239d3d2b522f9fddee.png",
+      "status": "DRAFT"
+    },
+    {
+      "legacy_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgxKV8yMDI2MDgyMDE0MTcwOTA2MS5wbmc",
+      "website_media_id": 141,
+      "storage_key": "website/images/54e0875ac9f6ea7239d9839d318a1193e04672bced8c439067cc5e4f870eefb2.png",
+      "status": "DRAFT"
+    },
+    {
+      "legacy_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgyKV8yMDI2MDgyMDE0MTcwODcyMS5wbmc",
+      "website_media_id": 142,
+      "storage_key": "website/images/f752b3669e8b58690d3abff894a523a33228c65216ebf2ed75d0ec5588950323.png",
+      "status": "DRAFT"
+    },
+    {
+      "legacy_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgzKV8yMDI2MDgyMDE0MTcwODM1My5wbmc",
+      "website_media_id": 143,
+      "storage_key": "website/images/59ef6aa77d0cb60776f47776b83e114b6ee3efae475736f94fdac9fd83f7bb51.png",
+      "status": "DRAFT"
+    },
+    {
+      "legacy_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgxKV8yMDI2MDgyMDEyMjUxNjI3MS5wbmc",
+      "website_media_id": 144,
+      "storage_key": "website/images/cec58c0e4b61519b0fd26fddf121903a6ea2561bee56bdb3f67c13670a0bf786.png",
+      "status": "DRAFT"
+    },
+    {
+      "legacy_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgyKV8yMDI2MDgyMDEyMjUxNjg4Mi5wbmc",
+      "website_media_id": 145,
+      "storage_key": "website/images/c5452ac86ae850c124b7e8ed13cc2413e3eb949077aabf2cf74f6bebc3d895e1.png",
+      "status": "DRAFT"
+    },
+    {
+      "legacy_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMzICgzKV8yMDI2MDgyMDEyMjUxNzIyNy5wbmc",
+      "website_media_id": 146,
+      "storage_key": "website/images/34693aba314445b82d4e9d39299fb1fb7e24bbd559dc01d5e82f7710610a8a38.png",
+      "status": "DRAFT"
+    }
+  ]
+}

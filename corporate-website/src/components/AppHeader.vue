@@ -1,7 +1,7 @@
 <script setup>
 /**
  * 顶部导航布局组件。
- * - 一级导航 5 项：首页 / 产品中心 / 解决方案 / 耗材与模具 / 关于利强
+ * - 一级导航 5 项：首页 / 产品中心 / 解决方案 / 包材耗材 / 关于利强
  * - 右侧主 CTA：获取包装方案 → /contact?type=consult
  * - 通过 route.meta.navKey 判断当前页并增加高亮（底部蓝绿色指示线）
  * - 资质页已降为 about 下属分区，但保留高亮联系规则（仍回 about）
@@ -24,15 +24,7 @@ const navLinks = [
   { navKey: 'home',      label: '首页',      to: '/' },
   { navKey: 'products',  label: '产品中心',  to: '/products' },
   { navKey: 'solutions', label: '解决方案',  to: '/solutions' },
-  {
-    /* 父级仅作下拉触发器，不跳独立页面（/supplies 中间页已下线） */
-    navKey: 'supplies',
-    label: '耗材与模具',
-    children: [
-      { label: '包材耗材', description: '封口膜、托盒、杯罐等配套耗材', to: '/packaging' },
-      { label: '模具中心', description: '标准模具与非标定制服务', to: '/molds' },
-    ],
-  },
+  { navKey: 'supplies', label: '包材耗材', to: '/packaging' },
   {
     navKey: 'about',
     label: '关于利强',

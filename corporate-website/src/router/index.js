@@ -4,7 +4,7 @@ import { createRouter, createWebHistory } from 'vue-router'
  * 路由配置。
  * - /about          关于我们
  * - /packaging      包装耗材
- * - /molds          模具中心（独立页）
+ * - /molds          旧书签兼容，跳转包材页
  */
 /**
  * 主导航 key：用于当前一级页高亮。
@@ -28,7 +28,7 @@ const routes = [
       navKey: NAV_KEYS.HOME,
       seo: {
         title: '利强包装｜食品包装设备与一站式包装解决方案',
-        description: '浙江利强包装科技有限公司专注食品包装设备研发制造，提供封口机、气调包装机、真空包装机、自动化包装产线及包装耗材模具，覆盖生鲜、熟食、预制菜、烘焙等场景。',
+        description: '浙江利强包装科技有限公司专注食品包装设备研发制造，提供封口机、气调包装机、真空包装机、自动化包装产线及配套包材，覆盖生鲜、熟食、预制菜、烘焙等场景。',
       },
     },
   },
@@ -65,7 +65,7 @@ const routes = [
       navKey: NAV_KEYS.SOLUTIONS,
       seo: {
         title: '包装解决方案｜气调锁鲜、封口包装、自动化产线',
-        description: '利强包装解决方案：针对生鲜肉类、熟食、预制菜、烘焙、中央厨房等场景，提供气调锁鲜、封口包装、自动化产线与耗材模具的整体包装方案。',
+        description: '利强包装解决方案：针对生鲜肉类、熟食、预制菜、烘焙、中央厨房等场景，提供气调锁鲜、封口包装、自动化产线与配套包材的包装方案。',
       },
     },
   },
@@ -103,7 +103,7 @@ const routes = [
       navKey: NAV_KEYS.ABOUT,
       seo: {
         title: '专利与知识产权｜发明专利、实用新型、外观设计',
-        description: '浙江利强包装科技专利与知识产权档案：覆盖食品包装设备、模具与工艺的发明专利、实用新型专利、外观设计及软件著作权，展示企业研发创新成果。',
+        description: '浙江利强包装科技专利与知识产权档案：覆盖食品包装设备与包装工艺的发明专利、实用新型专利、外观设计及软件著作权，展示企业研发创新成果。',
       },
     },
   },
@@ -115,7 +115,7 @@ const routes = [
       navKey: NAV_KEYS.ABOUT,
       seo: {
         title: '关于浙江利强包装科技有限公司',
-        description: '浙江利强包装科技有限公司成立于 2013 年，位于温州，专注包装设备研发制造，业务覆盖封口机、气调包装机、包装容器、封口膜、模具及配件，提供样品试封与非标定制服务。',
+        description: '浙江利强包装科技有限公司成立于 2013 年，位于温州，专注包装设备研发制造，业务覆盖封口机、气调包装机、包装容器及封口膜，提供样品试封与非标定制服务。',
       },
     },
   },
@@ -132,8 +132,7 @@ const routes = [
     },
   },
   {
-    /* /supplies 中间页已下线，旧链接兼容至 /packaging。
-       Header 一级导航“耗材与模具”改为纯下拉触发器（包材耗材 / 模具中心）。 */
+    /* 旧耗材入口兼容至包材页。 */
     path: '/supplies',
     name: 'supplies',
     redirect: { path: '/packaging' },
@@ -153,14 +152,7 @@ const routes = [
   {
     path: '/molds',
     name: 'molds',
-    component: () => import('../views/Molds.vue'),
-    meta: {
-      navKey: NAV_KEYS.SUPPLIES,
-      seo: {
-        title: '模具中心｜方盒 圆杯 碗 桶 盖 全品类自研模具',
-        description: '利强包装自研模具设计制造能力，覆盖方盒、圆杯、碗、桶、盖等全品类规格，支持定制化模具开发，公差±0.01mm，模具寿命100万+次。',
-      },
-    },
+    redirect: { path: '/packaging' },
   },
   {
     path: '/:pathMatch(.*)*',

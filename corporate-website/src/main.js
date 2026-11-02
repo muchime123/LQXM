@@ -34,7 +34,6 @@ const ROUTE_BREADCRUMB = {
   about: { name: '关于我们' },
   contact: { name: '联系我们' },
   packaging: { name: '包装耗材' },
-  molds: { name: '模具中心' },
   'not-found': { name: '页面未找到' },
 }
 

@@ -127,8 +127,6 @@ public interface PackagingMoldRepository extends JpaRepository<PackagingMold, Lo
 
     long countByMoldRole(String moldRole);
 
-    /** 已发布到官网的模具数量（官网工作台统计用）。 */
-    long countByWebsiteEnabledTrue();
 
     // ====== 软删除/回收站 ======
 

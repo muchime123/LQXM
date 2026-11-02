@@ -40,6 +40,4 @@ public interface PackagingModelRepository extends JpaRepository<PackagingModel, 
     @Query("SELECT DISTINCT m.status FROM PackagingModel m WHERE m.status IS NOT NULL AND m.status <> '' ORDER BY m.status")
     List<String> findDistinctStatuses();
 
-    /** 已发布到官网的包材数量（官网工作台统计用）。 */
-    long countByWebsiteEnabledTrue();
 }

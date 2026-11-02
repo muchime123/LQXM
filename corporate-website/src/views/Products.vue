@@ -15,25 +15,22 @@ import SearchBar from '../components/common/SearchBar.vue'
 import Pagination from '../components/common/Pagination.vue'
 import SiteCTA from '../components/common/SiteCTA.vue'
 import { usePageSections } from '../composables/usePageSections'
-import { useCmsPreview } from '../composables/useCmsPreview'
 
 const route = useRoute()
 const router = useRouter()
 const pageSections = usePageSections('PRODUCTS')
-const cmsPreview = useCmsPreview('PRODUCTS')
 const sectionEnabled = (key) => pageSections.isEnabled(key)
 const pageContent = computed(() => {
   const s = (key) => pageSections.section(key)
-  const d = (key) => cmsPreview.draft(key)
   return {
     hero: {
-      title: d('hero').title || s('hero')?.title || '查看包装设备，找到适合生产需求的产品',
-      description: d('hero').subtitle || s('hero')?.subtitle || '按设备类别或产品名称查找包装设备，进入产品详情查看适用范围与具体信息。',
-      image: d('hero').imageUrl || s('hero')?.imageUrl || '',
+      title: s('hero')?.title || '查看包装设备，找到适合生产需求的产品',
+      description: s('hero')?.subtitle || '按设备类别或产品名称查找包装设备，进入产品详情查看适用范围与具体信息。',
+      image: s('hero')?.imageUrl || '',
     },
     catalog: {
-      title: d('catalog').title || s('catalog')?.title || '全部包装设备',
-      description: d('catalog').subtitle || s('catalog')?.subtitle || '可按设备类型、包装产品、容器、工艺与目标产能筛选。',
+      title: s('catalog')?.title || '全部包装设备',
+      description: s('catalog')?.subtitle || '可按设备类型、包装产品、容器、工艺与目标产能筛选。',
     },
   }
 })
@@ -162,8 +159,6 @@ watch(() => route.query, (q) => {
     <!-- Hero -->
     <PageHero
       v-if="sectionEnabled('hero')"
-      data-cms-page="PRODUCTS"
-      data-cms-section="hero"
       eyebrow="PRODUCT CENTER"
       :description="pageContent.hero.description"
       :image="pageContent.hero.image"
@@ -172,7 +167,7 @@ watch(() => route.query, (q) => {
       <template #title><span>{{ pageContent.hero.title }}</span></template>
     </PageHero>
 
-    <section v-if="sectionEnabled('catalog')" id="product-catalog" class="product-catalog" data-cms-page="PRODUCTS" data-cms-section="catalog" data-cms-source="product">
+    <section v-if="sectionEnabled('catalog')" id="product-catalog" class="product-catalog">
       <div class="page-toolbar product-filter">
         <div class="product-filter__search">
           <SearchBar v-model="keyword" placeholder="产品名称 / 型号 / 类别" @input="onSearchInput" />
@@ -295,7 +290,7 @@ watch(() => route.query, (q) => {
     <SiteCTA
       id="cta"
       title="不确定应该选择哪种设备？"
-      description="准备好产品、容器尺寸和目标产能，我们可以先帮您梳理设备、模具和耗材的匹配方向。"
+      description="准备好产品、容器尺寸和目标产能，我们可以先帮您梳理设备与包材的匹配方向。"
       action-text="获取选型建议"
       inquiry-source="products-bottom"
     />

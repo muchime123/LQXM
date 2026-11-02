@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
 import {
   fetchBanners,
   fetchBannerById,
@@ -21,14 +20,13 @@ import BannerFormDialog from '@/components/website/BannerFormDialog.vue'
 import LqPagination from '@/components/common/LqPagination.vue'
 import { useListPagination } from '@/composables/list/useListPagination'
 
-const router = useRouter()
 const loading = ref(false)
 const banners = ref<WebsiteBannerSummary[]>([])
 // 后端 /api/admin/website/banners 的 page 为 0 基（Spring Page），与 useListPagination 一致
 const pagination = useListPagination({ size: 20 })
 
 const searchKeyword = ref('')
-const filterPosition = ref<BannerPosition | ''>('SIDE')
+const filterPosition = ref<BannerPosition | ''>('HERO')
 const filterEnabled = ref<boolean | ''>('')
 
 const dialogVisible = ref(false)
@@ -68,7 +66,7 @@ function handleSearch() {
 
 function handleReset() {
   searchKeyword.value = ''
-  filterPosition.value = 'SIDE'
+  filterPosition.value = 'HERO'
   filterEnabled.value = ''
   pagination.resetPage()
   loadData()
@@ -139,8 +137,7 @@ await loadData()
   <div class="banner-manage">
     <div class="page-header">
       <h2>官网内容管理 · Banner 管理</h2>
-      <p class="page-desc">管理官网侧边栏（SIDE）与公告条（ANNOUNCEMENT）Banner。首页 HERO 轮播请在「可视化编辑器」中编辑。</p>
-      <el-button class="hero-link" link type="primary" @click="router.push('/website/visual-editor')">前往可视化编辑器编辑 HERO →</el-button>
+      <p class="page-desc">管理官网首页轮播（HERO）、侧边栏（SIDE）与公告条（ANNOUNCEMENT）Banner。</p>
     </div>
 
     <div class="filter-bar">
@@ -258,7 +255,7 @@ await loadData()
       v-if="dialogVisible"
       :banner="editing"
       :saving="dialogSaving"
-      default-position="SIDE"
+      default-position="HERO"
       @update:banner="dialogVisible = $event"
       @save="handleSave"
     />

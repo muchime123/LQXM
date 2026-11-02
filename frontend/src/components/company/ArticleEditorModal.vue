@@ -43,19 +43,15 @@
           <el-option value="draft" label="草稿" />
         </el-select>
       </div>
-      <div class="form-field">
-        <label>官网展示</label>
-        <el-switch v-model="form.websiteVisible" />
-        <span class="hint-label">仅「已发布」且勾选后才会在官网知识库栏目展示</span>
-      </div>
     </div>
     <div class="content-field">
       <div class="content-head">
         <label class="required">正文内容</label>
-        <span class="hint-label">富文本编辑，用 H2/H3 标题分节，官网知识库展示时自动生成侧边目录</span>
+        <span class="hint-label">内部知识库富文本；用 H2/H3 标题整理内容。</span>
       </div>
       <RichTextEditor
         v-model="form.content"
+        media-scope="company"
         :height="460"
         placeholder="输入正文内容..."
       />
@@ -91,8 +87,7 @@ const defaultForm = () => ({
   source: '',
   tags: '',
   content: '',
-  status: 'published',
-  websiteVisible: false
+  status: 'published'
 })
 
 const form = reactive(defaultForm())
@@ -117,8 +112,7 @@ function initForm() {
       source: props.article.source ?? '',
       tags: props.article.tags ?? '',
       content: prepareContentForRichEditor(props.article.content),
-      status: props.article.status ?? 'published',
-      websiteVisible: !!props.article.websiteVisible
+      status: props.article.status ?? 'published'
     })
   }
 }

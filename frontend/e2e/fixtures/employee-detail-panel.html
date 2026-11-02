@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <title>B7-B1c EmployeeDetailPanel 校验态夹具</title>
+  </head>
+  <body>
+    <!--
+      B7-B1c 夹具：直接挂载真实业务组件 EmployeeDetailPanel。
+      只替换父级（EmployeeRosterView），组件与 Element Plus 均为真实实现。
+      所有 /api 请求由用例通过 page.route 拦截，不连接后端、无写入副作用。
+    -->
+    <div id="e2e-app"></div>
+    <script type="module" src="./employee-detail-panel-harness.ts"></script>
+  </body>
+</html>

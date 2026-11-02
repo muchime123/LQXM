@@ -14,11 +14,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +31,10 @@ public class WebsiteSolutionService {
 
     private final WebsiteSolutionRepository solutionRepo;
     private final ObjectMapper objectMapper;
+    private final WebsiteProductPublicationService publicationService;
+    private static final Pattern MEDIA_URL = Pattern.compile("/api/website/media/(\\d+)/content");
+    private static final Pattern ARCHIVE_FILE_URL = Pattern.compile(
+            "(?i)(?:/api/files/|/api/file-assets/|product_model/assets/|packaging_model/assets/)");
 
     public List<SolutionView> listAll() {
         return solutionRepo.findAllByOrderBySectionAscSortOrderAsc().stream()
@@ -88,6 +96,7 @@ public class WebsiteSolutionService {
     public SolutionView create(SolutionPayload payload) {
         WebsiteSolution entity = new WebsiteSolution();
         applyPayload(entity, payload);
+        publishReferencedMedia(entity);
         WebsiteSolution saved = solutionRepo.save(entity);
         log.info("Created website solution: section={}, key={}, title={}", payload.section(), payload.itemKey(), payload.title());
         return toView(saved);
@@ -97,26 +106,30 @@ public class WebsiteSolutionService {
     public SolutionView update(Long id, SolutionPayload payload) {
         WebsiteSolution entity = solutionRepo.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Solution not found: " + id));
+        boolean wasPublished = Boolean.TRUE.equals(entity.getWebsiteEnabled());
+        String oldCover = entity.getCoverImageUrl();
+        String oldHtml = entity.getContentHtml();
+        String oldSections = entity.getContentSections();
         applyPayload(entity, payload);
+        if (Boolean.TRUE.equals(entity.getWebsiteEnabled()) && (!wasPublished
+                || !java.util.Objects.equals(oldCover, entity.getCoverImageUrl())
+                || !java.util.Objects.equals(oldHtml, entity.getContentHtml())
+                || !java.util.Objects.equals(oldSections, entity.getContentSections()))) {
+            requireIndependentMedia(entity);
+        }
+        publishReferencedMedia(entity);
         WebsiteSolution saved = solutionRepo.save(entity);
         log.info("Updated website solution: id={}, title={}", id, payload.title());
         return toView(saved);
     }
 
     @Transactional
-    public void delete(Long id) {
-        if (!solutionRepo.existsById(id)) {
-            throw new IllegalArgumentException("Solution not found: " + id);
-        }
-        solutionRepo.deleteById(id);
-        log.info("Deleted website solution: id={}", id);
-    }
-
-    @Transactional
     public List<SolutionView> batchUpdateWebsiteEnabled(List<Long> ids, boolean enabled) {
         List<WebsiteSolution> entities = solutionRepo.findAllById(ids);
         for (WebsiteSolution e : entities) {
+            if (enabled && !Boolean.TRUE.equals(e.getWebsiteEnabled())) requireIndependentMedia(e);
             e.setWebsiteEnabled(enabled);
+            publishReferencedMedia(e);
         }
         List<WebsiteSolution> saved = solutionRepo.saveAll(entities);
         log.info("Batch updated websiteEnabled to {} for {} solutions", enabled, saved.size());
@@ -142,8 +155,30 @@ public class WebsiteSolutionService {
         entity.setSeoTitle(payload.seoTitle());
         entity.setSeoDescription(payload.seoDescription());
         entity.setSortOrder(payload.sortOrder() != null ? payload.sortOrder() : 0);
-        entity.setWebsiteEnabled(payload.websiteEnabled() != null ? payload.websiteEnabled() : true);
+        entity.setWebsiteEnabled(payload.websiteEnabled() != null ? payload.websiteEnabled()
+                : entity.getId() == null ? false : entity.getWebsiteEnabled());
         entity.setWebsiteFeatured(payload.websiteFeatured() != null ? payload.websiteFeatured() : false);
+    }
+
+    private void publishReferencedMedia(WebsiteSolution entity) {
+        if (!Boolean.TRUE.equals(entity.getWebsiteEnabled())) return;
+        if (entity.getId() == null) requireIndependentMedia(entity);
+        for (String value : List.of(entity.getCoverImageUrl() == null ? "" : entity.getCoverImageUrl(),
+                entity.getContentHtml() == null ? "" : entity.getContentHtml(),
+                entity.getContentSections() == null ? "" : entity.getContentSections())) {
+            Matcher matcher = MEDIA_URL.matcher(value);
+            while (matcher.find()) publicationService.publishMedia(Long.parseLong(matcher.group(1)));
+        }
+    }
+
+    private void requireIndependentMedia(WebsiteSolution entity) {
+        for (String value : List.of(entity.getCoverImageUrl() == null ? "" : entity.getCoverImageUrl(),
+                entity.getContentHtml() == null ? "" : entity.getContentHtml(),
+                entity.getContentSections() == null ? "" : entity.getContentSections())) {
+            if (ARCHIVE_FILE_URL.matcher(value).find()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "官网方案仍引用内部档案文件，请先复制到官网媒体库");
+            }
+        }
     }
 
     private SolutionView toView(WebsiteSolution entity) {

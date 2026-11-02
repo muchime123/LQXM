@@ -1,0 +1,28 @@
+{
+  "profile": {
+    "id": 1,
+    "status": "DRAFT",
+    "published_at": null
+  },
+  "logo": {
+    "id": 147,
+    "status": "DRAFT"
+  },
+  "milestones": [
+    {
+      "id": 1,
+      "status": "DRAFT",
+      "published_at": null
+    },
+    {
+      "id": 2,
+      "status": "DRAFT",
+      "published_at": null
+    },
+    {
+      "id": 3,
+      "status": "DRAFT",
+      "published_at": null
+    }
+  ]
+}

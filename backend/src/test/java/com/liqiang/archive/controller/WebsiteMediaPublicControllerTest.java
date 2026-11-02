@@ -2,7 +2,13 @@ package com.liqiang.archive.controller;
 
 import com.liqiang.archive.entity.WebsiteMediaAsset;
 import com.liqiang.archive.repository.WebsiteBannerRepository;
+import com.liqiang.archive.repository.WebsiteCompanyProfileRepository;
 import com.liqiang.archive.repository.WebsiteMediaAssetRepository;
+import com.liqiang.archive.repository.WebsiteSolutionRepository;
+import com.liqiang.archive.repository.WebsitePackagingItemRepository;
+import com.liqiang.archive.repository.WebsiteCredentialRepository;
+import com.liqiang.archive.repository.WebsiteIpItemRepository;
+import com.liqiang.archive.repository.WebsitePageSectionRepository;
 import com.liqiang.archive.service.WebsiteProductMediaVisibilityService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -30,8 +36,14 @@ class WebsiteMediaPublicControllerTest {
         WebsiteMediaAssetRepository mediaRepository = mock(WebsiteMediaAssetRepository.class);
         WebsiteBannerRepository bannerRepository = mock(WebsiteBannerRepository.class);
         WebsiteProductMediaVisibilityService productVisibility = mock(WebsiteProductMediaVisibilityService.class);
+        WebsiteCompanyProfileRepository companyProfiles = mock(WebsiteCompanyProfileRepository.class);
+        WebsiteSolutionRepository solutions = mock(WebsiteSolutionRepository.class);
+        WebsitePackagingItemRepository packaging = mock(WebsitePackagingItemRepository.class);
+        WebsiteIpItemRepository ipItems = mock(WebsiteIpItemRepository.class);
+        WebsitePageSectionRepository pageSections = mock(WebsitePageSectionRepository.class);
         WebsiteMediaPublicController controller = new WebsiteMediaPublicController(
-                mediaRepository, bannerRepository, productVisibility);
+                mediaRepository, bannerRepository, productVisibility, companyProfiles, solutions, packaging,
+                mock(WebsiteCredentialRepository.class), ipItems, pageSections);
         ReflectionTestUtils.setField(controller, "fileRoot", root.toString());
         Path image = root.resolve("website/images/banner.png");
         Files.createDirectories(image.getParent());
@@ -56,6 +68,36 @@ class WebsiteMediaPublicControllerTest {
         when(bannerRepository.existsActiveWebsiteMediaReference(1L)).thenReturn(false);
         mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
         when(productVisibility.isReferencedByPublishedProduct(1L)).thenReturn(false);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isNotFound());
+        when(companyProfiles.existsByLogoMediaIdAndStatus(1L, "PUBLISHED")).thenReturn(true);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
+        when(companyProfiles.existsByLogoMediaIdAndStatus(1L, "PUBLISHED")).thenReturn(false);
+        when(pageSections.existsByPageKeyNotAndEnabledTrueAndDeletedAtIsNullAndImageUrl("MOLDS", "/api/website/media/1/content")).thenReturn(true);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
+        when(pageSections.existsByPageKeyNotAndEnabledTrueAndDeletedAtIsNullAndImageUrl("MOLDS", "/api/website/media/1/content")).thenReturn(false);
+        when(pageSections.existsByPageKeyNotAndEnabledTrueAndDeletedAtIsNullAndContentContaining("MOLDS", "/api/website/media/1/content")).thenReturn(true);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
+        when(pageSections.existsByPageKeyNotAndEnabledTrueAndDeletedAtIsNullAndContentContaining("MOLDS", "/api/website/media/1/content")).thenReturn(false);
+        when(solutions.existsByWebsiteEnabledTrueAndCoverImageUrl("/api/website/media/1/content")).thenReturn(true);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
+        when(solutions.existsByWebsiteEnabledTrueAndCoverImageUrl("/api/website/media/1/content")).thenReturn(false);
+        when(solutions.existsByWebsiteEnabledTrueAndContentHtmlContaining("/api/website/media/1/content")).thenReturn(true);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
+        when(solutions.existsByWebsiteEnabledTrueAndContentHtmlContaining("/api/website/media/1/content")).thenReturn(false);
+        when(solutions.existsByWebsiteEnabledTrueAndContentSectionsContaining("/api/website/media/1/content")).thenReturn(true);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
+        when(solutions.existsByWebsiteEnabledTrueAndContentSectionsContaining("/api/website/media/1/content")).thenReturn(false);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isNotFound());
+        when(packaging.existsByCoverMediaIdAndStatusAndDeletedAtIsNull(1L, "PUBLISHED")).thenReturn(true);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
+        when(packaging.existsByCoverMediaIdAndStatusAndDeletedAtIsNull(1L, "PUBLISHED")).thenReturn(false);
+        when(ipItems.existsByMediaIdAndStatusAndDeletedAtIsNull(1L, "PUBLISHED")).thenReturn(true);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isNotFound());
+        ReflectionTestUtils.setField(controller, "nativeIpEnabled", true);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
+        when(ipItems.existsByMediaIdAndStatusAndDeletedAtIsNull(1L, "PUBLISHED")).thenReturn(false);
+        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isNotFound());
+        media.setStatus("DRAFT");
         mvc.perform(get("/api/website/media/1/content")).andExpect(status().isNotFound());
     }
 }

@@ -30,11 +30,6 @@ export async function updateSolution(id: number, payload: WebsiteSolutionPayload
   return res.data
 }
 
-export async function deleteSolution(id: number): Promise<{ success: boolean; id: number }> {
-  const res = await http.delete(`/website/solutions/admin/${id}`)
-  return res.data
-}
-
 export async function batchUpdateSolutionVisible(ids: number[], websiteEnabled: boolean): Promise<WebsiteSolution[]> {
   const res = await http.put('/website/solutions/admin/batch-visible', { ids, websiteEnabled })
   return res.data

@@ -1,0 +1,41 @@
+{
+  "read_only": true,
+  "schema": "product_archive",
+  "status_counts": {
+    "website_products": {
+      "active_by_status": {
+        "DRAFT": 45
+      },
+      "has_soft_delete": true
+    },
+    "website_product_categories": {
+      "active_by_status": {
+        "DRAFT": 9
+      },
+      "has_soft_delete": true
+    },
+    "website_packaging_items": {
+      "active_by_status": {},
+      "has_soft_delete": true
+    },
+    "website_company_profiles": {
+      "active_by_status": {},
+      "has_soft_delete": false
+    },
+    "website_company_milestones": {
+      "active_by_status": {},
+      "has_soft_delete": true
+    },
+    "website_social_links": {
+      "active_by_status": {},
+      "has_soft_delete": true
+    },
+    "website_credentials": {
+      "active_by_status": {},
+      "has_soft_delete": true
+    },
+    "website_packaging_variants": {
+      "active": 0
+    }
+  }
+}

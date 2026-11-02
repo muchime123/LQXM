@@ -64,14 +64,20 @@ const OPTIONAL_STAGE_LABELS: Record<string, string> = {
   WOODEN_CRATE: '需要木箱'
 }
 /**
- * 「模具生产」跟进筛选（10-21 跟单员需求：跟进模具生产有没有完成）。
- * 三档可多选，共同前提是**模具之后没有任何节点跟进**——后面一旦动了，说明这张单已越过模具这一关，不再筛出。
- * 口径刻意不看模具之前的节点（备料跟没跟无关），与后端 MOLD_STAGE_CODES / MOLD_NODE_STATE 一一对应。
+ * 「节点跟进」筛选的三档（顺序＝下拉顺序）：未跟进 / 进行中 / 已完成。
+ *
+ * 由「模具生产」三档（10-21）泛化而来：跟单员反复问的是同一个问题——**我关心的那道节点做到哪了**，
+ * 只是节点在换（模具 / 氧化 / 木箱 / 组装……）。故做成「节点 × 状态」一个条件，节点清单由
+ * filter-options 的 `nodeProgressNodes` 提供（制程表唯一源），前端不再为每个节点维护常量；
+ * 管理员加了节点，下拉直接出现，不用改代码。
+ *
+ * 共同前提仍是**该节点之后没有任何节点跟进**——后面一旦动了，说明这张单已越过这一关，不再筛出；
+ * 该节点之前的节点（备料跟没跟）不看。与后端 `nodeProgress` 入参（节点编码:档位）一一对应。
  */
-const MOLD_STAGE_OPTIONS = [
-  { value: 'MOLD_NONE', label: '模具未跟进' },
-  { value: 'MOLD_WORKING', label: '模具进行中' },
-  { value: 'MOLD_DONE', label: '模具已完成·后面没推' }
+const NODE_PROGRESS_STATE_OPTIONS = [
+  { value: 'NONE', label: '未跟进' },
+  { value: 'WORKING', label: '进行中' },
+  { value: 'DONE', label: '已完成·后面没推' }
 ]
 
 export function useTrackingFilters(options: { onChange: () => void }) {
@@ -90,10 +96,24 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   const countdownFilter = ref<string[]>([])
   const deliveryFilter = ref<string[]>([])
   const optionalStageFilter = ref('')
-  /** 模具生产跟进筛选：三档可多选，空数组＝不筛。 */
-  const moldStageFilter = ref<string[]>([])
+  /**
+   * 节点跟进筛选：**选一道节点 + 它的状态**（三档可多选）。
+   * 不变量：只有「选了节点 **且** 至少选了一档」时才构成条件；否则视为不筛（节点编码也一并清空，
+   * 避免下拉里留着一个看起来生效、实际没生效的值）。
+   */
+  const nodeProgressCode = ref('')
+  const nodeProgressStates = ref<string[]>([])
   /** 「业务员」筛选：取值来自数据（后端 filter-options 的 salespersons）。2026-10-21 上移到常用行。 */
   const salespersonFilter = ref<string[]>([])
+  /**
+   * 「额外模具」列头筛选（Excel 式下拉）：两态语义，与后端 filter 的 REQUIRED/NONE 一一对应。
+   * 需要＝字段='是'；否＝字段为空或非'是'。空数组＝不筛。
+   */
+  const EXTRA_MOLD_OPTIONS = [
+    { value: 'REQUIRED', label: '需要' },
+    { value: 'NONE', label: '否' }
+  ]
+  const extraMoldFilter = ref<string[]>([])
   const workshop = ref('')
   /**
    * 2026-10-21 精简：删除「跟单员」「任务单状态」两个下拉（真库实测与现有条件完全重复：
@@ -150,13 +170,35 @@ export function useTrackingFilters(options: { onChange: () => void }) {
   function optionalStageLabel(value: string) {
     return OPTIONAL_STAGE_LABELS[value] || value
   }
-  function moldStageLabel(value: string) {
-    return MOLD_STAGE_OPTIONS.find(option => option.value === value)?.label || value
+  /** 节点下拉：取值来自制程表（filter-options），未加载时为空 —— 不写死节点清单。 */
+  const nodeProgressOptions = computed(() =>
+    (filterOptions.value.nodeProgressNodes ?? []).map(node => ({ value: node.code, label: node.label })))
+  function nodeLabel(code: string) {
+    return nodeProgressOptions.value.find(option => option.value === code)?.label || code
+  }
+  function nodeStateLabel(state: string) {
+    return NODE_PROGRESS_STATE_OPTIONS.find(option => option.value === state)?.label || state
+  }
+  /** 是否构成一个有效的节点跟进条件（节点与档位都选了）。 */
+  const nodeProgressActive = computed(() => Boolean(nodeProgressCode.value) && nodeProgressStates.value.length > 0)
+  /**
+   * 选了节点默认只勾「未跟进」——跟单员点开节点，通常就是要看**这道节点还没动**的那批单；
+   * 要看进行中/已完成再自己加勾，不必先取消两档。
+   * 换节点时同样归位到默认档：节点换了，上一节点的档位组合没有继承意义。
+   */
+  function onNodeProgressCodeChange() {
+    nodeProgressStates.value = nodeProgressCode.value ? [NODE_PROGRESS_STATE_OPTIONS[0].value] : []
+    options.onChange()
+  }
+  /** 档位清空＝不再按节点筛，节点编码一并清掉，保持上面的不变量。 */
+  function onNodeProgressStatesChange() {
+    if (!nodeProgressStates.value.length) nodeProgressCode.value = ''
+    options.onChange()
   }
   const activeAdvancedFilterCount = computed(() => [Boolean(workshop.value), mine.value,
-    timeFilter.value !== 'all', Boolean(optionalStageFilter.value), moldStageFilter.value.length > 0,
-    // 「交付结果」「时间核实」已收进更多筛选区，计入角标；跟单状态排除工作台默认值，否则一进页面就多一个角标。
-    deliveryFilter.value.length > 0,
+    timeFilter.value !== 'all', Boolean(optionalStageFilter.value), nodeProgressActive.value,
+    // 「时间核实」已收进更多筛选区，计入角标；跟单状态排除工作台默认值，否则一进页面就多一个角标。
+    // 注：「生产交付结果」（deliveryFilter）2026-10-30 已移至列表表头筛选，不再计入本角标。
     trackingStatus.value !== 'all' && trackingStatus.value !== DEFAULT_TRACKING_STATUS]
     .filter(Boolean).length)
   const activeFilterChips = computed<FilterChip[]>(() => {
@@ -168,11 +210,12 @@ export function useTrackingFilters(options: { onChange: () => void }) {
     if (actionFilter.value !== 'all') chips.push({ key: 'action', label: `跟单待办：${actionFilter.value === 'any' ? '有提醒' : actionLabel(actionFilter.value as TrackingActionCode)}` })
     if (timeFilter.value !== 'all') chips.push({ key: 'time', label: `时间核实：${timeFilterLabels[timeFilter.value] || timeFilter.value}` })
     if (optionalStageFilter.value) chips.push({ key: 'optionalStage', label: `按需工序：${optionalStageLabel(optionalStageFilter.value)}` })
-    if (moldStageFilter.value.length) chips.push({ key: 'moldStage', label: `模具生产：${moldStageFilter.value.map(value => moldStageLabel(value)).join('、')}` })
+    if (nodeProgressActive.value) chips.push({ key: 'nodeProgress', label: `节点跟进：${nodeLabel(nodeProgressCode.value)} · ${nodeProgressStates.value.map(state => nodeStateLabel(state)).join('、')}` })
     if (urgentOnly.value) chips.push({ key: 'urgent', label: '仅看加急' })
     if (salespersonFilter.value.length) chips.push({ key: 'salesperson', label: `业务员：${salespersonFilter.value.join('、')}` })
     if (countdownFilter.value.length) chips.push({ key: 'countdown', label: `生产倒计时：${countdownFilter.value.map(value => COUNTDOWN_FILTER_OPTIONS.find(option => option.value === value)?.label || value).join('、')}` })
     if (deliveryFilter.value.length) chips.push({ key: 'delivery', label: `生产交付结果：${deliveryFilter.value.map(value => DELIVERY_FILTER_OPTIONS.find(option => option.value === value)?.label || value).join('、')}` })
+    if (extraMoldFilter.value.length) chips.push({ key: 'extraMold', label: `额外模具：${extraMoldFilter.value.map(value => EXTRA_MOLD_OPTIONS.find(option => option.value === value)?.label || value).join('、')}` })
     const created = dateFilters.value.created
     if (created.from || created.to) chips.push({ key: 'createdDate', label: `生产任务单提交时间：${created.from || '不限'}～${created.to || '不限'}` })
     const expected = dateFilters.value.expected
@@ -206,9 +249,10 @@ export function useTrackingFilters(options: { onChange: () => void }) {
       case 'action': actionFilter.value = 'all'; break
       case 'time': timeFilter.value = 'all'; break
       case 'optionalStage': optionalStageFilter.value = ''; break
-      case 'moldStage': moldStageFilter.value = []; break
+      case 'nodeProgress': nodeProgressCode.value = ''; nodeProgressStates.value = []; break
       case 'urgent': urgentOnly.value = false; break
       case 'salesperson': salespersonFilter.value = []; break
+      case 'extraMold': extraMoldFilter.value = []; break
       case 'countdown': countdownFilter.value = []; break
       case 'delivery': deliveryFilter.value = []; break
     }
@@ -218,7 +262,8 @@ export function useTrackingFilters(options: { onChange: () => void }) {
     keyword.value = ''; workshop.value = ''
     mine.value = false; urgentOnly.value = false; trackingStatus.value = 'all'; actionFilter.value = 'all'; timeFilter.value = 'all'
     salespersonFilter.value = []; countdownFilter.value = []; deliveryFilter.value = []; optionalStageFilter.value = ''
-    moldStageFilter.value = []
+    nodeProgressCode.value = ''; nodeProgressStates.value = []
+    extraMoldFilter.value = []
     dateFilters.value = { created: emptyTrackingDateFilter(), expected: emptyTrackingDateFilter() }
   }
   function resetTrackingFilters() { resetFilters(); options.onChange() }
@@ -250,7 +295,11 @@ export function useTrackingFilters(options: { onChange: () => void }) {
       salesperson: salespersonFilter.value.join(','),
       deliveryResult: deliveryFilter.value.join(','),
       optionalStage: optionalStageFilter.value,
-      moldStage: moldStageFilter.value.join(','),
+      // 「节点 × 状态」：一个节点内多档＝或，多个节点＝且（后端按节点分组各出一段条件）。
+      nodeProgress: nodeProgressActive.value
+        ? nodeProgressStates.value.map(state => `${nodeProgressCode.value}:${state}`).join(',')
+        : '',
+      extraMold: extraMoldFilter.value.join(','),
       createdFrom: dateFilters.value.created.from || '', createdTo: dateFilters.value.created.to || '',
       expectedFrom: dateFilters.value.expected.from || '', expectedTo: dateFilters.value.expected.to || '',
       month: '',
@@ -266,9 +315,12 @@ export function useTrackingFilters(options: { onChange: () => void }) {
 
   return {
     keyword, advancedFiltersVisible, dateFilters, countdownFilter, deliveryFilter, optionalStageFilter,
-    moldStageFilter, salespersonFilter, workshop, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
+    nodeProgressCode, nodeProgressStates, nodeProgressOptions, nodeProgressActive,
+    onNodeProgressCodeChange, onNodeProgressStatesChange,
+    salespersonFilter, workshop, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
+    extraMoldFilter, EXTRA_MOLD_OPTIONS,
     filterOptions, COUNTDOWN_FILTER_OPTIONS, DELIVERY_FILTER_OPTIONS, optionalStageOptions, optionalStageLabel,
-    MOLD_STAGE_OPTIONS, moldStageLabel,
+    NODE_PROGRESS_STATE_OPTIONS, nodeLabel, nodeStateLabel,
     quickFilterPresets, timeFilterLabels, quickFilterActive, applyQuickFilter, activeAdvancedFilterCount,
     activeFilterChips, clearFilterChip, resetTrackingFilters, onCreatedDateChange, onExpectedDateChange,
     trackingFilters, loadOptions

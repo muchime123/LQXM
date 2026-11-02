@@ -70,16 +70,9 @@ export function fetchPackaging() {
   return getJson('/api/website/packaging')
 }
 
-/** 官网公开模具档案。 */
-export function fetchMolds() {
-  return getJson('/api/website/molds')
-}
-
-/** 构造包材档案缩略图 URL。 */
-export function packagingImageUrl(item, size = 640) {
-  return item.defaultImageAssetId
-    ? `${apiBase}/api/file-assets/packaging_model/assets/${item.defaultImageAssetId}/thumbnail?size=${size}`
-    : ''
+/** 官网包材图片只使用官网媒体路径。 */
+export function packagingImageUrl(item) {
+  return item.imageUrl ? `${apiBase}${item.imageUrl}` : ''
 }
 
 /**
@@ -88,6 +81,16 @@ export function packagingImageUrl(item, size = 640) {
  */
 export function fetchCompanyDetail() {
   return getJson('/api/website/company-detail')
+}
+
+/** 官网资质独立内容预览；部署 V428 并开启后端门闩后才可使用。 */
+export function fetchNativeCredentials() {
+  return getJson('/api/website/native/credentials')
+}
+
+/** 官网独立知识产权；完成内容审核并打开双端开关后使用。 */
+export function fetchNativeIpItems() {
+  return getJson('/api/website/native/ip-items')
 }
 
 /**
@@ -209,6 +212,7 @@ export function fetchPageSections(pageKey) {
  * @property {number} productCount
  * @property {PublicProductView[]} products
  * @property {PublicMilestoneView[]} milestones
+ * @property {'legacy'|'native'} companySource
  */
 
 /**

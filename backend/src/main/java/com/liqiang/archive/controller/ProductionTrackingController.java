@@ -60,14 +60,17 @@ public class ProductionTrackingController {
             @RequestParam(defaultValue="") String expectedTo,
             @RequestParam(defaultValue="false") boolean expectedMissing,
             @RequestParam(defaultValue="") String optionalStage,
-            @RequestParam(defaultValue="") String moldStage,
+            /** 「节点跟进」筛选：{@code 节点编码:档位}（NONE/WORKING/DONE），多档逗号分隔。 */
+            @RequestParam(defaultValue="") String nodeProgress,
+            /** 「额外模具」列头筛选：{@code REQUIRED,NONE}（多选用逗号，与列表/导出同源）。 */
+            @RequestParam(defaultValue="") String extraMold,
             @RequestParam(defaultValue="1") int page,
             @RequestParam(defaultValue="30") int size){
         var result=service.list(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,salesperson,deliveryResult,
                 new ProductionTrackingService.DateRangeFilter(applicationFrom,applicationTo,applicationMissing),
                 new ProductionTrackingService.DateRangeFilter(scheduleFrom,scheduleTo,scheduleMissing),
                 new ProductionTrackingService.DateRangeFilter(expectedFrom,expectedTo,expectedMissing),urgent,moldLayout,
-                new ProductionTrackingService.DateRangeFilter(createdFrom,createdTo,false),optionalStage,moldStage,page,size);
+                new ProductionTrackingService.DateRangeFilter(createdFrom,createdTo,false),optionalStage,nodeProgress,extraMold,page,size);
         @SuppressWarnings("unchecked")
         var items=(List<Map<String,Object>>)result.get("items");
         outboundTrace.attachSummaries(items);
@@ -111,13 +114,14 @@ public class ProductionTrackingController {
             @RequestParam(defaultValue="") String expectedTo,
             @RequestParam(defaultValue="false") boolean expectedMissing,
             @RequestParam(defaultValue="") String optionalStage,
-            @RequestParam(defaultValue="") String moldStage,
+            @RequestParam(defaultValue="") String nodeProgress,
+            @RequestParam(defaultValue="") String extraMold,
             @RequestParam(defaultValue="") String ids){
         return service.exportRows(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,salesperson,deliveryResult,
                 new ProductionTrackingService.DateRangeFilter(applicationFrom,applicationTo,applicationMissing),
                 new ProductionTrackingService.DateRangeFilter(scheduleFrom,scheduleTo,scheduleMissing),
                 new ProductionTrackingService.DateRangeFilter(expectedFrom,expectedTo,expectedMissing),urgent,moldLayout,
-                new ProductionTrackingService.DateRangeFilter(createdFrom,createdTo,false),optionalStage,moldStage,ids);}
+                new ProductionTrackingService.DateRangeFilter(createdFrom,createdTo,false),optionalStage,nodeProgress,extraMold,ids);}
 
     @GetMapping("/summary")
     @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
@@ -540,5 +544,22 @@ public class ProductionTrackingController {
     public Map<String,Object> saveListColumnDefaults(
             @RequestBody List<ProductionTrackingService.ColumnDefaultSave> rows){
         return service.saveColumnDefaults(rows);
+    }
+
+    /**
+     * 导出字段选择的「全站默认字段」（2026-10-30）。
+     * <p>读沿用页面读权限（全站默认要对所有人生效）；写复用 manufacturing.listcolumns.manage（仅管理员）。
+     * <p>为什么不枚举白名单：导出列清单由前端 {@code EXPORT_COLUMNS} 唯一维护（含动态工序列），
+     * 后端复制一份只会漂移；表为空即「未配置」，前端回落「核心字段」。
+     */
+    @GetMapping("/export-column-defaults")
+    @RequirePermission({"manufacturing.read.self","manufacturing.read.department","manufacturing.read.all"})
+    public Map<String,Object> exportColumnDefaults(){return service.exportColumnDefaultMatrix();}
+
+    @PutMapping("/export-column-defaults")
+    @RequirePermission("manufacturing.listcolumns.manage")
+    public Map<String,Object> saveExportColumnDefaults(
+            @RequestBody List<ProductionTrackingService.ExportColumnDefaultSave> rows){
+        return service.saveExportColumnDefaults(rows);
     }
 }

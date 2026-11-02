@@ -41,12 +41,13 @@ placeholder="搜索知识库..."
             <button class="back-btn" @click="selectedArticle = null">← 返回列表</button>
             <div class="detail-actions">
               <button class="action-btn" title="编辑" @click="openEditArticle(selectedArticle)">✏</button>
-              <button class="action-btn danger" title="删除" @click="confirmDeleteArticle(selectedArticle)">🗑</button>
+              <button v-if="!selectedArticle.websiteVisible" class="action-btn danger" title="删除"
+                @click="confirmDeleteArticle(selectedArticle)">🗑</button>
             </div>
           </div>
           <h2 class="article-title">{{ selectedArticle.title }}</h2>
           <div class="article-meta">
-            <span v-if="selectedArticle.websiteVisible" class="article-website">官网展示</span>
+            <span v-if="selectedArticle.websiteVisible" class="article-website" title="历史公开接口仍可能读取此文；官网页面当前没有知识库栏目">旧公开接口可见</span>
             <span v-if="selectedArticle.author">作者：{{ selectedArticle.author }}</span>
             <span v-if="selectedArticle.source">来源：{{ selectedArticle.source }}</span>
             <span v-if="selectedArticle.tags" class="article-tags">
@@ -100,7 +101,7 @@ y2="12" />
                 <span class="article-status" :class="article.status">{{
                   article.status === 'draft' ? '草稿' : '已发布'
                 }}</span>
-                <span v-if="article.websiteVisible" class="article-website" title="该文章将在官网知识库栏目展示">官网展示</span>
+                <span v-if="article.websiteVisible" class="article-website" title="历史公开接口仍可能读取此文；官网页面当前没有知识库栏目">旧公开接口可见</span>
                 <div class="article-card-title">{{ article.title }}</div>
               </div>
               <div class="article-card-excerpt">{{ getExcerpt(article.content) }}</div>
@@ -111,7 +112,8 @@ y2="12" />
             </div>
             <div class="card-actions-mini">
               <button class="mini-btn" title="编辑" @click.stop="openEditArticle(article)">✏</button>
-              <button class="mini-btn danger" title="删除" @click.stop="confirmDeleteArticle(article)">🗑</button>
+              <button v-if="!article.websiteVisible" class="mini-btn danger" title="删除"
+                @click.stop="confirmDeleteArticle(article)">🗑</button>
             </div>
           </div>
         </div>

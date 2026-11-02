@@ -265,7 +265,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted, nextTick } from 'vue'
 import {
   fetchPackagingModels,
   fetchPackagingMold,
@@ -305,6 +305,18 @@ const formRef = ref<FormInstance>()
 const saving = ref(false)
 const dirty = ref(false)
 const loadingGroups = ref(false)
+
+/**
+ * 当前加载会话的序号：每次打开弹窗 / 切换模具都会递增。
+ *
+ * <p>详情请求是异步的，返回时会话可能已经变了（用户关了弹窗、或改用另一个模具）。
+ * 只有在返回时序号仍然是最新值，回填才允许落到表单上。
+ */
+let editLoadSeq = 0
+/** 组件已卸载：卸载后到达的响应一律丢弃，避免写入已失效的状态 */
+let disposed = false
+onUnmounted(() => (disposed = true))
+
 const productModels = ref<{ id: number; name: string }[]>([])
 const moldGroups = ref<{ id: number; modelId: number; name: string; moldCount: number }[]>([])
 
@@ -464,27 +476,93 @@ async function syncAccessoriesFromRaw(force = false) {
   }
 }
 
-const form = reactive<MoldPayload & { id?: number; engravingType?: string }>({
-  modelId: undefined,
-  groupId: undefined,
-  moldCode: '',
-  baseMoldCode: '',
-  moldTypeCode: '',
-  cavityCount: undefined,
-  moldRole: 'main',
-  moldCategory: '',
-  compartmentCount: '',
-  surfaceStructure: '',
-  bottomEngraving: '',
-  engravingType: 'generic',
-  rawAccessoriesText: '',
-  rawCaliber: '',
-  rawHeight: '',
-  status: 'in_use',
-  websiteEnabled: false,
-  websiteSortOrder: 0,
-  remark: ''
-})
+type MoldFormState = MoldPayload & { id?: number; engravingType?: string }
+
+/**
+ * 模具表单的默认值。
+ *
+ * <p>同时充当「用户是否改过某字段」的基准：异步回填只覆盖仍等于默认值的字段，
+ * 这样即便用户在详情返回之前就开始输入，也不会被旧响应静默抹掉。
+ */
+function buildDefaultMoldForm(): MoldFormState {
+  return {
+    id: undefined,
+    modelId: undefined,
+    groupId: undefined,
+    moldCode: '',
+    baseMoldCode: '',
+    moldTypeCode: '',
+    cavityCount: undefined,
+    moldRole: 'main',
+    moldCategory: '',
+    compartmentCount: '',
+    surfaceStructure: '',
+    bottomEngraving: '',
+    engravingType: 'generic',
+    rawAccessoriesText: '',
+    rawCaliber: '',
+    rawHeight: '',
+    status: 'in_use',
+    websiteEnabled: false,
+    websiteSortOrder: 0,
+    remark: ''
+  }
+}
+
+const form = reactive<MoldFormState>(buildDefaultMoldForm())
+
+/**
+ * 程序化写入（初始化 / 异步回填）期间不标记为「用户已改」。
+ *
+ * <p>用 `flush: 'sync'` 保证回调在 `Object.assign` 期间同步触发，
+ * 从而能被 `applyingForm` 正确屏蔽；若用默认异步刷新，屏蔽会在回调之后解除。
+ */
+let applyingForm = false
+watch(
+  form,
+  () => {
+    if (!applyingForm) dirty.value = true
+  },
+  { deep: true, flush: 'sync' }
+)
+
+function sameValue(a: unknown, b: unknown) {
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+}
+
+/** 统一入口：写入表单但不触发脏标记 */
+function applyForm(patch: Partial<MoldFormState>) {
+  applyingForm = true
+  try {
+    Object.assign(form, patch)
+  } finally {
+    applyingForm = false
+  }
+}
+
+/** 异步回填：只覆盖用户尚未修改的字段 */
+function mergeLoadedMoldForm(loaded: Record<string, unknown>) {
+  const defaults = buildDefaultMoldForm() as Record<string, unknown>
+  const patch: Record<string, unknown> = {}
+  for (const key of Object.keys(defaults)) {
+    if (sameValue(form[key as keyof MoldFormState], defaults[key])) {
+      patch[key] = loaded[key] ?? defaults[key]
+    }
+  }
+  applyForm(patch)
+}
+
+/** 该会话是否已被用户改动过（逐字段比对默认值，不依赖 dirty 标志） */
+function hasUserEdits() {
+  const defaults = buildDefaultMoldForm() as Record<string, unknown>
+  return Object.keys(defaults).some(key => !sameValue(form[key as keyof MoldFormState], defaults[key]))
+}
+
+/** 打开新会话时清掉上一次的校验红字（LqDialog 默认不销毁内部 el-form） */
+async function clearFormValidation() {
+  await nextTick()
+  formRef.value?.clearValidate()
+}
 
 const isEdit = computed(() => Boolean(props.moldId))
 const isNumericOnly = computed(() => /^\d+$/.test(form.moldCode?.trim() || ''))
@@ -627,33 +705,18 @@ async function openQuickCreateGroup() {
 
 async function loadForEdit() {
   if (!props.moldId) return
+  const seq = ++editLoadSeq
   try {
     const data = await fetchPackagingMold(props.moldId)
+    // 请求返回时会话可能已经结束（关闭 / 切到另一个模具 / 组件已卸载）—— 旧响应直接丢弃
+    if (disposed || seq !== editLoadSeq) return
     const v = data.mold
     // 先加载该系列的规格族列表，保证回显时有下拉项
     await loadMoldGroups(v.modelId)
-    Object.assign(form, {
-      id: v.id,
-      modelId: v.modelId,
-      groupId: v.groupId,
-      moldCode: v.moldCode,
-      baseMoldCode: v.baseMoldCode,
-      moldTypeCode: v.moldTypeCode,
-      cavityCount: v.cavityCount,
-      moldRole: v.moldRole || 'main',
-      moldCategory: v.moldCategory,
-      compartmentCount: v.compartmentCount,
-      surfaceStructure: v.surfaceStructure,
-      bottomEngraving: v.bottomEngraving,
-      engravingType: v.engravingType || 'generic',
-      rawAccessoriesText: v.rawAccessoriesText,
-      rawCaliber: v.rawCaliber,
-      rawHeight: v.rawHeight,
-      status: v.status || 'in_use',
-      websiteEnabled: v.websiteEnabled ?? false,
-      websiteSortOrder: v.websiteSortOrder ?? 0,
-      remark: v.remark
-    })
+    if (disposed || seq !== editLoadSeq) return
+    // 记录回填前用户是否已经动过表单：用于在回填后决定是否清掉脏标记
+    const touchedBeforeMerge = hasUserEdits()
+    mergeLoadedMoldForm((v ?? {}) as unknown as Record<string, unknown>)
     // 第一道：优先用后端返回的结构化配件
     const backendAccessories = data.accessories || []
     accessories.value = backendAccessories
@@ -683,36 +746,18 @@ async function loadForEdit() {
         ElMessage.warning('已根据配件原文自动解析出配件卡片，保存模具后会正式落库')
       }
     }
-    dirty.value = false
+    // 异步回填不得抹掉用户在加载窗口内已经做出的编辑
+    if (!touchedBeforeMerge) dirty.value = false
   } catch (e: any) {
+    // 会话已结束（关闭 / 切换 / 卸载）→ 不再向用户抛出「加载模具失败」
+    if (disposed || seq !== editLoadSeq) return
     ElMessage.error(e?.message || '加载模具失败')
     visible.value = false
   }
 }
 
 function resetForm() {
-  Object.assign(form, {
-    modelId: undefined,
-    groupId: undefined,
-    moldCode: '',
-    baseMoldCode: '',
-    moldTypeCode: '',
-    cavityCount: undefined,
-    moldRole: 'main',
-    moldCategory: '',
-    compartmentCount: '',
-    surfaceStructure: '',
-    bottomEngraving: '',
-    engravingType: 'generic',
-    rawAccessoriesText: '',
-    rawCaliber: '',
-    rawHeight: '',
-    status: 'in_use',
-    websiteEnabled: false,
-    websiteSortOrder: 0,
-    remark: '',
-    id: undefined
-  })
+  applyForm(buildDefaultMoldForm())
   moldGroups.value = []
   accessories.value = []
   dirty.value = false
@@ -791,27 +836,31 @@ async function handleBeforeClose(): Promise<boolean> {
 }
 
 watch(visible, v => {
-  if (v) {
-    loadProductModels()
-    if (props.moldId) loadForEdit()
-    else {
-      resetForm()
-      if (props.modelId) {
-        form.modelId = props.modelId
-        loadMoldGroups(props.modelId)
-      }
+  if (!v) {
+    // 弹窗关闭 → 之前发出的详情请求立即失效，其响应不得再落到表单上
+    editLoadSeq += 1
+    return
+  }
+  clearFormValidation()
+  loadProductModels()
+  if (props.moldId) loadForEdit()
+  else {
+    resetForm()
+    if (props.modelId) {
+      form.modelId = props.modelId
+      loadMoldGroups(props.modelId)
     }
   }
 })
 
 onMounted(() => {
-  if (props.visible) {
-    loadProductModels()
-    if (props.moldId) loadForEdit()
-    else if (props.modelId) {
-      form.modelId = props.modelId
-      loadMoldGroups(props.modelId)
-    }
+  if (!props.visible) return
+  clearFormValidation()
+  loadProductModels()
+  if (props.moldId) loadForEdit()
+  else if (props.modelId) {
+    form.modelId = props.modelId
+    loadMoldGroups(props.modelId)
   }
 })
 </script>

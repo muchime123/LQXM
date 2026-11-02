@@ -8,11 +8,15 @@ import com.liqiang.archive.repository.WebsitePageSectionRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Sort;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -20,7 +24,10 @@ import java.util.*;
 public class WebsitePageSectionService {
 
     /** 允许的页面标识。 */
-    private static final Set<String> VALID_PAGE_KEYS = Set.of("HOME", "PRODUCTS", "SOLUTIONS", "ABOUT", "CONTACT", "PACKAGING", "MOLDS");
+    private static final Set<String> VALID_PAGE_KEYS = Set.of("HOME", "PRODUCTS", "SOLUTIONS", "ABOUT", "CONTACT", "PACKAGING");
+    private static final Pattern MEDIA_URL = Pattern.compile("/api/website/media/(\\d+)/content");
+    private static final Pattern ARCHIVE_FILE_URL = Pattern.compile(
+            "(?i)(?:/api/files/|/api/file-assets/|product_model/assets/|packaging_model/assets/)");
 
     private static final Sort DEFAULT_SORT = Sort.by(
             Sort.Order.asc("pageKey"),
@@ -30,6 +37,7 @@ public class WebsitePageSectionService {
 
     private final WebsitePageSectionRepository sectionRepo;
     private final AuditLogService auditLogService;
+    private final WebsiteProductPublicationService publicationService;
 
     @Transactional(readOnly = true)
     public List<PageSectionView> listAll() {
@@ -50,6 +58,7 @@ public class WebsitePageSectionService {
     /** 官网公开区块：某页面下启用且未删除、排序后的区块列表。 */
     @Transactional(readOnly = true)
     public List<PublicPageSectionView> listPublic(String pageKey) {
+        if ("MOLDS".equalsIgnoreCase(pageKey)) return List.of();
         return sectionRepo.findByPageKeyAndEnabledTrueAndDeletedAtIsNullOrderBySortOrderAscIdAsc(pageKey).stream()
                 .map(PublicPageSectionView::from)
                 .toList();
@@ -81,6 +90,8 @@ public class WebsitePageSectionService {
         }
         WebsitePageSection entity = new WebsitePageSection();
         applyPayload(entity, payload);
+        if (Boolean.TRUE.equals(entity.getEnabled())) requireIndependentMedia(entity);
+        publishReferencedMedia(entity);
         WebsitePageSection saved = sectionRepo.save(entity);
         auditLogService.log("WebsitePageSection", saved.getId(), saved.getTitle() == null ? saved.getSectionKey() : saved.getTitle(),
                 "PAGE_SECTION_CREATE", String.format(Locale.ROOT, "创建页面区块 page=%s section=%s", saved.getPageKey(), saved.getSectionKey()));
@@ -99,7 +110,14 @@ public class WebsitePageSectionService {
             throw new IllegalArgumentException("同一页面下已存在该区块标识: " + sectionKey);
         }
         Map<String, Object> before = snapshot(entity);
+        boolean wasEnabled = Boolean.TRUE.equals(entity.getEnabled());
         applyPayload(entity, payload);
+        if (Boolean.TRUE.equals(entity.getEnabled()) && (!wasEnabled
+                || !Objects.equals(before.get("imageUrl"), entity.getImageUrl())
+                || !Objects.equals(before.get("content"), entity.getContent()))) {
+            requireIndependentMedia(entity);
+        }
+        publishReferencedMedia(entity);
         WebsitePageSection saved = sectionRepo.save(entity);
         Map<String, Object> after = snapshot(saved);
         String changes = buildChanges(before, after);
@@ -127,7 +145,9 @@ public class WebsitePageSectionService {
     public PageSectionView restore(Long id) {
         WebsitePageSection entity = sectionRepo.findById(id).orElseThrow(() -> new IllegalArgumentException("页面区块不存在: " + id));
         if (entity.getDeletedAt() == null) return PageSectionView.from(entity);
+        if (Boolean.TRUE.equals(entity.getEnabled())) requireIndependentMedia(entity);
         entity.setDeletedAt(null);
+        publishReferencedMedia(entity);
         WebsitePageSection saved = sectionRepo.save(entity);
         String title = saved.getTitle() == null ? saved.getSectionKey() : saved.getTitle();
         auditLogService.log("WebsitePageSection", saved.getId(), title, "PAGE_SECTION_RESTORE",
@@ -151,7 +171,9 @@ public class WebsitePageSectionService {
         int changed = 0;
         for (WebsitePageSection e : entities) {
             if ((enabled && !Boolean.TRUE.equals(e.getEnabled())) || (!enabled && Boolean.TRUE.equals(e.getEnabled()))) {
+                if (enabled) requireIndependentMedia(e);
                 e.setEnabled(enabled);
+                publishReferencedMedia(e);
                 changed++;
             }
         }
@@ -182,6 +204,24 @@ public class WebsitePageSectionService {
         entity.setImageUrl(trimToNull(payload.imageUrl()));
         entity.setSortOrder(payload.sortOrder() == null ? 0 : payload.sortOrder());
         entity.setEnabled(payload.enabled() == null || payload.enabled());
+    }
+
+    private void publishReferencedMedia(WebsitePageSection section) {
+        if (!Boolean.TRUE.equals(section.getEnabled())) return;
+        for (String value : List.of(section.getImageUrl() == null ? "" : section.getImageUrl(),
+                section.getContent() == null ? "" : section.getContent())) {
+            Matcher matcher = MEDIA_URL.matcher(value);
+            while (matcher.find()) publicationService.publishMedia(Long.parseLong(matcher.group(1)));
+        }
+    }
+
+    private static void requireIndependentMedia(WebsitePageSection section) {
+        for (String value : List.of(section.getImageUrl() == null ? "" : section.getImageUrl(),
+                section.getContent() == null ? "" : section.getContent())) {
+            if (ARCHIVE_FILE_URL.matcher(value).find()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "官网区块仍引用内部档案文件，请先复制到官网媒体库");
+            }
+        }
     }
 
     private static String trimToNull(String value) {

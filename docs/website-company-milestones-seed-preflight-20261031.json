@@ -1,0 +1,12 @@
+{
+  "source_ids": [
+    1,
+    2,
+    3
+  ],
+  "source_count": 3,
+  "target_count_before": 0,
+  "ready": true,
+  "blockers": [],
+  "applied": false
+}

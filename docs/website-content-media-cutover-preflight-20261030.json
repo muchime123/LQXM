@@ -1,0 +1,123 @@
+{
+  "read_only": true,
+  "ready": true,
+  "issues": [],
+  "banner_count": 2,
+  "section_references": 12,
+  "changes": [
+    {
+      "kind": "banner",
+      "id": 4,
+      "field": "image_url",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgyKV8yMDI2MDgyMDA5MTEzODczNy5wbmc",
+      "new_media_id": 2,
+      "new_url": "/api/website/media/2/content"
+    },
+    {
+      "kind": "banner",
+      "id": 5,
+      "field": "image_url",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgxKV8yMDI2MDgyMDA5MTEzODQwNC5wbmc",
+      "new_media_id": 3,
+      "new_url": "/api/website/media/3/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 3,
+      "field": "content",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgxKV8yMDI2MDgyMDE0MTcwOTA2MS5wbmc",
+      "new_media_id": 141,
+      "new_url": "/api/website/media/141/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 3,
+      "field": "content",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgyKV8yMDI2MDgyMDE0MTcwODcyMS5wbmc",
+      "new_media_id": 142,
+      "new_url": "/api/website/media/142/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 3,
+      "field": "content",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgzKV8yMDI2MDgyMDE0MTcwODM1My5wbmc",
+      "new_media_id": 143,
+      "new_url": "/api/website/media/143/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 8,
+      "field": "content",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgzKV8yMDI2MDgyMDE0MTcwODM1My5wbmc",
+      "new_media_id": 143,
+      "new_url": "/api/website/media/143/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 8,
+      "field": "image_url",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgyKV8yMDI2MDgyMDEyMjUxNjg4Mi5wbmc",
+      "new_media_id": 145,
+      "new_url": "/api/website/media/145/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 9,
+      "field": "content",
+      "old_url": "/api/files/company?encoded=MjAyNjA3MDYxNjE4MzM5NzNfZWI1ZWU5NzhlZWZjMjQ0YzUyNjdkYzIzNWFiYjUzYWIt5ou36LSdXzIwMjYwODIwMTQ0MDQ3MTEwLmpwZw",
+      "new_media_id": 140,
+      "new_url": "/api/website/media/140/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 9,
+      "field": "content",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgxKV8yMDI2MDgyMDE0MTcwOTA2MS5wbmc",
+      "new_media_id": 141,
+      "new_url": "/api/website/media/141/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 9,
+      "field": "content",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgzKV8yMDI2MDgyMDE0MTcwODM1My5wbmc",
+      "new_media_id": 143,
+      "new_url": "/api/website/media/143/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 9,
+      "field": "image_url",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgyKV8yMDI2MDgyMDE0MTcwODcyMS5wbmc",
+      "new_media_id": 142,
+      "new_url": "/api/website/media/142/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 14,
+      "field": "image_url",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgxKV8yMDI2MDgyMDEyMjUxNjI3MS5wbmc",
+      "new_media_id": 144,
+      "new_url": "/api/website/media/144/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 16,
+      "field": "image_url",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMzICgzKV8yMDI2MDgyMDEyMjUxNzIyNy5wbmc",
+      "new_media_id": 146,
+      "new_url": "/api/website/media/146/content"
+    },
+    {
+      "kind": "page_section",
+      "id": 19,
+      "field": "image_url",
+      "old_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgyKV8yMDI2MDgyMDEyMjUxNjg4Mi5wbmc",
+      "new_media_id": 145,
+      "new_url": "/api/website/media/145/content"
+    }
+  ],
+  "runtime_verification_available": false,
+  "note": "Database/file preflight only; public HTTP and browser parity require a running backend."
+}

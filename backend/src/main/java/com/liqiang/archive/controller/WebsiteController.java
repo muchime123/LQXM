@@ -5,8 +5,12 @@ import com.liqiang.archive.dto.CatalogDtos.ModelDetail;
 import com.liqiang.archive.dto.CatalogDtos.ModelView;
 import com.liqiang.archive.dto.CatalogDtos.VariantView;
 import com.liqiang.archive.dto.CatalogDtos.AssetView;
-import com.liqiang.archive.dto.PackagingMoldDtos.MoldSummary;
 import com.liqiang.archive.entity.CompanyInfo;
+import com.liqiang.archive.entity.WebsiteCompanyProfile;
+import com.liqiang.archive.entity.WebsiteCompanyMilestone;
+import com.liqiang.archive.entity.WebsiteSocialLink;
+import com.liqiang.archive.entity.WebsitePackagingItem;
+import com.liqiang.archive.entity.WebsitePackagingVariant;
 import com.liqiang.archive.entity.CompanyMilestone;
 import com.liqiang.archive.entity.KnowledgeArticle;
 import com.liqiang.archive.entity.KnowledgeCategory;
@@ -19,14 +23,18 @@ import com.liqiang.archive.service.CompanyInfoService;
 import com.liqiang.archive.service.InquiryAntiSpamService;
 import com.liqiang.archive.service.ProductCatalogService;
 import com.liqiang.archive.service.WebsiteNativeProductQueryService;
-import com.liqiang.archive.service.PackagingService;
-import com.liqiang.archive.service.PackagingMoldService;
+import com.liqiang.archive.service.WebsiteNativeCompanyQueryService;
+import com.liqiang.archive.service.WebsiteCompanyMilestoneService;
+import com.liqiang.archive.service.WebsiteSocialLinkService;
+import com.liqiang.archive.service.WebsitePackagingItemService;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -54,8 +62,10 @@ public class WebsiteController {
     private final CompanyInfoService companyInfoService;
     private final ProductCatalogService catalogService;
     private final WebsiteNativeProductQueryService nativeProducts;
-    private final PackagingService packagingService;
-    private final PackagingMoldService packagingMoldService;
+    private final WebsiteNativeCompanyQueryService nativeCompany;
+    private final WebsiteCompanyMilestoneService nativeMilestones;
+    private final WebsiteSocialLinkService nativeSocialLinks;
+    private final WebsitePackagingItemService nativePackaging;
     private final WebsiteInquiryRepository inquiryRepository;
     private final InquiryAntiSpamService antiSpamService;
     private final MediaAccountRepository mediaAccountRepository;
@@ -63,21 +73,40 @@ public class WebsiteController {
     @Value("${app.website.product-source:legacy}")
     private String productSource;
 
+    @Value("${app.website.company-source:native}")
+    private String companySource;
+
+    private PublicCompanyView publicCompany() {
+        if ("native".equalsIgnoreCase(companySource)) {
+            WebsiteCompanyProfile profile = nativeCompany.published();
+            return profile == null ? null : PublicCompanyView.from(profile);
+        }
+        CompanyInfo info = companyInfoService.getCompanyInfo();
+        return info == null ? null : PublicCompanyView.from(info);
+    }
+
+    private List<PublicMilestoneView> publicMilestones() {
+        if ("native".equalsIgnoreCase(companySource)) {
+            return nativeMilestones.published().stream().map(PublicMilestoneView::from).toList();
+        }
+        return companyInfoService.getMilestones().stream()
+                .filter(m -> Boolean.TRUE.equals(m.getWebsiteEnabled()))
+                .map(PublicMilestoneView::from).toList();
+    }
+
     private boolean useNativeProducts() {
         return "native".equalsIgnoreCase(productSource);
     }
 
     @GetMapping("/home")
     public Object home() {
-        CompanyInfo company = companyInfoService.getCompanyInfo();
+        PublicCompanyView company = publicCompany();
         if (useNativeProducts()) {
             List<WebsiteNativeProductQueryService.ProductView> featured = nativeProducts.featured(12);
             var page = nativeProducts.list(null, null, null, null, null, null, 0, 6);
-            return new NativeHomeView(PublicCompanyView.from(company), page.total(),
+            return new NativeHomeView(company, page.total(),
                     featured.isEmpty() ? page.items() : featured,
-                    companyInfoService.getMilestones().stream()
-                            .filter(m -> Boolean.TRUE.equals(m.getWebsiteEnabled()))
-                            .map(PublicMilestoneView::from).toList());
+                    publicMilestones(), companySourceLabel());
         }
         // 首页产品：后台明确勾选的核心产品优先展示。
         // websiteFeatured 已经表达了运营人员的发布意图，不再用资料完整度二次静默过滤。
@@ -106,12 +135,14 @@ public class WebsiteController {
                     .toList();
         }
         return new HomeView(
-                PublicCompanyView.from(company),
+                company,
                 productCount,
                 products,
-                companyInfoService.getMilestones().stream()
-                        .filter(m -> Boolean.TRUE.equals(m.getWebsiteEnabled()))
-                        .map(PublicMilestoneView::from).toList());
+                publicMilestones(), companySourceLabel());
+    }
+
+    private String companySourceLabel() {
+        return "native".equalsIgnoreCase(companySource) ? "native" : "legacy";
     }
 
     /**
@@ -200,28 +231,10 @@ public class WebsiteController {
                 List.of("手动/小批量", "半自动/中等产能", "全自动/高产能", "产线级"));
     }
 
-    /** 官网包材目录：只公开在售档案，剔除价格、来源文件和内部备注。 */
+    /** 官网包材目录只读取官网独立内容。 */
     @GetMapping("/packaging")
     public List<PublicPackagingView> packaging() {
-        return packagingService.search(null, null, null, "在售",
-                        PageRequest.of(0, 200, Sort.by("sortOrder").ascending().and(Sort.by("id"))))
-                .getContent().stream()
-                .filter(item -> Boolean.TRUE.equals(item.websiteEnabled()))
-                .sorted(java.util.Comparator.comparingInt(item -> item.websiteSortOrder() == null ? 0 : item.websiteSortOrder()))
-                .map(PublicPackagingView::from)
-                .toList();
-    }
-
-    /** 官网模具目录：只公开在用主模，剔除刻字、配件、来源和内部备注。 */
-    @GetMapping("/molds")
-    public List<PublicMoldView> molds() {
-        return packagingMoldService.search(null, null, "main", null, "in_use", null, null,
-                        PageRequest.of(0, 300, Sort.by("moldCode").ascending()))
-                .getContent().stream()
-                .filter(item -> Boolean.TRUE.equals(item.websiteEnabled()))
-                .sorted(java.util.Comparator.comparingInt(item -> item.websiteSortOrder() == null ? 0 : item.websiteSortOrder()))
-                .map(PublicMoldView::from)
-                .toList();
+        return nativePackaging.publishedCatalog().stream().map(PublicPackagingView::from).toList();
     }
 
     /**
@@ -230,8 +243,7 @@ public class WebsiteController {
      */
     @GetMapping("/company-detail")
     public PublicCompanyView companyDetail() {
-        CompanyInfo info = companyInfoService.getCompanyInfo();
-        return info != null ? PublicCompanyView.from(info) : null;
+        return publicCompany();
     }
 
     /**
@@ -240,19 +252,15 @@ public class WebsiteController {
      */
     @GetMapping("/milestones")
     public List<PublicMilestoneView> milestones() {
-        return companyInfoService.getMilestones().stream()
-                .filter(m -> Boolean.TRUE.equals(m.getWebsiteEnabled()))
-                .map(PublicMilestoneView::from)
-                .toList();
+        return publicMilestones();
     }
 
-    /**
-     * 官网官方展示的自媒体账号列表（标记为 website_official=true 的账号）。
-     * 由「自媒体账号管理」后台勾选「官网官方展示」的账号会出现在这里，
-     * 用于 Contact 页社交卡片与 Footer 社交图标，避免在 CompanyInfo 中重复维护链接。
-     */
+    /** 官网官方账号列表；独立来源仅读取官网已发布链接。 */
     @GetMapping("/official-media-accounts")
     public List<PublicMediaAccountView> officialMediaAccounts() {
+        if ("native".equalsIgnoreCase(companySource)) {
+            return nativeSocialLinks.published().stream().map(PublicMediaAccountView::from).toList();
+        }
         return mediaAccountRepository.findByWebsiteOfficialTrueOrderByPlatformAscIdAsc()
                 .stream()
                 .map(PublicMediaAccountView::from)
@@ -353,11 +361,11 @@ public class WebsiteController {
                                   String captchaId, String captchaAnswer) {}
 
     public record HomeView(PublicCompanyView company, long productCount, List<PublicProductView> products,
-                           List<PublicMilestoneView> milestones) {}
+                           List<PublicMilestoneView> milestones, String companySource) {}
 
     public record NativeHomeView(PublicCompanyView company, long productCount,
                                  List<WebsiteNativeProductQueryService.ProductView> products,
-                                 List<PublicMilestoneView> milestones) {}
+                                 List<PublicMilestoneView> milestones, String companySource) {}
 
     public record PublicProductPage(List<PublicProductView> items, long total, int totalPages, int page) {}
 
@@ -368,25 +376,27 @@ public class WebsiteController {
     public record PublicPackagingView(Long id, String name, String modelCode, String packagingKind,
                                       String filmForm, String shapeType, String material,
                                       String colorStyle, String capacityMl, String applicable,
-                                      Boolean customizable, String tags, Long defaultImageAssetId,
-                                      long variantCount) {
-        static PublicPackagingView from(com.liqiang.archive.dto.PackagingDtos.ModelSummary item) {
-            return new PublicPackagingView(item.id(), item.name(), item.modelCode(), item.packagingKind(),
-                    item.filmForm(), item.shapeType(), item.material(), item.colorStyle(),
-                    item.capacityMl(), item.applicable(), item.customizable(), item.tags(),
-                    item.defaultImageAssetId(), item.variantCount());
+                                      Boolean customizable, String tags,
+                                      long variantCount, String imageUrl,
+                                      List<PublicPackagingVariantView> variants) {
+        static PublicPackagingView from(WebsitePackagingItemService.CatalogItem catalog) {
+            WebsitePackagingItem item = catalog.item();
+            String imageUrl = item.getCoverMediaId() == null ? null
+                    : "/api/website/media/" + item.getCoverMediaId() + "/content";
+            List<PublicPackagingVariantView> variants = catalog.variants().stream()
+                    .map(PublicPackagingVariantView::from).toList();
+            return new PublicPackagingView(item.getId(), item.getName(), item.getSlug(),
+                    item.getPackagingKind(), null, item.getShapeType(), item.getMaterial(),
+                    null, item.getCapacityMl(), item.getApplicable(), item.getCustomizable(),
+                    null, variants.size(), imageUrl, variants);
         }
     }
 
-    public record PublicMoldView(Long id, String modelName, String groupName, String moldCode,
-                                 String moldTypeCode, Integer cavityCount, String moldCategory,
-                                 String compartmentCount, String surfaceStructure,
-                                 String representativeCaliber, String representativeHeight) {
-        static PublicMoldView from(MoldSummary item) {
-            return new PublicMoldView(item.id(), item.modelName(), item.groupName(), item.moldCode(),
-                    item.moldTypeCode(), item.cavityCount(), item.moldCategory(),
-                    item.compartmentCount(), item.surfaceStructure(),
-                    item.representativeCaliber(), item.representativeHeight());
+    public record PublicPackagingVariantView(String name, String publicSku, String dimensions,
+                                             String capacityMl, String description) {
+        static PublicPackagingVariantView from(WebsitePackagingVariant item) {
+            return new PublicPackagingVariantView(item.getName(), item.getPublicSku(),
+                    item.getDimensions(), item.getCapacityMl(), item.getDescription());
         }
     }
 
@@ -397,7 +407,8 @@ public class WebsiteController {
                                     String enterpriseScale,
                                     LocalDate establishmentDate,
                                     String officeAddress,
-                                    String factoryAddress, String phone, String email, String website) {
+                                    String factoryAddress, String phone, String email, String website,
+                                    Long logoMediaId) {
         static PublicCompanyView from(CompanyInfo info) {
             return new PublicCompanyView(info.getCompanyName(), info.getCompanyNameEn(), info.getBrandName(),
                     info.getBrandNameEn(), info.getBrandSlogan(), info.getMission(), info.getVision(),
@@ -407,7 +418,15 @@ public class WebsiteController {
                     info.getEnterpriseScale(),
                     info.getEstablishmentDate(),
                     info.getOfficeAddress(),
-                    info.getFactoryAddress(), info.getPhone(), info.getEmail(), info.getWebsite());
+                    info.getFactoryAddress(), info.getPhone(), info.getEmail(), info.getWebsite(), null);
+        }
+        static PublicCompanyView from(WebsiteCompanyProfile info) {
+            return new PublicCompanyView(info.getCompanyName(), info.getCompanyNameEn(), info.getBrandName(),
+                    info.getBrandNameEn(), info.getBrandSlogan(), info.getMission(), info.getVision(),
+                    info.getValues(), info.getCorePositioning(), info.getMainBusiness(),
+                    info.getTargetIndustries(), info.getAdvantages(), info.getManufacturingStrengths(),
+                    info.getEnterpriseScale(), info.getEstablishmentDate(), info.getOfficeAddress(),
+                    info.getFactoryAddress(), info.getPhone(), info.getEmail(), info.getWebsite(), info.getLogoMediaId());
         }
     }
 
@@ -539,6 +558,9 @@ public class WebsiteController {
         static PublicMilestoneView from(CompanyMilestone item) {
             return new PublicMilestoneView(item.getYear(), item.getTitle(), item.getDescription());
         }
+        static PublicMilestoneView from(WebsiteCompanyMilestone item) {
+            return new PublicMilestoneView(item.getYear(), item.getTitle(), item.getDescription());
+        }
     }
 
     /**
@@ -552,6 +574,9 @@ public class WebsiteController {
                     account.getPlatform(),
                     account.getAccountName(),
                     account.getLink());
+        }
+        static PublicMediaAccountView from(WebsiteSocialLink link) {
+            return new PublicMediaAccountView(link.getId(), link.getPlatform(), link.getAccountName(), link.getLink());
         }
     }
 
@@ -596,6 +621,7 @@ public class WebsiteController {
     /** 官网公开知识库分类：仅包含有「已发布 + 官网可见」文章的分类。 */
     @GetMapping("/knowledge-categories")
     public List<PublicKnowledgeCategoryView> knowledgeCategories() {
+        requireLegacyKnowledgeSource();
         List<KnowledgeCategory> categories = companyInfoService.getKbCategories();
         List<KnowledgeArticle> visibleArticles = companyInfoService.getWebsiteKbArticles(null, null);
         Map<Long, Long> counts = visibleArticles.stream()
@@ -611,6 +637,7 @@ public class WebsiteController {
     public List<PublicKnowledgeArticleView> knowledgeArticles(
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) String keyword) {
+        requireLegacyKnowledgeSource();
         Map<Long, String> categoryNames = companyInfoService.getKbCategories().stream()
                 .collect(java.util.stream.Collectors.toMap(KnowledgeCategory::getId, KnowledgeCategory::getName));
         return companyInfoService.getWebsiteKbArticles(categoryId, keyword).stream()
@@ -622,6 +649,7 @@ public class WebsiteController {
     /** 官网知识文章详情：仅返回「已发布 + 官网可见」的文章，并累加浏览量。 */
     @GetMapping("/knowledge-articles/{id}")
     public ResponseEntity<PublicKnowledgeArticleDetailView> knowledgeArticleDetail(@PathVariable Long id) {
+        requireLegacyKnowledgeSource();
         KnowledgeArticle article = companyInfoService.getWebsiteKbArticleDetail(id);
         if (article == null) {
             return ResponseEntity.notFound().build();
@@ -631,6 +659,12 @@ public class WebsiteController {
                 .map(KnowledgeCategory::getName)
                 .findFirst().orElse("技术知识");
         return ResponseEntity.ok(PublicKnowledgeArticleDetailView.from(article, categoryName));
+    }
+
+    private void requireLegacyKnowledgeSource() {
+        if ("native".equalsIgnoreCase(companySource)) {
+            throw new ResponseStatusException(HttpStatus.GONE, "官网知识库旧接口已停用");
+        }
     }
 
     /** 从 Markdown 正文提取纯文本摘要（去掉标题/列表标记，取前 140 字符）。 */

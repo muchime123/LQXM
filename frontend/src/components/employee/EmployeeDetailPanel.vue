@@ -255,7 +255,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, reactive, ref, watch } from 'vue'
+import { computed, reactive, ref, watch, nextTick } from 'vue'
 import { addEmployeeMapping, fetchEmployee, updateEmployeeMapping, removeEmployeeMapping, registerEmployeeFile } from '@/api/employees'
 import { fetchFileAssets } from '@/api/file/fileAssets'
 import { fileAssetApi } from '@/api/file/fileAssetApi'
@@ -280,12 +280,18 @@ import { formatDateTime } from '@/utils/common/dateUtils'
 const props = withDefaults(
   defineProps<{
     employeeId: number | null
-    /** 是否可维护员工档案（employee.manage 权限） */
+    /**
+     * 是否可维护员工档案（`system.employee.manage` 权限）。
+     *
+     * <p>默认 **false**（fail-closed）：写权限必须由父级**显式授予**。
+     * 此前默认为 `true`，而唯一父级 `EmployeeRosterView` 并未传该 prop，
+     * 相当于「漏传即放行」—— 与本仓库其它权限 prop 的口径相反。
+     */
     canManage?: boolean
     /** 身份映射来源系统选项 */
     filterOptions?: EmployeeFilterOptions | null
   }>(),
-  { canManage: true, filterOptions: null }
+  { canManage: false, filterOptions: null }
 )
 
 const emit = defineEmits<{
@@ -441,10 +447,26 @@ function resetMappingForm() {
   editingMappingId.value = null
 }
 
+/**
+ * 打开映射弹窗时清掉上一次的校验错误态。
+ *
+ * <p>本组件的 `LqDialog` 未传 `destroy-on-close`，关闭只隐藏 `el-dialog` 而不销毁内部
+ * `el-form`；而父级只在「切换员工」时才重建整个面板。两者叠加，同一员工内第二次打开
+ * 弹窗就会看到上一次 `validate()` 留下的红字。
+ *
+ * <p>这里只调 `clearValidate()` 清错误态，**不**用 `resetFields()`：后者会把字段重置成
+ * `el-form` 挂载时的初值，反而覆盖掉 `openEditMapping()` 刚写入的当前行数据。
+ */
+async function clearMappingValidation() {
+  await nextTick()
+  mappingFormRef.value?.clearValidate()
+}
+
 function openAddMapping() {
   if (!detail.value) return
   resetMappingForm()
   mappingEditorVisible.value = true
+  clearMappingValidation()
 }
 
 function openEditMapping(row: EmployeeMappingSummary) {
@@ -458,6 +480,7 @@ function openEditMapping(row: EmployeeMappingSummary) {
   })
   editingMappingId.value = row.id
   mappingEditorVisible.value = true
+  clearMappingValidation()
 }
 
 async function saveMapping() {

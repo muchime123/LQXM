@@ -12,10 +12,9 @@ import { computed, onMounted, onUnmounted, ref, watchEffect, reactive, nextTick 
 import { useWebsiteData } from '../composables/useWebsiteData'
 import { useCompany } from '../composables/useCompany'
 import { usePageSections } from '../composables/usePageSections'
-import { useCmsPreview } from '../composables/useCmsPreview'
 import { useInquiryModal } from '../composables/useInquiryModal'
-import { fetchSolutions } from '../api/website'
-import { patents } from '../data/qualifications'
+import { fetchSolutions, websiteProductMediaUrl } from '../api/website'
+import { useWebsiteIpItems } from '../composables/useWebsiteIpItems'
 import { setSchema, createOrganizationSchema, createLocalBusinessSchema } from '../composables/useSchema'
 import ProductCard from '../components/ProductCard.vue'
 import AppIcon from '../components/AppIcon.vue'
@@ -32,6 +31,7 @@ const {
 } = useWebsiteData()
 
 const { company } = useCompany()
+const { items: patents, load: loadIpItems } = useWebsiteIpItems()
 const { openInquiry } = useInquiryModal()
 const solutionGroups = ref([])
 
@@ -47,7 +47,8 @@ watchEffect(() => {
   if (company.value) {
     const orgData = {
       ...company.value,
-      logo: company.value.logoFileName ? `/images/${company.value.logoFileName}` : null,
+      logo: company.value.logoMediaId ? websiteProductMediaUrl(company.value.logoMediaId)
+        : company.value.logoFileName ? `/images/${company.value.logoFileName}` : null,
     }
     /* Organization（品牌标识）+ LocalBusiness（营业信息/地址/营业时间）双 schema */
     setSchema(createOrganizationSchema(orgData))
@@ -58,6 +59,7 @@ watchEffect(() => {
 
 onMounted(() => {
   load()
+  loadIpItems()
   loadHomeSolutions()
   pageSections.load()
   updateCarouselVisible()
@@ -106,9 +108,9 @@ onUnmounted(() => {
 /* ============ Banner 数据 ============ */
 const DEFAULT_HERO_BANNERS = [
   {
-    title: '包装设备与模具，<em>由我们自己制造</em>',
-    subtitle: 'PACKAGING EQUIPMENT & MOLD MANUFACTURER',
-    description: '从封口设备、气调包装机到配套模具与耗材，利强围绕您的产品、容器和产能目标完成整套包装配置。',
+    title: '包装设备与包材，<em>围绕您的产品配置</em>',
+    subtitle: 'PACKAGING EQUIPMENT & MATERIALS',
+    description: '从封口设备、气调包装机到配套包材，利强围绕您的产品、容器和产能目标完成包装配置。',
     buttonText: '探索产品',
     buttonUrl: '/products',
     secondaryButtonText: '获取包装方案',
@@ -128,7 +130,7 @@ const DEFAULT_HERO_BANNERS = [
   {
     title: '气调保鲜包装，<em>让产品新鲜到家</em>',
     subtitle: '气调保鲜 · 锁鲜封装',
-    description: '围绕气体置换、封合效果与生产节拍，为食品企业匹配设备、模具和包装材料。',
+    description: '围绕气体置换、封合效果与生产节拍，为食品企业匹配设备和包装材料。',
     buttonText: '查看气调设备',
     buttonUrl: '/products',
     secondaryButtonText: '获取包装方案',
@@ -138,68 +140,27 @@ const DEFAULT_HERO_BANNERS = [
 ]
 
 const pageSections = usePageSections('HOME')
-const cmsPreview = useCmsPreview('HOME')
 
-/* 首页 Hero 轮播：合并后台 Banner 数据与编辑器草稿。
-   - 后台 Banner 优先，草稿覆盖其字段；
-   - 仅存在草稿的 Banner（新建未保存）也会出现在列表中；
-   - 过滤破图（hero-machine.png）和无图片的 Banner；
-   - 不足 2 条时用 DEFAULT_HERO_BANNERS 补齐，保证轮播体验。 */
+/* 首页 Hero 使用已发布的 Banner，保留静态图片回退。 */
 function mapHeroBanner(b) {
-  const d = cmsPreview.bannerDraft(b.id)
   return {
     id: b.id,
-    title: d.title ?? b.title ?? '',
-    subtitle: d.subtitle ?? b.subtitle ?? '',
-    description: d.description ?? b.description ?? '',
-    buttonText: d.buttonText ?? b.buttonText ?? '探索产品',
-    buttonUrl: d.buttonUrl ?? b.buttonUrl ?? '/products',
-    secondaryButtonText: d.secondaryButtonText || b.secondaryButtonText || '获取包装方案',
-    secondaryButtonUrl: (d.secondaryButtonUrl ?? b.secondaryButtonUrl) || '',
-    imageUrl: d.imageUrl ?? b.imageUrl ?? '',
+    title: b.title ?? '',
+    subtitle: b.subtitle ?? '',
+    description: b.description ?? '',
+    buttonText: b.buttonText ?? '探索产品',
+    buttonUrl: b.buttonUrl ?? '/products',
+    secondaryButtonText: b.secondaryButtonText || '获取包装方案',
+    secondaryButtonUrl: b.secondaryButtonUrl || '',
+    imageUrl: b.imageUrl ?? '',
   }
 }
 const heroBanners = computed(() => {
-  const allCms = banners.value?.HERO || []
-  const draftIds = cmsPreview.bannerDraftIds.value || []
-  const draftIdSet = new Set(draftIds)
-
-  const merged = [...allCms]
-
-  for (const draftId of draftIds) {
-    if (!allCms.find((b) => b.id === draftId)) {
-      const draft = cmsPreview.bannerDraft(draftId)
-      if (draft && (draft.imageUrl || draft.title)) {
-        merged.push({
-          id: draftId,
-          title: draft.title || '',
-          subtitle: draft.subtitle || '',
-          description: draft.description || '',
-          imageUrl: draft.imageUrl || '',
-          buttonText: draft.buttonText || '',
-          buttonUrl: draft.buttonUrl || '',
-          secondaryButtonText: draft.secondaryButtonText || '',
-          secondaryButtonUrl: draft.secondaryButtonUrl || '',
-          badge: draft.badge || '',
-          sortOrder: 0,
-          position: 'HERO',
-        })
-      }
-    }
-  }
-
-  const validCms = merged.filter((b) => {
-    if (!b) return false
-    if (b.imageUrl && /hero-machine\.png$/.test(b.imageUrl)) return false
-    if (b.imageUrl) return true
-    const draft = cmsPreview.bannerDraft(b.id)
-    return !!draft.imageUrl
-  })
-
-  if (validCms.length >= 2) {
-    return validCms.map(mapHeroBanner)
-  }
-  const result = [...validCms.map(mapHeroBanner)]
+  const validCms = (banners.value?.HERO || []).filter((b) => b?.imageUrl
+    && !/hero-machine\.png$/.test(b.imageUrl)
+    && ![b.title, b.subtitle, b.description].some((text) => text?.includes('模具')))
+  if (validCms.length >= 2) return validCms.map(mapHeroBanner)
+  const result = validCms.map(mapHeroBanner)
   for (const fallback of DEFAULT_HERO_BANNERS) {
     if (result.length >= 3) break
     if (!result.find((m) => m.imageUrl === fallback.imageUrl)) result.push(fallback)
@@ -212,44 +173,44 @@ const heroBanners = computed(() => {
 const homeSectionEnabled = (key) => pageSections.isEnabled(key)
 const sectionRows = (key) => pageSections.sectionRows(key)
 const parseSectionRows = pageSections.parseSectionRows
+const publicCopy = (value, fallback) => value && !value.includes('模具') ? value : fallback
 const homeHeadings = computed(() => {
   const s = (key) => pageSections.section(key)
-  const d = (key) => cmsPreview.draft(key)
   return {
     strength: {
-      title: d('strength').title || s('strength')?.title || '扎根制造现场，提供设备、模具与耗材配套',
+      title: publicCopy(s('strength')?.title, '扎根制造现场，提供设备与包材配套'),
     },
     products: {
-      title: d('products').title || s('products')?.title || '核心设备',
-      description: d('products').subtitle || s('products')?.subtitle || '从实际产品出发，选择更适合您的包装方式与生产节奏。',
+      title: s('products')?.title || '核心设备',
+      description: s('products')?.subtitle || '从实际产品出发，选择更适合您的包装方式与生产节奏。',
     },
     showcase: {
-      title: d('showcase').title || s('showcase')?.title || '设备与模具，由我们自己制造',
-      description: d('showcase').subtitle || s('showcase')?.subtitle || '从设备装配、模具配套到整机测试，我们在自己的生产现场完成关键制造与交付环节。',
+      title: publicCopy(s('showcase')?.title, '包装设备，来自自己的制造现场'),
+      description: publicCopy(s('showcase')?.subtitle, '从设备装配到整机测试，我们在自己的生产现场完成关键制造与交付环节。'),
     },
     process: {
-      title: d('process').title || s('process')?.title || '合作流程',
-      description: d('process').subtitle || s('process')?.subtitle || '从需求确认到交付支持，四个环节依次推进。',
+      title: s('process')?.title || '合作流程',
+      description: s('process')?.subtitle || '从需求确认到交付支持，四个环节依次推进。',
     },
     industries: {
-      title: d('industries').title || s('industries')?.title || '按应用场景选择方案',
-      description: d('industries').subtitle || s('industries')?.subtitle || '不同产品对保鲜、产能与封装方式有不同要求，从实际场景开始选择。',
+      title: s('industries')?.title || '按应用场景选择方案',
+      description: s('industries')?.subtitle || '不同产品对保鲜、产能与封装方式有不同要求，从实际场景开始选择。',
     },
     selector: {
-      title: d('selector').title || s('selector')?.title || '不知道选哪种？两条路径帮您快速定位',
-      description: d('selector').subtitle || s('selector')?.subtitle || '可以从包装方式出发，也可以从应用场景出发；如果仍不确定，工程师可协助判断。',
+      title: s('selector')?.title || '不知道选哪种？两条路径帮您快速定位',
+      description: s('selector')?.subtitle || '可以从包装方式出发，也可以从应用场景出发；如果仍不确定，工程师可协助判断。',
     },
     cases: {
-      title: d('cases').title || s('cases')?.title || '典型配置参考',
-      description: d('cases').subtitle || s('cases')?.subtitle || '以下为常见应用条件下的配置思路，具体设备、模具与工艺参数需结合样品评估。',
+      title: s('cases')?.title || '典型配置参考',
+      description: publicCopy(s('cases')?.subtitle, '以下为常见应用条件下的配置思路，具体设备、包材与工艺参数需结合样品评估。'),
     },
     proof: {
-      title: d('proof').title || s('proof')?.title || '交付事实',
-      description: d('proof').subtitle || s('proof')?.subtitle || '围绕包装设备、模具与耗材配套的交付事实，便于您判断我们是否覆盖您的场景。',
+      title: s('proof')?.title || '交付事实',
+      description: publicCopy(s('proof')?.subtitle, '围绕包装设备与包材配套的交付事实，便于您判断我们是否覆盖您的场景。'),
     },
     service: {
-      title: d('service').title || s('service')?.title || '服务与交付保障',
-      description: d('service').subtitle || s('service')?.subtitle || '质保、响应与长期配套的明确承诺，降低设备采购与使用过程中的不确定性。',
+      title: s('service')?.title || '服务与交付保障',
+      description: s('service')?.subtitle || '质保、响应与长期配套的明确承诺，降低设备采购与使用过程中的不确定性。',
     },
   }
 })
@@ -265,13 +226,6 @@ const heroSectionEl = ref(null)
 const heroInView = ref(true)
 let heroTimer = null
 let heroObserver = null
-
-watchEffect(() => {
-  const requestedId = cmsPreview.activeBannerId.value
-  if (requestedId == null) return
-  const index = heroBanners.value.findIndex(item => item.id === requestedId)
-  if (index >= 0) heroIndex.value = index
-})
 
 function gotoHero(i) {
   if (heroTransitioning.value) return
@@ -422,10 +376,10 @@ const defaultManufacturingShowcase = [
     to: '/products',
   },
   {
-    key: 'mold',
-    title: '模具设计与生产',
+    key: 'packaging',
+    title: '包材耗材配套',
     image: '/images/manual-sealer.jpg',
-    to: '/molds',
+    to: '/packaging',
   },
   {
     key: 'factory',
@@ -435,7 +389,8 @@ const defaultManufacturingShowcase = [
   },
 ]
 const manufacturingShowcase = computed(() => {
-  const rows = sectionRows('showcase')
+  const rows = sectionRows('showcase').filter((row) => row.link !== '/molds'
+    && ![row.title, row.description].some((text) => text?.includes('模具')))
   if (!rows.length) return defaultManufacturingShowcase
   return rows.map((row, index) => ({
     key: `cms-showcase-${index}`,
@@ -457,9 +412,6 @@ function openSceneAssistInquiry(sceneName) {
     <section
       ref="heroSectionEl"
       class="hero hero-carousel"
-      data-cms-page="HOME"
-      data-cms-section="hero"
-      data-cms-source="banner"
       aria-roledescription="carousel"
       aria-label="首页 Banner"
       @mouseenter="heroPaused = true"
@@ -529,7 +481,7 @@ function openSceneAssistInquiry(sceneName) {
     </section>
 
     <!-- 首屏后的企业证明：先建立信任，再进入产品选择 -->
-    <section v-if="homeSectionEnabled('strength')" class="home-strength" aria-label="企业实力" data-cms-page="HOME" data-cms-section="strength">
+    <section v-if="homeSectionEnabled('strength')" class="home-strength" aria-label="企业实力">
       <div class="home-strength__intro">
         <span>LIQIANG AT A GLANCE</span>
         <strong>{{ homeHeadings.strength.title }}</strong>
@@ -538,12 +490,12 @@ function openSceneAssistInquiry(sceneName) {
         <RouterLink to="/about"><strong>{{ foundedYear }}</strong><span>创立于温州</span></RouterLink>
         <RouterLink to="/products"><strong>{{ productCount || homeProducts.length || '—' }}</strong><span>公开设备型号</span></RouterLink>
         <RouterLink to="/patents"><strong>{{ patents.length || '—' }}</strong><span>专利与知识产权</span></RouterLink>
-        <RouterLink to="/about"><strong>全链路</strong><span>设备 · 模具 · 耗材</span></RouterLink>
+        <RouterLink to="/about"><strong>配套</strong><span>设备 · 包材 · 方案</span></RouterLink>
       </div>
     </section>
 
     <!-- 精选产品：让访客先看到实际产品 -->
-    <section v-if="homeSectionEnabled('products')" class="section products" id="products" data-cms-page="HOME" data-cms-section="products" data-cms-source="product">
+    <section v-if="homeSectionEnabled('products')" class="section products" id="products">
       <SectionHeading
         eyebrow="CORE EQUIPMENT"
         :title="homeHeadings.products.title"
@@ -594,7 +546,7 @@ function openSceneAssistInquiry(sceneName) {
     </section>
 
     <!-- 首页核心制造能力图廊 -->
-    <section v-if="homeSectionEnabled('showcase')" class="section manufacturing-showcase" id="manufacturing-showcase" data-cms-page="HOME" data-cms-section="showcase">
+    <section v-if="homeSectionEnabled('showcase')" class="section manufacturing-showcase" id="manufacturing-showcase">
       <SectionHeading
         eyebrow="MANUFACTURING"
         :title="homeHeadings.showcase.title"
@@ -627,7 +579,7 @@ function openSceneAssistInquiry(sceneName) {
     </section>
 
     <!-- ============ Section 4：典型行业场景 ============ -->
-    <section v-if="homeSectionEnabled('industries') && industryScenarios.length" class="section industries section--alt" id="industries" data-cms-page="HOME" data-cms-section="industries" data-cms-source="solution">
+    <section v-if="homeSectionEnabled('industries') && industryScenarios.length" class="section industries section--alt" id="industries">
       <SectionHeading
         eyebrow="APPLICATIONS"
         :title="homeHeadings.industries.title"
@@ -662,7 +614,7 @@ function openSceneAssistInquiry(sceneName) {
       <div class="scene-assist reveal" v-reveal>
         <div class="scene-assist__text">
           <h4>不确定适合哪种设备？</h4>
-          <p>提供产品和容器信息，工程师可协助判断合适的设备与模具组合。</p>
+          <p>提供产品和容器信息，工程师可协助判断合适的设备与包材组合。</p>
         </div>
         <button type="button" class="button ghost-light" @click="openSceneAssistInquiry('选型协助')">请求协助选型 <span>→</span></button>
       </div>

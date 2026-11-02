@@ -1,13 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
-import { EXPORT_COLUMNS, useTrackingExport } from './useTrackingExport'
+import { DEFAULT_EXPORT_COLUMN_KEYS, useTrackingExport } from './useTrackingExport'
 
 vi.mock('element-plus', () => ({
   ElMessage: { success: vi.fn(), warning: vi.fn(), error: vi.fn(), info: vi.fn() },
   ElMessageBox: { confirm: vi.fn(), prompt: vi.fn() }
 }))
 vi.mock('@/api/productionTracking', () => ({
-  fetchTrackingExport: vi.fn(async () => ({ items: [], total: 0, exported: 0, truncated: false, maxRows: 0 }))
+  fetchTrackingExport: vi.fn(async () => ({ items: [], total: 0, exported: 0, truncated: false, maxRows: 0 })),
+  fetchTrackingExportColumnDefaults: vi.fn(async () => ({ columns: [] })),
+  saveTrackingExportColumnDefaults: vi.fn(async () => ({ changed: 0 }))
 }))
 
 /**
@@ -33,8 +35,8 @@ function createExport() {
 describe('导出勾选记忆：版本升级', () => {
   beforeEach(() => store.clear())
 
-  it('没有记忆时全选所有列', () => {
-    expect(createExport().exportColumns.value).toEqual(EXPORT_COLUMNS.map(column => column.key))
+  it('没有记忆时用「默认字段」（核心字段）预选', () => {
+    expect(createExport().exportColumns.value).toEqual(DEFAULT_EXPORT_COLUMN_KEYS)
   })
 
   it('v1 记忆（纯数组）读入时补上 10-15 新增的三列', () => {
@@ -56,9 +58,9 @@ describe('导出勾选记忆：版本升级', () => {
     expect(createExport().exportColumns.value).toEqual(['orderNo'])
   })
 
-  it('记忆整个坏掉时退回全选，而不是空勾选', () => {
+  it('记忆整个坏掉时退回默认字段，而不是空勾选', () => {
     localStorage.setItem('lq.trackingExportColumns', '{ 这不是 JSON')
-    expect(createExport().exportColumns.value).toEqual(EXPORT_COLUMNS.map(column => column.key))
+    expect(createExport().exportColumns.value).toEqual(DEFAULT_EXPORT_COLUMN_KEYS)
   })
 })
 

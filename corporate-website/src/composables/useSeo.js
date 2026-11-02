@@ -48,7 +48,7 @@ export function setSeo(title, description, options = {}) {
     : `${SITE_NAME}｜食品包装设备与一站式包装解决方案`
   document.title = fullTitle
 
-  const desc = description || '浙江利强包装科技有限公司专注食品包装设备研发制造，提供封口机、气调包装机、真空包装机、自动化包装产线及包装耗材模具。'
+  const desc = description || '浙江利强包装科技有限公司专注食品包装设备研发制造，提供封口机、气调包装机、真空包装机、自动化包装产线及配套包材。'
   const imageUrl = ogImage
     ? (ogImage.startsWith('http') ? ogImage : `${SITE_URL}${ogImage}`)
     : `${SITE_URL}${DEFAULT_OG_IMAGE}`

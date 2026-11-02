@@ -50,9 +50,9 @@
               <el-table-column label="当前超期" width="110">
                 <template #default="{ row }">{{ row.openOverdueDays == null ? '—' : `已超 ${row.openOverdueDays} 天` }}</template>
               </el-table-column>
-              <el-table-column prop="submittedDate" label="提交" width="105" />
-              <el-table-column prop="scheduleTime" label="排产" width="105" />
-              <el-table-column prop="waitDays" label="等待(天)" width="85" align="right" />
+              <el-table-column prop="submittedDate" label="提交" width="132" show-overflow-tooltip />
+              <el-table-column prop="scheduleTime" label="排产" width="132" show-overflow-tooltip />
+              <el-table-column prop="waitDays" label="等待(天)" width="95" align="center" />
               <el-table-column v-if="drillState.type === 'node'" prop="stageStatus" label="该节点" width="105">
                 <template #default="{ row }">{{ row.stageStatus === 'DONE' ? '已完成' : '未完成' }}</template>
               </el-table-column>

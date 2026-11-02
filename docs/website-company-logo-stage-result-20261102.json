@@ -1,0 +1,15 @@
+{
+  "source": "corporate-website\\public\\images\\logo-only.png",
+  "sha256": "d9767c3c37ad7dcf46ff2b73bf0496e5727ea27552dfcd45076591e10feb0cd6",
+  "size_bytes": 227698,
+  "profile_status": "DRAFT",
+  "profile_logo_media_id_before": null,
+  "reusable_media_id": null,
+  "ready": true,
+  "blockers": [],
+  "applied": true,
+  "public_content_changed": false,
+  "inserted_media": true,
+  "media_id": 147,
+  "storage_key": "website/images/brand-logo-d9767c3c37ad7dcf46ff2b73bf0496e5727ea27552dfcd45076591e10feb0cd6.png"
+}

@@ -1,6 +1,6 @@
 <template>
-  <section class="orders-table-panel">
-    <div class="orders-table-head">
+  <section class="orders-table-panel" :class="{ 'orders-table-panel--embedded': embedded }">
+    <div v-if="!embedded" class="orders-table-head">
       <div>
         <h2>{{ title }}</h2>
         <p>点击工单可打开生产跟单详情。</p>
@@ -27,7 +27,7 @@
       <!-- 附加列：各抽屉自己的业务列（提交/排产/等待/当前预计/整单完工/状态/逾期/超期…） -->
       <slot name="extra" />
     </el-table>
-    <el-pagination v-if="total > size" :current-page="page" :page-size="size" :total="total"
+    <el-pagination v-if="!embedded && total > size" :current-page="page" :page-size="size" :total="total"
       layout="prev, pager, next, total" @current-change="(p: number) => emit('update:page', p)" />
   </section>
 </template>
@@ -68,8 +68,10 @@ withDefaults(
     title: string
     loading?: boolean
     emptyText?: string
+    /** 嵌入复盘正文时，由外层提供标题和“仅前 20 条”提示。 */
+    embedded?: boolean
   }>(),
-  { loading: false, emptyText: '没有符合条件的工单' }
+  { loading: false, emptyText: '没有符合条件的工单', embedded: false }
 )
 
 const emit = defineEmits<{ 'update:page': [page: number]; 'open-order': [id: number]; close: [] }>()
@@ -87,6 +89,7 @@ function openOrder(row: OrdersTableRow) {
   padding: 18px;
   scroll-margin-top: 8px;
 }
+.orders-table-panel--embedded { border: 0; border-radius: 0; padding: 0; background: transparent; }
 .orders-table-head {
   display: flex;
   justify-content: space-between;

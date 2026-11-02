@@ -13,11 +13,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 制程节点管理：车间类别下「有哪些跟单节点、什么顺序、哪些是按需工序」的增删改。
+ * 全局节点字典与旧任务车间默认流程管理。新增定义只进入字典，明确纳入默认流程后才参与旧任务口径。
  *
  * <p>节点原先硬编码在 {@link ProductionTrackingPolicy}，加一个节点要改常量 + 写迁移 + 改测试 + 发版。
- * 落表后在这里维护，保存后整体替换 {@link ProductionTrackingStageCatalog} 的进程内快照，
- * 列表 / 导出 / 筛选 / 日期推算立即按新制程走。
+ * 落表后在这里维护，保存后整体替换 {@link ProductionTrackingStageCatalog} 的进程内快照。
  *
  * <p><b>两条硬约束</b>（都是为了避免历史跟单数据失联）：
  * <ol>
@@ -26,8 +25,7 @@ import java.util.Map;
  *   <li><b>有记录的节点不可删除，只能停用</b>：停用它不进完成分母、不显示在节点条上，历史记录原样保留。</li>
  * </ol>
  *
- * <p><b>影响面</b>：改制程会当场改写所有在制工单的「已完成 x/y」判定——新增一个必经节点，
- * 原本已判完成的单会集体退回「跟单中」。所以页面在保存前会调 {@link #impact(String)} 给出受影响单数。
+ * <p><b>影响面</b>：修改默认流程可能改写未匹配产品模板任务的完成判定；新增字典定义不会。
  */
 @Service
 public class ProductionTrackingStageService {
@@ -35,7 +33,7 @@ public class ProductionTrackingStageService {
     private static final String SEALER=ProductionTrackingStageCatalog.SEALER;
     private static final String MACHINE=ProductionTrackingStageCatalog.MACHINE;
     private static final String SELECT="SELECT workshop_kind,stage_code,stage_label,sort_no,optional,"
-            +"match_keywords,exclude_keywords,header_aliases,enabled FROM production_tracking_stage_defs "
+            +"match_keywords,exclude_keywords,header_aliases,enabled,default_included FROM production_tracking_stage_defs "
             +"ORDER BY workshop_kind,sort_no,id";
 
     private final JdbcTemplate jdbc;
@@ -53,7 +51,8 @@ public class ProductionTrackingStageService {
             var defs=jdbc.query(SELECT,(r,n)->new StageDef(r.getString("workshop_kind"),r.getString("stage_code"),
                     r.getString("stage_label"),r.getInt("sort_no"),r.getInt("optional")==1,
                     r.getString("match_keywords"),r.getString("exclude_keywords"),
-                    splitAliases(r.getString("header_aliases")),r.getInt("enabled")==1));
+                    splitAliases(r.getString("header_aliases")),r.getInt("enabled")==1,
+                    r.getInt("default_included")==1));
             if(defs.isEmpty()){log.warn("制程节点表为空，沿用内置默认制程");return;}
             ProductionTrackingStageCatalog.replace(defs);
         }catch(RuntimeException e){
@@ -61,15 +60,92 @@ public class ProductionTrackingStageService {
         }
     }
 
-    /** 制程列表（含已停用的），带每条节点已产生的跟单记录数——决定它能不能被删除。 */
+    /** 字典列表（含历史停用项），并标出是否属于车间默认流程。 */
     public List<Map<String,Object>> list(String kind) {
         checkKind(kind);
         return jdbc.queryForList("SELECT d.id,d.workshop_kind AS workshopKind,d.stage_code AS stageCode,"
                 +"d.stage_label AS stageLabel,d.sort_no AS sortNo,d.optional,"
                 +"d.match_keywords AS matchKeywords,d.exclude_keywords AS excludeKeywords,"
-                +"d.header_aliases AS headerAliases,d.enabled,"
+                +"d.header_aliases AS headerAliases,d.enabled,d.default_included AS defaultIncluded,"
                 +"("+usageCountSql(kind)+") AS usageCount "
                 +"FROM production_tracking_stage_defs d WHERE d.workshop_kind=? ORDER BY d.sort_no,d.id",kind);
+    }
+
+    public List<Map<String,Object>> dictionary() {
+        return jdbc.queryForList("SELECT d.stage_code AS stageCode,d.stage_label AS stageLabel,d.optional,"
+                +"d.match_keywords AS matchKeywords,d.exclude_keywords AS excludeKeywords,"
+                +"d.header_aliases AS headerAliases,"
+                +"(SELECT COUNT(*) FROM production_tracking_milestones m WHERE m.stage_code=d.stage_code) AS usageCount "
+                +"FROM production_tracking_stage_dictionary d ORDER BY d.created_at,d.stage_code");
+    }
+
+    @Transactional
+    public Map<String,Object> createDictionary(StageSave req) {
+        String code=normalizeCode(req.code());
+        String label=requireLabel(req.label());
+        if(Boolean.TRUE.equals(req.optional())&&blank(req.matchKeywords()))
+            throw new IllegalArgumentException("按需节点须填写命中关键词");
+        if(count("SELECT COUNT(*) FROM production_tracking_stage_dictionary WHERE stage_code=?",code)>0)
+            throw new IllegalArgumentException("节点编码已存在："+code);
+        jdbc.update("INSERT INTO production_tracking_stage_dictionary"
+                +"(stage_code,stage_label,optional,match_keywords,exclude_keywords,header_aliases) "
+                +"VALUES(?,?,?,?,?,?)",code,label,Boolean.TRUE.equals(req.optional())?1:0,
+                trimOrNull(req.matchKeywords()),trimOrNull(req.excludeKeywords()),trimOrNull(req.headerAliases()));
+        audit.log("STAGE_DICTIONARY",0L,code,"新增节点字典",label);
+        return Map.of("stageCode",code);
+    }
+
+    @Transactional
+    public void updateDictionary(String code,StageSave req) {
+        if(count("SELECT COUNT(*) FROM production_tracking_stage_dictionary WHERE stage_code=?",code)==0)
+            throw new IllegalArgumentException("字典节点不存在："+code);
+        String label=requireLabel(req.label());
+        if(Boolean.TRUE.equals(req.optional())&&blank(req.matchKeywords()))
+            throw new IllegalArgumentException("按需节点须填写命中关键词");
+        jdbc.update("UPDATE production_tracking_stage_dictionary SET stage_label=?,optional=?,"
+                +"match_keywords=?,exclude_keywords=?,header_aliases=? WHERE stage_code=?",
+                label,Boolean.TRUE.equals(req.optional())?1:0,trimOrNull(req.matchKeywords()),
+                trimOrNull(req.excludeKeywords()),trimOrNull(req.headerAliases()),code);
+        audit.log("STAGE_DICTIONARY",0L,code,"更新节点字典",label);
+    }
+
+    @Transactional
+    public void removeDictionary(String code) {
+        if(count("SELECT COUNT(*) FROM production_tracking_stage_defs WHERE stage_code=?",code)>0
+                ||count("SELECT COUNT(*) FROM production_tracking_process_template_nodes WHERE stage_code=?",code)>0
+                ||count("SELECT COUNT(*) FROM production_tracking_process_snapshot_nodes WHERE stage_code=?",code)>0
+                ||count("SELECT COUNT(*) FROM production_tracking_product_benchmarks WHERE stage_code=?",code)>0
+                ||count("SELECT COUNT(*) FROM production_tracking_milestones WHERE stage_code=?",code)>0)
+            throw new IllegalArgumentException("节点已用于流程、参考工期或跟单记录，不能删除");
+        jdbc.update("DELETE FROM production_tracking_stage_dictionary WHERE stage_code=?",code);
+        audit.log("STAGE_DICTIONARY",0L,code,"删除节点字典",code);
+    }
+
+    /** Link a global dictionary node to one workshop fallback flow. */
+    @Transactional
+    public void addToDefaultFlow(String kind,String code) {
+        checkKind(kind);
+        var item=jdbc.queryForList("SELECT stage_label,optional,match_keywords,exclude_keywords,header_aliases "
+                +"FROM production_tracking_stage_dictionary WHERE stage_code=?",code);
+        if(item.isEmpty())throw new IllegalArgumentException("字典节点不存在："+code);
+        var existing=jdbc.queryForList("SELECT id,enabled FROM production_tracking_stage_defs "
+                +"WHERE workshop_kind=? AND stage_code=?",kind,code);
+        if(!existing.isEmpty()){
+            if(!ProductionTrackingProcessService.flag(existing.getFirst().get("enabled")))
+                throw new IllegalArgumentException("该车间的历史节点已停用，请先核查数据");
+            setDefaultIncluded(((Number)existing.getFirst().get("id")).longValue(),true);
+            return;
+        }
+        var def=item.getFirst();
+        int sortNo=jdbc.queryForObject("SELECT COALESCE(MAX(sort_no),0)+1 FROM production_tracking_stage_defs "
+                +"WHERE workshop_kind=?",Integer.class,kind);
+        jdbc.update("INSERT INTO production_tracking_stage_defs(workshop_kind,stage_code,stage_label,sort_no,"
+                +"optional,match_keywords,exclude_keywords,header_aliases,enabled,default_included) "
+                +"VALUES(?,?,?,?,?,?,?,?,1,1)",kind,code,def.get("stage_label"),sortNo,
+                ProductionTrackingProcessService.flag(def.get("optional"))?1:0,
+                def.get("match_keywords"),def.get("exclude_keywords"),def.get("header_aliases"));
+        reload();
+        audit.log("STAGE_DEF",0L,code,"加入默认流程",kind);
     }
 
     @Transactional
@@ -93,9 +169,9 @@ public class ProductionTrackingStageService {
         int sortNo=jdbc.queryForObject("SELECT COALESCE(MAX(sort_no),0)+1 FROM production_tracking_stage_defs "
                 +"WHERE workshop_kind=?",Integer.class,req.kind());
         jdbc.update("INSERT INTO production_tracking_stage_defs(workshop_kind,stage_code,stage_label,sort_no,"
-                +"optional,match_keywords,exclude_keywords,header_aliases,enabled) VALUES(?,?,?,?,?,?,?,?,?)",
+                +"optional,match_keywords,exclude_keywords,header_aliases,enabled,default_included) VALUES(?,?,?,?,?,?,?,?,?,0)",
                 req.kind(),code,label,sortNo,optional?1:0,trimOrNull(req.matchKeywords()),
-                trimOrNull(req.excludeKeywords()),trimOrNull(req.headerAliases()),enabledOf(req.enabled()));
+                trimOrNull(req.excludeKeywords()),trimOrNull(req.headerAliases()),1);
         reload();
         audit.log("STAGE_DEF",0L,code,"新增节点",req.kind()+" 新增「"+label+"」"+(optional?"（按需）":""));
         return Map.of("stageCode",code,"sortNo",sortNo);
@@ -103,7 +179,7 @@ public class ProductionTrackingStageService {
 
     @Transactional
     public Map<String,Object> update(long id,StageSave req) {
-        var current=jdbc.queryForMap("SELECT workshop_kind,stage_code,stage_label FROM production_tracking_stage_defs "
+        var current=jdbc.queryForMap("SELECT workshop_kind,stage_code,stage_label,optional,default_included FROM production_tracking_stage_defs "
                 +"WHERE id=?",id);
         String kind=(String)current.get("workshop_kind");
         String label=requireLabel(req.label());
@@ -114,6 +190,11 @@ public class ProductionTrackingStageService {
         if(count("SELECT COUNT(*) FROM production_tracking_stage_defs WHERE workshop_kind=? AND stage_label=? AND id<>?",
                 kind,label,id)>0)throw new IllegalArgumentException("该车间类别下已有同名节点："+label);
         boolean optional=Boolean.TRUE.equals(req.optional());
+        if(optional && ((Number)current.get("default_included")).intValue()==1
+                && ((Number)current.get("optional")).intValue()==0
+                && count("SELECT COUNT(*) FROM production_tracking_stage_defs WHERE workshop_kind=? "
+                +"AND enabled=1 AND default_included=1 AND optional=0 AND id<>?",kind,id)==0)
+            throw new IllegalArgumentException("车间默认流程至少保留一个必经节点");
         if(optional&&blank(req.matchKeywords()))
             throw new IllegalArgumentException("按需工序必须填写命中关键词，否则没有任何工单会被判为要走这道工序");
         // 跨类别一致性（10.4）：同编码按需属性须跨类别一致，否则不带车间的 isOptionalStage 判定会误判。
@@ -122,21 +203,23 @@ public class ProductionTrackingStageService {
             throw new IllegalArgumentException("节点编码 "+current.get("stage_code")+" 已在其他车间类别存在且按需属性不一致，"
                     +"会导致跨类别按需判定误判；请与既有类别保持一致");
         jdbc.update("UPDATE production_tracking_stage_defs SET stage_label=?,optional=?,match_keywords=?,"
-                +"exclude_keywords=?,header_aliases=?,enabled=? WHERE id=?",
+                +"exclude_keywords=?,header_aliases=? WHERE id=?",
                 label,optional?1:0,trimOrNull(req.matchKeywords()),trimOrNull(req.excludeKeywords()),
-                trimOrNull(req.headerAliases()),enabledOf(req.enabled()),id);
+                trimOrNull(req.headerAliases()),id);
         reload();
         audit.log("STAGE_DEF",id,String.valueOf(current.get("stage_code")),"更新节点","更新「"+label+"」"+(optional?"（按需）":""));
         return Map.of("id",id);
     }
 
-    /** 上移/下移一位：与相邻节点交换 sort_no（制程顺序＝节点条顺序＝链式推算顺序）。 */
+    /** 默认流程内上移/下移一位；字典项本身无流程顺序。 */
     @Transactional
     public void move(long id,boolean up) {
-        var current=jdbc.queryForMap("SELECT workshop_kind,sort_no FROM production_tracking_stage_defs WHERE id=?",id);
+        var current=jdbc.queryForMap("SELECT workshop_kind,sort_no,stage_code,default_included FROM production_tracking_stage_defs WHERE id=?",id);
+        if(((Number)current.get("default_included")).intValue()!=1)
+            throw new IllegalArgumentException("字典节点尚未加入车间默认流程，不能调整流程顺序");
         String kind=(String)current.get("workshop_kind");
         int sortNo=((Number)current.get("sort_no")).intValue();
-        var neighbour=jdbc.query("SELECT id,sort_no FROM production_tracking_stage_defs WHERE workshop_kind=? "
+        var neighbour=jdbc.query("SELECT id,sort_no FROM production_tracking_stage_defs WHERE workshop_kind=? AND default_included=1 "
                 +"AND sort_no "+(up?"<":">")+" ? ORDER BY sort_no "+(up?"DESC":"ASC")+" LIMIT 1",
                 (r,n)->Map.of("id",(Object)r.getLong("id"),"sortNo",(Object)r.getInt("sort_no")),
                 kind,sortNo).stream().findFirst().orElse(null);
@@ -148,6 +231,25 @@ public class ProductionTrackingStageService {
         audit.log("STAGE_DEF",id,String.valueOf(current.get("stage_code")),"移动节点",(up?"上移":"下移")+"至 sort_no="+otherSort);
     }
 
+    /** Explicitly change the fallback flow. Creating a dictionary entry never calls this. */
+    @Transactional
+    public void setDefaultIncluded(long id,boolean included) {
+        var current=jdbc.queryForMap("SELECT workshop_kind,stage_code,stage_label,enabled,optional,default_included "
+                +"FROM production_tracking_stage_defs WHERE id=?",id);
+        if(included && ((Number)current.get("enabled")).intValue()!=1)
+            throw new IllegalArgumentException("停用的节点不能加入默认流程");
+        if(!included && ((Number)current.get("default_included")).intValue()==1
+                && ((Number)current.get("optional")).intValue()==0
+                && count("SELECT COUNT(*) FROM production_tracking_stage_defs WHERE workshop_kind=? "
+                +"AND enabled=1 AND default_included=1 AND optional=0 AND id<>?",
+                current.get("workshop_kind"),id)==0)
+            throw new IllegalArgumentException("车间默认流程至少保留一个必经节点，否则旧任务可能被误判为已完成");
+        jdbc.update("UPDATE production_tracking_stage_defs SET default_included=? WHERE id=?",included?1:0,id);
+        reload();
+        audit.log("STAGE_DEF",id,String.valueOf(current.get("stage_code")),included?"加入默认流程":"移出默认流程",
+                String.valueOf(current.get("stage_label")));
+    }
+
     @Transactional
     public void remove(long id) {
         var current=jdbc.queryForMap("SELECT workshop_kind,stage_code,stage_label FROM production_tracking_stage_defs "
@@ -156,7 +258,11 @@ public class ProductionTrackingStageService {
                 +"JOIN production_orders p ON p.id=m.production_order_id WHERE m.stage_code=? AND "+lineCondition(
                         (String)current.get("workshop_kind")),current.get("stage_code"));
         if(usage>0)throw new IllegalArgumentException("「"+current.get("stage_label")+"」已有 "+usage
-                +" 条跟单记录，不能删除；请改为「停用」，历史记录会原样保留");
+                +" 条跟单记录，不能删除；可将其移出车间默认流程，历史记录会保留");
+        String code=String.valueOf(current.get("stage_code"));
+        if(count("SELECT COUNT(*) FROM production_tracking_process_template_nodes WHERE stage_code=?",code)>0
+                ||count("SELECT COUNT(*) FROM production_tracking_process_snapshot_nodes WHERE stage_code=?",code)>0)
+            throw new IllegalArgumentException("该节点已被产品模板或任务快照引用，不能删除");
         jdbc.update("DELETE FROM production_tracking_stage_defs WHERE id=?",id);
         reload();
         audit.log("STAGE_DEF",id,String.valueOf(current.get("stage_code")),"删除节点","删除「"+current.get("stage_label")+"」");
@@ -215,7 +321,6 @@ public class ProductionTrackingStageService {
     }
     private static boolean blank(String value) {return value==null||value.isBlank();}
     private static String trimOrNull(String value) {return blank(value)?null:value.trim();}
-    private static int enabledOf(Boolean enabled) {return enabled==null||enabled?1:0;}
     private static List<String> splitAliases(String raw) {
         if(raw==null||raw.isBlank())return List.of();
         var out=new ArrayList<String>();

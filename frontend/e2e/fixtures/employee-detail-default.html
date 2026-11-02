@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <title>B7-B2b-1 EmployeeDetailPanel 默认值夹具</title>
+  </head>
+  <body>
+    <!--
+      B7-B2b-1 夹具：挂载真实业务组件 EmployeeDetailPanel，且**不传** can-manage。
+
+      用途：暴露该 prop 的默认值语义是否为 fail-open。
+      所有 /api/ 请求由用例通过 page.route 拦截，不存在任何写入副作用。
+    -->
+    <div id="e2e-app"></div>
+    <script type="module" src="./employee-detail-default-harness.ts"></script>
+  </body>
+</html>

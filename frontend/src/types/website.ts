@@ -261,60 +261,6 @@ export interface PublicBannerView {
 /** 按位置分组的Banner */
 export type PublicBannerMap = Record<BannerPosition, PublicBannerView[]>
 
-/** 官网工作台产品健康度示例产品 */
-export interface DashboardProductIssueItem {
-  id: number
-  name: string
-  modelCode: string | null
-  category: string | null
-  websiteSlug: string | null
-}
-
-/** 官网工作台产品健康度分组 */
-export interface DashboardProductHealthIssue {
-  key: string
-  label: string
-  count: number
-  samples: DashboardProductIssueItem[]
-}
-
-export interface DashboardPublishReadinessIssue {
-  key: string
-  label: string
-  domain: 'packaging' | 'mold' | 'solution' | string
-  target: string
-  count: number
-  samples: Array<{ id: number; name: string }>
-}
-
-/** 官网工作台聚合数据 */
-export interface WebsiteDashboard {
-  publishedProducts: number
-  featuredProducts: number
-  incompleteProducts: number
-  publishedPackaging: number
-  publishedMolds: number
-  publishedSolutions: number
-  officialMediaAccounts: number
-  publishedBanners: number
-  pendingInquiries: number
-  recentInquiries: number
-  productIssues: DashboardProductHealthIssue[]
-  readinessIssues: DashboardPublishReadinessIssue[]
-}
-
-/** 产品健康度问题键 -> 处理提示 映射 */
-export const PRODUCT_ISSUE_TIPS: Record<string, string> = {
-  belowListThreshold: '完整度低于 40 分，不会出现在官网产品中心',
-  missingMainImage: '未设置主图，官网卡片显示占位图',
-  missingSummary: '未填写官网摘要，或仍是系统默认文案',
-  missingEnName: '未填写英文名称，影响海外用户浏览',
-  missingCategory: '未填写设备类别，无法被分类筛选',
-  noVariant: '没有任何规格参数，官网详情展示不完整',
-  missingSlug: '缺少 Slug，产品详情页无法访问',
-  duplicateSlug: 'Slug 与其它产品冲突，详情页可能互相覆盖'
-}
-
 /** 官网页面标识 */
 export type PageSectionPageKey = 'HOME' | 'PRODUCTS' | 'SOLUTIONS' | 'ABOUT' | 'CONTACT' | 'PACKAGING' | 'MOLDS'
 

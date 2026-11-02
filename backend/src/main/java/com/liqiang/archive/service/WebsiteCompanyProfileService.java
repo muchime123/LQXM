@@ -19,6 +19,7 @@ public class WebsiteCompanyProfileService {
 
     private final WebsiteCompanyProfileRepository profiles;
     private final WebsiteMediaAssetRepository media;
+    private final WebsiteCompanyProfileReadinessService readiness;
     private final AuditLogService audit;
 
     @Transactional(readOnly = true)
@@ -37,13 +38,52 @@ public class WebsiteCompanyProfileService {
         if (!"DRAFT".equals(profile.getStatus())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "已发布官网公司介绍不能通过草稿接口修改");
         }
-        if (fields.logoMediaId() != null) {
-            var asset = media.findByIdAndDeletedAtIsNull(fields.logoMediaId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "官网 Logo 图片不存在"));
-            if (!"IMAGE".equals(asset.getMediaType()) || "ARCHIVED".equals(asset.getStatus())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "官网 Logo 只能选择有效官网图片");
-            }
+        validateMedia(fields.logoMediaId());
+        apply(profile, fields);
+        WebsiteCompanyProfile saved = profiles.save(profile);
+        audit.log("WebsiteCompanyProfile", PRIMARY_PROFILE_ID, saved.getCompanyName(),
+                "WEBSITE_COMPANY_PROFILE_DRAFT_SAVE", "保存官网独立公司介绍草稿");
+        return saved;
+    }
+
+    /** Explicit edit of published website content; changes are public immediately in native mode. */
+    @Transactional
+    public WebsiteCompanyProfile updatePublished(ProfileFields fields) {
+        validate(fields);
+        WebsiteCompanyProfile profile = profiles.findById(PRIMARY_PROFILE_ID)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "官网公司介绍不存在"));
+        if (!"PUBLISHED".equals(profile.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "只有已发布公司介绍可以使用此接口");
         }
+        validateMedia(fields.logoMediaId());
+        apply(profile, fields);
+        var check = readiness.check();
+        if (!check.ready()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "官网公司介绍未达到公开条件：" + String.join("；", check.blockers()));
+        }
+        var logo = media.findByIdAndDeletedAtIsNull(fields.logoMediaId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "官网 Logo 已不存在"));
+        if ("DRAFT".equals(logo.getStatus())) {
+            logo.setStatus("PUBLISHED");
+            media.save(logo);
+        }
+        WebsiteCompanyProfile saved = profiles.save(profile);
+        audit.log("WebsiteCompanyProfile", PRIMARY_PROFILE_ID, saved.getCompanyName(),
+                "WEBSITE_COMPANY_PROFILE_PUBLISHED_UPDATE", "更新已发布官网公司介绍");
+        return saved;
+    }
+
+    private void validateMedia(Long mediaId) {
+        if (mediaId == null) return;
+        var asset = media.findByIdAndDeletedAtIsNull(mediaId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "官网 Logo 图片不存在"));
+        if (!"IMAGE".equals(asset.getMediaType()) || "ARCHIVED".equals(asset.getStatus())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "官网 Logo 只能选择有效官网图片");
+        }
+    }
+
+    private static void apply(WebsiteCompanyProfile profile, ProfileFields fields) {
         profile.setCompanyName(fields.companyName().trim());
         profile.setCompanyNameEn(trim(fields.companyNameEn()));
         profile.setBrandName(trim(fields.brandName()));
@@ -65,10 +105,6 @@ public class WebsiteCompanyProfileService {
         profile.setEmail(trim(fields.email()));
         profile.setWebsite(trim(fields.website()));
         profile.setLogoMediaId(fields.logoMediaId());
-        WebsiteCompanyProfile saved = profiles.save(profile);
-        audit.log("WebsiteCompanyProfile", PRIMARY_PROFILE_ID, saved.getCompanyName(),
-                "WEBSITE_COMPANY_PROFILE_DRAFT_SAVE", "保存官网独立公司介绍草稿");
-        return saved;
     }
 
     private static void validate(ProfileFields f) {

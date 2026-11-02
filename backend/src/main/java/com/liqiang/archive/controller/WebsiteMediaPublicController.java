@@ -2,7 +2,13 @@ package com.liqiang.archive.controller;
 
 import com.liqiang.archive.entity.WebsiteMediaAsset;
 import com.liqiang.archive.repository.WebsiteBannerRepository;
+import com.liqiang.archive.repository.WebsiteCompanyProfileRepository;
 import com.liqiang.archive.repository.WebsiteMediaAssetRepository;
+import com.liqiang.archive.repository.WebsiteSolutionRepository;
+import com.liqiang.archive.repository.WebsitePackagingItemRepository;
+import com.liqiang.archive.repository.WebsiteCredentialRepository;
+import com.liqiang.archive.repository.WebsiteIpItemRepository;
+import com.liqiang.archive.repository.WebsitePageSectionRepository;
 import com.liqiang.archive.service.WebsiteProductMediaVisibilityService;
 import com.liqiang.archive.security.PublicApi;
 import lombok.RequiredArgsConstructor;
@@ -21,7 +27,7 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 
-/** Public media access requires an active Banner or published website product reference. */
+/** Public media access requires an active Banner or published website content reference. */
 @RestController
 @RequestMapping("/api/website/media")
 @PublicApi
@@ -30,6 +36,18 @@ public class WebsiteMediaPublicController {
     private final WebsiteMediaAssetRepository mediaRepository;
     private final WebsiteBannerRepository bannerRepository;
     private final WebsiteProductMediaVisibilityService productMediaVisibility;
+    private final WebsiteCompanyProfileRepository companyProfiles;
+    private final WebsiteSolutionRepository solutions;
+    private final WebsitePackagingItemRepository packagingItems;
+    private final WebsiteCredentialRepository credentials;
+    private final WebsiteIpItemRepository ipItems;
+    private final WebsitePageSectionRepository pageSections;
+
+    @Value("${app.website.credentials-native-enabled:false}")
+    private boolean nativeCredentialsEnabled;
+
+    @Value("${app.website.ip-native-enabled:false}")
+    private boolean nativeIpEnabled;
 
     @Value("${app.files.root}")
     private String fileRoot;
@@ -40,8 +58,20 @@ public class WebsiteMediaPublicController {
         if (media == null || !"PUBLISHED".equals(media.getStatus()) || !"IMAGE".equals(media.getMediaType())) {
             return ResponseEntity.notFound().build();
         }
+        String mediaUrl = "/api/website/media/" + id + "/content";
         if (!bannerRepository.existsActiveWebsiteMediaReference(id)
-                && !productMediaVisibility.isReferencedByPublishedProduct(id)) {
+                && !productMediaVisibility.isReferencedByPublishedProduct(id)
+                && !companyProfiles.existsByLogoMediaIdAndStatus(id, "PUBLISHED")
+                && !packagingItems.existsByCoverMediaIdAndStatusAndDeletedAtIsNull(id, "PUBLISHED")
+                && !(nativeCredentialsEnabled && (
+                    credentials.existsByMediaIdAndStatusAndDeletedAtIsNullAndValidUntilGreaterThanEqual(id, "PUBLISHED", java.time.LocalDate.now())
+                    || credentials.existsByMediaIdAndStatusAndDeletedAtIsNullAndValidUntilIsNull(id, "PUBLISHED")))
+                && !(nativeIpEnabled && ipItems.existsByMediaIdAndStatusAndDeletedAtIsNull(id, "PUBLISHED"))
+                && !pageSections.existsByPageKeyNotAndEnabledTrueAndDeletedAtIsNullAndImageUrl("MOLDS", mediaUrl)
+                && !pageSections.existsByPageKeyNotAndEnabledTrueAndDeletedAtIsNullAndContentContaining("MOLDS", mediaUrl)
+                && !solutions.existsByWebsiteEnabledTrueAndCoverImageUrl(mediaUrl)
+                && !solutions.existsByWebsiteEnabledTrueAndContentHtmlContaining(mediaUrl)
+                && !solutions.existsByWebsiteEnabledTrueAndContentSectionsContaining(mediaUrl)) {
             return ResponseEntity.notFound().build();
         }
         Path websiteRoot = Path.of(fileRoot).toAbsolutePath().normalize().resolve("website");

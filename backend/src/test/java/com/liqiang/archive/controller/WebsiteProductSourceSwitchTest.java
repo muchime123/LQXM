@@ -5,10 +5,11 @@ import com.liqiang.archive.repository.MediaAccountRepository;
 import com.liqiang.archive.repository.WebsiteInquiryRepository;
 import com.liqiang.archive.service.CompanyInfoService;
 import com.liqiang.archive.service.InquiryAntiSpamService;
-import com.liqiang.archive.service.PackagingMoldService;
-import com.liqiang.archive.service.PackagingService;
 import com.liqiang.archive.service.ProductCatalogService;
 import com.liqiang.archive.service.WebsiteNativeProductQueryService;
+import com.liqiang.archive.service.WebsiteNativeCompanyQueryService;
+import com.liqiang.archive.service.WebsiteCompanyMilestoneService;
+import com.liqiang.archive.service.WebsiteSocialLinkService;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -27,7 +28,9 @@ class WebsiteProductSourceSwitchTest {
     private final ProductCatalogService legacy = mock(ProductCatalogService.class);
     private final WebsiteNativeProductQueryService nativeProducts = mock(WebsiteNativeProductQueryService.class);
     private final WebsiteController controller = new WebsiteController(company, legacy,
-            nativeProducts, mock(PackagingService.class), mock(PackagingMoldService.class),
+            nativeProducts, mock(WebsiteNativeCompanyQueryService.class), mock(WebsiteCompanyMilestoneService.class),
+            mock(WebsiteSocialLinkService.class),
+            mock(com.liqiang.archive.service.WebsitePackagingItemService.class),
             mock(WebsiteInquiryRepository.class), mock(InquiryAntiSpamService.class),
             mock(MediaAccountRepository.class));
 

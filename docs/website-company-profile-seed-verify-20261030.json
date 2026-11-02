@@ -1,0 +1,38 @@
+{
+  "schema": "product_archive",
+  "source_id": 2,
+  "source_row_count": 2,
+  "source_selection": "lowest id, matching CompanyInfoService.getCompanyInfo()",
+  "target_count": 1,
+  "target_status": "DRAFT",
+  "target_logo_media_id": null,
+  "different_public_fields": [],
+  "field_presence": {
+    "company_name": true,
+    "company_name_en": true,
+    "brand_name": true,
+    "brand_name_en": true,
+    "brand_slogan": true,
+    "mission": true,
+    "vision": true,
+    "values": true,
+    "core_positioning": true,
+    "main_business": true,
+    "target_industries": true,
+    "advantages": true,
+    "manufacturing_strengths": true,
+    "enterprise_scale": true,
+    "establishment_date": true,
+    "office_address": true,
+    "factory_address": true,
+    "phone": true,
+    "email": true,
+    "website": true
+  },
+  "ready": false,
+  "blockers": [
+    "website_company_profiles already contains content"
+  ],
+  "applied": false,
+  "status": "DRAFT"
+}

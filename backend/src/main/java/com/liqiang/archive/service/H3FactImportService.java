@@ -139,6 +139,7 @@ private final SalesOutboundProfitService outboundProfitService;
 private final SalesOutboundNatureService outboundNatureService;
 private final H3PostImportAsyncService postImportAsyncService;
 private final BatchImportPipelineService pipeline;
+private final ProductionTrackingProcessService trackingProcess;
 private final DataFormatter formatter = new DataFormatter();
 
 /**
@@ -619,6 +620,13 @@ case CASHFLOW_JOURNAL, CASHIER_LOG -> null;
 if (sql == null) return;
 List<Long> ids = jdbc.query(sql, (rs, i) -> rs.getLong(1), no, group.externalId());
 for (Long id : ids) {
+if (type == FactType.PRODUCTION && jdbc.queryForObject(
+        "SELECT (SELECT COUNT(*) FROM production_tracking_process_snapshots WHERE production_order_id=?)"
+        +"+(SELECT COUNT(*) FROM production_tracking_state WHERE production_order_id=?)"
+        +"+(SELECT COUNT(*) FROM production_tracking_milestones WHERE production_order_id=?)",
+        Integer.class,id,id,id)>0) {
+    throw new IllegalArgumentException("同编号生产任务已有跟单或制程快照，请先核对氚云任务身份，不能覆盖历史执行记录："+no);
+}
 switch (type) {
 case OUTBOUND -> {
 jdbc.update("DELETE FROM sales_outbound_items WHERE sales_outbound_id=?", id);
@@ -672,6 +680,7 @@ jdbc.update("UPDATE " + table(type) + " SET source_hash=?,last_synced_at=NOW() W
 
 private Long saveProduction(Group g) {
 Map<String, String> m = g.main();
+boolean newlyImported = existingId(FactType.PRODUCTION, g) == null;
 Long customerId = customerId(first(m, "客户选择", "客户信息"));
 Long salespersonId = memberId(m.get("业务员"));
 Long employeeId = memberEmployeeId(m.get("业务员"));
@@ -686,8 +695,8 @@ customer_id,customer_name,product_name,required_quantity,completed_quantity,ware
 production_progress,warehousing_progress,production_completed,warehousing_completed,box_size,box_shape,
 box_material,mold_layout,voltage,plug_type,brand,optional_configuration,production_requirement,process_name,
 production_line,order_receiver,warehouse_operator,linked_sales_order_no,linked_sales_order_ref,
-product_order_external_id,department_name,source_created_by,source_created_at,source_updated_at,source_hash,last_synced_at)
-VALUES('H3YUN',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())
+product_order_external_id,department_name,source_created_by,source_created_at,source_updated_at,extra_mold_required,source_hash,last_synced_at)
+VALUES('H3YUN',?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())
 ON DUPLICATE KEY UPDATE work_order_no=VALUES(work_order_no),status=VALUES(status),plan_type=VALUES(plan_type),
 application_date=VALUES(application_date),required_completion_date=VALUES(required_completion_date),
 expected_completion_date=VALUES(expected_completion_date),actual_completion_date=VALUES(actual_completion_date),
@@ -703,7 +712,7 @@ production_requirement=VALUES(production_requirement),process_name=VALUES(proces
 order_receiver=VALUES(order_receiver),warehouse_operator=VALUES(warehouse_operator),linked_sales_order_no=VALUES(linked_sales_order_no),
 linked_sales_order_ref=VALUES(linked_sales_order_ref),product_order_external_id=VALUES(product_order_external_id),
 department_name=VALUES(department_name),source_created_by=VALUES(source_created_by),source_created_at=VALUES(source_created_at),
-source_updated_at=VALUES(source_updated_at),source_hash=VALUES(source_hash),last_synced_at=NOW()
+source_updated_at=VALUES(source_updated_at),extra_mold_required=VALUES(extra_mold_required),source_hash=VALUES(source_hash),last_synced_at=NOW()
 """, g.externalId(), g.key(), m.get("数据状态"), m.get("计划类型"), date(m.get("工单申请日期")),
 date(m.get("订单要求生产完成日期")), date(m.get("预计生产完成日期")), date(m.get("实际生产完成日期")),
 dateTime(m.get("排产时间")),
@@ -714,7 +723,7 @@ m.get("盒子尺寸"), first(m,"盒子形状","其他盒子形状"), m.get("盒�
 m.get("电压"), first(m,"插头","其他插头"), first(m,"品牌","自选品牌名称"), m.get("可选配置"), m.get("备注"),
 m.get("选择制程"), first(m,"产线选择","产线文本"), m.get("接单员"), m.get("入库员"),
 m.get("销售订单编号"), m.get("关联销售订单"), m.get("产品订单子OBJid"), m.get("所属部门"),
-m.get("创建人"), dateTime(m.get("创建时间")), dateTime(m.get("修改时间")), g.hash());
+m.get("创建人"), dateTime(m.get("创建时间")), dateTime(m.get("修改时间")), m.get("是否需要额外模具"), g.hash());
 Long id = existingId(FactType.PRODUCTION, g);
 if (id == null) throw new IllegalStateException("生产工单写入后未能定位（external_id=" + g.externalId() + ", 单号=" + g.key() + "）");
 // ⚠️ 先删后插只在「本次文件真的带了零部件制程子表」时才做。
@@ -746,6 +755,7 @@ row.get("零部件制程.生产完成比例"), dateTime(row.get("零部件制程
 bool(row.get("零部件制程.是否最终工序")), bool(row.get("零部件制程.生产完成")),
 row.get("零部件制程.零部件工艺图"), row.get("零部件制程.报工二维码"));
 }
+if (newlyImported) trackingProcess.captureNewOrder(id);
 return id;
 }
 

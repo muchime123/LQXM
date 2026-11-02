@@ -80,14 +80,6 @@ public class WebsiteSolutionController {
         return solutionService.update(id, payload);
     }
 
-    /** 管理接口：删除 */
-    @RequirePermission("website.manage")
-    @DeleteMapping("/admin/{id}")
-    public Map<String, Object> delete(@PathVariable Long id) {
-        solutionService.delete(id);
-        return Map.of("success", true, "id", id);
-    }
-
     /** 管理接口：批量更新官网可见性 */
     @RequirePermission("website.manage")
     @PutMapping("/admin/batch-visible")

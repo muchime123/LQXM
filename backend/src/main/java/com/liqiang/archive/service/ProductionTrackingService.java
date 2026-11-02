@@ -61,12 +61,12 @@ public class ProductionTrackingService {
             +optionalHitSql("p.optional_configuration")+" OR "+optionalHitSql("p.production_requirement")+"))";
     /** 指定按需工序：源单写明需要 ⇒ 本单要走它（不管有没有登记节点）。 */
     private static String configuredOptionalSql(String code) {
-        return "EXISTS (SELECT 1 FROM production_tracking_stage_defs d WHERE d.enabled=1 AND d.optional=1 "
+        return "EXISTS (SELECT 1 FROM production_tracking_stage_defs d WHERE d.enabled=1 AND d.default_included=1 AND d.optional=1 "
                 +"AND d.stage_code='"+code+"' AND d.workshop_kind="+KIND_CASE+" AND "+OPTIONAL_CONFIGURED_HIT+")";
     }
     /** 配置写明需要、但跟单员还没登记的按需工序道数：分母要加一，分子还没有 ⇒ 该单显示「差一个」。 */
     static final String CONFIGURED_OPTIONAL_PENDING="(SELECT COUNT(*) FROM production_tracking_stage_defs d "
-            +"WHERE d.enabled=1 AND d.optional=1 AND d.workshop_kind="+KIND_CASE+" AND "+OPTIONAL_CONFIGURED_HIT+" "
+            +"WHERE d.enabled=1 AND d.default_included=1 AND d.optional=1 AND d.workshop_kind="+KIND_CASE+" AND "+OPTIONAL_CONFIGURED_HIT+" "
             +"AND NOT EXISTS (SELECT 1 FROM production_tracking_milestones m "
             +"WHERE m.production_order_id=p.id AND m.stage_code=d.stage_code))";
     /**
@@ -81,27 +81,88 @@ public class ProductionTrackingService {
         return List.copyOf(out);
     }
     /**
-     * 「模具生产」跟进筛选的三档（顺序＝下拉顺序；10-21 跟单员需求）。
+     * 「节点跟进」筛选的三档（顺序＝下拉顺序）：未跟进 / 进行中 / 已完成。
      *
-     * <p>跟单员要回答的问题只有一个：<b>模具到底做完没有</b>。所以判据刻意<b>不看模具之前</b>
-     * （画图/备料/钣金跟进与否都不影响），只看两件事：
+     * <p>由「模具生产」筛选（10-21 需求）泛化而来。<b>为什么不再一个节点加一个筛选</b>：
+     * 跟单员反复问的是同一个问题——<b>我关心的那道节点做到哪了、后面推没推</b>，只是节点在换
+     * （模具 / 氧化 / 木箱 / 组装……）。每来一个节点就加一段专用 SQL + 一个下拉，
+     * 「更多筛选」区会失控，且每段都要重新对齐一次口径。故做成「节点 × 状态」一个条件，
+     * 节点取值直接来自制程表（{@link #nodeProgressCodes()}）：管理员在页面上加/停一个节点，
+     * 下拉立即跟随，前端不维护节点常量。
+     *
+     * <p>判据刻意<b>不看所选节点之前</b>的节点（备料跟没跟与「模具做完没有」无关），只看两件事：
      * <ol>
-     *   <li><b>模具之后有没有动</b>（{@link #MOLD_LATER_TRACKED}）——后面任一节点已跟进，说明这张单
-     *       已经越过模具这一关，三档都不筛出；</li>
-     *   <li>模具节点自己的状态，分出未跟进 / 进行中 / 已完成三档（{@link #MOLD_NODE_STATE}）。</li>
+     *   <li><b>所选节点之后有没有动</b>（{@link #nodeLaterTrackedSql}）——后面任一节点已跟进，
+     *       说明这张单已越过这一关，三档都不筛出；</li>
+     *   <li>该节点自己的状态，分出未跟进 / 进行中 / 已完成三档（{@link #nodeStateSql}）。</li>
      * </ol>
      * 「进行中」与「已完成」必须分开：混成一桶时，「已开工」和「已完工」在清单里长得一样，
      * 恰好把这个功能要回答的问题重新变得看不出来。
      *
      * <p>⚠️ 「未跟进」包含<b>完全没有该节点记录</b>的单（新单尚未开始跟单）——跟单员要能一并看到并催。
      */
-    static final List<String> MOLD_STAGE_CODES=List.of("MOLD_NONE","MOLD_WORKING","MOLD_DONE");
-    /** 模具节点三态：优先认已完成，其次进行中，其余（含无记录）都算未跟进。 */
-    static final String MOLD_NODE_STATE="CASE WHEN COALESCE(ms.mold_done_count,0)>0 THEN 'MOLD_DONE' "
-            +"WHEN COALESCE(ms.mold_working_count,0)>0 THEN 'MOLD_WORKING' ELSE 'MOLD_NONE' END";
-    /** 模具之后是否已有节点跟进（按车间取不同的后置节点集合）；为真即「已越过模具」，不再筛出。 */
-    static final String MOLD_LATER_TRACKED="(CASE WHEN p.production_line LIKE '%封口%' "
-            +"THEN COALESCE(ms.later_sealer_count,0) ELSE COALESCE(ms.later_machine_count,0) END)>0";
+    static final List<String> NODE_PROGRESS_STATES=List.of("NONE","WORKING","DONE");
+    /**
+     * 下拉可選的全部节点（制程表中启用的节点，跨车间类别按制程序号去重排序）。
+     * 白名单与下拉同源——新加的节点自动可筛，停用的节点自动消失。
+     */
+    static List<String> nodeProgressCodes() {
+        var sortNo=new java.util.LinkedHashMap<String,Integer>();
+        for(var defs:ProductionTrackingStageCatalog.snapshot().values())
+            for(var def:defs)
+                if(def.enabled())sortNo.merge(def.code(),def.sortNo(),Math::min);
+        return sortNo.entrySet().stream()
+                .sorted(java.util.Map.Entry.<String,Integer>comparingByValue()
+                        .thenComparing(java.util.Map.Entry::getKey))
+                .map(java.util.Map.Entry::getKey).toList();
+    }
+    /** 节点编码 → 下拉显示名（同一编码跨车间类别名称不同时，取制程序号靠前那个类别的叫法）。 */
+    static Map<String,String> nodeProgressLabels() {
+        var labels=new java.util.LinkedHashMap<String,String>();
+        var sortNo=new java.util.HashMap<String,Integer>();
+        for(var defs:ProductionTrackingStageCatalog.snapshot().values())
+            for(var def:defs){
+                if(!def.enabled())continue;
+                // 与 nodeProgressCodes() 同一把尺子：序号小的在前，下拉顺序与名称取自同一个节点。
+                var best=sortNo.get(def.code());
+                if(best==null||def.sortNo()<best){
+                    sortNo.put(def.code(),def.sortNo());
+                    labels.put(def.code(),def.label());
+                }
+            }
+        return labels;
+    }
+    /**
+     * 节点自身三态：优先认已完成，其次进行中，其余（含无任何该节点记录）都算未跟进。
+     *
+     * <p>⚠️ 只认<b>启用</b>的节点定义：停用的节点即便留有历史里程碑行，也不再参与「做到哪了」的判断。
+     * ⚠️ 依赖 {@code p} 别名（工单表），只能用在挂了 {@code p} 的语句上（列表 / 导出均已挂）。
+     * 走相关子查询而非 {@code ms} 派生表上的固定聚合——节点编码是请求时才确定的，
+     * 派生表里没法为「任意节点」预留列。
+     */
+    static String nodeStateSql(String code) {
+        return "CASE WHEN EXISTS (SELECT 1 FROM production_tracking_milestones m "
+                +"JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code AND d.enabled=1 "
+                +"WHERE m.production_order_id=p.id AND d.stage_code='"+code+"' AND m.stage_status='DONE') THEN 'DONE' "
+                +"WHEN EXISTS (SELECT 1 FROM production_tracking_milestones m "
+                +"JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code AND d.enabled=1 "
+                +"WHERE m.production_order_id=p.id AND d.stage_code='"+code+"' "
+                +"AND m.stage_status='IN_PROGRESS') THEN 'WORKING' ELSE 'NONE' END";
+    }
+    /**
+     * 所选节点之后是否已有节点跟进（为真即「已越过这一关」，不再筛出）。
+     *
+     * <p>后置节点<b>按制程序号判定</b>（{@code sort_no} 大于所选节点）而<b>不列举编码</b>：
+     * 新增节点自动纳入，所选节点自身与其之前的节点（钣金在模具之前）自然被排除。
+     * 后置集合按车间类别取（封口机与机器的制程不同），与 {@link #KIND_CASE} 同源。
+     */
+    static String nodeLaterTrackedSql(String code) {
+        return "EXISTS (SELECT 1 FROM production_tracking_milestones lm "
+                +"JOIN production_tracking_stage_defs ld ON ld.stage_code=lm.stage_code AND ld.enabled=1 "
+                +"WHERE lm.production_order_id=p.id AND lm.stage_status<>'PENDING' AND ld.workshop_kind="+KIND_CASE+" "
+                +"AND ld.sort_no>COALESCE((SELECT MIN(nd.sort_no) FROM production_tracking_stage_defs nd "
+                +"WHERE nd.stage_code='"+code+"' AND nd.enabled=1 AND nd.workshop_kind="+KIND_CASE+"),0))";
+    }
     /**
      * 本单**是否需要**某道按需工序＝源单可选配置写明需要，<b>或</b>已有该节点的跟单记录。
      *
@@ -122,17 +183,21 @@ public class ProductionTrackingService {
      * 不适用（源表填「无」或留空，没有里程碑行）时两者都不加 1 ⇒ 不会被误判成差一个节点；
      * 一旦该单真的登记了氧化，分母多 1、完成也就要求它做完。
      */
-    static final String STAGE_DONE_CASE="CASE WHEN p.production_line LIKE '%封口%' "
+    static final String LEGACY_STAGE_DONE_CASE="CASE WHEN p.production_line LIKE '%封口%' "
             +"THEN COALESCE(ms.sealer_done_count,0)+COALESCE(ms.sealer_optional_done_count,0) "
             +"ELSE COALESCE(ms.machine_done_count,0)+COALESCE(ms.machine_optional_done_count,0) END";
+    static final String STAGE_DONE_CASE="CASE WHEN ps.production_order_id IS NOT NULL "
+            +"THEN COALESCE(ps.done_count,0) ELSE "+LEGACY_STAGE_DONE_CASE+" END";
     /**
      * 列表「x/y 已完成」的分母：必经节点数 + 本单已登记的按需工序 + 配置写明需要但还没登记的。
      * 少了第三项，走过氧化的单分子含 5 而分母只有 4 ⇒ 列表显示「5/4 已完成」。
      */
-    static final String STAGE_TOTAL_WITH_OPTIONAL="("+STAGE_TOTAL_CASE+")"
+    static final String LEGACY_STAGE_TOTAL_WITH_OPTIONAL="("+STAGE_TOTAL_CASE+")"
             +"+CASE WHEN p.production_line LIKE '%封口%' THEN COALESCE(ms.sealer_optional_count,0) "
             +"ELSE COALESCE(ms.machine_optional_count,0) END"
             +"+"+CONFIGURED_OPTIONAL_PENDING;
+    static final String STAGE_TOTAL_WITH_OPTIONAL="CASE WHEN ps.production_order_id IS NOT NULL "
+            +"THEN COALESCE(ps.stage_total,0) ELSE "+LEGACY_STAGE_TOTAL_WITH_OPTIONAL+" END";
     static final String TRACKING_COMPLETE="("+STAGE_DONE_CASE+")="+STAGE_TOTAL_WITH_OPTIONAL;
     /** done 计数只数必经节点，按需工序单独统计，两者共用一个派生表。 */
     static final String TRACKING_FROM=" FROM production_orders p "
@@ -145,36 +210,36 @@ public class ProductionTrackingService {
             // 历史里程碑行原样保留（制程管理只允许停用有记录的节点，不允许删除）。
             +"LEFT JOIN (SELECT m.production_order_id,"
             // 必经节点与按需工序分开统计、并按车间类别分列：外层按 p.production_line 取对应那一列。
-            +"SUM(d.optional=0 AND d.workshop_kind='SEALER' AND m.stage_status='DONE') sealer_done_count,"
-            +"SUM(d.optional=0 AND d.workshop_kind='MACHINE' AND m.stage_status='DONE') machine_done_count,"
-            +"SUM(d.optional=1 AND d.workshop_kind='SEALER') sealer_optional_count,"
-            +"SUM(d.optional=1 AND d.workshop_kind='MACHINE') machine_optional_count,"
-            +"SUM(d.optional=1 AND d.workshop_kind='SEALER' AND m.stage_status='DONE') sealer_optional_done_count,"
-            +"SUM(d.optional=1 AND d.workshop_kind='MACHINE' AND m.stage_status='DONE') machine_optional_done_count,"
-            // 「模具生产」跟进三态与「模具之后是否已推进」——见 {@link #MOLD_NODE_STATE}。
-            // 同为同一 GROUP BY 上的聚合，不改变行使数，故统计卡/筛选项口径不受影响。
-            // ⚠️ 三态必须用条件求和判优先级，不能用 MAX(stage_status)：字典序是 DONE<IN_PROGRESS<PENDING，
-            // MAX 会把「待开始」取成最大，正好把已完成判成未开工。
-            +"SUM(d.stage_code='MOLD' AND m.stage_status='DONE') mold_done_count,"
-            +"SUM(d.stage_code='MOLD' AND m.stage_status='IN_PROGRESS') mold_working_count,"
-            // 模具之后的节点＝制程序号大于模具的任一节点（不再列举具体编码，钣金在模具之前自然被排除）。
-            // 只要其中任一节点 status<>'PENDING'，就说明这张单已经越过模具这一关。
-            +"SUM(d.workshop_kind='SEALER' AND d.sort_no>COALESCE(mold.sort_no,0) "
-            +"AND m.stage_status<>'PENDING') later_sealer_count,"
-            +"SUM(d.workshop_kind='MACHINE' AND d.sort_no>COALESCE(mold.sort_no,0) "
-            +"AND m.stage_status<>'PENDING') later_machine_count,"
+            +"SUM(d.default_included=1 AND d.optional=0 AND d.workshop_kind='SEALER' AND m.stage_status='DONE') sealer_done_count,"
+            +"SUM(d.default_included=1 AND d.optional=0 AND d.workshop_kind='MACHINE' AND m.stage_status='DONE') machine_done_count,"
+            +"SUM(d.default_included=1 AND d.optional=1 AND d.workshop_kind='SEALER') sealer_optional_count,"
+            +"SUM(d.default_included=1 AND d.optional=1 AND d.workshop_kind='MACHINE') machine_optional_count,"
+            +"SUM(d.default_included=1 AND d.optional=1 AND d.workshop_kind='SEALER' AND m.stage_status='DONE') sealer_optional_done_count,"
+            +"SUM(d.default_included=1 AND d.optional=1 AND d.workshop_kind='MACHINE' AND m.stage_status='DONE') machine_optional_done_count,"
             // 「跟单员登记的入库时间」＝在「入库」节点填的完成日期；节点未完成时为空。
             // 该列是同一 GROUP BY 上的聚合，不会改变行使数，故统计卡/筛选项口径不受影响。
-            +"MAX(CASE WHEN d.stage_code='WAREHOUSE' AND m.stage_status='DONE' THEN m.completed_date END) warehouse_in_date,"
+            +"MAX(CASE WHEN d.stage_code='WAREHOUSE' AND m.stage_status='DONE' "
+            +"AND (sn.stage_code IS NOT NULL OR NOT EXISTS (SELECT 1 FROM production_tracking_process_snapshots ws "
+            +"WHERE ws.production_order_id=m.production_order_id)) THEN m.completed_date END) warehouse_in_date,"
             // 「跟单是否已经开始」的真值＝该工单有没有任何跟单节点记录（见 NEVER_TRACKED）。
             // 同为同一 GROUP BY 上的聚合，不改变行使数。
             +"COUNT(*) node_count "
             +"FROM production_tracking_milestones m "
-            +"JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code AND d.enabled=1 "
-            +"LEFT JOIN production_tracking_stage_defs mold ON mold.stage_code='MOLD' AND mold.enabled=1 "
-            +"AND mold.workshop_kind=d.workshop_kind "
+            +"LEFT JOIN production_tracking_process_snapshot_nodes sn "
+            +"ON sn.production_order_id=m.production_order_id AND sn.stage_code=m.stage_code "
+            +"AND sn.applicability<>'NOT_APPLICABLE' "
+            +"JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code "
+            +"AND (d.enabled=1 OR sn.stage_code IS NOT NULL) "
             +"GROUP BY m.production_order_id) ms "
-            +"ON ms.production_order_id=p.id";
+            +"ON ms.production_order_id=p.id "
+            +"LEFT JOIN (SELECT s.production_order_id,"
+            +"SUM(n.applicability<>'NOT_APPLICABLE') stage_total,"
+            +"SUM(n.applicability<>'NOT_APPLICABLE' AND m.stage_status='DONE') done_count "
+            +"FROM production_tracking_process_snapshots s "
+            +"JOIN production_tracking_process_snapshot_nodes n ON n.production_order_id=s.production_order_id "
+            +"LEFT JOIN production_tracking_milestones m ON m.production_order_id=n.production_order_id "
+            +"AND m.stage_code=n.stage_code GROUP BY s.production_order_id) ps "
+            +"ON ps.production_order_id=p.id";
     /**
      * 采购入库关联：氚云生产任务单自身没有「入库时间」列，真正的入库时间落在采购入库明细的
      * 「选择生产任务单」上（首段编号 = {@code production_orders.work_order_no}）。
@@ -454,6 +519,7 @@ public class ProductionTrackingService {
     static final String LIST_COLUMNS="SELECT p.id,p.work_order_no order_no,p.status source_status,"
             +"p.product_name product_name_snapshot,p.production_requirement source_order_remark,"
             +"p.optional_configuration source_optional_configuration,"
++"p.extra_mold_required extra_mold_required,"
             +"DATE_FORMAT("+CREATED_MONTH_DATE+",'%Y-%m') tracking_month,"
             +"CONCAT_WS(' / ',p.box_size,p.box_shape,p.box_material) specification_snapshot,"
             +"p.mold_layout mold_layout,"
@@ -515,7 +581,24 @@ public class ProductionTrackingService {
                         String delayReason, LocalDate nextFollowupDate, Long assigneeEmployeeId,
                         String deliveryResult, String shipmentStatus, String remark) {}
     public record Milestone(String code, String status, LocalDate completedDate, String note,
-                            LocalDate manualReferenceDate, String manualReferenceReason) {}
+                            LocalDate manualReferenceDate, String manualReferenceReason,
+                            String completionSource) {
+        public Milestone(String code,String status,LocalDate completedDate,String note,
+                         LocalDate manualReferenceDate,String manualReferenceReason) {
+            this(code,status,completedDate,note,manualReferenceDate,manualReferenceReason,null);
+        }
+    }
+    static void validateMilestoneCompletion(Milestone milestone,String label) {
+        if("DONE".equals(milestone.status()) && milestone.completedDate()==null
+                &&(!"NO_DATE".equals(milestone.completionSource())
+                ||milestone.note()==null||milestone.note().isBlank()))
+            throw new IllegalArgumentException(label+"已完成但日期未知时，请确认日期未知并填写核实依据");
+        if(!"DONE".equals(milestone.status())&&milestone.completionSource()!=null)
+            throw new IllegalArgumentException("未完成节点不能设置完成来源");
+        if(milestone.completedDate()!=null&&milestone.completionSource()!=null
+                &&!"MANUAL".equals(milestone.completionSource()))
+            throw new IllegalArgumentException("已填写真实完成日期的节点不能标记日期未知");
+    }
     public record EntryRequest(long version, String content, State state, List<Milestone> milestones) {}
     public record DispositionRequest(long version, boolean stopped, String reason) {}
     /**
@@ -524,7 +607,44 @@ public class ProductionTrackingService {
      * {@code closed=false}＝撤销结案，恢复按节点进度派生状态。
      * 关闭态下 status 强制展示为 completed；停止态下 status 仍为 stopped；二者互斥。
      */
-    public record ClosureRequest(long version, boolean closed, String note) {}
+    /**
+     * 结案时对<b>单个</b>节点的人工确认：四种结论都<b>由人给出</b>，系统不推断任何日期或适用性。
+     *
+     * <p>为什么不推断：「跳过的工序」「没登记的日期」在这套数据里根本无法自证，
+     * 写进去的就是一个假事实；宁可让人点一下四选一，也不能让代码替车间隔空猜。
+     *
+     * @param result        四选一，见 {@link #CONFIRM_RESULTS}
+     * @param completedDate 仅 {@code DONE_WITH_DATE} 需要
+     * @param note          人工填写的依据（仅 {@code DONE_WITH_DATE} 之外的情形要求写）
+     */
+    public record NodeConfirmation(String code, String result, LocalDate completedDate, String note) {}
+
+    /**
+     * 日期未知但确认做完仍算完成事实，要求依据但不算异常结案。
+     * 「本单不适用」和「适用但无法确认」会跳过正常完成判据，需异常权限和整体说明。
+     */
+    private static final Set<String> CONFIRM_RESULTS =
+            Set.of("DONE_WITH_DATE", "DONE_NO_DATE", "APPLICABLE", "NOT_APPLICABLE");
+    /** 这三种结论必须逐条写明依据：它们都无法自证，没有依据等于「凭感觉」 */
+    private static final Set<String> EVIDENCE_RESULTS = Set.of("DONE_NO_DATE", "APPLICABLE", "NOT_APPLICABLE");
+    /**
+     * 需要 {@code manufacturing.followup.abnormal} 权限的结论。
+     *
+     * <p>与 {@link #EVIDENCE_RESULTS} 当前取值相同，但语义不同、必须分开写：
+     * 「要写依据」是留痕要求，「要权限」是准入门槛。
+     * {@code DONE_NO_DATE} 之所以也要权限 —— 它能让节点跳过「必须有完成日期」这条硬校验，
+     * 跟进抽屉与结案弹窗两个入口共用同一把钥匙（否则选更松的那个入口就能绕开）。
+     */
+    private static final Set<String> ABNORMAL_RESULTS = Set.of("DONE_NO_DATE", "APPLICABLE", "NOT_APPLICABLE");
+    private static final String PERMISSION_ABNORMAL_CLOSURE = "manufacturing.followup.abnormal";
+
+    public record ClosureRequest(long version, boolean closed, String note,
+                                 String abnormalReason, List<NodeConfirmation> nodeConfirmations) {
+        /** 兼容不带节点确认的调用（老前端、只需改结案状态的场景）。 */
+        public ClosureRequest(long version, boolean closed, String note) {
+            this(version, closed, note, null, null);
+        }
+    }
     public record TimeReviewRequest(String kind,String status,String reason,String contactName,
                                     LocalDate agreedDate,LocalDate nextFollowupDate) {}
 
@@ -1074,20 +1194,20 @@ public class ProductionTrackingService {
             DateRangeFilter created,String optionalStage,int page,int size) {
         return list(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,
                 salesperson,deliveryResult,application,schedule,expected,urgent,moldLayout,created,
-                optionalStage,"",page,size);
+                optionalStage,"","",page,size);
     }
 
     public Map<String,Object> list(String keyword,String workshop,String trackingStatus,String reminder,
             String sourceStatus,boolean mine,String assignee,String month,String action,String countdown,
             String salesperson,String deliveryResult,DateRangeFilter application,DateRangeFilter schedule,
             DateRangeFilter expected,boolean urgent,String moldLayout,
-            DateRangeFilter created,String optionalStage,String moldStage,int page,int size) {
+            DateRangeFilter created,            String optionalStage,String nodeProgress,String extraMold,int page,int size) {
         if(page<1 || size<1 || size>100)throw new IllegalArgumentException("分页范围无效");
         boolean scheduleFilter=scheduleAction(action)||"any".equals(action);
         var f=filter(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,
                 scheduleFilter?"all":action,countdown,
                 salesperson,deliveryResult,application,schedule,expected,urgent,moldLayout,created,
-                optionalStage,moldStage);
+                optionalStage,nodeProgress,extraMold);
         if(scheduleFilter){
             var matched=new ArrayList<>(jdbc.query(LIST_COLUMNS+TRACKING_FROM+INBOUND_JOIN+f.where()+LIST_ORDER,
                     (r,n)->row(r),f.params().toArray()));
@@ -1150,7 +1270,7 @@ public class ProductionTrackingService {
      */
     static Map<String,Object> filterForTest(ProductionTrackingService service,String trackingStatus) {
         Filtered filtered=service.filter(null,null,trackingStatus,"all",null,false,null,null,"all","",null,null,
-                EMPTY_DATE_FILTER,EMPTY_DATE_FILTER,EMPTY_DATE_FILTER,false,null,EMPTY_DATE_FILTER,"","");
+                EMPTY_DATE_FILTER,EMPTY_DATE_FILTER,EMPTY_DATE_FILTER,false,null,EMPTY_DATE_FILTER,"","","");
         return Map.of("where",filtered.where().toString(),"needsInbound",filtered.needsInbound());
     }
 
@@ -1158,7 +1278,7 @@ public class ProductionTrackingService {
             String sourceStatus,boolean mine,String assignee,String month,String action,String countdown,
             String salesperson,String deliveryResult,DateRangeFilter application,DateRangeFilter schedule,
             DateRangeFilter expected,boolean urgent,String moldLayout,DateRangeFilter created,
-            String optionalStage,String moldStage) {
+            String optionalStage,String nodeProgress,String extraMold) {
         // 引用 ib.first_in 的两组谓词：交付结果、倒计时（两侧都依赖「实际交付日」）。
         // ⚠️ 第三处：跟单状态 `open` ＝ 未交付，同样引用 DELIVERED_IN_DATE（含 ib.first_in），
         // 漏挂 INBOUND_JOIN 会直接 SQL 报「Unknown column 'ib.first_in'」——这不会在单测里暴露，
@@ -1213,6 +1333,24 @@ public class ProductionTrackingService {
                 where.append(" AND p.salesperson_name IN (")
                         .append("?,".repeat(selected.size()-1)).append("?)");
                 params.addAll(selected);
+            }
+        }
+        // 「额外模具」列头筛选：取值是固定的两态语义（需要＝字段='是'；否＝字段为空或非'是'），
+        // 白名单校验后内联（值恒为 REQUIRED/NONE，无注入风险）。
+        if(extraMold!=null&&!extraMold.isBlank()){
+            var selected=new java.util.LinkedHashSet<>(List.of(extraMold.split(",",-1)));
+            selected.removeIf(String::isBlank);
+            if(!selected.isEmpty()){
+                if(!Set.of("REQUIRED","NONE").containsAll(selected))
+                    throw new IllegalArgumentException("额外模具筛选无效");
+                var clauses=new java.util.ArrayList<String>();
+                for(String value:selected){
+                    if("REQUIRED".equals(value))
+                        clauses.add("TRIM(p.extra_mold_required) = '是'");
+                    else // NONE：字段为空或不是'是'（NULL 不能用 <> 命中，需显式 OR IS NULL）
+                        clauses.add("(p.extra_mold_required IS NULL OR TRIM(p.extra_mold_required) <> '是')");
+                }
+                where.append(" AND (").append(String.join(" OR ",clauses)).append(")");
             }
         }
         // 「生产交付结果」列筛选：取值是固定的四态枚举（见 {@link #DELIVERY_OUTCOME}），白名单校验后内联。
@@ -1289,18 +1427,28 @@ public class ProductionTrackingService {
             if(!optionalStageCodes().contains(code))throw new IllegalArgumentException("按需工序筛选无效");
             where.append(" AND ").append(needsOptionalStage(code));
         }
-        // 「模具生产」跟进筛选（三档可多选，取值固定枚举，白名单校验后内联）。
-        // 两个条件缺一不可：① 模具之后没有任何节点跟进（否则单已越过模具这一关）；
-        // ② 模具节点自身落在所选档位。刻意不看模具之前的节点——备料跟没跟与本功能无关。
-        if(moldStage!=null&&!moldStage.isBlank()){
-            var selected=new java.util.LinkedHashSet<>(List.of(moldStage.split(",",-1)));
-            selected.removeIf(String::isBlank);
-            if(!selected.isEmpty()){
-                if(!MOLD_STAGE_CODES.containsAll(selected))
-                    throw new IllegalArgumentException("模具跟进筛选无效");
-                where.append(" AND NOT ").append(MOLD_LATER_TRACKED)
-                        .append(" AND ").append(MOLD_NODE_STATE).append(" IN ('")
-                        .append(String.join("','",selected)).append("')");
+        // 「节点跟进」筛选（{@code 节点编码:档位}，形如 {@code MOLD:NONE,MOLD:WORKING}）。
+        // 一个节点内多档＝或（任一档命中），多个节点＝且（同时卡在两道节点上）。
+        // 每个节点两段条件缺一不可：① 该节点之后没有任何节点跟进（否则单已越过这一关）；
+        // ② 该节点自身落在所选档位。刻意不看该节点之前——备料跟没跟与「模具做完没有」无关。
+        if(nodeProgress!=null&&!nodeProgress.isBlank()){
+            var codes=nodeProgressCodes();
+            var groups=new java.util.LinkedHashMap<String,java.util.LinkedHashSet<String>>();
+            for(String part:nodeProgress.split(",",-1)){
+                String token=part.trim();
+                if(token.isBlank())continue;
+                int cut=token.indexOf(':');
+                if(cut<=0)throw new IllegalArgumentException("节点跟进筛选无效");
+                String code=token.substring(0,cut).trim();
+                String state=token.substring(cut+1).trim();
+                if(!codes.contains(code)||!NODE_PROGRESS_STATES.contains(state))
+                    throw new IllegalArgumentException("节点跟进筛选无效");
+                groups.computeIfAbsent(code,k->new java.util.LinkedHashSet<>()).add(state);
+            }
+            for(var group:groups.entrySet()){
+                where.append(" AND NOT ").append(nodeLaterTrackedSql(group.getKey()))
+                        .append(" AND ").append(nodeStateSql(group.getKey())).append(" IN ('")
+                        .append(String.join("','",group.getValue())).append("')");
             }
         }
         if(mine){where.append(" AND assigned.id=?");params.add(actors.current().employeeId());}
@@ -1409,19 +1557,19 @@ public class ProductionTrackingService {
             String optionalStage,String ids) {
         return exportRows(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,action,countdown,
                 salesperson,deliveryResult,application,schedule,expected,urgent,moldLayout,created,
-                optionalStage,"",ids);
+                optionalStage,"","",ids);
     }
 
     public Map<String,Object> exportRows(String keyword,String workshop,String trackingStatus,String reminder,
             String sourceStatus,boolean mine,String assignee,String month,String action,String countdown,
             String salesperson,String deliveryResult,DateRangeFilter application,DateRangeFilter schedule,
             DateRangeFilter expected,boolean urgent,String moldLayout,DateRangeFilter created,
-            String optionalStage,String moldStage,String ids) {
+            String optionalStage,String nodeProgress,String extraMold,String ids) {
         boolean scheduleFilter=scheduleAction(action)||"any".equals(action);
         var f=filter(keyword,workshop,trackingStatus,reminder,sourceStatus,mine,assignee,month,
                 scheduleFilter?"all":action,countdown,
                 salesperson,deliveryResult,application,schedule,expected,urgent,moldLayout,created,
-                optionalStage,moldStage);
+                optionalStage,nodeProgress,extraMold);
         String where=f.where().toString();
         var params=new ArrayList<>(f.params());
         if(ids!=null&&!ids.isBlank()){
@@ -1571,6 +1719,13 @@ public class ProductionTrackingService {
         result.put("months",months);
         result.put("actionCounts",actionCounts);
         result.put("optionalStageCounts",optionalStageCounts);
+        // 「节点跟进」下拉的节点清单：直接取制程表（与筛选白名单同源），前端不再维护节点常量。
+        // ⚠️ 刻意不带条数：条数要按「该节点之后没推」逐节点算，等于把筛选谓词在整表上跑 N 遍，
+        //    会把这次刚优化到 ~100ms 的下拉重新拖慢；条数由列表筛选后的总数回答。
+        var labels=nodeProgressLabels();
+        result.put("nodeProgressNodes",nodeProgressCodes().stream()
+                .map(code->Map.<String,Object>of("code",code,"label",labels.getOrDefault(code,code)))
+                .toList());
         return result;
     }
     /** GROUP_CONCAT 会话上限：取值均为已去重的短文本，20000 字符足够装下全库维度，且不会撑爆内存。 */
@@ -1928,8 +2083,11 @@ public class ProductionTrackingService {
                 +"m.stage_code,m.completed_date "
                 +"FROM production_orders p "
                 +"JOIN production_tracking_state t ON t.production_order_id=p.id "
+                +"LEFT JOIN production_tracking_process_snapshots ps ON ps.production_order_id=p.id "
                 +"LEFT JOIN production_tracking_milestones m ON m.production_order_id=p.id AND m.stage_status='DONE' "
                 +"WHERE p.production_line=? AND p.product_name=? "
+                +"AND (ps.production_order_id IS NULL OR ps.source_kind='LEGACY') "
+                +"AND t.stopped_at IS NULL "
                 +"AND (p.status IS NULL OR p.status NOT IN ('CANCELLED','CANCELED','已取消')) "
                 +"ORDER BY p.source_created_at,p.id",
                 r->{
@@ -2015,6 +2173,31 @@ public class ProductionTrackingService {
         summary.put("matchedOrders",orders.size());
         summary.put("scheduledAnchorCount",scheduled);
         summary.put("noAnchorCount",none);
+        var quality=new LinkedHashMap<String,Map<String,Integer>>();
+        for(String code:codes){
+            int usable=0,missing=0,noAnchor=0,reversed=0,tooLong=0,future=0,zeroDay=0;
+            for(var orderRow:rows){
+                @SuppressWarnings("unchecked")
+                var stages=(List<Map<String,Object>>)orderRow.get("stages");
+                for(var stage:stages){
+                    if(!code.equals(stage.get("stageCode")))continue;
+                    if(Boolean.TRUE.equals(stage.get("used"))){
+                        usable++;
+                        if(Boolean.TRUE.equals(stage.get("zeroDay")))zeroDay++;
+                    }else{
+                        String reason=(String)stage.get("reason");
+                        if("未登记完成日期".equals(reason))missing++;
+                        else if("缺锚点（无排产日）".equals(reason))noAnchor++;
+                        else if("完成日期早于上一节点".equals(reason))reversed++;
+                        else if("间隔超过 60 天".equals(reason))tooLong++;
+                        else if("完成日期在未来".equals(reason))future++;
+                    }
+                }
+            }
+            quality.put(code,Map.of("usable",usable,"missingDate",missing,"noAnchor",noAnchor,
+                    "reversedDate",reversed,"over60Days",tooLong,"futureDate",future,"zeroDay",zeroDay));
+        }
+        summary.put("stageQuality",quality);
         summary.put("spanFrom",from);
         summary.put("spanTo",to);
         return Map.of("workshop",workshop,"product",product,"stageCodes",codes,"summary",summary,"orders",rows);
@@ -2263,8 +2446,9 @@ public class ProductionTrackingService {
                 +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
                 +"WHERE c.id=? AND c.config_type='PRODUCT_NAME'",(r,n)->r.getString(1),row.taskConfigId());
         if(items.isEmpty())throw new IllegalArgumentException("产品不存在、不是产品名称配置，或没有所属车间");
-        if(!ProductionTrackingPolicy.stageCodes(items.getFirst()).contains(row.stageCode()))
-            throw new IllegalArgumentException("节点不属于该产品车间");
+        if(jdbc.queryForObject("SELECT COUNT(*) FROM production_tracking_stage_dictionary "
+                +"WHERE stage_code=?",Integer.class,row.stageCode())==0)
+            throw new IllegalArgumentException("跟单节点字典中不存在该节点");
         if(row.typicalDays()!=null&&(row.typicalDays().signum()<0||row.typicalDays().doubleValue()>60))
             throw new IllegalArgumentException("参考间隔须在 0~60 天之间");
         if(row.typicalDays()==null){
@@ -2365,7 +2549,7 @@ public class ProductionTrackingService {
      */
     static final List<String> LIST_COLUMN_KEYS=List.of(
             "salesperson","workshop","sourceStatus","trackingStatus","trackingAction","sourceCreatedAt","applicationDate","scheduleTime","dueDate","requestedLeadDays",
-            "expectedFinish","countdown","completion","deliveryResult","stages","timeSignals","salesTrace","assignee");
+            "expectedFinish","countdown","completion","deliveryResult","extraMoldRequired","stages","timeSignals","salesTrace","assignee");
 
     /** 表里没有该列的配置时回落到什么：＝改造前前端写死的那 6 个隐藏列（保证升级后界面不变）。 */
     static final Set<String> LIST_COLUMN_FALLBACK_HIDDEN=Set.of(
@@ -2456,8 +2640,84 @@ public class ProductionTrackingService {
                 (r,n)->r.getLong(1),key).stream().findFirst().orElse(null);
     }
 
+    /** 导出默认勾选字段的保存入参（selected 为 null 视为非法）。 */
+    public record ExportColumnDefaultSave(String columnKey,Boolean selected) {}
+
+    /**
+     * 导出默认勾选字段（全站）：只返回管理员显式配置过的 key。
+     * <p>不枚举白名单：导出列清单由前端 {@code EXPORT_COLUMNS} 唯一维护（含动态展开的工序列），
+     * 后端再复制一份只会漂移；表为空即「未配置」，前端回落「核心字段」。
+     */
+    public Map<String,Object> exportColumnDefaultMatrix() {
+        var columns=new ArrayList<Map<String,Object>>();
+        jdbc.query("SELECT column_key,selected FROM production_tracking_export_column_defaults",r->{
+            columns.add(Map.of("columnKey",r.getString(1),"selected",r.getBoolean(2)));
+        });
+        return Map.of("columns",columns);
+    }
+
+    /**
+     * 全量覆盖保存导出默认勾选字段（权限由 Controller 的 manufacturing.listcolumns.manage 把关）。
+     * <p>「全不选」必须能表达：请求里的列逐行写 selected=0/1，未提交的列删掉（回落「核心字段」）。
+     * <p>只写真正变化的行，返回 changed 便于前端提示。
+     */
+    @Transactional
+    public Map<String,Object> saveExportColumnDefaults(List<ExportColumnDefaultSave> rows) {
+        if(rows==null||rows.isEmpty())throw new IllegalArgumentException("没有要保存的默认字段");
+        var pending=new LinkedHashMap<String,Boolean>();
+        for(var row:rows){
+            if(row==null||row.columnKey()==null||row.columnKey().isBlank())
+                throw new IllegalArgumentException("列标识不能为空");
+            if(row.selected()==null)throw new IllegalArgumentException("列勾选状态不能为空："+row.columnKey());
+            pending.put(row.columnKey(),row.selected());
+        }
+        var actor=actors.current();
+        var current=new LinkedHashMap<String,Boolean>();
+        jdbc.query("SELECT column_key,selected FROM production_tracking_export_column_defaults",r->{
+            current.put(r.getString(1),r.getBoolean(2));
+        });
+        int changed=0;
+        for(String key:current.keySet()){
+            if(pending.containsKey(key))continue;
+            jdbc.update("DELETE FROM production_tracking_export_column_defaults WHERE column_key=?",key);
+            changed++;
+        }
+        for(var entry:pending.entrySet()){
+            Boolean before=current.get(entry.getKey());
+            if(entry.getValue().equals(before))continue;
+            jdbc.update("INSERT INTO production_tracking_export_column_defaults(column_key,selected,updated_by) VALUES(?,?,?) "
+                            +"ON DUPLICATE KEY UPDATE selected=VALUES(selected),updated_by=VALUES(updated_by)",
+                    entry.getKey(),entry.getValue()?1:0,actor==null?null:actor.employeeId());
+            changed++;
+        }
+        return Map.of("changed",changed);
+    }
+
     /** 详情里程碑附加生效参考日期与只读倒排目标。 */
-    private Map<String,Object> attachNodeReferences(Map<String,Object> source,List<Map<String,Object>> milestones,List<String> codes) {
+    private Map<String,Object> attachNodeReferences(Map<String,Object> source,List<Map<String,Object>> milestones,
+            List<String> codes,boolean linearProcess) {
+        if(!linearProcess){
+            for(var item:milestones){
+                Object manual=item.get("manualReferenceDate");
+                item.put("referenceDate",manual);
+                item.put("referenceSource",manual==null?"NONE":"MANUAL");
+                item.put("systemReferenceDate",null);
+                item.put("targetDate",null);
+                item.put("referenceOverdueDays",manual instanceof LocalDate d
+                        &&!"DONE".equals(item.get("status"))&&LocalDate.now().isAfter(d)
+                        ?(int)ChronoUnit.DAYS.between(d,LocalDate.now()):null);
+            }
+            var result=new LinkedHashMap<String,Object>();
+            result.put("latestStartDate",null);
+            result.put("predictedFinishDate",null);
+            result.put("slackDays",null);
+            result.put("risk",null);
+            result.put("deadline",source.get("forecastFinishDate")!=null
+                    ?source.get("forecastFinishDate"):source.get("expectedFinishDate"));
+            result.put("productBaselineComplete",false);
+            result.put("referenceNote","本单存在并行或未定义依赖的制程，暂不按串行节点推算自动参考日期");
+            return result;
+        }
         boolean sealer=ProductionTrackingPolicy.isSealer((String)source.get("workshopType"));
         var benchmarks=benchmarksForOrder(source);
         var applicable=new HashMap<String,Boolean>();var statuses=new HashMap<String,String>();var dates=new HashMap<String,LocalDate>();
@@ -2523,24 +2783,41 @@ public class ProductionTrackingService {
             byOrder.computeIfAbsent(((Number)milestone.get("productionOrderId")).longValue(),id->new HashMap<>())
                     .put(String.valueOf(milestone.get("stageCode")),milestone);
         }
+        var snapshotNodes=jdbc.queryForList("SELECT production_order_id,stage_code AS code,stage_label AS label,"
+                +"sort_no,conditional,applicability FROM production_tracking_process_snapshot_nodes "
+                +"WHERE production_order_id IN ("+marks+") ORDER BY sort_no,stage_code",ids.toArray());
+        var snapshotsByOrder=new HashMap<Long,List<Map<String,Object>>>();
+        for(var node:snapshotNodes)snapshotsByOrder.computeIfAbsent(
+                ((Number)node.get("production_order_id")).longValue(),key->new ArrayList<>()).add(node);
         for(var item:items){
             String workshop=(String)item.get("workshopType");
             boolean sealer=ProductionTrackingPolicy.isSealer(workshop);
-            var milestones=byOrder.getOrDefault(((Number)item.get("id")).longValue(),Map.of());
+            long orderId=((Number)item.get("id")).longValue();
+            var milestones=byOrder.getOrDefault(orderId,Map.of());
+            var snapshot=snapshotsByOrder.get(orderId);
             var stages=new ArrayList<Map<String,Object>>();
-            for(String code:ProductionTrackingPolicy.stageCodes(workshop)){
+            var codes=snapshot==null?ProductionTrackingPolicy.stageCodes(workshop)
+                    :snapshot.stream().map(node->(String)node.get("code")).toList();
+            for(String code:codes){
                 var stage=new LinkedHashMap<String,Object>();
                 var milestone=milestones.get(code);
-                boolean optional=ProductionTrackingPolicy.isOptionalStage(code,workshop);
+                var snapshotNode=snapshot==null?null:snapshot.stream()
+                        .filter(node->code.equals(node.get("code"))).findFirst().orElse(null);
+                boolean optional=snapshotNode==null?ProductionTrackingPolicy.isOptionalStage(code,workshop)
+                        :ProductionTrackingProcessService.flag(snapshotNode.get("conditional"));
                 stage.put("code",code);
-                stage.put("label",ProductionTrackingPolicy.stageLabel(code,sealer));
+                stage.put("label",snapshotNode==null?ProductionTrackingPolicy.stageLabel(code,sealer):snapshotNode.get("label"));
                 stage.put("status",milestone!=null?milestone.get("stageStatus"):"PENDING");
                 stage.put("completedDate",milestone!=null?milestone.get("completedDate"):null);
                 stage.put("note",milestone!=null?milestone.get("note"):null);
                 // 按需工序：没有里程碑行＝本单不走这道工序，前端不该把它显示成「未完成」。
                 stage.put("optional",optional);
-                stage.put("applicable",!optional||milestone!=null||ProductionTrackingPolicy.configuredOptionalStage(code,
-                        (String)item.get("sourceOptionalConfiguration"),(String)item.get("sourceOrderRemark")));
+                String applicability=snapshotNode==null?null:(String)snapshotNode.get("applicability");
+                stage.put("applicability",applicability);
+                stage.put("applicable",snapshotNode==null
+                        ?(!optional||milestone!=null||ProductionTrackingPolicy.configuredOptionalStage(code,
+                            (String)item.get("sourceOptionalConfiguration"),(String)item.get("sourceOrderRemark")))
+                        :!"NOT_APPLICABLE".equals(applicability));
                 stages.add(stage);
             }
             item.put("stageProgress",stages);
@@ -2552,6 +2829,7 @@ public class ProductionTrackingService {
         return jdbc.query("SELECT p.id,p.work_order_no order_no,p.external_source,p.external_id,p.status source_status,"
                 +"p.product_name product_name_snapshot,"
                 +"p.production_requirement source_order_remark,p.optional_configuration source_optional_configuration,"
++"p.extra_mold_required extra_mold_required,"
                 +"CONCAT_WS(' / ',p.box_size,p.box_shape,p.box_material) specification_snapshot,"
                 +"p.mold_layout mold_layout,"
                 +"p.required_quantity planned_quantity,'台' unit,p.production_line workshop_type,"
@@ -2620,31 +2898,72 @@ public class ProductionTrackingService {
         // 详情也补 primaryAction/scheduleRisk：抽屉显示用 primaryAction，与列表同口径。
         attachScheduleSignals(List.of(source));
         result.put("order",source);
-        var codes=stageCodes((String)source.get("workshopType"));
-        var saved=jdbc.query("SELECT stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason FROM production_tracking_milestones WHERE production_order_id=?",
+        var processSnapshot=jdbc.queryForList("SELECT stage_code AS code,stage_label AS label,"
+                +"conditional,applicability,applicability_reason AS applicabilityReason "
+                +"FROM production_tracking_process_snapshot_nodes WHERE production_order_id=? "
+                +"ORDER BY sort_no,stage_code",id);
+        var codes=processSnapshot.isEmpty()?stageCodes((String)source.get("workshopType"))
+                :processSnapshot.stream().map(node->(String)node.get("code")).toList();
+        var saved=jdbc.query("SELECT stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason,"
+                +"applicability,applicability_note,completion_source FROM production_tracking_milestones WHERE production_order_id=?",
                 (r,n)->row(r),id);
         var milestones=new ArrayList<Map<String,Object>>();
         boolean sealer=ProductionTrackingPolicy.isSealer((String)source.get("workshopType"));
         for(String code:codes){
             var item=new LinkedHashMap<String,Object>();
-            boolean optional=ProductionTrackingPolicy.isOptionalStage(code,(String)source.get("workshopType"));
+            var snapshotNode=processSnapshot.stream().filter(node->code.equals(node.get("code")))
+                    .findFirst().orElse(null);
+            boolean optional=snapshotNode==null
+                    ?ProductionTrackingPolicy.isOptionalStage(code,(String)source.get("workshopType"))
+                    :ProductionTrackingProcessService.flag(snapshotNode.get("conditional"));
             Optional<Map<String,Object>> savedRow=saved.stream().filter(s->code.equals(s.get("stageCode"))).findFirst();
-            item.put("code",code);item.put("label",ProductionTrackingPolicy.stageLabel(code,sealer));
+            item.put("code",code);item.put("label",snapshotNode==null
+                    ?ProductionTrackingPolicy.stageLabel(code,sealer):snapshotNode.get("label"));
             item.put("optional",optional);
             // 按需工序没有里程碑行 ⇒ 本单不适用；有行则按行上的状态走。
-            item.put("applicable",!optional||savedRow.isPresent()||ProductionTrackingPolicy.configuredOptionalStage(code,
-                    (String)source.get("sourceOptionalConfiguration"),(String)source.get("sourceOrderRemark")));
+            item.put("applicable",snapshotNode==null
+                    ?(!optional||savedRow.isPresent()||ProductionTrackingPolicy.configuredOptionalStage(code,
+                        (String)source.get("sourceOptionalConfiguration"),(String)source.get("sourceOrderRemark")))
+                    :!"NOT_APPLICABLE".equals(snapshotNode.get("applicability")));
             item.put("status","PENDING");item.put("completedDate",null);item.put("note",null);
             item.put("manualReferenceDate",null);item.put("manualReferenceReason",null);
+            // 还没有行 ⇒ 也没有人工确认过适用性：三个新列保持 NULL，前端按「沿用源单关键词规则」处理。
+            item.put("applicability",null);item.put("applicabilityNote",null);item.put("completionSource",null);
             savedRow.ifPresent(s->{
                 item.put("status",s.get("stageStatus"));item.put("completedDate",s.get("completedDate"));item.put("note",s.get("note"));
                 item.put("manualReferenceDate",s.get("manualReferenceDate"));item.put("manualReferenceReason",s.get("manualReferenceReason"));
+                item.put("applicability",s.get("applicability"));item.put("applicabilityNote",s.get("applicabilityNote"));
+                item.put("completionSource",s.get("completionSource"));
             });
+            if(snapshotNode!=null){
+                item.put("applicability",snapshotNode.get("applicability"));
+                item.put("applicabilityNote",snapshotNode.get("applicabilityReason"));
+            }
             milestones.add(item);
         }
-        result.put("schedule",attachNodeReferences(source,milestones,codes));
+        boolean linearProcess=true;
+        if(!processSnapshot.isEmpty()){
+            var sourceKinds=jdbc.query("SELECT source_kind FROM production_tracking_process_snapshots "
+                    +"WHERE production_order_id=?",(r,n)->r.getString(1),id);
+            if(!sourceKinds.isEmpty()&&!"LEGACY".equals(sourceKinds.getFirst())){
+                var edges=jdbc.queryForList("SELECT predecessor_code,successor_code "
+                        +"FROM production_tracking_process_snapshot_edges WHERE production_order_id=?",id);
+                var fromCounts=new HashMap<String,Integer>();
+                var toCounts=new HashMap<String,Integer>();
+                for(var edge:edges){
+                    fromCounts.merge((String)edge.get("predecessor_code"),1,Integer::sum);
+                    toCounts.merge((String)edge.get("successor_code"),1,Integer::sum);
+                }
+                linearProcess=edges.size()==codes.size()-1
+                        &&fromCounts.values().stream().allMatch(count->count<=1)
+                        &&toCounts.values().stream().allMatch(count->count<=1);
+            }
+        }
+        result.put("schedule",attachNodeReferences(source,milestones,codes,linearProcess));
         result.put("milestones",milestones);
-        result.put("stageTotal",stageTotal((String)source.get("workshopType"),milestones));
+        result.put("stageTotal",processSnapshot.isEmpty()
+                ?stageTotal((String)source.get("workshopType"),milestones)
+                :(int)milestones.stream().filter(node->!"NOT_APPLICABLE".equals(node.get("applicability"))).count());
         result.put("operations",jdbc.query("SELECT c.id,c.sequence_no,c.component_name operation_name_snapshot,"
                 +"CASE WHEN c.completed=1 OR c.completed_at IS NOT NULL "
                 +"OR (COALESCE(c.required_quantity,0)>0 AND COALESCE(c.completed_quantity,0)>=c.required_quantity) "
@@ -2804,13 +3123,17 @@ public class ProductionTrackingService {
             else jdbc.update("UPDATE production_tracking_state SET stopped_at=NULL,stopped_reason=NULL,"
                     +"stopped_by_name=NULL,version=?,last_followup_at=NOW() WHERE production_order_id=?",version+1,id);
             var after=jdbc.queryForMap("SELECT * FROM production_tracking_state WHERE production_order_id=?",id);
-            var milestones=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note "
+            // 快照是列白名单：新增列不会自动进 before/after，漏在这里就等于「改了节点但审计看不到」。
+            var milestones=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,"
+                    +"applicability,applicability_note,completion_source "
                     +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",id);
             String content=(request.stopped()?"停止生产跟单：":"恢复生产跟单：")+reason;
             jdbc.update("INSERT INTO production_tracking_entries(production_order_id,version,content,before_json,after_json,"
                     +"created_by_employee_id,created_by_name) VALUES(?,?,?,?,?,?,?)",id,version+1,content,
                     write(Map.of("state",before,"milestones",milestones)),
                     write(Map.of("state",after,"milestones",milestones)),actor.employeeId(),actor.name());
+            // 与结案同款：割面审计和时间线各记一份（见 changeClosure 里的说明）。
+            audit.log("TRACKING_STATE",id,(String)current.get("orderNo"),request.stopped()?"停止跟单":"恢复跟单",content);
             long entryId=Objects.requireNonNull(jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class));
 
             return String.valueOf(version+1);
@@ -2834,6 +3157,8 @@ public class ProductionTrackingService {
         if(current.get("stoppedAt")!=null)throw new IllegalArgumentException("已停止跟单的任务不能结案，请先恢复跟单");
         if(request.closed() && current.get("deliveredDate")==null && note.trim().length()<6)
             throw new IllegalArgumentException("该任务尚未登记交付（入库），结案说明请写明实际情况与核实结果（不少于 6 字）");
+        // 节点确认的校验全部在进事务之前做：参数不对就别开事务，也别写半截。
+        var confirmations=closureNodeConfirmations(id,current,request);
         var actor=actors.current();
         return Long.parseLong(idem.execute(actor,key,"production.tracking.closure",
                 Map.of("id",id,"request",request),()->{
@@ -2845,6 +3170,9 @@ public class ProductionTrackingService {
             if(version!=request.version())throw new ResponseStatusException(HttpStatus.CONFLICT,"该任务已由其他人更新，请刷新后重试");
             boolean alreadyClosed=before.get("closed_at")!=null;
             if(alreadyClosed==request.closed())throw new IllegalArgumentException(alreadyClosed?"该任务已结案":"该任务未结案");
+            var beforeMilestones=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,"
+                    +"applicability,applicability_note,completion_source "
+                    +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",id);
             if(request.closed())jdbc.update("UPDATE production_tracking_state SET closed_at=NOW(),closed_by_name=?,"
                     +"closed_note=?,version=?,last_followup_at=NOW() WHERE production_order_id=?",
                     actor.name(),note,version+1,id);
@@ -2852,17 +3180,155 @@ public class ProductionTrackingService {
                     +"closed_note=NULL,version=?,last_followup_at=NOW() WHERE production_order_id=?",
                     version+1,id);
             var after=jdbc.queryForMap("SELECT * FROM production_tracking_state WHERE production_order_id=?",id);
-            var milestones=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note "
+            // 节点确认写在这里而不是另开事务：与结案状态、时间线、审计同生同灭，不会留下「状态结案了但节点没改」的半成品。
+            String confirmed=applyNodeConfirmations(id,current,confirmations);
+            // 快照是列白名单：新增列不会自动进 before/after，漏在这里就等于「改了节点但审计看不到」。
+            var milestones=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,"
+                    +"applicability,applicability_note,completion_source "
                     +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",id);
-            String content=(request.closed()?"跟单结案确认：":"撤销跟单结案：")+note;
+            String content=(request.closed()?"跟单结案确认：":"撤销跟单结案：")+note+confirmed;
             jdbc.update("INSERT INTO production_tracking_entries(production_order_id,version,content,before_json,after_json,"
                     +"created_by_employee_id,created_by_name) VALUES(?,?,?,?,?,?,?)",id,version+1,content,
-                    write(Map.of("state",before,"milestones",milestones)),
+                    write(Map.of("state",before,"milestones",beforeMilestones)),
                     write(Map.of("state",after,"milestones",milestones)),actor.employeeId(),actor.name());
+            // 统一割面审计：entries 是「跟单时间线」（业务叙事），这张表是「谁在什么时候改了什么」（可追责）。
+            // 两者互补，缺一条事后就说不清；将来结案允许改节点（适用性/日期来源），这条日志是唯一能回答「谁点的」的地方。
+            // 写在同一个事务里：节点写入失败回滚时审计一并回滚，不会出现「有日志没改动」。
+            // 异常结案单独用一个动作名：审计列表里要能一眼挑出「哪些单是靠人工确认绕过了没登记的节点」。
+            // 「异常结案」这个动作名只留给<b>改了适用性</b>的裁决：它改的是「这道工序算不算」——
+            // 统计口径（节点完成率的分母）会跟着变，必须能被单独挑出来复核。
+            // NO_DATE 不改变分母（节点确实完成了，只是没有日期），靠 changes 里的摘要留痕即可。
+            boolean applicabilityRuled=confirmations.values().stream()
+                    .anyMatch(c->"APPLICABLE".equals(c.result())||"NOT_APPLICABLE".equals(c.result()));
+            audit.log("TRACKING_STATE",id,(String)current.get("orderNo"),
+                    !request.closed()?"撤销结案":(applicabilityRuled?"异常结案":"结案"),
+                    content+(current.get("deliveredDate")==null?"（未登记交付）":"（已登记交付）"));
             long entryId=Objects.requireNonNull(jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class));
 
             return String.valueOf(version+1);
         }));
+    }
+
+    /**
+     * 结案时的节点确认：把「能不能提」的校验全部做完再返回，通过后才由事务体写库。
+     *
+     * <p>三个口子必须同时收紧，缺一个这套数据就会被架空：
+     * ① 结论只能是四种之一（防止将来随手加枚举绕过权限）；
+     * ② 无法自证的三种要 {@code manufacturing.followup.abnormal} 权限（防止谁都能跳过节点）；
+     * ③ 异常必须写明原因与每条依据（防止「点了但没有解释」，事后照样查不清）。
+     */
+    private Map<String,NodeConfirmation> closureNodeConfirmations(long id,Map<String,Object> current,ClosureRequest request){
+        List<NodeConfirmation> submitted=request.closed()&&request.nodeConfirmations()!=null
+                ?request.nodeConfirmations():List.of();
+        if(!request.closed())return Map.of();
+        String workshop=(String)current.get("workshopType");
+        boolean sealer=ProductionTrackingPolicy.isSealer(workshop);
+        var snapshotNodes=jdbc.queryForList("SELECT stage_code,applicability FROM "
+                +"production_tracking_process_snapshot_nodes WHERE production_order_id=?",id);
+        var allowed=snapshotNodes.isEmpty()?stageCodes(workshop):snapshotNodes.stream()
+                .map(row->String.valueOf(row.get("stage_code"))).toList();
+        var seen=new java.util.HashSet<String>();
+        var out=new LinkedHashMap<String,NodeConfirmation>();
+        boolean abnormal=false;
+        for(var c:submitted){
+            if(c==null||!allowed.contains(c.code())||!seen.add(c.code()))
+                throw new IllegalArgumentException("节点确认无效，请刷新后重试");
+            if(!CONFIRM_RESULTS.contains(c.result()))throw new IllegalArgumentException("节点确认结论无效");
+            String label=ProductionTrackingPolicy.stageLabel(c.code(),sealer);
+            if("DONE_WITH_DATE".equals(c.result())&&c.completedDate()==null)
+                throw new IllegalArgumentException(label+"：选择「已完成」时必须填写完成日期");
+            if(!"DONE_WITH_DATE".equals(c.result())&&c.completedDate()!=null)
+                throw new IllegalArgumentException(label+"：日期仅能用于已完成且有真实日期的结论");
+            String why=clean(c.note(),300,label+"确认说明");
+            if("NOT_APPLICABLE".equals(c.result())){
+                Integer recordedDone=jdbc.queryForObject("SELECT COUNT(*) FROM production_tracking_milestones "
+                        +"WHERE production_order_id=? AND stage_code=? AND stage_status='DONE'",
+                        Integer.class,id,c.code());
+                if(recordedDone!=null&&recordedDone>0)
+                    throw new IllegalArgumentException(label+"已有完成记录，请先核实并更正节点，不能直接标为不适用");
+            }
+            if(EVIDENCE_RESULTS.contains(c.result())&&why.trim().length()<4)
+                throw new IllegalArgumentException(label+"：请写明确认依据（不少于 4 字）");
+            abnormal|=ABNORMAL_RESULTS.contains(c.result());
+            out.put(c.code(),new NodeConfirmation(c.code(),c.result(),c.completedDate(),why));
+        }
+        if(abnormal){
+            if(!users.can(PERMISSION_ABNORMAL_CLOSURE))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "标记节点「不适用 / 完成但查不到日期」需要异常结案权限，请联系管理员开通");
+            if(clean(request.abnormalReason(),500,"异常结案原因").trim().length()<6)
+                throw new IllegalArgumentException("异常结案请写明原因（不少于 6 字）：为什么节点没登记、你核实的依据是什么");
+        }
+        if(!snapshotNodes.isEmpty()){
+            var saved=jdbc.queryForList("SELECT stage_code,stage_status FROM production_tracking_milestones "
+                    +"WHERE production_order_id=?",id);
+            var missing=missingClosureNodes(snapshotNodes,saved,out);
+            if(!missing.isEmpty())throw new IllegalArgumentException("结案前请逐项核实节点："
+                    +ProductionTrackingPolicy.stageLabel(missing.getFirst(),sealer));
+        }
+        return out;
+    }
+
+    static List<String> missingClosureNodes(List<Map<String,Object>> snapshotNodes,
+                                             List<Map<String,Object>> saved,
+                                             Map<String,NodeConfirmation> confirmations){
+        var done=new java.util.HashSet<String>();
+        for(var row:saved)if("DONE".equals(row.get("stage_status")))done.add(String.valueOf(row.get("stage_code")));
+        var missing=new ArrayList<String>();
+        for(var node:snapshotNodes){
+            String code=String.valueOf(node.get("stage_code"));
+            String applicability=String.valueOf(node.get("applicability"));
+            if("NOT_APPLICABLE".equals(applicability))continue;
+            if("APPLICABLE".equals(applicability)&&done.contains(code))continue;
+            if(!confirmations.containsKey(code))missing.add(code);
+        }
+        return missing;
+    }
+
+    /** 把四选一结论写进节点行，并返回要追加到结案说明里的摘要 —— 时间线与审计都要能看出当时点了什么。 */
+    private String applyNodeConfirmations(long id,Map<String,Object> current,Map<String,NodeConfirmation> confirmations){
+        if(confirmations.isEmpty())return "";
+        boolean sealer=ProductionTrackingPolicy.isSealer((String)current.get("workshopType"));
+        var parts=new ArrayList<String>();
+        for(var e:confirmations.entrySet()){
+            String code=e.getKey();var c=e.getValue();
+            String label=ProductionTrackingPolicy.stageLabel(code,sealer);
+            // 节点行可能还没建：先占位再更新，保证 applicability / completion_source 一定有落点。
+            jdbc.update("INSERT IGNORE INTO production_tracking_milestones(production_order_id,stage_code,stage_status) "
+                    +"VALUES(?,?,'PENDING')",id,code);
+            switch(c.result()){
+                case "NOT_APPLICABLE"->{
+                    jdbc.update("UPDATE production_tracking_milestones SET applicability='NOT_APPLICABLE',"
+                            +"applicability_note=?,completion_source=NULL WHERE production_order_id=? AND stage_code=?",
+                            c.note(),id,code);
+                    parts.add(label+"：本单不适用");
+                }
+                case "APPLICABLE"->{
+                    jdbc.update("UPDATE production_tracking_milestones SET applicability='APPLICABLE',"
+                            +"applicability_note=?,completion_source=NULL WHERE production_order_id=? AND stage_code=?",
+                            c.note(),id,code);
+                    parts.add(label+"：适用，尚未登记");
+                }
+                case "DONE_WITH_DATE"->{
+                    jdbc.update("UPDATE production_tracking_milestones SET stage_status='DONE',completed_date=?,"
+                            +"completion_source='MANUAL',applicability='APPLICABLE' "
+                            +"WHERE production_order_id=? AND stage_code=?",c.completedDate(),id,code);
+                    parts.add(label+"：已完成，补登记 "+c.completedDate());
+                }
+                case "DONE_NO_DATE"->{
+                    jdbc.update("UPDATE production_tracking_milestones SET stage_status='DONE',completed_date=NULL,"
+                            +"completion_source='NO_DATE',applicability='APPLICABLE',note=? "
+                            +"WHERE production_order_id=? AND stage_code=?",c.note(),id,code);
+                    parts.add(label+"：已完成，日期查不到（记 NO_DATE）");
+                }
+                default->throw new IllegalArgumentException("节点确认结论无效");
+            }
+            jdbc.update("UPDATE production_tracking_process_snapshot_nodes SET applicability=?,"
+                    +"applicability_reason=? WHERE production_order_id=? AND stage_code=?",
+                    "NOT_APPLICABLE".equals(c.result())?"NOT_APPLICABLE":"APPLICABLE",
+                    c.note(),id,code);
+        }
+        return "；节点确认："+String.join("；",parts);
     }
 
     public long add(long id,EntryRequest request,String key) {
@@ -2879,16 +3345,27 @@ public class ProductionTrackingService {
         String remark=s==null?null:clean(s.remark(),1000,"备注");
         if(s!=null&&s.riskCategory()!=null&&!RISKS.contains(s.riskCategory()))
             throw new IllegalArgumentException("风险分类无效");
-        var allowedStages=stageCodes((String)current.get("workshopType"));
+        var snapshotRows=jdbc.queryForList("SELECT stage_code,applicability FROM production_tracking_process_snapshot_nodes "
+                +"WHERE production_order_id=?",id);
+        var snapshotStages=snapshotRows.stream().map(row->(String)row.get("stage_code")).toList();
+        var allowedStages=snapshotStages.isEmpty()?stageCodes((String)current.get("workshopType")):snapshotStages;
         var milestones=request.milestones()==null?List.<Milestone>of():request.milestones();
         if(milestones.size()>allowedStages.size())throw new IllegalArgumentException("跟单节点数量无效");
         var seen=new java.util.HashSet<String>();
         for(var milestone:milestones){
             if(milestone==null||!allowedStages.contains(milestone.code())||!seen.add(milestone.code())
                     ||!STAGE_STATUSES.contains(milestone.status()))throw new IllegalArgumentException("跟单节点无效");
-            if("DONE".equals(milestone.status()) && milestone.completedDate()==null)
-                throw new IllegalArgumentException(ProductionTrackingPolicy.stageLabel(milestone.code(),
-                        ProductionTrackingPolicy.isSealer((String)current.get("workshopType")))+"已完成时请填写完成日期");
+            if(snapshotRows.stream().anyMatch(row->milestone.code().equals(row.get("stage_code"))
+                    &&"NOT_APPLICABLE".equals(row.get("applicability"))
+                    &&!"PENDING".equals(milestone.status())))
+                throw new IllegalArgumentException("该节点在本单制程中不适用，请先调整本单制程");
+            // 与结案通道**同一把钥匙**：把节点标成「已完成但日期查不到」是无法自证的人工确认，
+            // 不管从哪个入口进来都必须 manufacturing.followup.abnormal —— 否则「节点完成率」可以被随手跳过。
+            if("NO_DATE".equals(milestone.completionSource())&&!users.can(PERMISSION_ABNORMAL_CLOSURE))
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "标记节点「完成但查不到日期」需要异常结案权限，请联系管理员开通");
+            validateMilestoneCompletion(milestone,ProductionTrackingPolicy.stageLabel(milestone.code(),
+                    ProductionTrackingPolicy.isSealer((String)current.get("workshopType"))));
             clean(milestone.note(),500,"节点备注");
             if(milestone.manualReferenceDate()!=null){
                 if("DONE".equals(milestone.status()))throw new IllegalArgumentException("已完成节点不需要人工预计日期");
@@ -2909,7 +3386,8 @@ public class ProductionTrackingService {
                     +"ON DUPLICATE KEY UPDATE production_order_id=production_order_id",id);
             var before=jdbc.queryForMap("SELECT * FROM production_tracking_state WHERE production_order_id=? FOR UPDATE",id);
             if(before.get("stopped_at")!=null)throw new IllegalArgumentException("该任务已停止跟单，请先恢复跟单");
-            var beforeMilestones=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason "
+            var beforeMilestones=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason,"
+                    +"applicability,applicability_note,completion_source "
                     +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",id);
             var submittedByCode=new HashMap<String,Milestone>();
             for(var milestone:milestones)submittedByCode.put(milestone.code(),milestone);
@@ -2954,15 +3432,18 @@ public class ProductionTrackingService {
                         +"WHERE production_order_id=?",version+1,id);
             }
             for(var milestone:milestones){
-                jdbc.update("INSERT INTO production_tracking_milestones(production_order_id,stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason) "
-                                +"VALUES(?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stage_status=VALUES(stage_status),"
+                jdbc.update("INSERT INTO production_tracking_milestones(production_order_id,stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason,completion_source) "
+                                +"VALUES(?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE stage_status=VALUES(stage_status),"
                                 +"completed_date=VALUES(completed_date),note=VALUES(note),"
-                                +"manual_reference_date=VALUES(manual_reference_date),manual_reference_reason=VALUES(manual_reference_reason)",
+                                +"manual_reference_date=VALUES(manual_reference_date),manual_reference_reason=VALUES(manual_reference_reason),"
+                                +"completion_source=VALUES(completion_source)",
                         id,milestone.code(),milestone.status(),milestone.completedDate(),clean(milestone.note(),500,"节点备注"),
-                        milestone.manualReferenceDate(),milestone.manualReferenceDate()==null?null:clean(milestone.manualReferenceReason(),300,"人工预计原因"));
+                        milestone.manualReferenceDate(),milestone.manualReferenceDate()==null?null:clean(milestone.manualReferenceReason(),300,"人工预计原因"),
+                        milestone.completionSource());
             }
             var after=jdbc.queryForMap("SELECT * FROM production_tracking_state WHERE production_order_id=?",id);
-            var milestoneSnapshot=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason "
+            var milestoneSnapshot=jdbc.queryForList("SELECT stage_code,stage_status,completed_date,note,manual_reference_date,manual_reference_reason,"
+                    +"applicability,applicability_note,completion_source "
                     +"FROM production_tracking_milestones WHERE production_order_id=? ORDER BY stage_code",id);
             // 跟进内容不再要求手填：按节点或延期至日期的变更自动生成。
             String entryContent=provided;
@@ -2977,6 +3458,9 @@ public class ProductionTrackingService {
                     +"created_by_employee_id,created_by_name) VALUES(?,?,?,?,?,?,?)",id,version+1,entryContent,
                     write(Map.of("state",before,"milestones",beforeMilestones)),write(Map.of("state",after,"milestones",milestoneSnapshot)),
                     actor.employeeId(),actor.name());
+            // 节点/状态修改同样要进割面审计：这里改的是适用性、日期与预测等一手数据，
+            // 只有 entries 的话，按人维度查不到「谁改了这个节点」。
+            audit.log("TRACKING_STATE",id,(String)current.get("orderNo"),"保存跟进",entryContent);
             long entryId=Objects.requireNonNull(jdbc.queryForObject("SELECT LAST_INSERT_ID()",Long.class));
 
             return String.valueOf(version+1);

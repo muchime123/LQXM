@@ -156,28 +156,12 @@ export const archiveNavItems: NavItem[] = [
 
   // ==================== 官网运营 ====================
   {
-    to: '/website/dashboard',
+    to: '/website/solutions',
     label: '官网运营',
-    description: '在真实官网中编辑内容，管理发布、询盘与运营数据。',
+    description: '管理官网独立内容、媒体和询盘。',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>',
     group: 'marketing',
     children: [
-      {
-        to: '/website/dashboard',
-        permission: 'website.manage',
-        label: '官网工作台',
-        description: '官网发布总览与内容健康度检查。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>',
-        group: 'marketing'
-      },
-      {
-        to: '/website/visual-editor',
-        permission: 'website.manage',
-        label: '可视化编辑器',
-        description: '在真实官网画面中点击区块、实时预览并保存内容。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="3" width="18" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M8 8h8M8 12h5"/></svg>',
-        group: 'marketing'
-      },
       {
         to: '/website/solutions',
         permission: 'website.manage',
@@ -211,11 +195,51 @@ export const archiveNavItems: NavItem[] = [
         group: 'marketing'
       },
       {
+        to: '/website/packaging',
+        permission: 'website.manage',
+        label: '官网包材草稿',
+        description: '独立维护官网包材展示内容；当前不影响公开页面。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M8 15h8"/></svg>',
+        group: 'marketing'
+      },
+      {
+        to: '/website/credentials',
+        permission: 'website.manage',
+        label: '官网资质',
+        description: '独立维护官网公开资质草稿与发布状态。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 2 20 6v6c0 5-3 8-8 10-5-2-8-5-8-10V6z"/><path d="m9 12 2 2 4-4"/></svg>',
+        group: 'marketing'
+      },
+      {
+        to: '/website/ip-items',
+        permission: 'website.manage',
+        label: '官网知识产权',
+        description: '独立维护官网知识产权草稿与发布状态。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
+        group: 'marketing'
+      },
+      {
         to: '/website/company-profile',
         permission: 'website.manage',
         label: '官网公司介绍草稿',
         description: '独立维护官网对外介绍与联系方式，当前公开页面仍使用原内容。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 21V10l8-6 8 6v11"/><path d="M9 21v-7h6v7"/></svg>',
+        group: 'marketing'
+      },
+      {
+        to: '/website/company-milestones',
+        permission: 'website.manage',
+        label: '官网发展历程',
+        description: '独立维护官网发展历程草稿、发布与归档。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 20V4m0 16h16M7 15l4-4 3 2 5-7"/></svg>',
+        group: 'marketing'
+      },
+      {
+        to: '/website/social-links',
+        permission: 'website.manage',
+        label: '官网官方链接',
+        description: '独立维护官网公开社交账号及链接。',
+        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/></svg>',
         group: 'marketing'
       },
       {

@@ -55,8 +55,9 @@ public class WebsiteCompanyProfileReadinessService {
             return;
         }
         WebsiteMediaAsset asset = media.findByIdAndDeletedAtIsNull(id).orElse(null);
-        if (asset == null || !"IMAGE".equals(asset.getMediaType()) || !"PUBLISHED".equals(asset.getStatus())) {
-            blockers.add("官网 Logo 不是已发布的官网图片");
+        if (asset == null || !"IMAGE".equals(asset.getMediaType())
+                || !("DRAFT".equals(asset.getStatus()) || "PUBLISHED".equals(asset.getStatus()))) {
+            blockers.add("官网 Logo 不是有效的官网图片");
             return;
         }
         if (blank(asset.getStorageKey())) {

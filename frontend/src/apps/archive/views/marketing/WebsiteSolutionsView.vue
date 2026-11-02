@@ -2,7 +2,7 @@
 import { ref, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { Plus, Refresh, View } from '@element-plus/icons-vue'
-import { fetchSolutionsGrouped, deleteSolution, batchUpdateSolutionVisible } from '@/api/website/solutions'
+import { fetchSolutionsGrouped, batchUpdateSolutionVisible } from '@/api/website/solutions'
 import { SOLUTION_SECTION_LABELS, VISIBLE_SOLUTION_SECTIONS } from '@/types/website'
 import type { WebsiteSolution, SolutionSection, SolutionSectionGroup } from '@/types/website'
 import { notify } from '@/composables/ui/useToast'
@@ -93,24 +93,6 @@ function openEdit(item: WebsiteSolution) {
 
 function handleSave() {
   loadData()
-}
-
-async function handleDelete(item: WebsiteSolution) {
-  const ok = await askConfirm({
-    title: '删除确认',
-    message: `确定删除「${item.title}」？此操作不可恢复。`,
-    confirmText: '删除',
-    cancelText: '取消',
-    danger: true
-  })
-  if (!ok) return
-  try {
-    await deleteSolution(item.id)
-    notify('已删除', 'success')
-    loadData()
-  } catch (err) {
-    notify.errorWithDetail('删除失败', err)
-  }
 }
 
 async function toggleVisible(item: WebsiteSolution, enabled: boolean) {
@@ -249,10 +231,9 @@ if (requested) openEdit(requested)
                     </div>
                   </template>
                 </el-table-column>
-                <el-table-column label="操作" width="130" fixed="right" align="center">
+                <el-table-column label="操作" width="90" fixed="right" align="center">
                   <template #default="{ row }">
                     <el-button link type="primary" size="small" @click="openEdit(row)">编辑</el-button>
-                    <el-button link type="danger" size="small" @click="handleDelete(row)">删除</el-button>
                   </template>
                 </el-table-column>
                 <template #empty>

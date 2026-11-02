@@ -3,20 +3,39 @@
     <header class="page-head">
       <div>
         <h1>制程管理</h1>
-        <p class="lead">车间跟单节点长什么样、按什么顺序走、哪些是可选的。保存即全站生效——跟单页的节点按钮、进度表表头、导出列与「已完成 x/y」的分母都按这里走。</p>
+        <p class="lead">统一维护全局跟单节点字典；车间默认流程和各产品制程分别选择需要的节点。</p>
       </div>
       <div class="head-actions">
         <el-popover placement="bottom-end" :width="540" trigger="click">
           <template #reference><el-button text size="small">口径说明</el-button></template>
-          <p class="caliber-note">制程按<b>车间类别</b>配置（封口机 / 其他机器），不是按单个车间——跟单统计的派生表按类别各出一列，按车间展开会让列数爆炸。将来制程真分叉，应扩「类别」而不是扩「车间」。</p>
-          <p class="caliber-note">「已完成 x/y」的 y = <b>启用的必经节点数</b>；按需工序（氧化/喷特氟龙、木箱）不计入分母，按源单「可选配置 / 生产要求」是否命中关键词判断本单要不要走它。</p>
+          <p class="caliber-note">新增节点只进入全局字典，不归属于任何车间，也不会改变任务进度。车间默认流程和「生产参考工期」中的产品制程分别引用字典节点。</p>
+          <p class="caliber-note">未匹配产品模板任务的「已完成 x/y」只计算默认流程中的必经节点；按需节点按源单配置或实际登记判断。已绑定产品制程的任务按本单快照计算。</p>
           <p class="caliber-note">否定关键词优先：「需要氧化，但不含特氟龙」不会被误判为需要。可选配置与生产要求分别判断后取并集。</p>
-          <p class="caliber-note">节点编码是历史里程碑与参考工期的唯一关联键，<b>一经产生跟单记录不可修改</b>；有记录的节点只能停用、不能删除（历史记录原样保留，只是不再进分母、不再显示在节点条上）。</p>
+          <p class="caliber-note">节点编码关联历史里程碑、产品模板和参考工期，不可修改；被任务或模板引用的字典节点不可删除。移出默认流程不会删除历史记录。</p>
         </el-popover>
         <el-button :icon="Refresh" :loading="loading" @click="load">刷新</el-button>
       </div>
     </header>
 
+    <h2 class="dictionary-heading">全局跟单节点字典 <small>同一节点只定义一次，新增后不自动进入任何流程</small></h2>
+    <section class="dictionary-panel">
+      <div class="chain-head">
+        <div><h2>全部可用节点</h2><span class="muted">定义节点编码、名称与按需条件；车间和产品在各自流程中引用。</span></div>
+        <el-button v-if="canManage" type="primary" plain @click="startCreate">新增字典节点</el-button>
+      </div>
+      <div class="dictionary-list">
+        <div v-for="row in dictionary" :key="row.stageCode" class="dictionary-item">
+          <div class="dictionary-name"><b>{{ row.stageLabel }}</b><small>{{ row.stageCode }}</small>
+            <em v-if="row.optional" class="b-opt">按需</em></div>
+          <div class="dictionary-actions">
+            <el-button v-if="canManage" link type="primary" @click="selectDictionary(row)">编辑定义</el-button>
+            <span v-if="row.usageCount" class="muted">已有 {{ row.usageCount }} 条跟单记录</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <h2 class="dictionary-heading">车间默认流程 <small>仅供未匹配产品模板的任务使用</small></h2>
     <!-- 类别切换：卡片上带「几个节点 / 几个必经」，切换前就能对比两套制程的规模。 -->
     <section class="kind-bar" aria-label="车间类别">
       <button v-for="item in KINDS" :key="item.kind" type="button" class="kind-card"
@@ -24,63 +43,62 @@
         <span class="kind-name">{{ item.label }}</span>
         <span class="kind-hint">{{ item.hint }}</span>
         <span class="kind-count">
-          {{ (defs[item.kind] ?? []).length }} 个节点 ·
-          {{ (defs[item.kind] ?? []).filter(row => row.enabled && !row.optional).length }} 个必经
+          {{ (defs[item.kind] ?? []).filter(row => row.enabled && row.defaultIncluded).length }} 个流程节点
         </span>
       </button>
     </section>
 
-    <!-- 改制程会当场改写在制工单的完成判定，先把影响面摆出来。 -->
-    <el-alert v-if="impact" type="warning" :closable="false" class="impact">
-      该类别现有 <b>{{ impact.requiredStages }}</b> 个必经节点；<b>{{ impact.openOrders }}</b> 张在制工单正在跟单，
-      其中 <b>{{ impact.completedOrders }}</b> 张已判「跟单完成」。新增必经节点 / 停用节点会改写这些单的完成判定。
+    <div v-if="canManage" class="flow-picker">
+      <el-select v-model="defaultAddCode" placeholder="从全局字典选择节点" filterable clearable>
+        <el-option v-for="item in dictionary.filter(item => !defaultRows.some(row => row.stageCode === item.stageCode))"
+          :key="item.stageCode" :label="item.stageLabel" :value="item.stageCode" />
+      </el-select>
+      <el-button :disabled="!defaultAddCode" @click="addDefault">加入该车间默认流程</el-button>
+    </div>
+
+    <el-alert v-if="impact" type="info" :closable="false" class="impact">
+      默认流程影响未匹配产品模板的任务：当前 <b>{{ impact.requiredStages }}</b> 个必经节点，
+      <b>{{ impact.openOrders }}</b> 张在制单有跟单记录，其中 <b>{{ impact.completedOrders }}</b> 张已判跟单完成。
     </el-alert>
 
     <div class="layout">
       <section class="chain-panel">
         <div class="chain-head">
-          <h2>制程链</h2>
-          <span class="muted">点击节点编辑；箭头方向即进度表列顺序</span>
+          <h2>车间默认流程</h2>
+          <span class="muted">只有这里的节点才用于未匹配产品模板的任务；顺序可上移或下移</span>
         </div>
 
         <div v-loading="loading" class="chain">
-          <template v-for="(row, index) in rows" :key="row.id">
-            <div class="node" :class="{ active: selectedId === row.id, off: !row.enabled, optional: row.optional }"
-              role="button" tabindex="0" @click="select(row)" @keydown.enter.prevent="select(row)">
+          <template v-for="(row, index) in defaultRows" :key="row.id">
+            <div class="node" :class="{ active: selectedCode === row.stageCode, optional: row.optional }">
               <span class="node-index">{{ index + 1 }}</span>
               <b class="node-label">{{ row.stageLabel }}</b>
               <code class="node-code">{{ row.stageCode }}</code>
               <span class="node-badges">
                 <em :class="row.optional ? 'b-opt' : 'b-req'">{{ row.optional ? '按需' : '必经' }}</em>
-                <em v-if="!row.enabled" class="b-off">停用</em>
               </span>
               <span v-if="row.usageCount" class="node-used">{{ row.usageCount }} 单</span>
               <span v-if="canManage" class="node-ops">
                 <button type="button" :disabled="index === 0" title="上移" @click.stop="move(row, true)">↑</button>
-                <button type="button" :disabled="index === rows.length - 1" title="下移" @click.stop="move(row, false)">↓</button>
+                <button type="button" :disabled="index === defaultRows.length - 1" title="下移" @click.stop="move(row, false)">↓</button>
+                <button type="button" title="移出默认流程" @click.stop="changeDefault(row, false)">×</button>
               </span>
             </div>
-            <span v-if="index < rows.length - 1" class="arrow" aria-hidden="true">→</span>
+            <span v-if="index < defaultRows.length - 1" class="arrow" aria-hidden="true">→</span>
           </template>
-
-          <button v-if="canManage" type="button" class="node node-add" @click="startCreate">
-            <span class="plus">+</span><span>新增节点</span>
-          </button>
+          <el-empty v-if="!defaultRows.length" :image-size="48" description="尚未配置车间默认流程" />
         </div>
 
         <p class="chain-foot">
-          停用的节点会在链条上变灰并退出分母，历史记录不动。节点条顺序同时决定进度表模板的列顺序——
-          <b>线下 Excel 模板要人工加列</b>，系统没有模板下载功能，缺列导入会直接报错（刻意的，避免静默读错列）。
+          新增字典节点不会改变这条流程。调整默认流程会影响未匹配产品模板的任务；已有产品制程版本与任务快照保持各自记录。
         </p>
       </section>
 
-      <aside class="editor">
-        <template v-if="mode !== 'idle'">
-          <div class="editor-head">
-            <h2>{{ mode === 'create' ? '新增节点' : '节点属性' }}</h2>
-            <el-button v-if="mode === 'edit'" link size="small" @click="mode = 'idle'">收起</el-button>
-          </div>
+    </div>
 
+    <el-dialog v-model="editorVisible" :title="mode === 'create' ? '新增字典节点' : '编辑字典定义'"
+      width="min(520px, calc(100vw - 32px))">
+      <div class="editor">
           <el-form label-position="top" size="small" class="editor-form">
             <el-form-item label="节点名称" required>
               <el-input v-model="form.label" maxlength="50" placeholder="如：物料配齐" />
@@ -88,7 +106,7 @@
             <el-form-item label="节点编码" required>
               <el-input v-model="form.code" maxlength="30" :disabled="mode === 'edit'" placeholder="如：MATERIAL_READY" />
               <p class="field-hint">
-                {{ mode === 'edit' ? '编码不可修改：历史里程碑与参考工期都按编码关联，要换编码请停用本节点再新建。' : '大写字母、数字与下划线，以字母开头。保存后不可修改。' }}
+                {{ mode === 'edit' ? '编码不可修改：历史里程碑、产品模板与参考工期都按编码关联。' : '大写字母、数字与下划线，以字母开头。保存后不可修改。' }}
               </p>
             </el-form-item>
             <el-form-item label="按需工序">
@@ -111,9 +129,6 @@
               <el-input v-model="form.headerAliases" placeholder="物料齐套,齐套" />
               <p class="field-hint">除节点名称外，进度表里还要认的写法，逗号分隔。</p>
             </el-form-item>
-            <el-form-item label="启用">
-              <el-switch v-model="form.enabled" />
-            </el-form-item>
           </el-form>
 
           <div class="editor-actions">
@@ -122,14 +137,10 @@
               :disabled="(selected?.usageCount ?? 0) > 0" @click="remove">删除</el-button>
           </div>
           <p v-if="mode === 'edit' && selected?.usageCount" class="field-hint">
-            已有 {{ selected.usageCount }} 条跟单记录，只能停用、不能删除。
+            已有 {{ selected.usageCount }} 条跟单记录，不能删除该字典节点。
           </p>
-        </template>
-
-        <el-empty v-else :image-size="72"
-          :description="canManage ? '点左侧节点编辑，或「+ 新增节点」' : '查看制程需要 manufacturing.template.manage 权限'" />
-      </aside>
-    </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -139,25 +150,24 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
 import {
-  createTrackingStageDef,
-  deleteTrackingStageDef,
+  createTrackingStageDictionary,
+  deleteTrackingStageDictionary,
+  fetchTrackingStageDictionary,
   fetchTrackingStageDefs,
   fetchTrackingStageDefsImpact,
   moveTrackingStageDef,
-  updateTrackingStageDef,
+  setTrackingStageDefaultFlow,
+  addTrackingDictionaryStageToDefaultFlow,
+  updateTrackingStageDictionary,
   type TrackingStageDef,
+  type TrackingStageDictionaryItem,
   type TrackingStageDefImpact,
   type TrackingStageDefInput,
 } from '@/api/productionTracking'
 
 /**
- * 制程管理：车间类别下的跟单节点序列。
- *
- * 节点序列原先硬编码在 ProductionTrackingPolicy 的常量里，加一个节点要改常量 + 写迁移 + 改测试 + 发版，
- * 还被拼进 SQL 字面量。落表后在这里自助维护，保存即刷新进程内快照，全站口径跟随。
- *
- * 与「生产参考工期」是两件事：本页定义<b>有哪些节点</b>，那一页定义<b>每个节点给多少天</b>。
- * 所以不再挤在参考工期页脚，独立成页。
+ * 全局节点字典与未匹配产品制程任务的车间默认流程。
+ * 产品采用哪些节点及参考天数，在「生产参考工期」按产品配置。
  */
 const { can } = useCurrentUser()
 const canManage = computed(() => can('manufacturing.template.manage'))
@@ -168,35 +178,41 @@ const KINDS = [
 ] as const
 type Kind = typeof KINDS[number]['kind']
 
-/** 两套制程都拉下来，类别卡片上才能直接对比节点规模。 */
+/** 字典全局一份；车间类别仅决定未匹配产品模板任务的默认流程。 */
+const dictionary = ref<TrackingStageDictionaryItem[]>([])
 const defs = reactive<Record<Kind, TrackingStageDef[]>>({ SEALER: [], MACHINE: [] })
 const kind = ref<Kind>('SEALER')
+const defaultAddCode = ref<string | null>(null)
 const impact = ref<TrackingStageDefImpact | null>(null)
 const loading = ref(false)
 
 const rows = computed(() => defs[kind.value])
-const selectedId = ref<number | null>(null)
-const selected = computed(() => rows.value.find(row => row.id === selectedId.value) ?? null)
+const defaultRows = computed(() => rows.value.filter(row => row.enabled && row.defaultIncluded))
+const selectedCode = ref<string | null>(null)
+const selected = computed(() => dictionary.value.find(row => row.stageCode === selectedCode.value) ?? null)
 const mode = ref<'idle' | 'edit' | 'create'>('idle')
+const editorVisible = computed({ get: () => mode.value !== 'idle', set: value => { if (!value) mode.value = 'idle' } })
 const saving = ref(false)
 
 interface FormState extends TrackingStageDefInput { label: string; code?: string }
 const blankForm = (): FormState => ({
-  kind: kind.value, label: '', code: '', optional: false,
-  matchKeywords: null, excludeKeywords: null, headerAliases: null, enabled: true,
+  kind: '', label: '', code: '', optional: false,
+  matchKeywords: null, excludeKeywords: null, headerAliases: null,
 })
 const form = ref<FormState>(blankForm())
 
 async function load() {
   loading.value = true
   try {
-    const [sealer, machine] = await Promise.all([
+    const [global, sealer, machine] = await Promise.all([
+      fetchTrackingStageDictionary(),
       fetchTrackingStageDefs('SEALER'),
       fetchTrackingStageDefs('MACHINE'),
     ])
+    dictionary.value = global.map(row => ({ ...row, optional: Boolean(row.optional) }))
     // MySQL 的 TINYINT(1) 回来是 0/1，统一成布尔，否则 switch 绑上去会出现「1 也当假」。
-    defs.SEALER = sealer.map(row => ({ ...row, optional: Boolean(row.optional), enabled: Boolean(row.enabled) }))
-    defs.MACHINE = machine.map(row => ({ ...row, optional: Boolean(row.optional), enabled: Boolean(row.enabled) }))
+    defs.SEALER = sealer.map(row => ({ ...row, optional: Boolean(row.optional), enabled: Boolean(row.enabled), defaultIncluded: Boolean(row.defaultIncluded) }))
+    defs.MACHINE = machine.map(row => ({ ...row, optional: Boolean(row.optional), enabled: Boolean(row.enabled), defaultIncluded: Boolean(row.defaultIncluded) }))
     impact.value = canManage.value ? await fetchTrackingStageDefsImpact(kind.value) : null
   } finally {
     loading.value = false
@@ -208,7 +224,7 @@ function switchKind(next: Kind) {
   if (kind.value === next) return
   kind.value = next
   mode.value = 'idle'
-  selectedId.value = null
+  defaultAddCode.value = null
   void loadImpact()
 }
 
@@ -216,43 +232,42 @@ async function loadImpact() {
   impact.value = canManage.value ? await fetchTrackingStageDefsImpact(kind.value) : null
 }
 
-function select(row: TrackingStageDef) {
+function selectDictionary(row: TrackingStageDictionaryItem) {
   if (!canManage.value) return
-  selectedId.value = row.id
+  selectedCode.value = row.stageCode
   mode.value = 'edit'
   form.value = {
-    kind: kind.value, code: row.stageCode, label: row.stageLabel, optional: row.optional,
+    kind: '', code: row.stageCode, label: row.stageLabel, optional: row.optional,
     matchKeywords: row.matchKeywords, excludeKeywords: row.excludeKeywords,
-    headerAliases: row.headerAliases, enabled: row.enabled,
+    headerAliases: row.headerAliases,
   }
 }
 
 function startCreate() {
-  selectedId.value = null
+  selectedCode.value = null
   mode.value = 'create'
   form.value = blankForm()
 }
 
 function payload(): TrackingStageDefInput {
   return {
-    kind: kind.value,
+    kind: '',
     code: form.value.code?.trim().toUpperCase() || undefined,
     label: form.value.label?.trim() ?? '',
     optional: form.value.optional,
     matchKeywords: form.value.matchKeywords?.trim() || null,
     excludeKeywords: form.value.excludeKeywords?.trim() || null,
     headerAliases: form.value.headerAliases?.trim() || null,
-    enabled: form.value.enabled,
   }
 }
 
-/** 会改写完成判定的操作（增删改性质 / 启停）都先摆出影响面，让操作者自己确认。 */
+/** Only explicit changes to the fallback flow can change legacy task completion. */
 async function confirmImpact(action: string) {
   if (!impact.value) return true
   try {
     await ElMessageBox.confirm(
       `该类别有 ${impact.value.openOrders} 张在制工单正在跟单，其中 ${impact.value.completedOrders} 张已判「跟单完成」。`
-      + `「${action}」会当场改写这些单的完成判定。`,
+      + `「${action}」可能改变未匹配产品模板任务的节点与完成判定。`,
       '确认改制程', { type: 'warning', confirmButtonText: '确认修改', cancelButtonText: '再想想' })
     return true
   } catch { return false }
@@ -265,18 +280,33 @@ async function save() {
     ElMessage.warning('按需工序必须填写命中关键词，否则没有任何工单会被判为要走这道工序')
     return
   }
-  if (!(await confirmImpact(mode.value === 'create' ? '新增节点' : '修改节点'))) return
   saving.value = true
   try {
-    if (mode.value === 'create') await createTrackingStageDef(payload())
-    else if (selectedId.value) await updateTrackingStageDef(selectedId.value, payload())
+    const creating = mode.value === 'create'
+    if (creating) await createTrackingStageDictionary(payload())
+    else if (selectedCode.value) await updateTrackingStageDictionary(selectedCode.value, payload())
     mode.value = 'idle'
-    selectedId.value = null
+    selectedCode.value = null
     await load()
-    ElMessage.success('制程已保存')
+    ElMessage.success(creating ? '字典节点已新增，尚未加入任何流程' : '节点定义已保存')
   } finally {
     saving.value = false
   }
+}
+
+async function changeDefault(row: TrackingStageDef, included: boolean) {
+  if (!(await confirmImpact(included ? '加入默认流程' : '移出默认流程'))) return
+  await setTrackingStageDefaultFlow(row.id, included)
+  await load()
+  ElMessage.success(included ? '已加入车间默认流程' : '已移出车间默认流程')
+}
+
+async function addDefault() {
+  if (!defaultAddCode.value || !(await confirmImpact('加入默认流程'))) return
+  await addTrackingDictionaryStageToDefaultFlow(kind.value, defaultAddCode.value)
+  defaultAddCode.value = null
+  await load()
+  ElMessage.success('节点已加入该车间默认流程')
 }
 
 /** 只换顺序：不影响完成判定的分子，故不弹确认。 */
@@ -287,11 +317,10 @@ async function move(row: TrackingStageDef, up: boolean) {
 
 async function remove() {
   if (!selected.value) return
-  if (selected.value.usageCount > 0) { ElMessage.warning('该节点已有跟单记录，只能停用'); return }
-  if (!(await confirmImpact('删除节点'))) return
-  await deleteTrackingStageDef(selected.value.id)
+  if (selected.value.usageCount > 0) { ElMessage.warning('该节点已有跟单记录，不能删除'); return }
+  await deleteTrackingStageDictionary(selected.value.stageCode)
   mode.value = 'idle'
-  selectedId.value = null
+  selectedCode.value = null
   await load()
   ElMessage.success('节点已删除')
 }
@@ -299,6 +328,8 @@ async function remove() {
 
 <style scoped>
 .process-page { display: flex; flex-direction: column; gap: 16px; }
+.dictionary-heading { margin: 5px 0 0; font-size: 17px; }
+.dictionary-heading small { margin-left: 10px; color: var(--color-text-secondary); font-size: 12px; font-weight: normal; }
 .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
 .page-head h1 { margin: 0; font-size: 20px; }
 .lead { margin: 6px 0 0; color: var(--color-text-secondary); max-width: 720px; line-height: 1.6; }
@@ -317,9 +348,18 @@ async function remove() {
 .kind-hint, .kind-count { font-size: 12px; color: var(--color-text-secondary); }
 
 .impact { margin: 0; }
+.flow-picker { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.flow-picker .el-select { width: min(320px, 100%); }
+.dictionary-panel { border: 1px solid var(--color-border, #ebeef5); border-radius: 10px; background: #fff; padding: 14px 16px; }
+.dictionary-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(275px, 1fr)); gap: 8px; }
+.dictionary-item { border: 1px solid var(--color-border, #ebeef5); border-radius: 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+.dictionary-name, .dictionary-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.dictionary-name b { font-size: 13px; }
+.dictionary-name small { color: var(--color-text-secondary); }
+.dictionary-name em { font-style: normal; font-size: 11px; padding: 1px 5px; border-radius: 3px; }
+.dictionary-actions { min-height: 24px; }
 
-.layout { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
-@media (max-width: 1100px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.layout { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; align-items: start; }
 
 .chain-panel, .editor {
   border: 1px solid var(--color-border, #ebeef5); border-radius: 10px; background: #fff; padding: 14px 16px;
@@ -338,8 +378,6 @@ async function remove() {
 }
 .node:hover { border-color: var(--color-primary, #409eff); }
 .node.active { border-color: var(--color-primary, #409eff); box-shadow: 0 0 0 1px var(--color-primary, #409eff) inset; background: #fff; }
-/* 停用：灰底虚线，一眼看出「链条上还在、但不参与分母」。 */
-.node.off { background: #f5f7fa; border-style: dashed; opacity: .72; }
 .node-index {
   position: absolute; top: -8px; left: -8px; width: 20px; height: 20px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
@@ -352,7 +390,6 @@ async function remove() {
 .node-badges em { font-style: normal; font-size: 11px; padding: 1px 5px; border-radius: 3px; }
 .b-req { background: #f0f2f5; color: #606266; }
 .b-opt { background: #fdf6ec; color: #b88230; }
-.b-off { background: #f4f4f5; color: #909399; }
 .node-used { font-size: 11px; color: var(--color-text-secondary); margin-top: 2px; }
 .node-ops { position: absolute; right: 4px; bottom: 4px; display: none; gap: 2px; }
 .node:hover .node-ops { display: flex; }
@@ -371,7 +408,7 @@ async function remove() {
 
 .chain-foot { margin: 14px 0 0; font-size: 12px; line-height: 1.7; color: var(--color-text-secondary); }
 
-.editor { display: flex; flex-direction: column; gap: 10px; position: sticky; top: 12px; }
+.editor { display: flex; flex-direction: column; gap: 10px; }
 .editor-head { display: flex; align-items: center; justify-content: space-between; }
 .editor-form { margin-top: 4px; }
 .field-hint { margin: 4px 0 0; font-size: 12px; line-height: 1.6; color: var(--color-text-secondary); }

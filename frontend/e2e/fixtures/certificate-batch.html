@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <title>B7-B2a Certificate 权限与批量夹具</title>
+  </head>
+  <body>
+    <!--
+      B7-B2a 夹具：直接挂载真实业务页面 CertificateView + 确认弹窗宿主。
+
+      不连接后端：所有 /api/ 请求由用例通过 page.route 拦截返回固定夹具数据，
+      因此不存在任何写入副作用。
+    -->
+    <div id="e2e-app"></div>
+    <script type="module" src="./certificate-batch-harness.ts"></script>
+  </body>
+</html>

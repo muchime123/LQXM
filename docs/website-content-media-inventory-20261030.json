@@ -1,0 +1,387 @@
+{
+  "read_only": true,
+  "schema": "product_archive",
+  "counts": {
+    "banners": 3,
+    "page_sections": 20,
+    "solutions": 9,
+    "records_with_internal_archive_media": 8,
+    "unique_internal_archive_urls": 9,
+    "unresolved_or_ambiguous_files": 0,
+    "sources_without_verified_website_copy": 7
+  },
+  "records": [
+    {
+      "kind": "banner",
+      "id": 2,
+      "references": []
+    },
+    {
+      "kind": "banner",
+      "id": 4,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgyKV8yMDI2MDgyMDA5MTEzODczNy5wbmc"
+        }
+      ]
+    },
+    {
+      "kind": "banner",
+      "id": 5,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgxKV8yMDI2MDgyMDA5MTEzODQwNC5wbmc"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 1,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 2,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 3,
+      "references": [
+        {
+          "field": "content",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgzKV8yMDI2MDgyMDE0MTcwODM1My5wbmc"
+        },
+        {
+          "field": "content",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgyKV8yMDI2MDgyMDE0MTcwODcyMS5wbmc"
+        },
+        {
+          "field": "content",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgxKV8yMDI2MDgyMDE0MTcwOTA2MS5wbmc"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 4,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 5,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 6,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 7,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 8,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgyKV8yMDI2MDgyMDEyMjUxNjg4Mi5wbmc"
+        },
+        {
+          "field": "content",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgzKV8yMDI2MDgyMDE0MTcwODM1My5wbmc"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 9,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgyKV8yMDI2MDgyMDE0MTcwODcyMS5wbmc"
+        },
+        {
+          "field": "content",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgzKV8yMDI2MDgyMDE0MTcwODM1My5wbmc"
+        },
+        {
+          "field": "content",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgxKV8yMDI2MDgyMDE0MTcwOTA2MS5wbmc"
+        },
+        {
+          "field": "content",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=MjAyNjA3MDYxNjE4MzM5NzNfZWI1ZWU5NzhlZWZjMjQ0YzUyNjdkYzIzNWFiYjUzYWIt5ou36LSdXzIwMjYwODIwMTQ0MDQ3MTEwLmpwZw"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 10,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 11,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 12,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 13,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 14,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgxKV8yMDI2MDgyMDEyMjUxNjI3MS5wbmc"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 15,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 16,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMzICgzKV8yMDI2MDgyMDEyMjUxNzIyNy5wbmc"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 17,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 18,
+      "references": []
+    },
+    {
+      "kind": "page_section",
+      "id": 19,
+      "references": [
+        {
+          "field": "image_url",
+          "kind": "internal_archive",
+          "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgyKV8yMDI2MDgyMDEyMjUxNjg4Mi5wbmc"
+        }
+      ]
+    },
+    {
+      "kind": "page_section",
+      "id": 20,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 1,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 2,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 3,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 4,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 11,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 12,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 13,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 14,
+      "references": []
+    },
+    {
+      "kind": "solution",
+      "id": 15,
+      "references": []
+    }
+  ],
+  "source_files": [
+    {
+      "url": "/api/files/company?encoded=MjAyNjA3MDYxNjE4MzM5NzNfZWI1ZWU5NzhlZWZjMjQ0YzUyNjdkYzIzNWFiYjUzYWIt5ou36LSdXzIwMjYwODIwMTQ0MDQ3MTEwLmpwZw",
+      "source_filename": "20260706161833973_eb5ee978eefc244c5267dc235abb53ab-拷贝_20260820144047110.jpg",
+      "candidate_count": 1,
+      "candidates": [
+        {
+          "relative_path": "company/website_media/20260706161833973_eb5ee978eefc244c5267dc235abb53ab-拷贝_20260820144047110.jpg",
+          "size_bytes": 1664007,
+          "sha256": "1f0afad09890bd9054931d415152cc6a1cad810ab68baf1e7df3323e1c3e054d"
+        }
+      ],
+      "website_copies": []
+    },
+    {
+      "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgxKV8yMDI2MDgyMDA5MTEzODQwNC5wbmc",
+      "source_filename": "ChatGPT Image 2026年8月20日 09_10_33 (1)_20260820091138404.png",
+      "candidate_count": 1,
+      "candidates": [
+        {
+          "relative_path": "company/website_media/ChatGPT Image 2026年8月20日 09_10_33 (1)_20260820091138404.png",
+          "size_bytes": 1571521,
+          "sha256": "d4df1f129689737dd3c3b457b0d61da0983d5af7d554c4d9ae96fca10af8acb4"
+        }
+      ],
+      "website_copies": [
+        {
+          "media_id": 3,
+          "storage_key": "website/images/d4df1f129689737dd3c3b457b0d61da0983d5af7d554c4d9ae96fca10af8acb4.png",
+          "status": "DRAFT",
+          "file_matches": true
+        }
+      ]
+    },
+    {
+      "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgyKV8yMDI2MDgyMDA5MTEzODczNy5wbmc",
+      "source_filename": "ChatGPT Image 2026年8月20日 09_10_33 (2)_20260820091138737.png",
+      "candidate_count": 1,
+      "candidates": [
+        {
+          "relative_path": "company/website_media/ChatGPT Image 2026年8月20日 09_10_33 (2)_20260820091138737.png",
+          "size_bytes": 1535013,
+          "sha256": "b0004abd6d401569c6787488bde196308cc61278c02a1e239d3d2b522f9fddee"
+        }
+      ],
+      "website_copies": [
+        {
+          "media_id": 2,
+          "storage_key": "website/images/b0004abd6d401569c6787488bde196308cc61278c02a1e239d3d2b522f9fddee.png",
+          "status": "DRAFT",
+          "file_matches": true
+        }
+      ]
+    },
+    {
+      "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgxKV8yMDI2MDgyMDE0MTcwOTA2MS5wbmc",
+      "source_filename": "ChatGPT Image 2026年8月20日 14_16_13 (1)_20260820141709061.png",
+      "candidate_count": 1,
+      "candidates": [
+        {
+          "relative_path": "company/website_media/ChatGPT Image 2026年8月20日 14_16_13 (1)_20260820141709061.png",
+          "size_bytes": 2236717,
+          "sha256": "54e0875ac9f6ea7239d9839d318a1193e04672bced8c439067cc5e4f870eefb2"
+        }
+      ],
+      "website_copies": []
+    },
+    {
+      "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgyKV8yMDI2MDgyMDE0MTcwODcyMS5wbmc",
+      "source_filename": "ChatGPT Image 2026年8月20日 14_16_13 (2)_20260820141708721.png",
+      "candidate_count": 1,
+      "candidates": [
+        {
+          "relative_path": "company/website_media/ChatGPT Image 2026年8月20日 14_16_13 (2)_20260820141708721.png",
+          "size_bytes": 2156666,
+          "sha256": "f752b3669e8b58690d3abff894a523a33228c65216ebf2ed75d0ec5588950323"
+        }
+      ],
+      "website_copies": []
+    },
+    {
+      "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgzKV8yMDI2MDgyMDE0MTcwODM1My5wbmc",
+      "source_filename": "ChatGPT Image 2026年8月20日 14_16_13 (3)_20260820141708353.png",
+      "candidate_count": 1,
+      "candidates": [
+        {
+          "relative_path": "company/website_media/ChatGPT Image 2026年8月20日 14_16_13 (3)_20260820141708353.png",
+          "size_bytes": 2180163,
+          "sha256": "59ef6aa77d0cb60776f47776b83e114b6ee3efae475736f94fdac9fd83f7bb51"
+        }
+      ],
+      "website_copies": []
+    },
+    {
+      "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgxKV8yMDI2MDgyMDEyMjUxNjI3MS5wbmc",
+      "source_filename": "ChatGPT Image 2026年8月20日 12_24_32 (1)_20260820122516271.png",
+      "candidate_count": 1,
+      "candidates": [
+        {
+          "relative_path": "company/website_media/ChatGPT Image 2026年8月20日 12_24_32 (1)_20260820122516271.png",
+          "size_bytes": 1679337,
+          "sha256": "cec58c0e4b61519b0fd26fddf121903a6ea2561bee56bdb3f67c13670a0bf786"
+        }
+      ],
+      "website_copies": []
+    },
+    {
+      "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgyKV8yMDI2MDgyMDEyMjUxNjg4Mi5wbmc",
+      "source_filename": "ChatGPT Image 2026年8月20日 12_24_32 (2)_20260820122516882.png",
+      "candidate_count": 1,
+      "candidates": [
+        {
+          "relative_path": "company/website_media/ChatGPT Image 2026年8月20日 12_24_32 (2)_20260820122516882.png",
+          "size_bytes": 1832837,
+          "sha256": "c5452ac86ae850c124b7e8ed13cc2413e3eb949077aabf2cf74f6bebc3d895e1"
+        }
+      ],
+      "website_copies": []
+    },
+    {
+      "url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMzICgzKV8yMDI2MDgyMDEyMjUxNzIyNy5wbmc",
+      "source_filename": "ChatGPT Image 2026年8月20日 12_24_33 (3)_20260820122517227.png",
+      "candidate_count": 1,
+      "candidates": [
+        {
+          "relative_path": "company/website_media/ChatGPT Image 2026年8月20日 12_24_33 (3)_20260820122517227.png",
+          "size_bytes": 2206034,
+          "sha256": "34693aba314445b82d4e9d39299fb1fb7e24bbd559dc01d5e82f7710610a8a38"
+        }
+      ],
+      "website_copies": []
+    }
+  ],
+  "note": "Only effective active Banner images are counted; external URLs require manual review."
+}

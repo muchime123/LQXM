@@ -33,6 +33,10 @@ class WebsiteCompanyProfileAdminControllerTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"companyName\":\"官网公司\"}"))
                 .andExpect(status().isForbidden());
         verify(service, never()).saveDraft(any());
+        mvc.perform(put("/api/website/admin/company-profile/published")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"companyName\":\"官网公司\"}"))
+                .andExpect(status().isForbidden());
+        verify(service, never()).updatePublished(any());
 
         when(users.current()).thenReturn(new CurrentUserService.CurrentUser(2L, "Manager", "Dept",
                 Set.of(), Set.of("website.manage"), "ALL", false, "LOCAL", 2L, null, Map.of()));
@@ -40,5 +44,9 @@ class WebsiteCompanyProfileAdminControllerTest {
                 .contentType(MediaType.APPLICATION_JSON).content("{\"companyName\":\"官网公司\"}"))
                 .andExpect(status().isOk());
         verify(service).saveDraft(any(WebsiteCompanyProfileService.ProfileFields.class));
+        mvc.perform(put("/api/website/admin/company-profile/published")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"companyName\":\"官网公司\"}"))
+                .andExpect(status().isOk());
+        verify(service).updatePublished(any(WebsiteCompanyProfileService.ProfileFields.class));
     }
 }

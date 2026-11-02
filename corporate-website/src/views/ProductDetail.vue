@@ -183,8 +183,7 @@ const variantCards = computed(() => (detail.value?.variants || []).map((variant)
   ...variant,
   facts: [
     { label: '适用产品', value: variant.applicableProduct },
-    { label: '模具形式', value: variant.boxOrMoldShape },
-    { label: '封口口径', value: variant.moldSizeLabel || variant.mouthSpec || variant.filmOrBoxSize },
+    { label: '封口口径', value: variant.mouthSpec || variant.filmOrBoxSize },
     { label: '包装速度', value: variant.packagingSpeed },
     { label: '电源 / 功率', value: [variant.voltage, variant.power].filter(Boolean).join(' · ') },
     { label: '设备尺寸', value: variant.dimensions || variant.deviceSize || variant.equipmentSizeSpec },
@@ -194,12 +193,7 @@ const variantCards = computed(() => (detail.value?.variants || []).map((variant)
 })).filter((variant) => variant.variantName || variant.facts.length).slice(0, 6))
 
 const compatiblePackaging = computed(() => detail.value?.compatiblePackaging || [])
-const compatibleMolds = computed(() => detail.value?.compatibleMolds || [])
-const hasCompatibility = computed(() => compatiblePackaging.value.length > 0 || compatibleMolds.value.length > 0)
-
-function moldRelationLabel(value) {
-  return ({ main: '主配模具', backup: '备用模具', paired: '配套模具' })[value] || '可配模具'
-}
+const hasCompatibility = computed(() => compatiblePackaging.value.length > 0)
 
 const detailNav = computed(() => [
   hasIntroduction.value && { id: 'introduction', label: '产品介绍' },
@@ -429,7 +423,7 @@ watch(() => route.params.slug, load)
         <section v-if="variantCards.length" id="variants" class="detail-section">
           <div class="detail-section__heading">
             <span>CONFIGURATIONS</span><h2>可选规格</h2>
-            <p>展示最多 6 个代表性规格。不同模具口径、产能和电气配置可能对应不同方案，最终以样品和容器实测为准。</p>
+            <p>展示最多 6 个代表性规格。不同封口尺寸、产能和电气配置可能对应不同方案，最终以样品和容器实测为准。</p>
           </div>
           <div class="detail-section__content variant-card-grid">
             <article v-for="(variant, index) in variantCards" :key="variant.id || index" class="variant-card">
@@ -446,8 +440,8 @@ watch(() => route.params.slug, load)
 
         <section v-if="hasCompatibility" id="compatibility" class="detail-section compatibility-section">
           <div class="detail-section__heading">
-            <span>COMPATIBILITY</span><h2>兼容包材与包材配套模具</h2>
-            <p>产品只关联兼容包材；模具信息由对应包材继续关联获得，不代表产品与模具建立了直接关系。</p>
+            <span>COMPATIBILITY</span><h2>兼容包材</h2>
+            <p>可选包材仍需结合实际容器、膜材和生产条件进行试封确认。</p>
           </div>
           <div class="detail-section__content compatibility-columns">
             <div v-if="compatiblePackaging.length" class="compatibility-panel">
@@ -468,20 +462,6 @@ watch(() => route.params.slug, load)
               </article>
             </div>
 
-            <div v-if="compatibleMolds.length" class="compatibility-panel">
-              <header><div><small>PACKAGING TOOLING</small><h3>包材配套模具</h3></div><strong>{{ compatibleMolds.length }}</strong></header>
-              <article v-for="item in compatibleMolds" :key="`${item.packagingVariantId}-${item.moldId}`" class="compatibility-card">
-                <div class="compatibility-card__title">
-                  <div><small>{{ [item.packagingModelName, item.packagingVariantName].filter(Boolean).join(' · ') || '兼容包材' }}</small><h4>{{ item.moldCategory || '配套模具' }}</h4></div>
-                  <span>{{ item.defaultMold ? '推荐配置' : moldRelationLabel(item.relationType) }}</span>
-                </div>
-                <p>该模具关联于上述包材规格，用于说明包材体系的配套能力。</p>
-                <ul>
-                  <li v-if="item.apertureLabel">{{ item.apertureLabel }}</li>
-                  <li v-if="item.cavityCount">{{ item.cavityCount }} 腔</li>
-                </ul>
-              </article>
-            </div>
           </div>
         </section>
 
@@ -514,7 +494,7 @@ watch(() => route.params.slug, load)
       <SiteCTA
         eyebrow="PRODUCT CONSULTATION"
         :title="`确认 ${model.name || '这款设备'} 是否适合您的产品`"
-        description="提供产品、容器尺寸和目标产能，工程师将协助核对设备、模具与包材配置。"
+        description="提供产品、容器尺寸和目标产能，工程师将协助核对设备与包材配置。"
         action-text="咨询该产品"
         inquiry-source="product-detail-bottom"
       />

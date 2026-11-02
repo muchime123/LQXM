@@ -27,15 +27,14 @@ const douyinTitle = computed(() => (douyin.value ? `抖音：${douyin.value.acco
 const douyinHref = computed(() => douyin.value?.link || '')
 
 const companyName = computed(() => company.value?.companyName || '浙江利强包装科技有限公司')
-const phone = computed(() => company.value?.phone || '4009008878')
+const phone = computed(() => company.value?.phone || '')
 const phoneText = computed(() => phone.value.replace(/(\d{4})(\d{3})(\d{4})/, '$1 $2 $3'))
-const email = computed(() => company.value?.email || '768963166@qq.com')
+const email = computed(() => company.value?.email || '')
 const year = new Date().getFullYear()
 const address = computed(() =>
   company.value?.factoryAddress ||
   company.value?.officeAddress ||
-  company.value?.registeredAddress ||
-  '浙江省温州市瓯海区南白象街道金洋路77号启迪未来产业园D栋2层'
+  company.value?.registeredAddress || ''
 )
 </script>
 
@@ -54,7 +53,7 @@ const address = computed(() =>
         </RouterLink>
         <div class="footer-brand-meta">
           <p class="footer-slogan">一站式包装合作伙伴</p>
-          <a class="footer-phone" href="#" @click.prevent="copyText(phoneText)">
+          <a v-if="phone" class="footer-phone" href="#" @click.prevent="copyText(phoneText)">
             <span class="footer-phone__label">服务热线</span>
             <strong>{{ phoneText }}</strong>
           </a>
@@ -67,7 +66,6 @@ const address = computed(() =>
           <RouterLink to="/products">产品中心</RouterLink>
           <RouterLink to="/solutions">解决方案</RouterLink>
           <RouterLink to="/packaging">包材耗材</RouterLink>
-          <RouterLink to="/molds">模具中心</RouterLink>
         </nav>
         <nav class="footer-nav-group" aria-label="企业导航">
           <strong>企业与合作</strong>
@@ -81,8 +79,8 @@ const address = computed(() =>
 
       <div class="footer-contact">
         <strong>联系我们</strong>
-        <span class="footer-addr">{{ address }}</span>
-        <a href="#" @click.prevent="copyText(email)">{{ email }}</a>
+        <span v-if="address" class="footer-addr">{{ address }}</span>
+        <a v-if="email" href="#" @click.prevent="copyText(email)">{{ email }}</a>
         <button type="button" class="footer-consult-link" @click="openConsult()">提交包装需求 →</button>
       </div>
     </div>
@@ -94,7 +92,7 @@ const address = computed(() =>
           <AppIcon name="douyin" :size="18" />
         </a>
       </div>
-      <span class="footer-motto">食品包装 · 设备 / 耗材 / 模具 / 方案</span>
+      <span class="footer-motto">食品包装 · 设备 / 包材 / 方案</span>
     </div>
   </footer>
 </template>

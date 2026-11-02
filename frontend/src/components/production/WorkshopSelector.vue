@@ -14,7 +14,6 @@
       >
         <div class="ws-title">
           <span class="ws-name">{{ w.workshopName }}</span>
-          <el-tag v-if="!w.enabled" size="small" type="info" effect="plain">停用</el-tag>
         </div>
         <div class="ws-counts">
           <span class="c-product">产品 {{ w.productCount }}</span>
@@ -29,7 +28,6 @@
 export interface WorkshopCard {
   id: number
   workshopName: string
-  enabled: boolean
   productCount: number
   configCount: number
 }

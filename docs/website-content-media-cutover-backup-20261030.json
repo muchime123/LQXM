@@ -1,0 +1,69 @@
+{
+  "banners": [
+    {
+      "id": 4,
+      "image_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgyKV8yMDI2MDgyMDA5MTEzODczNy5wbmc",
+      "website_media_id": null
+    },
+    {
+      "id": 5,
+      "image_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDA5XzEwXzMzICgxKV8yMDI2MDgyMDA5MTEzODQwNC5wbmc",
+      "website_media_id": null
+    }
+  ],
+  "page_sections": [
+    {
+      "id": 3,
+      "image_url": null,
+      "content": "[{\"title\":\"包装设备制造\",\"description\":\"1\",\"image\":\"/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgzKV8yMDI2MDgyMDE0MTcwODM1My5wbmc\",\"link\":\"/products\"},{\"title\":\"模具设计与生产\",\"description\":\"\",\"image\":\"/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgyKV8yMDI2MDgyMDE0MTcwODcyMS5wbmc\",\"link\":\"/molds\"},{\"title\":\"工厂现场与交付\",\"description\":\"\",\"image\":\"/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgxKV8yMDI2MDgyMDE0MTcwOTA2MS5wbmc\",\"link\":\"/about\"}]",
+      "enabled": 1,
+      "deleted_at": null
+    },
+    {
+      "id": 8,
+      "image_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgyKV8yMDI2MDgyMDEyMjUxNjg4Mi5wbmc",
+      "content": "[{\"image\":\"/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgzKV8yMDI2MDgyMDE0MTcwODM1My5wbmc\",\"caption\":\"\"}]",
+      "enabled": 1,
+      "deleted_at": null
+    },
+    {
+      "id": 9,
+      "image_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgyKV8yMDI2MDgyMDE0MTcwODcyMS5wbmc",
+      "content": "[{\"image\":\"/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgzKV8yMDI2MDgyMDE0MTcwODM1My5wbmc\",\"caption\":\"\"},{\"image\":\"/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDE0XzE2XzEzICgxKV8yMDI2MDgyMDE0MTcwOTA2MS5wbmc\",\"caption\":\"\"},{\"image\":\"/api/files/company?encoded=MjAyNjA3MDYxNjE4MzM5NzNfZWI1ZWU5NzhlZWZjMjQ0YzUyNjdkYzIzNWFiYjUzYWIt5ou36LSdXzIwMjYwODIwMTQ0MDQ3MTEwLmpwZw\",\"caption\":\"\"}]",
+      "enabled": 1,
+      "deleted_at": null
+    },
+    {
+      "id": 14,
+      "image_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgxKV8yMDI2MDgyMDEyMjUxNjI3MS5wbmc",
+      "content": null,
+      "enabled": 1,
+      "deleted_at": null
+    },
+    {
+      "id": 16,
+      "image_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMzICgzKV8yMDI2MDgyMDEyMjUxNzIyNy5wbmc",
+      "content": null,
+      "enabled": 1,
+      "deleted_at": null
+    },
+    {
+      "id": 19,
+      "image_url": "/api/files/company?encoded=Q2hhdEdQVCBJbWFnZSAyMDI25bm0OOaciDIw5pelIDEyXzI0XzMyICgyKV8yMDI2MDgyMDEyMjUxNjg4Mi5wbmc",
+      "content": null,
+      "enabled": 1,
+      "deleted_at": null
+    }
+  ],
+  "media_statuses": {
+    "2": "DRAFT",
+    "3": "DRAFT",
+    "140": "DRAFT",
+    "141": "DRAFT",
+    "142": "DRAFT",
+    "143": "DRAFT",
+    "144": "DRAFT",
+    "145": "DRAFT",
+    "146": "DRAFT"
+  }
+}

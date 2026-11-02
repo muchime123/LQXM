@@ -60,7 +60,7 @@ const form = ref<{
   seoTitle: '',
   seoDescription: '',
   sortOrder: 0,
-  websiteEnabled: true,
+  websiteEnabled: false,
   websiteFeatured: false
 })
 
@@ -113,7 +113,7 @@ watch(
         seoTitle: '',
         seoDescription: '',
         sortOrder: 0,
-        websiteEnabled: true,
+        websiteEnabled: false,
         websiteFeatured: false
       }
     }
@@ -287,7 +287,7 @@ function movePointDown(index: number) {
         <el-form-item label="正文内容">
           <div class="rich-text-form-item">
             <RichTextEditor v-model="form.contentHtml" :height="560" placeholder="正文内容… 用 H2/H3 标题分节，官网会自动生成侧边目录" />
-            <p class="field-help">H2/H3 标题会自动生成官网侧边目录；图片直接粘贴或从工具栏上传，自动进入官网素材库。</p>
+            <p class="field-help">H2/H3 标题会自动生成官网侧边目录；图片直接粘贴或从工具栏上传，自动进入官网媒体库。</p>
           </div>
         </el-form-item>
         <el-divider content-position="left">搜索展示</el-divider>

@@ -33,6 +33,7 @@ export interface TrackingStageProgress {
   optional?: boolean
   /** optional 为真时才有意义：本单是否真的走这道工序（有里程碑行）。 */
   applicable?: boolean
+  applicability?: 'APPLICABLE' | 'NOT_APPLICABLE' | 'PENDING_REVIEW' | null
 }
 
 export interface TrackingOrder {
@@ -150,6 +151,8 @@ export interface TrackingOrder {
   sourceOrderRemark?: string | null
   /** 氚云生产任务单的可选配置原文，用于辨认氧化/喷特氟龙、木箱等按需加工。 */
   sourceOptionalConfiguration?: string | null
+  /** 源生产任务单「是否需要额外模具」（氚云取值：是/否），落 production_orders.extra_mold_required。 */
+  extraMoldRequired?: string | null
 }
 
 export type TrackingTimeReviewKind = 'SOURCE_DATE' | 'ACCEPTANCE' | 'COMMITMENT' | 'REPORTING' | 'WAREHOUSING' | 'OVERDUE'
@@ -179,6 +182,8 @@ export interface TrackingMilestone {
   label: string
   status: TrackingMilestoneStatus
   completedDate: string | null
+  /** 已完成但真实日期未知时为 NO_DATE。 */
+  completionSource?: 'NO_DATE' | 'MANUAL' | null
   note: string | null
   /** 当前任务单的人工预计日期与原因；为空时使用产品/通用参考推算。 */
   manualReferenceDate?: string | null
@@ -186,6 +191,7 @@ export interface TrackingMilestone {
   referenceSource?: 'MANUAL' | 'SYSTEM' | 'NONE'
   optional?: boolean
   applicable?: boolean
+  applicability?: 'APPLICABLE' | 'NOT_APPLICABLE' | 'PENDING_REVIEW' | null
   /** 该工序一般耗时（天）＝基准表里上游完成→本节点完成的中位间隔；无基准（如机器车间暂无数据）为 null。 */
   typicalDays?: number | null
   /**
@@ -405,6 +411,11 @@ export interface TrackingFilterOptions {
    * 口径＝源单配置要求这道工序 或 已有该节点的跟单记录。
    */
   optionalStageCounts?: { code: string; count: number }[]
+  /**
+   * 「节点跟进」筛选可选的**节点清单**（制程表里启用的节点，按制程序号排序）。
+   * 与后端筛选白名单同源：管理员加/停一个节点后下拉自动跟随，前端不维护节点常量。
+   */
+  nodeProgressNodes?: { code: string; label: string }[]
 }
 
 export interface TrackingAnalyticsBucket {
@@ -864,9 +875,16 @@ export const changeTrackingDisposition = async (id: number, version: number, sto
  * 跟单结案确认 / 撤销：与「标记不再生产」互斥的本地处置（不修改氚云生产任务单）；
  * closed=true 写结案时间/原因/操作人；closed=false 清空三列，恢复按节点进度派生状态。
  */
-export const changeTrackingClosure = async (id: number, version: number, closed: boolean, note: string) =>
+export interface TrackingClosureNodeConfirmation {
+  code: string
+  result: 'DONE_WITH_DATE' | 'DONE_NO_DATE' | 'APPLICABLE' | 'NOT_APPLICABLE'
+  completedDate: string | null
+  note: string | null
+}
+export const changeTrackingClosure = async (id: number, version: number, closed: boolean, note: string,
+  nodeConfirmations: TrackingClosureNodeConfirmation[] = [], abnormalReason: string | null = null) =>
   (await http.post<{ version: number }>(`/manufacturing/followups/${id}/closure`,
-    { version, closed, note }, { headers: { 'X-Request-Key': createRequestKey() } })).data
+    { version, closed, note, nodeConfirmations, abnormalReason }, { headers: { 'X-Request-Key': createRequestKey() } })).data
 
 export interface TrackingBenchmarkStage {
   stageCode: string
@@ -956,7 +974,7 @@ export interface TrackingStageDef {
   /** 内部编码；一经产生跟单记录不可修改。 */
   stageCode: string
   stageLabel: string
-  /** 制程顺序，升序。 */
+  /** 字典展示顺序；被纳入默认流程时也是默认流程顺序。 */
   sortNo: number
   /** true＝按需工序：不计入完成分母，按关键词判定本单是否适用。 */
   optional: boolean
@@ -964,9 +982,36 @@ export interface TrackingStageDef {
   excludeKeywords: string | null
   headerAliases: string | null
   enabled: boolean
+  /** 是否属于未匹配产品模板任务所用的车间默认流程。 */
+  defaultIncluded: boolean
   /** 已产生的跟单记录数；>0 时只能停用、不能删除。 */
   usageCount: number
 }
+
+export interface TrackingStageDictionaryItem {
+  stageCode: string
+  stageLabel: string
+  optional: boolean
+  matchKeywords: string | null
+  excludeKeywords: string | null
+  headerAliases: string | null
+  usageCount: number
+}
+
+export const fetchTrackingStageDictionary = async () =>
+  (await http.get<TrackingStageDictionaryItem[]>('/manufacturing/master/stage-dictionary')).data
+
+export const createTrackingStageDictionary = async (payload: TrackingStageDefInput) =>
+  (await http.post<{ stageCode: string }>('/manufacturing/master/stage-dictionary', payload)).data
+
+export const updateTrackingStageDictionary = async (code: string, payload: TrackingStageDefInput) =>
+  (await http.put(`/manufacturing/master/stage-dictionary/${encodeURIComponent(code)}`, payload)).data
+
+export const deleteTrackingStageDictionary = async (code: string) =>
+  (await http.delete(`/manufacturing/master/stage-dictionary/${encodeURIComponent(code)}`)).data
+
+export const addTrackingDictionaryStageToDefaultFlow = async (kind: string, code: string) =>
+  (await http.post('/manufacturing/master/stage-defs/default-flow', { kind, code })).data
 
 /** 改制程的影响面：多少在制单会被改写完成判定。 */
 export interface TrackingStageDefImpact {
@@ -1003,6 +1048,9 @@ export const updateTrackingStageDef = async (id: number, payload: TrackingStageD
 export const moveTrackingStageDef = async (id: number, up: boolean) =>
   (await http.post<{ id: number }>(`/manufacturing/master/stage-defs/${id}/move`, null, { params: { up } })).data
 
+export const setTrackingStageDefaultFlow = async (id: number, included: boolean) =>
+  (await http.put<{ id: number; included: boolean }>(`/manufacturing/master/stage-defs/${id}/default-flow`, { included })).data
+
 export const deleteTrackingStageDef = async (id: number) =>
   (await http.delete<{ id: number }>(`/manufacturing/master/stage-defs/${id}`)).data
 
@@ -1032,6 +1080,10 @@ export interface ProductBenchmarkSamples {
     matchedOrders: number
     scheduledAnchorCount: number
     noAnchorCount: number
+    stageQuality: Record<string, {
+      usable: number; missingDate: number; noAnchor: number; reversedDate: number
+      over60Days: number; futureDate: number; zeroDay: number
+    }>
     spanFrom: string | null
     spanTo: string | null
   }
@@ -1160,3 +1212,26 @@ export const fetchTrackingColumnDefaults = async () =>
 export const saveTrackingColumnDefaults = async (
   rows: { columnKey: string; visible: boolean }[]
 ) => (await http.put<{ changed: number }>('/manufacturing/followups/list-column-defaults', rows)).data
+
+/** 导出默认勾选字段（全站，仅管理员可改）；selected 表示该列是否默认勾选。 */
+export interface TrackingExportColumnDefault {
+  columnKey: string
+  selected: boolean
+}
+
+export interface TrackingExportColumnDefaults {
+  columns: TrackingExportColumnDefault[]
+}
+
+/**
+ * 生产跟单导出弹窗的「全站默认字段」。
+ * 读走页面读权限（全员）；写复用 manufacturing.listcolumns.manage（仅管理员）。
+ * 表为空＝未配置，前端回落「核心字段」。
+ */
+export const fetchTrackingExportColumnDefaults = async () =>
+  (await http.get<TrackingExportColumnDefaults>('/manufacturing/followups/export-column-defaults')).data
+
+/** 全量覆盖保存导出默认字段；未提交的列＝回落「核心字段」。 */
+export const saveTrackingExportColumnDefaults = async (
+  rows: { columnKey: string; selected: boolean }[]
+) => (await http.put<{ changed: number }>('/manufacturing/followups/export-column-defaults', rows)).data

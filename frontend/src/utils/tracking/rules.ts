@@ -95,7 +95,9 @@ export function stageOverdue(stage: TrackingMilestone): boolean {
  * 按需工序（封口机的氧化/喷特氟龙）：源表填「无」或留空的单不写里程碑行 ⇒ 本单不走这道工序。
  * 这类节点既不进分母、也不该被显示成「未完成」，否则封口机几乎每单都永远差一个节点。
  */
-export function stageRelevant(stage: Pick<TrackingMilestone, 'optional' | 'applicable'>) {
+export function stageRelevant(stage: Pick<TrackingMilestone, 'optional' | 'applicable' | 'applicability'>) {
+  if (stage.applicability === 'NOT_APPLICABLE') return false
+  if (stage.applicability === 'APPLICABLE' || stage.applicability === 'PENDING_REVIEW') return true
   return stage.optional !== true || stage.applicable === true
 }
 /**
@@ -107,7 +109,8 @@ export function listStages(row: Pick<TrackingOrder, 'stageProgress'>) {
 }
 /** 单次保存前的节点校验（批量完成与详情保存共用同一份判据）。 */
 export function stageValidationError(stages: TrackingMilestone[]) {
-  const missingDate = stages.find(stage => stage.status === 'DONE' && !stage.completedDate)
+  const missingDate = stages.find(stage => stage.status === 'DONE' && !stage.completedDate
+    && stage.completionSource !== 'NO_DATE')
   if (missingDate) return `节点「${missingDate.label}」已完成时请填写完成日期`
   return null
 }

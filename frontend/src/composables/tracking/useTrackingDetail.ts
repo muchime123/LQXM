@@ -20,7 +20,7 @@ import {
   fetchTrackingDetail, fetchTrackingPurchaseReceiptDetail, fetchTrackingPurchaseReceipts
 } from '@/api/productionTracking'
 import type {
-  TrackingEntry, TrackingMilestone, TrackingOrder, TrackingPurchaseReceipt,
+  TrackingClosureNodeConfirmation, TrackingEntry, TrackingMilestone, TrackingOrder, TrackingPurchaseReceipt,
   TrackingTimeReview, TrackingTimeReviewKind, TrackingTimeReviewStatus
 } from '@/api/productionTracking'
 import type { LedgerDetailResult } from '@/types/h3Import'
@@ -45,7 +45,7 @@ const STATE_FIELDS: Array<{ key: string, label: string }> = [
   { key: 'closedAt', label: '结案时间' },
   { key: 'closedNote', label: '结案说明' }
 ]
-interface EntrySnapshotMilestone { code?: string | null, status?: string | null, completedDate?: string | null, note?: string | null, manualReferenceDate?: string | null, manualReferenceReason?: string | null }
+interface EntrySnapshotMilestone { code?: string | null, status?: string | null, completedDate?: string | null, completionSource?: string | null, note?: string | null, manualReferenceDate?: string | null, manualReferenceReason?: string | null }
 interface EntrySnapshot { state?: Record<string, unknown> | null, milestones?: EntrySnapshotMilestone[] | null }
 interface DiffRow { label: string, from: string, to: string }
 interface TimeHistoryItem { key: string; time: string; by: string; title: string; lines: string[] }
@@ -68,6 +68,7 @@ function snapshotStage(raw: EntrySnapshotMilestone): EntrySnapshotMilestone {
     code: val('code', 'stage_code') as string | undefined,
     status: val('status', 'stage_status') as string | undefined,
     completedDate: val('completedDate', 'completed_date') as string | undefined,
+    completionSource: val('completionSource', 'completion_source') as string | undefined,
     note: val('note') as string | undefined,
     manualReferenceDate: val('manualReferenceDate', 'manual_reference_date') as string | undefined,
     manualReferenceReason: val('manualReferenceReason', 'manual_reference_reason') as string | undefined
@@ -95,7 +96,8 @@ function snapshotStageStatus(stage: EntrySnapshotMilestone) {
 }
 function snapshotStageText(stage: EntrySnapshotMilestone) {
   const label = stageStatusText(snapshotStageStatus(stage) as TrackingMilestone['status'])
-  return stage.completedDate ? `${label} ${stage.completedDate}` : label
+  return stage.completedDate ? `${label} ${stage.completedDate}`
+    : stage.completionSource === 'NO_DATE' ? `${label}（日期未知）` : label
 }
 
 export function useTrackingDetail(options: {
@@ -251,7 +253,7 @@ export function useTrackingDetail(options: {
     closureNote.value = ''
     closureVisible.value = true
   }
-  async function saveClosure() {
+  async function saveClosure(nodeConfirmations: TrackingClosureNodeConfirmation[] = [], abnormalReason: string | null = null) {
     const order = detail.value?.order
     const note = closureNote.value.trim()
     if (!order || !note || closureSaving.value) return
@@ -262,7 +264,8 @@ export function useTrackingDetail(options: {
     }
     closureSaving.value = true
     try {
-      await changeTrackingClosure(order.id, order.version, closureClosing.value, note)
+      await changeTrackingClosure(order.id, order.version, closureClosing.value, note,
+        closureClosing.value ? nodeConfirmations : [], closureClosing.value ? abnormalReason : null)
       closureVisible.value = false
       ElMessage.success(closureClosing.value ? '已确认结案，状态按「结案优先」展示为已完成' : '已撤销结案，状态恢复按节点进度派生')
       await openDetail(order)
@@ -319,7 +322,8 @@ export function useTrackingDetail(options: {
   function hasUnsavedStageChanges() {
     return milestones.value.some((stage, index) => {
       const before = originalStages.value[index]
-      return !before || before.status !== stage.status || before.completedDate !== stage.completedDate || (before.note || '') !== (stage.note || '')
+      return !before || before.status !== stage.status || before.completedDate !== stage.completedDate
+        || before.completionSource !== stage.completionSource || (before.note || '') !== (stage.note || '')
         || (before.manualReferenceDate || '') !== (stage.manualReferenceDate || '')
         || (before.manualReferenceReason || '') !== (stage.manualReferenceReason || '')
     })
@@ -442,7 +446,8 @@ export function useTrackingDetail(options: {
         if (normalizeValue(stage.note)) rows.push({ label: `${label}备注`, from: '未填', to: stage.note || '未填' })
         continue
       }
-      if (snapshotStageStatus(previous) !== snapshotStageStatus(stage) || normalizeValue(previous.completedDate) !== normalizeValue(stage.completedDate)) {
+      if (snapshotStageStatus(previous) !== snapshotStageStatus(stage) || normalizeValue(previous.completedDate) !== normalizeValue(stage.completedDate)
+        || normalizeValue(previous.completionSource) !== normalizeValue(stage.completionSource)) {
         rows.push({ label, from: snapshotStageText(previous), to: snapshotStageText(stage) })
       }
       if (normalizeValue(previous.note) !== normalizeValue(stage.note)) {
@@ -518,6 +523,7 @@ export function useTrackingDetail(options: {
         const statusChanged = !prev
           || snapshotStageStatus(prev) !== snapshotStageStatus(stage)
           || normalizeValue(prev.completedDate) !== normalizeValue(stage.completedDate)
+          || normalizeValue(prev.completionSource) !== normalizeValue(stage.completionSource)
         const noteChanged = normalizeValue(prev?.note) !== normalizeValue(stage.note)
         const manualChanged = normalizeValue(prev?.manualReferenceDate) !== normalizeValue(stage.manualReferenceDate)
           || normalizeValue(prev?.manualReferenceReason) !== normalizeValue(stage.manualReferenceReason)
@@ -559,7 +565,8 @@ export function useTrackingDetail(options: {
       const prev = beforeStages.get(stage.code)
       if (!prev) continue
       const parts: string[] = []
-      if (snapshotStageStatus(prev) !== snapshotStageStatus(stage) || normalizeValue(prev.completedDate) !== normalizeValue(stage.completedDate)) {
+      if (snapshotStageStatus(prev) !== snapshotStageStatus(stage) || normalizeValue(prev.completedDate) !== normalizeValue(stage.completedDate)
+        || normalizeValue(prev.completionSource) !== normalizeValue(stage.completionSource)) {
         parts.push(`${snapshotStageText(prev)} → ${snapshotStageText(stage)}`)
       }
       if (normalizeValue(prev.note) !== normalizeValue(stage.note)) {
@@ -586,9 +593,8 @@ export function useTrackingDetail(options: {
         return
       }
     }
-    if (stage.status === 'DONE' && !stage.completedDate) stage.completedDate = todayKey()
     if (stage.status === 'DONE') { stage.manualReferenceDate = null; stage.manualReferenceReason = null }
-    if (stage.status !== 'DONE') stage.completedDate = null
+    if (stage.status !== 'DONE') { stage.completedDate = null; stage.completionSource = null }
     previousStageStatuses.value[stage.code] = stage.status
   }
 

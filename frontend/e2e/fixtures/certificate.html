@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <title>B7-B1b Certificate 搜索分页联动夹具</title>
+  </head>
+  <body>
+    <!--
+      B7-B1b 夹具：直接挂载真实业务页面 CertificateView。
+
+      不连接后端：所有 /api/ 请求由用例通过 page.route 拦截返回固定夹具数据，
+      因此不存在任何写入副作用。权限通过「本地 token + /api/auth/me 拦截」注入。
+    -->
+    <div id="e2e-app"></div>
+    <script type="module" src="./certificate-harness.ts"></script>
+  </body>
+</html>

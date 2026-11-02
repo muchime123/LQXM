@@ -27,4 +27,9 @@ public class WebsiteCompanyProfileAdminController {
     public WebsiteCompanyProfile saveDraft(@RequestBody WebsiteCompanyProfileService.ProfileFields fields) {
         return service.saveDraft(fields);
     }
+
+    @PutMapping("/published")
+    public WebsiteCompanyProfile updatePublished(@RequestBody WebsiteCompanyProfileService.ProfileFields fields) {
+        return service.updatePublished(fields);
+    }
 }

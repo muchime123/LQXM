@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <title>B6-1 OperationLog 视觉验收夹具</title>
+  </head>
+  <body>
+    <!--
+      B6-1 试点页面夹具：直接挂载真实业务页面 OperationLogView。
+
+      与 LqPreviewHarness 的差别：本夹具需要**真实视觉**（含 Element Plus 与项目样式），
+      因此入口脚本自行完成 createApp + ElementPlus + 样式导入，而不是由用例动态挂载。
+
+      不连接后端：所有 /api/audit-logs 请求由用例通过 page.route 拦截返回固定夹具数据，
+      因此不存在任何写入副作用，也不需要登录态或路由守卫。
+    -->
+    <div id="e2e-app"></div>
+    <script type="module" src="./operation-log-harness.ts"></script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "ready": true,
+  "blockers": [],
+  "source_company_id": 2,
+  "public_field_differences": 0,
+  "source_milestone_ids": [
+    1,
+    2,
+    3
+  ],
+  "website_milestone_ids": [
+    1,
+    2,
+    3
+  ],
+  "source_social_count": 0,
+  "website_social_count": 0,
+  "logo_media_id": 147,
+  "profile_status_before": "DRAFT",
+  "logo_status_before": "DRAFT",
+  "applied": true,
+  "public_source_changed": false,
+  "published_milestones": 3,
+  "backup": "docs\\website-company-publish-backup-20261102.json"
+}

@@ -750,14 +750,13 @@ body { font-size: 16px; background: var(--white); }
 .site-page:not(.site-page--home) .industry-item h4 { font-size: 21px; }
 
 
-/* 产品、方案、耗材、模具：图片区优先，卡片减少装饰。 */
+/* 产品、方案、耗材：图片区优先，卡片减少装饰。 */
 .catalog-overview { padding-top: var(--section-space); }
 .products-grid { padding-top: 42px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
-.solution-detail-grid, .packaging-grid, .mold-grid { gap: 18px; }
+.solution-detail-grid, .packaging-grid { gap: 18px; }
 .solution-detail-card,
 .support-card,
-.packaging-card,
-.mold-card { border-radius: var(--radius-card) !important; }
+.packaging-card { border-radius: var(--radius-card) !important; }
 .consumable-card,
 .packaging-record-card,
 .advantage-card,
@@ -766,18 +765,14 @@ body { font-size: 16px; background: var(--white); }
 .related-card { border-radius: var(--radius-card); overflow: hidden; }
 
 /* 业务筛选统一使用品牌高亮；静态信息卡不再模拟可点击交互。 */
-.mold-tab.active,
 .catalog-tabs button.active {
   background: var(--cyan);
   border-color: var(--cyan);
   color: var(--ink);
 }
-.mold-tab.active span { background: rgba(7, 35, 44, .1); color: var(--ink); }
 .site-page--solutions .industry-card:hover,
 .site-page--packaging .consumable-card:hover,
-.site-page--packaging .advantage-card:hover,
-.site-page--molds .material-card:hover,
-.site-page--molds .custom-service-card:hover {
+.site-page--packaging .advantage-card:hover {
   transform: none;
   box-shadow: none;
 }
@@ -786,9 +781,7 @@ body { font-size: 16px; background: var(--white); }
   border-color: var(--white-alpha-10);
 }
 .site-page--packaging .consumable-card:hover,
-.site-page--packaging .advantage-card:hover,
-.site-page--molds .material-card:hover,
-.site-page--molds .custom-service-card:hover { border-color: var(--line); }
+.site-page--packaging .advantage-card:hover { border-color: var(--line); }
 .solutions-page .industries--dark { background: var(--navy); }
 
 /* 给不同业务页自己的首屏语境，避免所有内页看起来完全一样。 */
@@ -799,7 +792,6 @@ body { font-size: 16px; background: var(--white); }
 .site-page--solutions .page-hero {
   --page-hero-image: url('/images/factory.webp');
 }
-.site-page--molds .page-hero,
 .site-page--packaging .page-hero {
   --page-hero-image: url('/images/hero-machine.png');
 }

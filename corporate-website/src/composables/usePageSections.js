@@ -4,14 +4,12 @@
  * - 按 sectionKey 提供查找能力，页面组件用后台文案替换硬编码默认值
  * - 失败时返回空映射，页面回退到前端默认文案，不阻塞渲染
  * - 统一提供 sectionEnabled / sectionRows / parseSectionRows 供所有页面使用，
- *   避免各页面重复实现相同的草稿合并与 JSON 解析逻辑。
+ *   避免各页面重复实现相同的JSON 解析逻辑。
  */
 import { ref, computed } from 'vue'
 import { fetchPageSections } from '../api/website'
-import { useCmsPreview } from './useCmsPreview'
 
 export function usePageSections(pageKey) {
-  const cmsPreview = useCmsPreview(pageKey)
   const sections = ref([])
   const loaded = ref(false)
   const loadFailed = ref(false)
@@ -26,10 +24,7 @@ export function usePageSections(pageKey) {
 
   /** 按 sectionKey 取区块，不存在返回 null（页面自行回退默认文案）。 */
   function section(key) {
-    const saved = sectionMap.value[key] || null
-    const draft = cmsPreview.draft(key)
-    if (!saved && !Object.keys(draft).length) return null
-    return { ...(saved || {}), ...draft }
+    return sectionMap.value[key] || null
   }
 
   /**
@@ -37,8 +32,6 @@ export function usePageSections(pageKey) {
    * 接口失败或尚未完成加载时保持显示，确保官网可以使用静态回退内容。
    */
   function isEnabled(key) {
-    const draftEnabled = cmsPreview.draft(key).enabled
-    if (typeof draftEnabled === 'boolean') return draftEnabled
     if (!loaded.value || loadFailed.value) return true
     return Boolean(sectionMap.value[key])
   }
@@ -55,14 +48,9 @@ export function usePageSections(pageKey) {
   }
 
   /**
-   * 结构化内容优先取编辑器内存草稿（content 存在即以草稿为准，含空列表），
-   * 其次取后台已保存内容。
+   * 读取后台已保存的结构化内容。
    */
   function sectionRows(key) {
-    const draft = cmsPreview.draft(key)
-    if (typeof draft.content === 'string') {
-      return parseSectionRows(draft.content)
-    }
     return parseSectionRows(section(key)?.content)
   }
 

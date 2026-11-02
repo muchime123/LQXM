@@ -21,7 +21,7 @@
         :view-mode="catalogDisplayMode"
         :view-mode-options="catalogViewModeOptions"
         :view-toggle-visible="!isCompactViewport"
-        batch-enabled
+        :batch-enabled="canManageProduct"
         :batch-mode="batchMode"
         :selected-count="selectedModelIds.size"
         :models-count="models.length"
@@ -175,7 +175,10 @@
           :style="titleMenuStyle"
           @click.stop
         >
-          <button type="button" class="danger" @click="handleTitleMenuRemove">删除产品</button>
+          <!-- 与顶部「新建产品 / 导入 / 导出」同口径：`product.manage` -->
+          <button v-if="canManageProduct" type="button" class="danger" @click="handleTitleMenuRemove">
+            删除产品
+          </button>
         </div>
       </Teleport>
 

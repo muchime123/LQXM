@@ -1,0 +1,15 @@
+{
+  "read_only": true,
+  "legacy_public_milestones": 3,
+  "legacy_public_milestone_ids": [
+    1,
+    2,
+    3
+  ],
+  "milestones_with_file": [],
+  "native_milestones": 0,
+  "legacy_public_social_links": 0,
+  "legacy_public_social_ids": [],
+  "social_missing_link_ids": [],
+  "native_social_links": 0
+}

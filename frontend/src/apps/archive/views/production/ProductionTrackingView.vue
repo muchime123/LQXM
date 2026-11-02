@@ -28,9 +28,7 @@
         <div class="tracking-filter-fields">
       <!-- 搜索框唯一入口（10-19 LQ）：任务号 / 产品 / 客户 / 规格共用一个框，后端同一段谓词匹配。 -->
       <el-input v-model="keyword" class="tracking-keyword" clearable placeholder="任务号、产品、客户或规格" aria-label="关键词（任务号、产品、客户、规格）" @keyup.enter="search" @clear="search" />
-      <el-select v-model="countdownFilter" multiple collapse-tags clearable placeholder="生产倒计时（全部）" aria-label="生产倒计时" @change="search"><el-option v-for="option in COUNTDOWN_FILTER_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select>
-      <!-- 业务员：2026-10-21 从「更多筛选」上移到常用行（真库 12 人都有量，是最常按人看的一维）。 -->
-      <el-select v-model="salespersonFilter" multiple filterable collapse-tags clearable placeholder="业务员（全部）" aria-label="业务员" @change="search"><el-option v-for="name in salespersonOptions" :key="name" :label="name" :value="name" /></el-select>
+      <!-- 业务员：2026-10-30 从常用行迁至列表表头筛选（复用同一 salespersonFilter 状态，与「生产倒计时」「生产交付结果」一并从搜索栏迁到表头）。 -->
       <!-- 2026-10-21 精简：「生产交付结果」「跟单待办」撤出常用行——工作台默认口径（未交付）下交付结果恒为「未交付」，
            待办升成快捷标签「已报工待入库」；交付结果移入更多筛选，待办靠列表徽标呈现。 -->
       <div class="tracking-common-date" aria-label="生产任务单提交时间" title="按生产任务单提交时间筛选"><div class="tracking-extra-date-inputs"><el-date-picker v-model="dateFilters.created.from" type="date" value-format="YYYY-MM-DD" placeholder="提交时间起" aria-label="生产任务单提交起始日期" @change="onCreatedDateChange('from')" /><span>至</span><el-date-picker v-model="dateFilters.created.to" type="date" value-format="YYYY-MM-DD" placeholder="提交时间止" aria-label="生产任务单提交截止日期" @change="onCreatedDateChange('to')" /></div></div>
@@ -77,17 +75,21 @@
       <div v-if="activeFilterChips.length" class="tracking-active-filters" aria-label="当前筛选条件"><span>已筛选：</span><el-tag v-for="chip in activeFilterChips" :key="chip.key" closable type="info" @close="clearFilterChip(chip.key)">{{ chip.label }}</el-tag><el-button link type="primary" @click="resetTrackingFilters">清除全部</el-button></div>
     </div>
     <div v-if="advancedFiltersVisible" class="tracking-extra-filters" aria-label="更多生产跟单筛选条件">
-      <!-- 2026-10-21 精简：删除「任务单状态」（与跟单状态同一件事）与「跟单员」（与车间同一刀），
-           「交付结果」从常用行移入本区；本区只剩切历史/全部视图才用得到的条件。 -->
+      <!-- 2026-10-21 精简：删除「任务单状态」（与跟单状态同一件事）与「跟单员」（与车间同一刀）；
+           2026-10-30「生产交付结果」从本区移出，改为列表表头筛选（与「生产倒计时」一并从搜索栏迁至表头）；
+           本区只剩切历史/全部视图才用得到的条件。 -->
       <div class="tracking-extra-filter"><el-select v-model="trackingStatus" aria-label="跟单状态" @change="search"><el-option label="全部跟单状态" value="all" /><el-option label="待处理（未交付）" value="open" title="未停工、未结案、且还没有入库的任务。入库口径：跟单员填写的入库日期优先，没填则看采购入库；两者都没有＝未入库" /><el-option label="待跟单" value="pending" /><el-option label="跟单中" value="in_progress" /><el-option label="跟单已完成" value="completed" /><el-option label="停止生产跟单" value="stopped" /><el-option-group label="完成方式"><el-option label="人工结案" value="closed" /></el-option-group></el-select></div>
       <div class="tracking-extra-filter"><el-select v-model="actionFilter" aria-label="跟单待办" @change="search"><el-option label="全部跟单待办" value="all" /><el-option label="有提醒" value="any" /><el-option v-for="code in TRACKING_ACTION_CODES" :key="code" :label="actionLabel(code)" :value="code" /></el-select></div>
-      <div class="tracking-extra-filter"><el-select v-model="deliveryFilter" multiple collapse-tags clearable placeholder="生产交付结果（全部）" aria-label="生产交付结果" @change="search"><el-option v-for="option in DELIVERY_FILTER_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select></div>
+
       <div class="tracking-extra-filter"><el-select v-model="workshop" clearable filterable placeholder="车间（全部）" aria-label="车间" @change="search"><el-option v-for="line in filterOptions.workshops" :key="line" :label="shortWorkshop(line)" :value="line" /></el-select></div>
       <div class="tracking-extra-filter tracking-extra-filter-check"><el-checkbox v-model="mine" @change="search">我的跟单</el-checkbox></div>
       <div class="tracking-extra-filter"><el-select v-model="optionalStageFilter" clearable placeholder="按需工序（全部）" aria-label="按需工序" @change="search"><el-option label="全部按需工序" value="" /><el-option v-for="option in optionalStageOptions" :key="option.value" :label="option.label" :value="option.value" /></el-select></div>
-      <!-- 「模具生产」跟进：三档可多选。只筛「模具之后没有任何节点跟进」的单——后面一旦动了就已越过模具这一关；
-           模具之前（画图/备料/钣金）跟没跟都不影响。可多选组合，例如只勾前两项＝模具还没完工。 -->
-      <div class="tracking-extra-filter"><el-select v-model="moldStageFilter" multiple collapse-tags clearable placeholder="模具生产（全部）" aria-label="模具生产跟进" @change="search"><el-option v-for="option in MOLD_STAGE_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select></div>
+      <!-- 「节点跟进」：先选一道节点，默认只勾「未跟进」（要看这道节点还没动的那批单），
+           想看进行中/已完成再自己加勾——状态档位可多选，同节点内取或。
+           由原先写死的「模具生产」三档泛化而来——换节点不用改代码，节点清单直接来自制程表。
+           共同前提仍是「该节点之后没有任何节点跟进」：后面一旦动了就说明已越过这一关。 -->
+      <div class="tracking-extra-filter"><el-select v-model="nodeProgressCode" clearable filterable placeholder="节点跟进（全部）" aria-label="节点跟进" @change="onNodeProgressCodeChange"><el-option v-for="option in nodeProgressOptions" :key="option.value" :label="option.label" :value="option.value" /></el-select></div>
+      <div v-if="nodeProgressCode" class="tracking-extra-filter"><el-select v-model="nodeProgressStates" multiple collapse-tags collapse-tags-tooltip placeholder="节点状态（可多选）" aria-label="节点状态" @change="onNodeProgressStatesChange"><el-option v-for="option in NODE_PROGRESS_STATE_OPTIONS" :key="option.value" :label="option.label" :value="option.value" /></el-select></div>
       <div class="tracking-extra-filter"><el-select v-model="timeFilter" aria-label="时间核实" @change="search">
         <el-option label="全部时间核实" value="all" />
         <el-option label="待核实问题" value="time_attention" title="仅筛出尚待处理的问题；已核实的源日期异常不在此项中" />
@@ -130,6 +132,7 @@
         <template #default="{ row }"><strong>{{ row.productNameSnapshot }}</strong><span class="tracking-product-qty">{{ row.plannedQuantity }}{{ row.unit }}</span><small v-if="productSize(row) || row.moldLayout?.trim()">{{ productSize(row) }}<template v-if="row.moldLayout?.trim()">{{ productSize(row) ? ' / ' : '' }}{{ row.moldLayout.trim() }}</template></small></template>
       </el-table-column>
       <el-table-column v-if="isListColumnVisible('salesperson')" label="业务员" width="128">
+        <template #header><TableHeaderFilter v-model="salespersonFilter" :options="salespersonOptions" title="业务员" @change="search" /></template>
         <template #default="{ row }"><span v-if="row.salespersonNameSnapshot">{{ row.salespersonNameSnapshot }}</span><span v-else class="muted">—</span></template>
       </el-table-column>
       <el-table-column v-if="isListColumnVisible('workshop')" label="车间" min-width="110"><template #default="{ row }">{{ shortWorkshop(row.workshopType) }}</template></el-table-column>
@@ -165,7 +168,8 @@
       <el-table-column v-if="isListColumnVisible('expectedFinish')" label="预计完成" width="125">
         <template #default="{ row }"><span>{{ shortDate(currentCompletionDate(row)) || '未定' }}</span><small v-if="row.forecastFinishDate" class="metric-delay">{{ forecastAdjustText(row) }}</small></template>
       </el-table-column>
-      <el-table-column v-if="isListColumnVisible('countdown')" label="生产倒计时" width="145">
+      <el-table-column v-if="isListColumnVisible('countdown')" label="生产倒计时" width="150">
+        <template #header><TableHeaderFilter v-model="countdownFilter" :options="COUNTDOWN_FILTER_OPTIONS" title="生产倒计时" @change="search" /></template>
         <template #default="{ row }"><span :class="countdownTone(row, countdownToday)">{{ productionCountdown(row, countdownToday) }}</span></template>
       </el-table-column>
       <el-table-column v-if="isListColumnVisible('completion')" label="完工 / 入库" width="130">
@@ -175,7 +179,8 @@
           <small v-else class="muted">无采购入库</small>
         </template>
       </el-table-column>
-      <el-table-column v-if="isListColumnVisible('deliveryResult')" label="生产交付结果" width="158">
+      <el-table-column v-if="isListColumnVisible('deliveryResult')" label="生产交付结果" width="162">
+        <template #header><TableHeaderFilter v-model="deliveryFilter" :options="DELIVERY_FILTER_OPTIONS" title="生产交付结果" @change="search" /></template>
         <template #default="{ row }">
           <el-tag v-if="row.stoppedAt" type="info" effect="plain">已停止跟单</el-tag>
           <el-tag v-else-if="row.deliveryOutcome === 'OVERDUE'" type="danger" effect="light">{{ deliveryOutcomeText(row) }}</el-tag>
@@ -184,6 +189,14 @@
           <span v-else class="muted">{{ deliveryOutcomeText(row) }}</span>
           <small v-if="!row.stoppedAt && row.deliveredDate" class="muted"> {{ shortDate(row.deliveredDate) }}</small>
           <small v-else-if="!row.stoppedAt && row.expectedFinishDate" class="muted"> {{ shortDate(row.expectedFinishDate) }}</small>
+        </template>
+      </el-table-column>
+      <el-table-column v-if="isListColumnVisible('extraMoldRequired')" label="额外模具" width="140">
+        <template #header><TableHeaderFilter v-model="extraMoldFilter" :options="EXTRA_MOLD_OPTIONS" title="额外模具" @change="search" /></template>
+        <template #default="{ row }">
+          <el-tag v-if="row.extraMoldRequired?.trim() === '是'" type="warning" effect="light">需要</el-tag>
+          <span v-else-if="row.extraMoldRequired?.trim()">{{ row.extraMoldRequired }}</span>
+          <span v-else class="muted">否</span>
         </template>
       </el-table-column>
       <el-table-column v-if="isListColumnVisible('stages')" label="跟单节点" min-width="440">
@@ -285,8 +298,9 @@
       </div>
       <div class="export-presets">
         <el-button link type="primary" @click="applyExportPreset('list')">与列表一致</el-button>
-        <el-button link type="primary" @click="applyExportPreset('core')">只导核心字段</el-button>
+        <el-button link type="primary" @click="applyExportPreset('default')">默认字段</el-button>
         <el-button link type="primary" @click="toggleAllExportColumns">{{ allExportSelected ? '全不选' : '全选' }}</el-button>
+        <el-button v-if="canManageExportDefaults" link type="primary" :loading="savingExportDefaults" @click="saveGlobalExportDefaults">存为全站默认</el-button>
         <span class="muted">{{ exportSelectionSummary }}</span>
       </div>
       <!-- 列按「字段来源」分三段：蓝＝氚云同步只读、绿＝跟单登记人工、橙＝系统计算只读。
@@ -581,6 +595,7 @@ import { useTrackingBatchClosure } from '@/composables/tracking/useTrackingBatch
 import { useListPagination } from '@/composables/list/useListPagination'
 import LqPagination from '@/components/common/LqPagination.vue'
 import LqDialog from '@/components/common/LqDialog.vue'
+import TableHeaderFilter from '@/components/common/TableHeaderFilter.vue'
 
 /**
  * 筛选条件（关键词 / 车间 / 跟单状态 / 交付结果 / 提交时间 …）的状态与全部派生都收在 useTrackingFilters 里，
@@ -588,8 +603,9 @@ import LqDialog from '@/components/common/LqDialog.vue'
  */
 const {
   keyword, advancedFiltersVisible, dateFilters, countdownFilter, deliveryFilter, optionalStageFilter,
-  moldStageFilter, salespersonFilter, workshop, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
-  filterOptions, COUNTDOWN_FILTER_OPTIONS, DELIVERY_FILTER_OPTIONS, optionalStageOptions, MOLD_STAGE_OPTIONS,
+  nodeProgressCode, nodeProgressStates, nodeProgressOptions, onNodeProgressCodeChange, onNodeProgressStatesChange,
+  salespersonFilter, extraMoldFilter, EXTRA_MOLD_OPTIONS, workshop, trackingStatus, timeFilter, actionFilter, urgentOnly, mine,
+  filterOptions, COUNTDOWN_FILTER_OPTIONS, DELIVERY_FILTER_OPTIONS, optionalStageOptions, NODE_PROGRESS_STATE_OPTIONS,
   quickFilterPresets, quickFilterActive, applyQuickFilter, activeAdvancedFilterCount,
   activeFilterChips, clearFilterChip, resetTrackingFilters, onCreatedDateChange, onExpectedDateChange,
   trackingFilters, loadOptions: loadFilterOptions
@@ -780,11 +796,13 @@ function rowTimeSignals(row: TrackingOrder) { return listRowTimeSignals.value.ge
 const {
   exportVisible, exporting, exportScope, exportSelectedIds, exportColumns, exportFormat,
   EXPORT_COLUMN_GROUPS, exportSelectionSummary, allExportSelected, exportFormatHint,
-  openExport, toggleAllExportColumns, applyExportPreset, doExport
+  openExport, toggleAllExportColumns, applyExportPreset, doExport,
+  loadExportColumnDefaults, saveGlobalExportDefaults, canManageExportDefaults, savingExportDefaults
 } = useTrackingExport({
   filters: trackingFilters,
   visibility,
-  selectedIds: () => selectedTrackingRows.value.map(row => row.id)
+  selectedIds: () => selectedTrackingRows.value.map(row => row.id),
+  canManage: () => auth.can('manufacturing.listcolumns.manage')
 })
 /**
  * 导回（导出件改完再导回）收在 useTrackingRoundTrip 里：预检与写入都在后端，
@@ -801,7 +819,7 @@ const {
  */
 const taskImportVisible = ref(false)
 function onProductionTaskImported() { void load(true) }
-await Promise.all([loadColumnDefaults(), load()])
+await Promise.all([loadColumnDefaults(), loadExportColumnDefaults(), load()])
 </script>
 
 

@@ -66,6 +66,22 @@ class ProductionTrackingStageCatalogTest {
         }
     }
 
+    @Test void dictionaryOnlyStageDoesNotEnterTheDefaultFlow() {
+        var before=flatten(ProductionTrackingStageCatalog.snapshot());
+        try{
+            ProductionTrackingStageCatalog.replace(List.of(SEALER_MATERIAL,
+                    new ProductionTrackingStageCatalog.StageDef("SEALER","PACK","包装",2,false,
+                            null,null,null,true,false)));
+            assertEquals(List.of("MATERIAL"),ProductionTrackingPolicy.stageCodes("封口机"));
+            assertEquals(List.of("MATERIAL"),ProductionTrackingPolicy.requiredStages("封口机"));
+            assertEquals("包装",ProductionTrackingPolicy.stageLabel("PACK",true),
+                    "字典节点仍应可供产品模板选用");
+            assertEquals(2,ProductionTrackingStageCatalog.enabled("SEALER").size());
+        }finally{
+            ProductionTrackingStageCatalog.replace(before);
+        }
+    }
+
     /** 按需工序的关键词取自制程表：改了关键词，判定即刻跟着变（不再写死「氧化|特氟龙|木箱」）。 */
     @Test void optionalKeywordsComeFromTheCatalog() {
         var before=flatten(ProductionTrackingStageCatalog.snapshot());
@@ -96,8 +112,9 @@ class ProductionTrackingStageCatalogTest {
     @Test void stageTotalIsCountedFromTheStageTable() {
         String total=ProductionTrackingPolicy.stageTotalCase("p.production_line");
         assertTrue(total.contains("production_tracking_stage_defs"),"分母必须查制程表："+total);
-        assertTrue(total.contains("d.enabled=1")&&total.contains("d.optional=0"),
-                "停用与按需节点都不该进分母："+total);
+        assertTrue(total.contains("d.enabled=1")&&total.contains("d.default_included=1")
+                        &&total.contains("d.optional=0"),
+                "字典节点、停用与按需节点都不该进默认流程分母："+total);
         assertFalse(total.matches(".*THEN \\d+.*"),"分母不能再是写死的数字："+total);
     }
 

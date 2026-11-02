@@ -136,7 +136,7 @@
     </DataState>
 
     <template #pagination>
-      <LqPagination :pagination="pagination" @change="loadList" />
+      <LqPagination :pagination="pagination" @change="doSearch" />
     </template>
 
     <CertDetailModal
@@ -511,8 +511,14 @@ async function loadCertificate(id: number) {
 
 // === 筛选与分页 ===
 
+/**
+ * 清除筛选：与「改条件」同口径 —— 复位筛选值后**回到第 1 页**再请求。
+ *
+ * <p>此前只把 `doSearch` 交给 `resetFilters`，筛选值清了但页码留着，
+ * 第 5 页点「清除筛选」会继续请求第 5 页。
+ */
 function handleResetFilters() {
-  resetFilters(doSearch)
+  resetFilters(applyFilters)
 }
 
 // === 证书管理 ===

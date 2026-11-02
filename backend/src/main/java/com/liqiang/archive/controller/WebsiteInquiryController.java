@@ -29,6 +29,7 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/website/inquiries/admin")
+@RequirePermission("website.manage")
 @RequiredArgsConstructor
 public class WebsiteInquiryController {
 

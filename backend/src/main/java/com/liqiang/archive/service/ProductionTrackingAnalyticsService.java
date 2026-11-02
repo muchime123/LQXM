@@ -58,6 +58,22 @@ public class ProductionTrackingAnalyticsService {
      */
     private static final String ACTIVE_SCOPE=" AND t.stopped_at IS NULL "
             +"AND (p.status IS NULL OR TRIM(p.status) NOT IN ('已取消','取消','已作废','作废','CANCELLED','CANCELED'))";
+    /** 图表与下钻共用的任务节点集合：快照任务含尚未登记的适用节点；旧任务沿用已有里程碑。 */
+    static final String NODE_ROWS_JOIN=" JOIN ("
+            +"SELECT n.production_order_id,n.stage_code,n.stage_label,n.sort_no,"
+            +"NULL AS workshop_kind FROM production_tracking_process_snapshot_nodes n "
+            +"WHERE n.applicability<>'NOT_APPLICABLE' "
+            +"UNION ALL "
+            +"SELECT lm.production_order_id,lm.stage_code,d.stage_label,d.sort_no,d.workshop_kind "
+            +"FROM production_tracking_milestones lm "
+            +"JOIN production_tracking_stage_defs d ON d.stage_code=lm.stage_code AND d.enabled=1 "
+            +"WHERE NOT EXISTS (SELECT 1 FROM production_tracking_process_snapshots s "
+            +"WHERE s.production_order_id=lm.production_order_id)"
+            +") pr ON pr.production_order_id=p.id "
+            +"AND (pr.workshop_kind IS NULL OR pr.workshop_kind=CASE WHEN p.production_line LIKE '%封口%' "
+            +"THEN 'SEALER' ELSE 'MACHINE' END) "
+            +"LEFT JOIN production_tracking_milestones m ON m.production_order_id=p.id "
+            +"AND m.stage_code=pr.stage_code ";
 
     /**
      * 整单是否<b>仍在产</b>（＝还没被跟单判定为完成），取 1 表示仍在产。
@@ -585,18 +601,16 @@ public class ProductionTrackingAnalyticsService {
         var where=tracking.visible(params);
         // 节点完成率：动态制程表 + 车间分组，按制程序号排序，不写死节点序列。
         var nodeSql="SELECT COALESCE(NULLIF(p.production_line,''),'未分车间') workshop,"
-                +"d.stage_code stage,COALESCE(d.stage_label,d.stage_code) stageName,"
+                +"pr.stage_code stage,pr.stage_label stageName,"
                 +"COUNT(DISTINCT p.id) involved,"
                 +"COUNT(DISTINCT CASE WHEN m.stage_status='DONE' THEN p.id END) done "
                 // FROM 直接复用生产跟单的统一 FROM：它自带 t（跟单状态行：stopped_at/closed_at/forecast_finish_date）
                 // 与 ms（按单聚合的节点计数派生表），TRACKING_COMPLETE 才能复用同一份判据；
                 // 这两个派生表都对 p.id 一对一，不会让 COUNT(DISTINCT p.id) 变大。
                 +ProductionTrackingService.TRACKING_FROM
-                +" JOIN production_tracking_milestones m ON m.production_order_id=p.id "
-                +"JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code AND d.enabled=1 "
-                +"AND d.workshop_kind=CASE WHEN p.production_line LIKE '%封口%' THEN 'SEALER' ELSE 'MACHINE' END "
+                +NODE_ROWS_JOIN
                 +where+ACTIVE_SCOPE
-                +" GROUP BY workshop,d.stage_code,d.stage_label,d.sort_no ORDER BY workshop,d.sort_no";
+                +" GROUP BY workshop,pr.stage_code,pr.stage_label,pr.sort_no ORDER BY workshop,pr.sort_no";
         List<Map<String,Object>> nodes=new ArrayList<>();
         for(var row:jdbc.queryForList(nodeSql,params.toArray())){
             long involved=((Number)row.get("involved")).longValue();
@@ -640,7 +654,7 @@ public class ProductionTrackingAnalyticsService {
         try{
             Long cnt=jdbc.queryForObject("SELECT COUNT(DISTINCT p.id) "
                     +ProductionTrackingService.TRACKING_FROM
-                    +" JOIN production_tracking_milestones m ON m.production_order_id=p.id "+where+ACTIVE_SCOPE,
+                    +NODE_ROWS_JOIN+where+ACTIVE_SCOPE,
                     Long.class,params.toArray());
             covered=cnt==null?0:cnt;
         }catch(Exception e){ /* 降级：覆盖单数统计失败不阻断视图 */ covered=0; }
@@ -671,7 +685,7 @@ public class ProductionTrackingAnalyticsService {
                 +"COALESCE(NULLIF(p.production_line,''),'未分车间') workshop,"
                 +"DATE(p.source_created_at) submittedDate,DATE(p.schedule_time) scheduleTime,"
                 +"FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at))) waitDays,"
-                +(byNode?"m.stage_status stageStatus":"NULL stageStatus")+","
+                +(byNode?"COALESCE(m.stage_status,'PENDING') stageStatus":"NULL stageStatus")+","
                 // 交期两列：预计日期用全站唯一的「当前有效预计」（车间 forecast 优先），不直接用源单的 expected_completion_date，
                 // 否则同一个单在这个抽屉和生产分析里会按两个日期判断是否超期。
                 +EFFECTIVE_EXPECTED_DATE+" expectedDate,"
@@ -692,20 +706,15 @@ public class ProductionTrackingAnalyticsService {
         var p=new ArrayList<Object>(base);
         if(byWait){
             from=ProductionTrackingService.TRACKING_FROM
-                    +" JOIN (SELECT DISTINCT production_order_id FROM production_tracking_milestones) m ON m.production_order_id=p.id "
                     +where+ACTIVE_SCOPE+" AND p.schedule_time IS NOT NULL AND p.source_created_at IS NOT NULL "
                     +"AND FLOOR(DATEDIFF(DATE(p.schedule_time),DATE(p.source_created_at)))"
                     +(waitDays!=null?"=? ":">=? ");
             p.add(waitDays!=null?waitDays:waitDaysMin);
         } else {
-            from=ProductionTrackingService.TRACKING_FROM
-                    +" JOIN production_tracking_milestones m ON m.production_order_id=p.id "
-                    +"JOIN production_tracking_stage_defs d ON d.stage_code=m.stage_code AND d.enabled=1 "
-                    +"AND d.workshop_kind=CASE WHEN p.production_line LIKE '%封口%' THEN 'SEALER' ELSE 'MACHINE' END "
-                    +where+ACTIVE_SCOPE;
+            from=ProductionTrackingService.TRACKING_FROM+NODE_ROWS_JOIN+where+ACTIVE_SCOPE;
             // stage_code 过滤必须放在 visible() 之后，参数顺序才能与 SQL 中的 `?` 一致；
             // 若放在 JOIN ON 里，跟单员数据范围（SELF/DEPARTMENT）非空参数时 stage 会被错位绑定 → 节点下钻返回 0
-            whereTail="AND m.stage_code=? ";p.add(stage);
+            whereTail="AND pr.stage_code=? ";p.add(stage);
             // 「未完成」按 <> 'DONE' 判定，不写成 = 'OPEN'：里程碑的实际状态是 DONE / PENDING / IN_PROGRESS
             // （V369 建表 NOT NULL DEFAULT 'PENDING'），库内从不存在 'OPEN' —— 旧写法让「未完成」筛选恒返回 0 条。
             // COALESCE 只是防御性兜底（该列 NOT NULL，正常情况下不会命中 NULL 分支）。

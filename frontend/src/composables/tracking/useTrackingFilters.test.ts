@@ -4,7 +4,7 @@ import { useTrackingFilters } from './useTrackingFilters'
 
 /** 关键词是任务号 / 产品 / 客户 / 规格的**唯一**搜索入口，不再有独立的「规格」标签。 */
 const CHIP_KEYS = ['keyword', 'workshop', 'mine', 'trackingStatus',
-  'action', 'time', 'optionalStage', 'moldStage', 'urgent', 'salesperson', 'countdown', 'delivery', 'createdDate', 'expectedDate']
+  'action', 'time', 'optionalStage', 'nodeProgress', 'urgent', 'salesperson', 'countdown', 'delivery', 'createdDate', 'expectedDate']
 
 function setup() {
   const onChange = vi.fn()
@@ -20,7 +20,8 @@ function enableAll(filters: ReturnType<typeof useTrackingFilters>) {
   filters.actionFilter.value = 'any'
   filters.timeFilter.value = 'time_attention'
   filters.optionalStageFilter.value = 'OXIDATION'
-  filters.moldStageFilter.value = ['MOLD_NONE']
+  filters.nodeProgressCode.value = 'MOLD'
+  filters.nodeProgressStates.value = ['NONE']
   filters.urgentOnly.value = true
   filters.salespersonFilter.value = ['张三']
   filters.countdownFilter.value = ['today']
@@ -55,7 +56,7 @@ describe('tracking/useTrackingFilters · 筛选清单单一来源', () => {
     const defaults = {
       keyword: '', workshop: '', sourceStatus: '', trackingStatus: 'all', reminder: 'all',
       action: 'all', urgent: false, countdown: '', salesperson: '', deliveryResult: '', optionalStage: '',
-      moldStage: '',
+      nodeProgress: '',
       createdFrom: '', createdTo: '', expectedFrom: '', expectedTo: '',
       month: '', mine: false, assignee: ''
     }
@@ -71,6 +72,34 @@ describe('tracking/useTrackingFilters · 筛选清单单一来源', () => {
     expect(filters.activeFilterChips.value.map(chip => chip.key)).toEqual(['trackingStatus', 'optionalStage'])
     filters.clearFilterChip('optionalStage')
     expect(filters.activeFilterChips.value.map(chip => chip.key)).toEqual(['trackingStatus'])
+  })
+
+  it('节点跟进＝「节点 × 状态」：选节点默认只选未跟进，档位清空即不再按节点筛', () => {
+    const { filters } = setup()
+    filters.nodeProgressCode.value = 'MOLD'
+    filters.onNodeProgressCodeChange()
+    // 默认只勾「未跟进」：跟单员点开节点通常就是要看这道节点还没动的那批单，其他档位自己加
+    expect(filters.nodeProgressStates.value).toEqual(['NONE'])
+    expect(filters.trackingFilters().nodeProgress).toBe('MOLD:NONE')
+    expect(filters.activeFilterChips.value.find(chip => chip.key === 'nodeProgress')?.label)
+      .toBe('节点跟进：MOLD · 未跟进')
+
+    // 再勾一档＝同节点内取或
+    filters.nodeProgressStates.value = ['NONE', 'WORKING']
+    filters.onNodeProgressStatesChange()
+    expect(filters.trackingFilters().nodeProgress).toBe('MOLD:NONE,MOLD:WORKING')
+
+    // 换节点时档位归位到默认，不继承上一节点的组合
+    filters.nodeProgressCode.value = 'ASSEMBLY'
+    filters.onNodeProgressCodeChange()
+    expect(filters.nodeProgressStates.value).toEqual(['NONE'])
+    expect(filters.trackingFilters().nodeProgress).toBe('ASSEMBLY:NONE')
+
+    // 档位清空＝不筛，节点编码一并清掉，下拉里不留「看起来生效其实没生效」的值
+    filters.nodeProgressStates.value = []
+    filters.onNodeProgressStatesChange()
+    expect(filters.nodeProgressCode.value).toBe('')
+    expect(filters.trackingFilters().nodeProgress).toBe('')
   })
 
   it('提交时间起止写反时清掉另一端并刷新', () => {

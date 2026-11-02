@@ -406,8 +406,14 @@ function removeFilterChip(key: string) {
   applyFilters()
 }
 
+/**
+ * 清除筛选：与「改条件」同口径 —— 复位筛选值后**回到第 1 页**再请求。
+ *
+ * <p>此前只把 `doSearch` 交给 `resetFilters`，筛选值清了但页码留着，
+ * 第 5 页点「清除筛选」会继续请求第 5 页；批量勾选亦保留，符合既有行为。
+ */
 function handleResetFilters() {
-  resetFilters(doSearch)
+  resetFilters(applyFilters)
 }
 
 // ========== 数据加载 ==========

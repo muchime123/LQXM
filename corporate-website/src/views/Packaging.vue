@@ -6,28 +6,22 @@ import SiteCTA from '../components/common/SiteCTA.vue'
 import AppIcon from '../components/AppIcon.vue'
 import { fetchPackaging, packagingImageUrl } from '../api/website'
 import { usePageSections } from '../composables/usePageSections'
-import { useCmsPreview } from '../composables/useCmsPreview'
 import { useInquiryModal } from '../composables/useInquiryModal'
 
 const { openInquiry } = useInquiryModal()
 const pageSections = usePageSections('PACKAGING')
-const cmsPreview = useCmsPreview('PACKAGING')
-function sectionEnabled(key) {
-  const draftEnabled = cmsPreview.draft(key).enabled
-  return typeof draftEnabled === 'boolean' ? draftEnabled : pageSections.isEnabled(key)
-}
+const sectionEnabled = (key) => pageSections.isEnabled(key)
 const heroContent = computed(() => {
   const s = (key) => pageSections.section(key)
-  const d = (key) => cmsPreview.draft(key)
   return {
-    title: d('hero').title || s('hero')?.title || '',
-    description: d('hero').subtitle || s('hero')?.subtitle || '从托盒与膜材的实际组合出发，围绕密封、展示、储运和生产节拍选择包装耗材。',
-    image: d('hero').imageUrl || s('hero')?.imageUrl || '',
+    title: s('hero')?.title || '',
+    description: s('hero')?.subtitle || '从托盒与膜材的实际组合出发，围绕密封、展示、储运和生产节拍选择包装耗材。',
+    image: s('hero')?.imageUrl || '',
   }
 })
 
-const archiveItems = ref([])
-const archiveError = ref(false)
+const packagingItems = ref([])
+const packagingError = ref(false)
 const loading = ref(true)
 const activeKind = ref('all')
 
@@ -52,9 +46,9 @@ const selectionChecks = [
 onMounted(async () => {
   pageSections.load()
   try {
-    archiveItems.value = await fetchPackaging()
+    packagingItems.value = await fetchPackaging()
   } catch {
-    archiveError.value = true
+    packagingError.value = true
   } finally {
     loading.value = false
   }
@@ -62,7 +56,7 @@ onMounted(async () => {
 
 const archiveKinds = computed(() => {
   const seen = new Map()
-  archiveItems.value.forEach((item) => {
+  packagingItems.value.forEach((item) => {
     const key = item.packagingKind || 'other'
     if (!seen.has(key)) seen.set(key, kindMeta[key]?.title || key || '其他耗材')
   })
@@ -70,16 +64,14 @@ const archiveKinds = computed(() => {
 })
 
 const filteredArchiveItems = computed(() => activeKind.value === 'all'
-  ? archiveItems.value
-  : archiveItems.value.filter((item) => (item.packagingKind || 'other') === activeKind.value))
+  ? packagingItems.value
+  : packagingItems.value.filter((item) => (item.packagingKind || 'other') === activeKind.value))
 </script>
 
 <template>
   <main class="packaging-page">
     <PageHero
       v-if="sectionEnabled('hero')"
-      data-cms-page="PACKAGING"
-      data-cms-section="hero"
       eyebrow="PACKAGING MATERIALS"
       :description="heroContent.description"
       :image="heroContent.image"
@@ -109,17 +101,17 @@ const filteredArchiveItems = computed(() => activeKind.value === 'all'
       <SectionHeading
         eyebrow="MATERIAL CATALOG"
         title="公开耗材系列"
-        :description="archiveItems.length ? `当前展示 ${archiveItems.length} 个公开系列，可按类别查看具体材质与规格。` : '耗材档案正在整理，当前先展示主要材料类别与选配逻辑。'"
+        :description="packagingItems.length ? `当前展示 ${packagingItems.length} 个公开系列，可按类别查看具体材质与规格。` : '耗材内容正在整理，当前先展示主要材料类别与选配逻辑。'"
       />
 
-      <template v-if="archiveItems.length">
+      <template v-if="packagingItems.length">
         <div class="catalog-tabs" role="tablist" aria-label="包材类型筛选">
           <button v-for="kind in archiveKinds" :key="kind.key" type="button" role="tab" :aria-selected="activeKind === kind.key" :class="{ active: activeKind === kind.key }" @click="activeKind = kind.key">{{ kind.label }}</button>
         </div>
         <div class="packaging-record-grid" aria-live="polite">
           <article v-for="item in filteredArchiveItems" :key="item.id" class="packaging-record-card">
             <div class="packaging-record-card__visual">
-              <img v-if="item.defaultImageAssetId" :src="packagingImageUrl(item)" :alt="item.name" loading="lazy" decoding="async" />
+              <img v-if="item.imageUrl" :src="packagingImageUrl(item)" :alt="item.name" loading="lazy" decoding="async" />
               <AppIcon v-else :name="kindMeta[item.packagingKind]?.icon || 'consumables'" :size="40" />
             </div>
             <div class="packaging-record-card__body">
@@ -133,15 +125,25 @@ const filteredArchiveItems = computed(() => activeKind.value === 'all'
                 <span v-if="item.customizable">支持定制</span>
               </div>
               <p v-if="item.applicable" class="record-applicable">适用：{{ item.applicable }}</p>
+              <details v-if="item.variants?.length" class="packaging-variant-list">
+                <summary>查看 {{ item.variants.length }} 个公开规格</summary>
+                <ul>
+                  <li v-for="(variant, index) in item.variants" :key="`${item.id}-${variant.publicSku || index}`">
+                    <strong>{{ variant.name }}</strong>
+                    <span>{{ [variant.publicSku, variant.dimensions, variant.capacityMl].filter(Boolean).join(' · ') }}</span>
+                    <p v-if="variant.description">{{ variant.description }}</p>
+                  </li>
+                </ul>
+              </details>
               <button type="button" class="record-action" @click="openInquiry({ type: 'consult', source: 'packaging', productName: item.name })">咨询材料适配 <span>→</span></button>
             </div>
           </article>
         </div>
       </template>
-      <div v-else-if="loading" class="packaging-catalog-state">正在加载耗材档案…</div>
+      <div v-else-if="loading" class="packaging-catalog-state">正在加载官网包材…</div>
       <div v-else class="packaging-catalog-state">
         <strong>具体系列持续整理中</strong>
-        <p>{{ archiveError ? '当前暂时无法读取公开档案。' : '更多材质与规格将在确认后陆续公开。' }}您可以先提交盒、膜或产品信息进行匹配。</p>
+        <p>{{ packagingError ? '当前暂时无法读取官网包材。' : '更多材质与规格将在确认后陆续公开。' }}您可以先提交盒、膜或产品信息进行匹配。</p>
       </div>
     </section>
 

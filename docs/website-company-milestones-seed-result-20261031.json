@@ -1,0 +1,28 @@
+{
+  "source_ids": [
+    1,
+    2,
+    3
+  ],
+  "source_count": 3,
+  "target_count_before": 0,
+  "ready": true,
+  "blockers": [],
+  "applied": true,
+  "mapping": [
+    {
+      "source_id": 1,
+      "website_id": 1
+    },
+    {
+      "source_id": 2,
+      "website_id": 2
+    },
+    {
+      "source_id": 3,
+      "website_id": 3
+    }
+  ],
+  "target_count_after": 3,
+  "field_mismatches": 0
+}

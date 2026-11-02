@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="UTF-8" />
+    <title>B6-2 OfficeAsset 视觉验收夹具</title>
+  </head>
+  <body>
+    <!--
+      B6-2 综合试点页面夹具：直接挂载真实业务页面 OfficeAssetView。
+
+      与 B6-1 夹具的唯一差别：本页有权限分支（can('officeAsset.manage') 控制
+      新增 / 登记 / 编辑 / 设计打印 / 批量操作）。夹具内注入一个只含 officeAsset.manage
+      的模拟身份（localStorage token + /api/auth/me 拦截），以便验证受权限保护的交互。
+
+      不连接后端：所有 /api/** 请求由用例通过 page.route 拦截返回固定夹具数据，
+      因此不存在任何写入副作用（批量删除、保存、打印均被拦截，不会真正执行）。
+    -->
+    <div id="e2e-app"></div>
+    <script type="module" src="./office-asset-harness.ts"></script>
+  </body>
+</html>

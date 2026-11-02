@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { fetchProducts, productImageUrl, productImageSrcSet } from '../src/api/website.js'
+import { fetchProducts, productImageUrl, productImageSrcSet, packagingImageUrl } from '../src/api/website.js'
 
 test('product category filter uses the public API category parameter', async () => {
   const previous = globalThis.fetch
@@ -31,4 +31,9 @@ test('legacy product images keep their existing URL until public source cutover'
   const product = { defaultImageAssetId: 22 }
   assert.equal(productImageUrl(product), '/api/file-assets/product_model/assets/22/thumbnail?size=640')
   assert.match(productImageSrcSet(product), /22\/thumbnail\?size=320/)
+})
+
+test('packaging images use only website media and never archive asset IDs', () => {
+  assert.equal(packagingImageUrl({ imageUrl: '/api/website/media/9/content' }), '/api/website/media/9/content')
+  assert.equal(packagingImageUrl({ defaultImageAssetId: 22 }), '')
 })

@@ -31,6 +31,7 @@ class ProductionTrackingServiceTest {
         assertTrue(columns.contains("source_created_at"));
         assertTrue(columns.contains("source_order_remark"));
         assertTrue(columns.contains("source_optional_configuration"));
+        assertTrue(columns.contains("extra_mold_required"),"源生产任务单：是否需要额外模具必须随列表和导出查询返回");
     }
 
     @Test
@@ -650,7 +651,7 @@ class ProductionTrackingServiceTest {
     @Test
     void listColumnKeysAreDistinctAndCoverFallbackHidden() {
         var keys=ProductionTrackingService.LIST_COLUMN_KEYS;
-        assertEquals(18,keys.size(),"改动列清单后同步本数字："+keys);
+        assertEquals(19,keys.size(),"改动列清单后同步本数字："+keys);
         assertEquals(keys.size(),new java.util.HashSet<>(keys).size(),"不得有重复列");
         assertEquals(6,ProductionTrackingService.LIST_COLUMN_FALLBACK_HIDDEN.size());
         assertTrue(keys.containsAll(ProductionTrackingService.LIST_COLUMN_FALLBACK_HIDDEN),
@@ -1095,17 +1096,19 @@ class ProductionTrackingServiceTest {
     }
 
     /**
-     * 「模具生产」跟进筛选（2026-10-21 跟单员需求：跟进模具生产有没有完成）。
+     * 「节点跟进」筛选（由 2026-10-21「模具生产」三档泛化而来）。
      *
-     * <p>要回答的只有一个问题：<b>模具做完没有</b>。所以判据刻意不看模具之前（画图/备料/钣金跟没跟都无关），
-     * 只看两件事：① 模具之后<b>没有任何</b>节点跟进（后面一旦动了，说明这张单已越过模具这一关，不该再出现在待办里）；
-     * ② 模具节点自身落在所选档位（未跟进 / 进行中 / 已完成）。
+     * <p>跟单员要回答的只有一个问题：<b>这道节点做到哪了</b>。所以判据刻意不看该节点之前
+     * （备料跟没跟与「模具做完没有」无关），只看两件事：① 该节点之后<b>没有任何</b>节点跟进
+     * （后面一旦动了，说明这张单已越过这一关，不该再出现在待办里）；② 该节点自身落在所选档位
+     * （未跟进 / 进行中 / 已完成）。
      *
-     * <p>后置节点集合必须按车间区分：封口机是氧化/组装/入库/木箱，机器是组装/调试/入库/木箱。
-     * 模具自身与模具之前的钣金都<b>不得</b>出现在后置集合里——否则「刚做完备料、模具还没开工」的单会被误判成已推进。
+     * <p>【为什么是「节点 × 状态」而不是一个节点一段筛选】需求每次换的只是节点（模具 / 氧化 / 木箱……），
+     * 问题本身不变。故要求：<b>换节点不改代码</b>——后置节点集合按制程序号判定、不列举编码，
+     * 节点取值来自制程表白名单（新增节点自动可筛）。
      */
     @Test
-    void moldStageFilterOnlySelectsOrdersStuckBeforeLaterStages() {
+    void nodeProgressFilterOnlySelectsOrdersStuckBeforeLaterStages() {
         var jdbc=mock(JdbcTemplate.class);
         when(jdbc.queryForObject(anyString(),eq(Long.class),any(Object[].class))).thenReturn(0L);
         var sql=org.mockito.ArgumentCaptor.forClass(String.class);
@@ -1114,41 +1117,51 @@ class ProductionTrackingServiceTest {
         var empty=new ProductionTrackingService.DateRangeFilter("","",false);
 
         service.list("","","all","all","",false,"","","all","","","",empty,empty,empty,
-                false,"",empty,"","MOLD_NONE,MOLD_WORKING",1,30);
+                false,"",empty,"","MOLD:NONE,MOLD:WORKING","",1,30);
 
         String where=sql.getValue();
-        assertTrue(where.contains("NOT "+ProductionTrackingService.MOLD_LATER_TRACKED),
-                "模具之后已有节点跟进的单必须排除："+where);
-        assertTrue(where.contains(ProductionTrackingService.MOLD_NODE_STATE+" IN ('MOLD_NONE','MOLD_WORKING')"),
-                "三档必须按模具节点自身状态过滤："+where);
+        assertTrue(where.contains("NOT "+ProductionTrackingService.nodeLaterTrackedSql("MOLD")),
+                "所选节点之后已有节点跟进的单必须排除："+where);
+        assertTrue(where.contains(ProductionTrackingService.nodeStateSql("MOLD")+" IN ('NONE','WORKING')"),
+                "三档必须按节点自身状态过滤："+where);
 
-        // 后置节点集合按车间区分，且不得含模具自己或模具之前的钣金。
-        String from=ProductionTrackingService.TRACKING_FROM;
-        for(String field:List.of("later_sealer_count","later_machine_count")){
-            int at=from.indexOf(field);
-            assertTrue(at>0,"TRACKING_FROM 必须聚合 "+field+"："+from);
-            // 只取本条 SUM(...) 表达式：用 lastIndexOf("SUM(") 回退，避免把上一条聚合的 stage_code 也算进来。
-            String agg=from.substring(from.lastIndexOf("SUM(",at),at);
-            assertFalse(agg.contains("'MOLD'")||agg.contains("'SHEET_METAL'"),
-                    "模具自身与模具之前的钣金都不能算「模具之后」（"+field+"）："+agg);
-        }
-        // 「模具之后」按制程序号判定，不再列举后置节点编码（新增节点自动纳入）。
-        assertTrue(from.contains("d.sort_no>COALESCE(mold.sort_no,0)"),
-                "模具之后＝制程序号大于模具，不能写死后置节点列表："+from);
-        assertTrue(from.contains("LEFT JOIN production_tracking_stage_defs mold ON mold.stage_code='MOLD'"),
-                "模具的序号要按同一车间类别取，否则跨类别串了："+from);
+        // 「之后」按制程序号判定，不得列举后置节点编码（否则新增节点要改代码）。
+        String later=ProductionTrackingService.nodeLaterTrackedSql("MOLD");
+        assertTrue(later.contains("ld.sort_no>COALESCE((SELECT MIN(nd.sort_no) "
+                +"FROM production_tracking_stage_defs nd WHERE nd.stage_code='MOLD'"),
+                "后置节点＝制程序号大于所选节点，不能写死后置节点列表："+later);
+        assertFalse(later.contains("'SHEET_METAL'")||later.contains("'ASSEMBLY'")||later.contains("'WAREHOUSE'"),
+                "后置集合不得列举具体节点编码（模具之前的钣金尤其不能算）："+later);
+        // 后置集合按车间类别取：封口机与机器制程不同，跨类别串了会误判「已推进」。
+        assertTrue(later.contains("ld.workshop_kind=")&&later.contains("nd.workshop_kind="),
+                "所选节点与后置节点都要按同一车间类别取序号："+later);
+        assertTrue(later.contains("ld.enabled=1")&&later.contains("nd.enabled=1"),
+                "停用的节点不得参与「做到哪了」的判断："+later);
+
+        // 换一个节点＝同一段判据（这正是通用化的目的：不再为新增节点改代码）。
+        service.list("","","all","all","",false,"","","all","","","",empty,empty,empty,
+                false,"",empty,"","ASSEMBLY:DONE","",1,30);
+        String assembly=sql.getAllValues().get(1);
+        assertTrue(assembly.contains(ProductionTrackingService.nodeStateSql("ASSEMBLY")+" IN ('DONE')"),
+                "换节点后必须用同一段节点状态判据："+assembly);
+        assertTrue(assembly.contains("NOT "+ProductionTrackingService.nodeLaterTrackedSql("ASSEMBLY")),
+                "换节点后排除条件同样要跟着换："+assembly);
 
         // 导出必须与列表同一段谓词（否则导出的行和页面上看到的行对不上）。
         service.exportRows("","","all","all","",false,"","","all","","","",empty,empty,empty,
-                false,"",empty,"","MOLD_DONE","");
-        assertTrue(sql.getAllValues().get(1).contains(ProductionTrackingService.MOLD_NODE_STATE+" IN ('MOLD_DONE')"),
-                "导出必须带同一段模具谓词："+sql.getAllValues().get(1));
-        assertTrue(sql.getAllValues().get(1).contains("NOT "+ProductionTrackingService.MOLD_LATER_TRACKED),
-                "导出的排除条件也必须一致："+sql.getAllValues().get(1));
+                false,"",empty,"","MOLD:DONE","","");
+        assertTrue(sql.getAllValues().get(2).contains(ProductionTrackingService.nodeStateSql("MOLD")+" IN ('DONE')"),
+                "导出必须带同一段节点谓词："+sql.getAllValues().get(2));
+        assertTrue(sql.getAllValues().get(2).contains("NOT "+ProductionTrackingService.nodeLaterTrackedSql("MOLD")),
+                "导出的排除条件也必须一致："+sql.getAllValues().get(2));
 
         assertThrows(IllegalArgumentException.class,
                 ()->service.list("","","all","all","",false,"","","all","","","",empty,empty,empty,
-                        false,"",empty,"","MOLD_NOT_A_STAGE",1,30),
+                        false,"",empty,"","NOT_A_NODE:NONE","",1,30),
+                "非白名单节点必须拒绝，不能静默变成不筛");
+        assertThrows(IllegalArgumentException.class,
+                ()->service.list("","","all","all","",false,"","","all","","","",empty,empty,empty,
+                        false,"",empty,"","MOLD:NOT_A_STATE","",1,30),
                 "非白名单档位必须拒绝，不能静默变成不筛");
     }
 

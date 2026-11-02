@@ -32,9 +32,8 @@ export * from './packagingMold'
 // 行政物品资产
 export * from './officeAsset'
 
-// 官网管理（Banner / 询盘 / 解决方案 / 页面区块 / 仪表盘）
+// 官网管理（Banner / 询盘 / 解决方案 / 页面区块）
 export * as websiteBannerApi from './website/banners'
 export * as websiteInquiryApi from './website/inquiries'
 export * as websiteSolutionApi from './website/solutions'
 export * as websitePageSectionApi from './website/pageSections'
-export * as websiteDashboardApi from './website/dashboard'

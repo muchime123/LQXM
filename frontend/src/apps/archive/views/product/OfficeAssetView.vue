@@ -3,6 +3,7 @@
     class="office-assets-page"
     title="物品资产"
     description="统一管理资产档案、扫码流转和标签打印。"
+    show-header
     :busy="loading || scanning"
     content-label="物品资产列表"
   >
@@ -12,7 +13,7 @@
       </MetricGrid>
     </template>
 
-    <section class="operation-page-layout__station scan-panel" aria-label="扫码工作台">
+    <section class="scan-panel" aria-label="扫码工作台">
       <div class="scan-copy"><strong>扫码工作台</strong><span>扫描标签后自动定位资产并打开登记窗口</span></div>
       <el-input
         ref="scanInputRef"
@@ -30,17 +31,16 @@
     <template #toolbar>
       <SearchToolbar
         v-model:keyword="filters.keyword"
-        class="asset-toolbar"
         search-placeholder="搜索编号、名称、序列号、保管人"
         :fields="toolbarFields"
         :field-values="toolbarFieldValues"
-        batch-enabled
+        :batch-enabled="canManageOfficeAsset"
         :batch-entry-visible="false"
         :batch-mode="batchMode"
         :selected-count="selectedIds.size"
         :models-count="assets.length"
         :is-all-selected="isAllPageSelected"
-        @search="loadAssets"
+        @search="handleKeywordSearch"
         @filter-change="handleToolbarFilterChange"
         @clear="resetAssetFilters"
         @toggle-batch-mode="toggleBatchMode"
@@ -90,7 +90,7 @@
         @row-click="onRowClick"
         @row-dblclick="openDetail"
       >
-        <el-table-column width="46" align="center">
+        <el-table-column v-if="canManageOfficeAsset" width="46" align="center">
           <template #header>
             <el-checkbox :model-value="isAllPageSelected" aria-label="全选当前页" @change="toggleSelectAll" />
           </template>
@@ -388,12 +388,19 @@ const stats = reactive<OfficeAssetStats>({ total: 0, inStock: 0, inUse: 0, repai
   filters = reactive({ keyword: '', category: '', status: '' })
 
 // ========== 搜索栏筛选字段配置 ==========
+// 字段宽度走 SearchToolbar 的 `width` props（原先靠 .asset-toolbar :deep(.el-select) 覆盖公共组件内部，等价但属重写）
 const toolbarFields: ToolbarField[] = [
-  { key: 'category', label: '分类', options: categories },
-  { key: 'status', label: '状态', options: statuses }
+  { key: 'category', label: '分类', options: categories, width: 140 },
+  { key: 'status', label: '状态', options: statuses, width: 140 }
 ]
 
 const toolbarFieldValues = computed(() => ({ category: filters.category, status: filters.status }))
+
+/** 关键词搜索：与其它筛选入口一致，先回到第 1 页再请求（否则会停留在越界页码） */
+function handleKeywordSearch() {
+  pagination.resetPage()
+  loadAssets()
+}
 
 function handleToolbarFilterChange(key: string, value: unknown) {
   if (key === 'category' || key === 'status') filters[key] = (value as string) || ''
@@ -570,7 +577,61 @@ const editorVisible = ref(false),
   editingId = ref<number | null>(null),
   formRef = ref<FormInstance>(),
   printItems = ref<{ asset: OfficeAsset; qr: string }[]>([])
-const emptyForm = (): Partial<OfficeAsset> => ({ name: '', category: '', assetCode: '', status: '在库' }),
+/**
+ * 空表单必须覆盖**全部**可编辑字段：此前只重置 4 个字段，
+ * 编辑过某条资产后再点「新增物品」，品牌 / 型号 / 部门 / 金额等会残留上一次的值。
+ * 日期与金额用 undefined（JSON 序列化时自动省略，与「字段不存在」等价）。
+ */
+const emptyForm = (): Partial<OfficeAsset> => ({
+  name: '',
+  category: '',
+  assetCode: '',
+  status: '在库',
+  brand: '',
+  model: '',
+  serialNumber: '',
+  department: '',
+  custodian: '',
+  location: '',
+  purchaseDate: undefined,
+  purchasePrice: undefined,
+  supplier: '',
+  warrantyUntil: undefined,
+  notes: ''
+}),
+  /**
+   * 可编辑字段白名单 —— 表单生命周期的**唯一口径**。
+   *
+   * <p>【为什么必须有它】两个 `Object.assign` 缺陷叠加会污染新建请求：
+   * ① `openEdit` 用 `Object.assign(form, asset)` 把资产对象上的**全部**属性
+   *    （含 `id` / `lastInventoryAt` / `createdAt` / `updatedAt`）搬到表单上；
+   * ② `openCreate` 用 `Object.assign(form, emptyForm())` 重置，而它**只覆盖不删除**，
+   *    于是 ① 带进来的非表单字段会一直挂在 form 上，下一次保存时被一并 POST 出去。
+   *
+   * <p>其中真正会落到库里的是 `lastInventoryAt`：后端 `OfficeAssetService.create`
+   * 只重置了 `id`（`asset.setId(null)`），`createdAt` / `updatedAt` 由
+   * `@CreationTimestamp` / `@UpdateTimestamp` 覆盖，而 `lastInventoryAt` 无任何保护，
+   * 新资产会继承上一条资产的最后盘点时间 —— 属实际数据正确性风险。
+   *
+   * <p>该白名单同时用于「编辑映射」与「提交载荷映射」，保证进出两条路径口径一致。
+   */
+  EDITABLE_FIELDS = [
+    'name',
+    'category',
+    'assetCode',
+    'status',
+    'brand',
+    'model',
+    'serialNumber',
+    'department',
+    'custodian',
+    'location',
+    'purchaseDate',
+    'purchasePrice',
+    'supplier',
+    'warrantyUntil',
+    'notes'
+  ] as const,
   form = reactive<Partial<OfficeAsset>>(emptyForm())
 const actionForm = reactive<AssetActionPayload>({
   action: '盘点',
@@ -648,21 +709,51 @@ async function loadStats() {
     /* 页面列表仍可使用 */
   }
 }
+/**
+ * 由资产数据构造表单状态：以 `emptyForm()` 打底，**只取白名单字段**。
+ *
+ * <p>传 null / 不传 = 纯新建态。这样无论上一次是编辑还是新增，
+ * 表单都不会继承任何历史属性（`id` / `lastInventoryAt` / `createdAt` / `updatedAt`）。
+ */
+function toFormState(source?: Partial<OfficeAsset> | null): Partial<OfficeAsset> {
+  const next = emptyForm()
+  if (!source) return next
+  for (const key of EDITABLE_FIELDS) {
+    if (key in source) (next as Record<string, unknown>)[key] = source[key]
+  }
+  return next
+}
+/**
+ * 整体替换表单状态，并清掉上一次的校验错误态。
+ *
+ * <p>`Object.assign` 只覆盖已有 key、不删除多余 key，无法清除残留；这里先删除全部 key 再写入。
+ * 同时补 `clearValidate()`：`LqDialog` 关闭不销毁 `el-form`（`destroyOnClose: false`），
+ * 上次校验失败留下的红字会延续到下一次打开（B7-A P1-6）。
+ */
+function resetForm(next: Partial<OfficeAsset>) {
+  for (const key of Object.keys(form) as (keyof OfficeAsset)[]) delete form[key]
+  Object.assign(form, next)
+  formRef.value?.clearValidate()
+}
 function openCreate() {
   editingId.value = null
-  Object.assign(form, emptyForm())
+  resetForm(toFormState())
   editorVisible.value = true
 }
 function openEdit(asset: OfficeAsset) {
   editingId.value = asset.id
-  Object.assign(form, asset)
+  resetForm(toFormState(asset))
   editorVisible.value = true
 }
 async function saveAsset() {
   if (!(await formRef.value?.validate().catch(() => false))) return
   saving.value = true
   try {
-    const saved = editingId.value ? await updateOfficeAsset(editingId.value, form) : await createOfficeAsset(form)
+    // 只提交白名单字段：新建时不携带上一次编辑残留的 id / lastInventoryAt 等
+    const payload = toFormState(form)
+    const saved = editingId.value
+      ? await updateOfficeAsset(editingId.value, payload)
+      : await createOfficeAsset(payload)
     editorVisible.value = false
     notify.success(`已保存，资产编号：${saved.assetCode}`)
     await Promise.all([loadAssets(), loadStats()])
@@ -827,23 +918,21 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.office-assets-page {
-  width: 100%;
-}
-.scan-panel,
-.asset-toolbar {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-sm);
-}
+/* 扫码工作台：业务专属区块，无公共等价物（与 SearchToolbar 自带的卡片外观不同源）。
+   原先与 .asset-toolbar 共用一份「表面卡片」规则 —— 那份与 SearchToolbar 自身
+   .search-toolbar 的 background/border/radius/shadow 逐项相同，属重复，已删除。 */
 .scan-panel {
+  min-width: 0;
+  margin-bottom: var(--space-section-gap);
   display: grid;
   grid-template-columns: minmax(220px, 0.7fr) minmax(320px, 1.4fr) auto;
   gap: var(--space-section-gap);
   align-items: center;
   padding: 18px;
-  border-color: var(--color-primary);
+  background: var(--color-surface);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 .scan-copy {
   display: flex;
@@ -851,11 +940,8 @@ onMounted(async () => {
   gap: var(--space-control-gap-tight);
 }
 .scan-copy span {
-  font-size: 12px;
+  font-size: var(--fs-xs);
   color: var(--color-text-muted);
-}
-.asset-toolbar :deep(.el-select) {
-  width: 140px;
 }
 .asset-table-card {
   min-width: 0;
@@ -905,8 +991,8 @@ onMounted(async () => {
   width: 100%;
 }
 .print-help {
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-loose);
   color: var(--color-text-muted);
 }
 .label-preview-panel {
@@ -939,6 +1025,11 @@ onMounted(async () => {
   border-radius: var(--radius-lg);
   overflow: auto;
 }
+/* 标签预览 = 物理标签的屏幕模拟（mm × 5 倍缩放）：
+   - 底色恒为白（--color-text-on-primary），不随主题变化 —— 纸就是白的；
+   - 字号用 px 字面量，因为它们对应的是打印字号（9pt/15pt/6.5pt）的预览换算值，不是界面字号；
+   - 投影不走 --shadow-*：那是「纸张浮起」的模拟，主题化后深色下会变成发光，反而失真。
+   以上三项属有意例外，不参与令牌化。 */
 .preview-label {
   box-sizing: border-box;
   padding: 16px 18px;
@@ -986,10 +1077,9 @@ onMounted(async () => {
   text-align: center;
   white-space: nowrap;
 }
+/* 断点说明：标签设计器是 340px 设置栏 + 预览区两栏布局，767px 才折叠会挤压预览，
+   故此处保留 1000px 业务断点（与公共组件 767/768/1200 不同，属有意例外）。 */
 @media (max-width: 1000px) {
-  .asset-stats {
-    grid-template-columns: repeat(3, 1fr);
-  }
   .scan-panel {
     grid-template-columns: 1fr;
   }
@@ -1000,9 +1090,5 @@ onMounted(async () => {
     padding-right: 0;
     border-right: 0;
   }
-}
-.operation-page-layout__station {
-  min-width: 0;
-  margin-bottom: var(--space-section-gap);
 }
 </style>

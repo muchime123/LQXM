@@ -50,7 +50,8 @@ class H3FactImportServiceCustomerEnrichNullSafetyTest {
                 mock(SalesOutboundProfitService.class),
                 mock(SalesOutboundNatureService.class),
                 mock(H3PostImportAsyncService.class),
-                mock(BatchImportPipelineService.class));
+                mock(BatchImportPipelineService.class),
+                mock(ProductionTrackingProcessService.class));
     }
 
     private static void enrich(H3FactImportService service, Map<String, String> row) throws Exception {

@@ -232,6 +232,10 @@ public class ManufacturingTaskConfigController {
                     "该行来自氚云任务单字典镜像，不能在本地删除——没被用过也不代表氚云侧不存在（可能是新增还没下单的项）。"
                     +"氚云侧移除后会随导入同步消失；只有本地补录的行才可删除");
         if("PRODUCT_NAME".equals(row.get("config_type"))){
+            Integer templates=jdbc.queryForObject("SELECT COUNT(*) FROM production_tracking_process_templates "
+                    +"WHERE product_config_id=?",Integer.class,id);
+            if(templates!=null&&templates>0)
+                throw new ResponseStatusException(HttpStatus.CONFLICT,"该产品已有制程模板版本，需保留产品身份与历史任务快照，不能删除");
             Integer benchmarks=jdbc.queryForObject("SELECT COUNT(*) FROM production_tracking_product_benchmarks WHERE task_config_id=?",Integer.class,id);
             if(benchmarks!=null&&benchmarks>0)
                 throw new ResponseStatusException(HttpStatus.CONFLICT,"该产品已有节点参考间隔记录（含候选统计），删除会永久丢失已发布基准，请先撤销发布");
@@ -254,7 +258,7 @@ public class ManufacturingTaskConfigController {
     /* ==================== 制程节点管理（车间类别级） ==================== */
     /*
      * 节点序列原先硬编码在 ProductionTrackingPolicy，加一个节点要改常量 + 迁库 + 改测试 + 发版。
-     * 落表后在这里维护：保存即刷新进程内快照，列表 / 导出 / 筛选 / 日期推算立即按新制程走。
+     * 新增节点只进入字典；加入默认流程或发布产品模板后才用于任务。
      *
      * ⚠️ 两条约束由 ProductionTrackingStageService 把关，违反时抛 IllegalArgumentException（→ 400）：
      *   ① 节点编码不可修改（历史里程碑行与基准行都按编码关联）；
@@ -265,6 +269,33 @@ public class ManufacturingTaskConfigController {
     @GetMapping("/stage-defs")
     public List<Map<String,Object>> listStageDefs(@RequestParam(defaultValue="SEALER") String kind) {
         return stages.list(kind);
+    }
+
+    @GetMapping("/stage-dictionary")
+    public List<Map<String,Object>> stageDictionary() { return stages.dictionary(); }
+
+    @PostMapping("/stage-dictionary")
+    public Map<String,Object> createStageDictionary(@RequestBody ProductionTrackingStageService.StageSave request) {
+        return stages.createDictionary(request);
+    }
+
+    @PutMapping("/stage-dictionary/{code}")
+    public Map<String,Object> updateStageDictionary(@PathVariable String code,
+            @RequestBody ProductionTrackingStageService.StageSave request) {
+        stages.updateDictionary(code,request);
+        return Map.of("stageCode",code);
+    }
+
+    @DeleteMapping("/stage-dictionary/{code}")
+    public Map<String,Object> deleteStageDictionary(@PathVariable String code) {
+        stages.removeDictionary(code);
+        return Map.of("stageCode",code);
+    }
+
+    @PostMapping("/stage-defs/default-flow")
+    public Map<String,Object> addDictionaryStageToDefaultFlow(@RequestBody Map<String,String> request) {
+        stages.addToDefaultFlow(request.get("kind"),request.get("code"));
+        return Map.of("kind",request.get("kind"),"code",request.get("code"));
     }
 
     /** 改制程的影响面：多少在制单会被改写完成判定。 */
@@ -289,6 +320,14 @@ public class ManufacturingTaskConfigController {
     public Map<String,Object> moveStageDef(@PathVariable long id,@RequestParam(defaultValue="true") boolean up) {
         stages.move(id,up);
         return Map.of("id",id);
+    }
+
+    @PutMapping("/stage-defs/{id}/default-flow")
+    public Map<String,Object> setStageDefaultFlow(@PathVariable long id,@RequestBody Map<String,Boolean> request) {
+        if(!request.containsKey("included")||request.get("included")==null)
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"请明确是否纳入车间默认流程");
+        stages.setDefaultIncluded(id,request.get("included"));
+        return Map.of("id",id,"included",request.get("included"));
     }
 
     @DeleteMapping("/stage-defs/{id}")
