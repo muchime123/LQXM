@@ -38,8 +38,7 @@ import static org.mockito.Mockito.*;
  */
 class ManufacturingTaskConfigControllerTest {
     private final JdbcTemplate jdbc=mock(JdbcTemplate.class);
-    private final ManufacturingTaskConfigController controller=new ManufacturingTaskConfigController(jdbc,
-            new com.liqiang.archive.service.ProductionTrackingStageService(jdbc, mock(com.liqiang.archive.service.AuditLogService.class)));
+    private final ManufacturingTaskConfigController controller=new ManufacturingTaskConfigController(jdbc);
 
     private static Map<String,Object> row(Object... kv) {
         var m=new LinkedHashMap<String,Object>();

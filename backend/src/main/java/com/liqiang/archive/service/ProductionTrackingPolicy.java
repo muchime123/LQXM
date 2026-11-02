@@ -6,7 +6,7 @@ import java.util.List;
  * 车间类别相关的跟单口径：节点序列、默认跟单员、可见范围、完成判据的 SQL 片段。
  *
  * <p><b>节点序列不再写在这里</b>——唯一源已搬到 {@code production_tracking_stage_defs} 表
- * （经 {@link ProductionTrackingStageCatalog} 快照读取），由「生产参考工期」页的制程管理维护。
+ * （经 {@link ProductionTrackingStageCatalog} 快照读取），当前由代码与数据库迁移维护。
  * 本类只保留「车间名 → 车间类别」的判定与各类 SQL 片段的拼装，节点相关的取值一律走快照，
  * 快照未加载时回落到 {@link ProductionTrackingStageCatalog#builtIn()}。
  */

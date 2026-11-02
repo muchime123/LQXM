@@ -1,0 +1,16 @@
+{
+  "source": "corporate-website\\src\\data\\qualifications.js",
+  "static_ids": [
+    1,
+    2,
+    3,
+    4
+  ],
+  "source_count": 4,
+  "table_exists": true,
+  "target_count_before": 0,
+  "ready": true,
+  "blockers": [],
+  "applied": false,
+  "publication_changed": false
+}

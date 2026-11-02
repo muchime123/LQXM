@@ -205,9 +205,7 @@ public class ProductionTrackingService {
             +"LEFT JOIN (SELECT MIN(id) id,name FROM employees WHERE status='ACTIVE' "
             +"AND name IN ('陈苏平','胡健') GROUP BY name) assigned "
             +"ON assigned.name=CASE WHEN p.production_line LIKE '%封口%' THEN '陈苏平' ELSE '胡健' END "
-            // ⚠️ 节点集合一律由制程表判定，不再写死 stage_code 列表：管理员在页面上加/停一个节点，
-            // 分子分母与下面所有筛选立即跟随。停用（enabled=0）的节点被 JOIN 排除 ⇒ 不进分母，
-            // 历史里程碑行原样保留（制程管理只允许停用有记录的节点，不允许删除）。
+            // 节点集合从代码维护的默认流程表读取；历史里程碑行原样保留。
             +"LEFT JOIN (SELECT m.production_order_id,"
             // 必经节点与按需工序分开统计、并按车间类别分列：外层按 p.production_line 取对应那一列。
             +"SUM(d.default_included=1 AND d.optional=0 AND d.workshop_kind='SEALER' AND m.stage_status='DONE') sealer_done_count,"
@@ -2446,9 +2444,11 @@ public class ProductionTrackingService {
                 +"JOIN manufacturing_workshops w ON w.id=c.workshop_id "
                 +"WHERE c.id=? AND c.config_type='PRODUCT_NAME'",(r,n)->r.getString(1),row.taskConfigId());
         if(items.isEmpty())throw new IllegalArgumentException("产品不存在、不是产品名称配置，或没有所属车间");
-        if(jdbc.queryForObject("SELECT COUNT(*) FROM production_tracking_stage_dictionary "
-                +"WHERE stage_code=?",Integer.class,row.stageCode())==0)
-            throw new IllegalArgumentException("跟单节点字典中不存在该节点");
+        String kind=ProductionTrackingPolicy.kindOf(items.getFirst());
+        if(jdbc.queryForObject("SELECT COUNT(*) FROM production_tracking_stage_defs "
+                +"WHERE workshop_kind=? AND stage_code=? AND enabled=1 AND default_included=1",
+                Integer.class,kind,row.stageCode())==0)
+            throw new IllegalArgumentException("该节点不属于当前车间跟单流程");
         if(row.typicalDays()!=null&&(row.typicalDays().signum()<0||row.typicalDays().doubleValue()>60))
             throw new IllegalArgumentException("参考间隔须在 0~60 天之间");
         if(row.typicalDays()==null){
@@ -3358,7 +3358,7 @@ public class ProductionTrackingService {
             if(snapshotRows.stream().anyMatch(row->milestone.code().equals(row.get("stage_code"))
                     &&"NOT_APPLICABLE".equals(row.get("applicability"))
                     &&!"PENDING".equals(milestone.status())))
-                throw new IllegalArgumentException("该节点在本单制程中不适用，请先调整本单制程");
+                throw new IllegalArgumentException("该节点在本单历史快照中不适用，不能登记为进行中或已完成");
             // 与结案通道**同一把钥匙**：把节点标成「已完成但日期查不到」是无法自证的人工确认，
             // 不管从哪个入口进来都必须 manufacturing.followup.abnormal —— 否则「节点完成率」可以被随手跳过。
             if("NO_DATE".equals(milestone.completionSource())&&!users.can(PERMISSION_ABNORMAL_CLOSURE))

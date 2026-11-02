@@ -5,6 +5,7 @@ import PageHero from '../components/common/PageHero.vue'
 import SiteCTA from '../components/common/SiteCTA.vue'
 import { fetchSolutions } from '../api/website'
 import { usePageSections } from '../composables/usePageSections'
+import { FALLBACK_IMAGE_URL } from '../utils/fallbackImage'
 
 const route = useRoute()
 const router = useRouter()
@@ -36,7 +37,7 @@ const articles = ref([])
 function normalizeArticle(item) {
   return {
     ...item,
-    coverImage: item.coverImageUrl || '/images/workshop.webp',
+    coverImage: item.coverImageUrl || FALLBACK_IMAGE_URL,
     sections: item.contentSections || [],
   }
 }
@@ -51,7 +52,7 @@ async function loadCmsContent() {
       id: scene.itemKey,
       name: scene.title,
       desc: scene.summary || '',
-      image: scene.coverImageUrl || '/images/workshop.webp',
+      image: scene.coverImageUrl || FALLBACK_IMAGE_URL,
       articleSlugs: articles.value
         .filter((article) => article.relatedSceneKeys?.includes(scene.itemKey))
         .map((article) => article.slug),

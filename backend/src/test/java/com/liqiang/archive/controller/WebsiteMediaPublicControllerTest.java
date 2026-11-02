@@ -6,8 +6,6 @@ import com.liqiang.archive.repository.WebsiteCompanyProfileRepository;
 import com.liqiang.archive.repository.WebsiteMediaAssetRepository;
 import com.liqiang.archive.repository.WebsiteSolutionRepository;
 import com.liqiang.archive.repository.WebsitePackagingItemRepository;
-import com.liqiang.archive.repository.WebsiteCredentialRepository;
-import com.liqiang.archive.repository.WebsiteIpItemRepository;
 import com.liqiang.archive.repository.WebsitePageSectionRepository;
 import com.liqiang.archive.service.WebsiteProductMediaVisibilityService;
 import org.junit.jupiter.api.Test;
@@ -39,11 +37,10 @@ class WebsiteMediaPublicControllerTest {
         WebsiteCompanyProfileRepository companyProfiles = mock(WebsiteCompanyProfileRepository.class);
         WebsiteSolutionRepository solutions = mock(WebsiteSolutionRepository.class);
         WebsitePackagingItemRepository packaging = mock(WebsitePackagingItemRepository.class);
-        WebsiteIpItemRepository ipItems = mock(WebsiteIpItemRepository.class);
         WebsitePageSectionRepository pageSections = mock(WebsitePageSectionRepository.class);
         WebsiteMediaPublicController controller = new WebsiteMediaPublicController(
                 mediaRepository, bannerRepository, productVisibility, companyProfiles, solutions, packaging,
-                mock(WebsiteCredentialRepository.class), ipItems, pageSections);
+                pageSections);
         ReflectionTestUtils.setField(controller, "fileRoot", root.toString());
         Path image = root.resolve("website/images/banner.png");
         Files.createDirectories(image.getParent());
@@ -91,12 +88,6 @@ class WebsiteMediaPublicControllerTest {
         when(packaging.existsByCoverMediaIdAndStatusAndDeletedAtIsNull(1L, "PUBLISHED")).thenReturn(true);
         mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
         when(packaging.existsByCoverMediaIdAndStatusAndDeletedAtIsNull(1L, "PUBLISHED")).thenReturn(false);
-        when(ipItems.existsByMediaIdAndStatusAndDeletedAtIsNull(1L, "PUBLISHED")).thenReturn(true);
-        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isNotFound());
-        ReflectionTestUtils.setField(controller, "nativeIpEnabled", true);
-        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isOk());
-        when(ipItems.existsByMediaIdAndStatusAndDeletedAtIsNull(1L, "PUBLISHED")).thenReturn(false);
-        mvc.perform(get("/api/website/media/1/content")).andExpect(status().isNotFound());
         media.setStatus("DRAFT");
         mvc.perform(get("/api/website/media/1/content")).andExpect(status().isNotFound());
     }

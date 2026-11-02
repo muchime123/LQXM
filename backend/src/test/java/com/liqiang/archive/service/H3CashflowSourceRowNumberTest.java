@@ -66,7 +66,7 @@ class H3CashflowSourceRowNumberTest {
 
     @Test
     void balanceShiftKeepsCoreIdentityAndNormalizesExcelNumbers() throws Exception {
-        var service = new H3FactImportService(null, null, null, new ObjectMapper(), null, null, null, null, null, null);
+        var service = new H3FactImportService(null, null, null, new ObjectMapper(), null, null, null, null, null);
         Method identity = H3FactImportService.class.getDeclaredMethod("cashflowIdentity", Map.class, boolean.class);
         identity.setAccessible(true);
         Map<String, String> oldRow = Map.of("账户", "安徽盒多多工商银行", "日期", "2026-10-17",
@@ -79,7 +79,7 @@ class H3CashflowSourceRowNumberTest {
     }
 
     private List<?> parse(byte[] bytes, String fileName) throws Exception {
-        var service = new H3FactImportService(null, null, null, new ObjectMapper(), null, null, null, null, null, null);
+        var service = new H3FactImportService(null, null, null, new ObjectMapper(), null, null, null, null, null);
         Method parse = H3FactImportService.class.getDeclaredMethod("parse", H3FactImportService.FactType.class,
                 org.springframework.web.multipart.MultipartFile.class);
         parse.setAccessible(true);

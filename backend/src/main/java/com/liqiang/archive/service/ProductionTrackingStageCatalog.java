@@ -8,11 +8,11 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * 制程节点定义的**进程内快照**：节点序列、名称、是否按需工序的唯一运行时来源。
+ * 跟单节点定义的进程内缓存：节点序列、名称和按需识别规则供现有任务读取。
  *
  * <p>节点原先是 {@code ProductionTrackingPolicy} 里的 {@code static final} 常量，加一个节点要改常量 +
- * 写迁移 + 改测试 + 发版。落表（{@code production_tracking_stage_defs}）之后由「生产参考工期」页维护，
- * 这里只负责持有已加载的快照，供全进程读取。
+ * 写迁移 + 改测试 + 发版。当前通过代码迁移维护 {@code production_tracking_stage_defs}，
+ * 本类只负责持有已加载的定义，供全进程读取。
  *
  * <p>【为什么是快照而不是每次查库】节点集合被拼进列表 / 导出 / 筛选 / 统计卡的 SQL 与日期推算，
  * 一次列表请求会读上百次；每次查库会让最热的一条查询多出一轮往返。表小且变更极低频，

@@ -1,0 +1,15 @@
+{
+  "read_only": true,
+  "item_id": 1,
+  "item_status": "DRAFT",
+  "patent_type": "外观设计",
+  "number_present": true,
+  "applicant_present": true,
+  "legal_status": "正常有效",
+  "media_id": 148,
+  "media_status": "DRAFT",
+  "file_hash_matches": true,
+  "ip_status_counts": {
+    "DRAFT": 4
+  }
+}

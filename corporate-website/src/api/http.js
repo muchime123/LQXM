@@ -6,6 +6,8 @@
  * - GET 请求支持内存级 Promise 缓存（同一路径并发去重 + 会话内复用）
  */
 
+import { snapshotGet, snapshotMode } from './snapshot.js'
+
 export const apiBase = ''
 
 /* ----------------- 内存缓存 ----------------- */
@@ -69,6 +71,7 @@ export async function getJson(path, opts = {}) {
 }
 
 async function rawGet(path) {
+  if (snapshotMode) return snapshotGet(path)
   const response = await fetch(`${apiBase}${path}`)
   if (!response.ok) {
     throw new Error(`HTTP ${response.status}`)
@@ -83,6 +86,7 @@ async function rawGet(path) {
  * @returns {Promise<any>} 解析后的 JSON 数据
  */
 export async function postJson(path, body) {
+  if (snapshotMode) throw new Error('Static website has no inquiry API')
   const response = await fetch(`${apiBase}${path}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

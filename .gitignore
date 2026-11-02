@@ -192,3 +192,8 @@ frontend/_build_c8a_before/
 /val_perler_work/
 frontend/_build_c8a_after/
 frontend/_build_c8a_before2/
+
+# --- 静态站构建/部署产物（大体积，不入仓，added 2026-11-02） ---
+/liqiang-static-site/dist/
+/liqiang-static-site/_edgeprofile/
+/liqiang-static-site-deploy/

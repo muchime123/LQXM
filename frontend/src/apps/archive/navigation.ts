@@ -89,16 +89,6 @@ export const archiveNavItems: NavItem[] = [
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="4" width="18" height="7" rx="1.5"/><rect x="3" y="15" width="18" height="5" rx="1.5"/><circle cx="8" cy="7.5" r="1.2"/></svg>',
         group: 'h3'
       },
-      // 「制程管理」：定义车间类别下「有哪些跟单节点」。与「生产参考工期」分开——
-      // 那边定「每个节点多少天」，这边定「节点是什么、什么顺序、哪些可按需」，两件事混在一页会互相干扰。
-      {
-        to: '/production-process-configs',
-        permission: 'manufacturing.template.manage',
-        label: '制程管理',
-        description: '维护封口机与其他机器两类车间的跟单节点：顺序、名称、按需工序关键词与进度表表头别名。保存即全站生效，改动前会给出受影响工单数。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="5" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/><path d="M7.2 12h9.6"/><path d="M12 7v10"/></svg>',
-        group: 'h3'
-      },
       // 2026-10-06 按 LQ 决定下线「车间执行」导航项与页面（/h3-production-execution）。留底 commit 23a0eda。
       {
         to: '/monthly-commission',
@@ -200,22 +190,6 @@ export const archiveNavItems: NavItem[] = [
         label: '官网包材草稿',
         description: '独立维护官网包材展示内容；当前不影响公开页面。',
         icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18M8 15h8"/></svg>',
-        group: 'marketing'
-      },
-      {
-        to: '/website/credentials',
-        permission: 'website.manage',
-        label: '官网资质',
-        description: '独立维护官网公开资质草稿与发布状态。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M12 2 20 6v6c0 5-3 8-8 10-5-2-8-5-8-10V6z"/><path d="m9 12 2 2 4-4"/></svg>',
-        group: 'marketing'
-      },
-      {
-        to: '/website/ip-items',
-        permission: 'website.manage',
-        label: '官网知识产权',
-        description: '独立维护官网知识产权草稿与发布状态。',
-        icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>',
         group: 'marketing'
       },
       {

@@ -1,0 +1,88 @@
+{
+  "read_only": true,
+  "schema": "product_archive",
+  "recent_migrations": [
+    {
+      "version": "421",
+      "description": "production tracking analytics snapshots",
+      "success": 1
+    },
+    {
+      "version": "422",
+      "description": "tracking remove application anchor columns",
+      "success": 1
+    },
+    {
+      "version": "423",
+      "description": "create website company profile",
+      "success": 1
+    },
+    {
+      "version": "424",
+      "description": "create website company milestones",
+      "success": 1
+    },
+    {
+      "version": "425",
+      "description": "create website social links",
+      "success": 1
+    },
+    {
+      "version": "426",
+      "description": "create website packaging items",
+      "success": 1
+    },
+    {
+      "version": "427",
+      "description": "create website packaging variants",
+      "success": 1
+    },
+    {
+      "version": "428",
+      "description": "create website credentials",
+      "success": 1
+    },
+    {
+      "version": "429",
+      "description": "tracking node applicability",
+      "success": 1
+    },
+    {
+      "version": "430",
+      "description": "tracking product process snapshots",
+      "success": 1
+    },
+    {
+      "version": "431",
+      "description": "tracking closure node confirmation",
+      "success": 1
+    },
+    {
+      "version": "432",
+      "description": "add production order extra mold",
+      "success": 1
+    },
+    {
+      "version": "433",
+      "description": "tracking export column defaults",
+      "success": 1
+    },
+    {
+      "version": "434",
+      "description": "tracking stage default flow",
+      "success": 1
+    },
+    {
+      "version": "435",
+      "description": "tracking global stage dictionary",
+      "success": 1
+    },
+    {
+      "version": "436",
+      "description": "create website ip items",
+      "success": 1
+    }
+  ],
+  "website_ip_table_exists": true,
+  "website_ip_counts": {}
+}

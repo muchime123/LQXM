@@ -6,8 +6,6 @@ import com.liqiang.archive.repository.WebsiteCompanyProfileRepository;
 import com.liqiang.archive.repository.WebsiteMediaAssetRepository;
 import com.liqiang.archive.repository.WebsiteSolutionRepository;
 import com.liqiang.archive.repository.WebsitePackagingItemRepository;
-import com.liqiang.archive.repository.WebsiteCredentialRepository;
-import com.liqiang.archive.repository.WebsiteIpItemRepository;
 import com.liqiang.archive.repository.WebsitePageSectionRepository;
 import com.liqiang.archive.service.WebsiteProductMediaVisibilityService;
 import com.liqiang.archive.security.PublicApi;
@@ -39,15 +37,7 @@ public class WebsiteMediaPublicController {
     private final WebsiteCompanyProfileRepository companyProfiles;
     private final WebsiteSolutionRepository solutions;
     private final WebsitePackagingItemRepository packagingItems;
-    private final WebsiteCredentialRepository credentials;
-    private final WebsiteIpItemRepository ipItems;
     private final WebsitePageSectionRepository pageSections;
-
-    @Value("${app.website.credentials-native-enabled:false}")
-    private boolean nativeCredentialsEnabled;
-
-    @Value("${app.website.ip-native-enabled:false}")
-    private boolean nativeIpEnabled;
 
     @Value("${app.files.root}")
     private String fileRoot;
@@ -63,10 +53,6 @@ public class WebsiteMediaPublicController {
                 && !productMediaVisibility.isReferencedByPublishedProduct(id)
                 && !companyProfiles.existsByLogoMediaIdAndStatus(id, "PUBLISHED")
                 && !packagingItems.existsByCoverMediaIdAndStatusAndDeletedAtIsNull(id, "PUBLISHED")
-                && !(nativeCredentialsEnabled && (
-                    credentials.existsByMediaIdAndStatusAndDeletedAtIsNullAndValidUntilGreaterThanEqual(id, "PUBLISHED", java.time.LocalDate.now())
-                    || credentials.existsByMediaIdAndStatusAndDeletedAtIsNullAndValidUntilIsNull(id, "PUBLISHED")))
-                && !(nativeIpEnabled && ipItems.existsByMediaIdAndStatusAndDeletedAtIsNull(id, "PUBLISHED"))
                 && !pageSections.existsByPageKeyNotAndEnabledTrueAndDeletedAtIsNullAndImageUrl("MOLDS", mediaUrl)
                 && !pageSections.existsByPageKeyNotAndEnabledTrueAndDeletedAtIsNullAndContentContaining("MOLDS", mediaUrl)
                 && !solutions.existsByWebsiteEnabledTrueAndCoverImageUrl(mediaUrl)

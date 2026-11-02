@@ -12,8 +12,6 @@ import com.liqiang.archive.entity.WebsiteSocialLink;
 import com.liqiang.archive.entity.WebsitePackagingItem;
 import com.liqiang.archive.entity.WebsitePackagingVariant;
 import com.liqiang.archive.entity.CompanyMilestone;
-import com.liqiang.archive.entity.KnowledgeArticle;
-import com.liqiang.archive.entity.KnowledgeCategory;
 import com.liqiang.archive.entity.MediaAccount;
 import com.liqiang.archive.entity.WebsiteInquiry;
 import com.liqiang.archive.repository.MediaAccountRepository;
@@ -33,8 +31,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -70,7 +66,7 @@ public class WebsiteController {
     private final InquiryAntiSpamService antiSpamService;
     private final MediaAccountRepository mediaAccountRepository;
 
-    @Value("${app.website.product-source:legacy}")
+    @Value("${app.website.product-source:native}")
     private String productSource;
 
     @Value("${app.website.company-source:native}")
@@ -580,115 +576,4 @@ public class WebsiteController {
         }
     }
 
-    /**
-     * 官网公开知识库分类视图：含「已发布 + 官网可见」的文章数量。
-     */
-    public record PublicKnowledgeCategoryView(Long id, String name, String nameEn, long articleCount) {
-        static PublicKnowledgeCategoryView from(KnowledgeCategory category, long articleCount) {
-            return new PublicKnowledgeCategoryView(category.getId(), category.getName(),
-                    category.getNameEn(), articleCount);
-        }
-    }
-
-    /**
-     * 官网公开知识文章卡片视图（列表用）：脱敏，只回摘要，不含全文。
-     */
-    public record PublicKnowledgeArticleView(Long id, Long categoryId, String categoryName, String title,
-                                             String summary, List<String> tags, String author,
-                                             Integer viewCount, java.time.LocalDateTime updatedAt) {
-        static PublicKnowledgeArticleView from(KnowledgeArticle article, String categoryName) {
-            return new PublicKnowledgeArticleView(article.getId(), article.getCategoryId(), categoryName,
-                    article.getTitle(), plainSummary(article.getContent()),
-                    splitTags(article.getTags()), article.getAuthor(),
-                    article.getViewCount(), article.getUpdatedAt());
-        }
-    }
-
-    /**
-     * 官网公开知识文章详情视图：含全文，不含来源文件、内部备注等。
-     */
-    public record PublicKnowledgeArticleDetailView(Long id, Long categoryId, String categoryName, String title,
-                                                   String content, List<String> tags, String author,
-                                                   Integer viewCount, java.time.LocalDateTime createdAt,
-                                                   java.time.LocalDateTime updatedAt) {
-        static PublicKnowledgeArticleDetailView from(KnowledgeArticle article, String categoryName) {
-            return new PublicKnowledgeArticleDetailView(article.getId(), article.getCategoryId(), categoryName,
-                    article.getTitle(), article.getContent(), splitTags(article.getTags()),
-                    article.getAuthor(), article.getViewCount(), article.getCreatedAt(), article.getUpdatedAt());
-        }
-    }
-
-    /** 官网公开知识库分类：仅包含有「已发布 + 官网可见」文章的分类。 */
-    @GetMapping("/knowledge-categories")
-    public List<PublicKnowledgeCategoryView> knowledgeCategories() {
-        requireLegacyKnowledgeSource();
-        List<KnowledgeCategory> categories = companyInfoService.getKbCategories();
-        List<KnowledgeArticle> visibleArticles = companyInfoService.getWebsiteKbArticles(null, null);
-        Map<Long, Long> counts = visibleArticles.stream()
-                .collect(java.util.stream.Collectors.groupingBy(KnowledgeArticle::getCategoryId, java.util.stream.Collectors.counting()));
-        return categories.stream()
-                .filter(c -> counts.getOrDefault(c.getId(), 0L) > 0)
-                .map(c -> PublicKnowledgeCategoryView.from(c, counts.getOrDefault(c.getId(), 0L)))
-                .toList();
-    }
-
-    /** 官网知识文章列表：仅返回「已发布 + 官网可见」的文章，支持分类与关键词过滤。 */
-    @GetMapping("/knowledge-articles")
-    public List<PublicKnowledgeArticleView> knowledgeArticles(
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) String keyword) {
-        requireLegacyKnowledgeSource();
-        Map<Long, String> categoryNames = companyInfoService.getKbCategories().stream()
-                .collect(java.util.stream.Collectors.toMap(KnowledgeCategory::getId, KnowledgeCategory::getName));
-        return companyInfoService.getWebsiteKbArticles(categoryId, keyword).stream()
-                .map(a -> PublicKnowledgeArticleView.from(a,
-                        categoryNames.getOrDefault(a.getCategoryId(), "技术知识")))
-                .toList();
-    }
-
-    /** 官网知识文章详情：仅返回「已发布 + 官网可见」的文章，并累加浏览量。 */
-    @GetMapping("/knowledge-articles/{id}")
-    public ResponseEntity<PublicKnowledgeArticleDetailView> knowledgeArticleDetail(@PathVariable Long id) {
-        requireLegacyKnowledgeSource();
-        KnowledgeArticle article = companyInfoService.getWebsiteKbArticleDetail(id);
-        if (article == null) {
-            return ResponseEntity.notFound().build();
-        }
-        String categoryName = companyInfoService.getKbCategories().stream()
-                .filter(c -> c.getId().equals(article.getCategoryId()))
-                .map(KnowledgeCategory::getName)
-                .findFirst().orElse("技术知识");
-        return ResponseEntity.ok(PublicKnowledgeArticleDetailView.from(article, categoryName));
-    }
-
-    private void requireLegacyKnowledgeSource() {
-        if ("native".equalsIgnoreCase(companySource)) {
-            throw new ResponseStatusException(HttpStatus.GONE, "官网知识库旧接口已停用");
-        }
-    }
-
-    /** 从 Markdown 正文提取纯文本摘要（去掉标题/列表标记，取前 140 字符）。 */
-    private static String plainSummary(String markdown) {
-        if (markdown == null || markdown.isBlank()) {
-            return "";
-        }
-        String text = markdown
-                .replaceAll("(?m)^#{1,6}\\s+", "")
-                .replaceAll("(?m)^[-*]\\s+", "")
-                .replaceAll("[*_`#>|\\[\\]()]", "")
-                .replaceAll("\\s+", " ")
-                .trim();
-        return text.length() > 140 ? text.substring(0, 140) + "…" : text;
-    }
-
-    /** 逗号分隔的标签字符串 -> 标签列表。 */
-    private static List<String> splitTags(String tags) {
-        if (tags == null || tags.isBlank()) {
-            return List.of();
-        }
-        return java.util.Arrays.stream(tags.split("[,，]"))
-                .map(String::trim)
-                .filter(s -> !s.isEmpty())
-                .toList();
-    }
 }

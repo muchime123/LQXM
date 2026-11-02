@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 import { fetchProducts, productImageUrl, productImageSrcSet, packagingImageUrl } from '../src/api/website.js'
+import { FALLBACK_IMAGE_URL } from '../src/utils/fallbackImage.js'
 
 test('product category filter uses the public API category parameter', async () => {
   const previous = globalThis.fetch
@@ -24,6 +25,12 @@ test('product category filter uses the public API category parameter', async () 
 test('website media IDs use the independent public media path', () => {
   const product = { heroMediaId: 15, cardMediaId: 16, defaultImageAssetId: 22 }
   assert.equal(productImageUrl(product), '/api/website/media/16/content')
+  assert.equal(productImageSrcSet(product), '')
+})
+
+test('native product without media uses the embedded placeholder and no archive asset path', () => {
+  const product = { slug: 'native-product', defaultImageAssetId: 22 }
+  assert.equal(productImageUrl(product), FALLBACK_IMAGE_URL)
   assert.equal(productImageSrcSet(product), '')
 })
 

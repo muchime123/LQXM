@@ -1,0 +1,11 @@
+{
+  "ready": true,
+  "blockers": [],
+  "products": 45,
+  "categories": 9,
+  "gallery_rows": 141,
+  "media_files_verified": 136,
+  "product_1_uses_existing_card_as_hero_and_gallery": true,
+  "seo_policy": "existing public name + brand for title; existing public summary for description",
+  "applied": false
+}

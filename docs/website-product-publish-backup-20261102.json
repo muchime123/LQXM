@@ -1,0 +1,967 @@
+{
+  "products": [
+    {
+      "id": 1,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": null
+    },
+    {
+      "id": 2,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 5
+    },
+    {
+      "id": 3,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 13
+    },
+    {
+      "id": 4,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 28
+    },
+    {
+      "id": 5,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 40
+    },
+    {
+      "id": 6,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 45
+    },
+    {
+      "id": 7,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 48
+    },
+    {
+      "id": 8,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 54
+    },
+    {
+      "id": 9,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 59
+    },
+    {
+      "id": 10,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 61
+    },
+    {
+      "id": 11,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 64
+    },
+    {
+      "id": 12,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 65
+    },
+    {
+      "id": 13,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 68
+    },
+    {
+      "id": 14,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 70
+    },
+    {
+      "id": 15,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 71
+    },
+    {
+      "id": 16,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 75
+    },
+    {
+      "id": 17,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 76
+    },
+    {
+      "id": 18,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 83
+    },
+    {
+      "id": 19,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 84
+    },
+    {
+      "id": 20,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 86
+    },
+    {
+      "id": 21,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 90
+    },
+    {
+      "id": 22,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 91
+    },
+    {
+      "id": 23,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 95
+    },
+    {
+      "id": 24,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 99
+    },
+    {
+      "id": 25,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 96
+    },
+    {
+      "id": 26,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 100
+    },
+    {
+      "id": 27,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 101
+    },
+    {
+      "id": 28,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 103
+    },
+    {
+      "id": 29,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 106
+    },
+    {
+      "id": 30,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 107
+    },
+    {
+      "id": 31,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 113
+    },
+    {
+      "id": 32,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 117
+    },
+    {
+      "id": 33,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 118
+    },
+    {
+      "id": 34,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 119
+    },
+    {
+      "id": 35,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 120
+    },
+    {
+      "id": 36,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 120
+    },
+    {
+      "id": 37,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 123
+    },
+    {
+      "id": 38,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 125
+    },
+    {
+      "id": 39,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 127
+    },
+    {
+      "id": 40,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 129
+    },
+    {
+      "id": 41,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 131
+    },
+    {
+      "id": 42,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 135
+    },
+    {
+      "id": 43,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 137
+    },
+    {
+      "id": 44,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 138
+    },
+    {
+      "id": 45,
+      "status": "DRAFT",
+      "published_at": null,
+      "seo_title": null,
+      "seo_description": null,
+      "hero_media_id": 139
+    }
+  ],
+  "categories": [
+    {
+      "id": 1,
+      "status": "DRAFT",
+      "seo_title": null,
+      "seo_description": null
+    },
+    {
+      "id": 2,
+      "status": "DRAFT",
+      "seo_title": null,
+      "seo_description": null
+    },
+    {
+      "id": 3,
+      "status": "DRAFT",
+      "seo_title": null,
+      "seo_description": null
+    },
+    {
+      "id": 4,
+      "status": "DRAFT",
+      "seo_title": null,
+      "seo_description": null
+    },
+    {
+      "id": 5,
+      "status": "DRAFT",
+      "seo_title": null,
+      "seo_description": null
+    },
+    {
+      "id": 6,
+      "status": "DRAFT",
+      "seo_title": null,
+      "seo_description": null
+    },
+    {
+      "id": 7,
+      "status": "DRAFT",
+      "seo_title": null,
+      "seo_description": null
+    },
+    {
+      "id": 8,
+      "status": "DRAFT",
+      "seo_title": null,
+      "seo_description": null
+    },
+    {
+      "id": 9,
+      "status": "DRAFT",
+      "seo_title": null,
+      "seo_description": null
+    }
+  ],
+  "media": [
+    {
+      "id": 4,
+      "status": "DRAFT"
+    },
+    {
+      "id": 5,
+      "status": "DRAFT"
+    },
+    {
+      "id": 6,
+      "status": "DRAFT"
+    },
+    {
+      "id": 7,
+      "status": "DRAFT"
+    },
+    {
+      "id": 8,
+      "status": "DRAFT"
+    },
+    {
+      "id": 9,
+      "status": "DRAFT"
+    },
+    {
+      "id": 10,
+      "status": "DRAFT"
+    },
+    {
+      "id": 11,
+      "status": "DRAFT"
+    },
+    {
+      "id": 12,
+      "status": "DRAFT"
+    },
+    {
+      "id": 13,
+      "status": "DRAFT"
+    },
+    {
+      "id": 14,
+      "status": "DRAFT"
+    },
+    {
+      "id": 15,
+      "status": "DRAFT"
+    },
+    {
+      "id": 16,
+      "status": "DRAFT"
+    },
+    {
+      "id": 17,
+      "status": "DRAFT"
+    },
+    {
+      "id": 18,
+      "status": "DRAFT"
+    },
+    {
+      "id": 19,
+      "status": "DRAFT"
+    },
+    {
+      "id": 20,
+      "status": "DRAFT"
+    },
+    {
+      "id": 21,
+      "status": "DRAFT"
+    },
+    {
+      "id": 22,
+      "status": "DRAFT"
+    },
+    {
+      "id": 23,
+      "status": "DRAFT"
+    },
+    {
+      "id": 24,
+      "status": "DRAFT"
+    },
+    {
+      "id": 25,
+      "status": "DRAFT"
+    },
+    {
+      "id": 26,
+      "status": "DRAFT"
+    },
+    {
+      "id": 27,
+      "status": "DRAFT"
+    },
+    {
+      "id": 28,
+      "status": "DRAFT"
+    },
+    {
+      "id": 29,
+      "status": "DRAFT"
+    },
+    {
+      "id": 30,
+      "status": "DRAFT"
+    },
+    {
+      "id": 31,
+      "status": "DRAFT"
+    },
+    {
+      "id": 32,
+      "status": "DRAFT"
+    },
+    {
+      "id": 33,
+      "status": "DRAFT"
+    },
+    {
+      "id": 34,
+      "status": "DRAFT"
+    },
+    {
+      "id": 35,
+      "status": "DRAFT"
+    },
+    {
+      "id": 36,
+      "status": "DRAFT"
+    },
+    {
+      "id": 37,
+      "status": "DRAFT"
+    },
+    {
+      "id": 38,
+      "status": "DRAFT"
+    },
+    {
+      "id": 39,
+      "status": "DRAFT"
+    },
+    {
+      "id": 40,
+      "status": "DRAFT"
+    },
+    {
+      "id": 41,
+      "status": "DRAFT"
+    },
+    {
+      "id": 42,
+      "status": "DRAFT"
+    },
+    {
+      "id": 43,
+      "status": "DRAFT"
+    },
+    {
+      "id": 44,
+      "status": "DRAFT"
+    },
+    {
+      "id": 45,
+      "status": "DRAFT"
+    },
+    {
+      "id": 46,
+      "status": "DRAFT"
+    },
+    {
+      "id": 47,
+      "status": "DRAFT"
+    },
+    {
+      "id": 48,
+      "status": "DRAFT"
+    },
+    {
+      "id": 49,
+      "status": "DRAFT"
+    },
+    {
+      "id": 50,
+      "status": "DRAFT"
+    },
+    {
+      "id": 51,
+      "status": "DRAFT"
+    },
+    {
+      "id": 52,
+      "status": "DRAFT"
+    },
+    {
+      "id": 53,
+      "status": "DRAFT"
+    },
+    {
+      "id": 54,
+      "status": "DRAFT"
+    },
+    {
+      "id": 55,
+      "status": "DRAFT"
+    },
+    {
+      "id": 56,
+      "status": "DRAFT"
+    },
+    {
+      "id": 57,
+      "status": "DRAFT"
+    },
+    {
+      "id": 58,
+      "status": "DRAFT"
+    },
+    {
+      "id": 59,
+      "status": "DRAFT"
+    },
+    {
+      "id": 60,
+      "status": "DRAFT"
+    },
+    {
+      "id": 61,
+      "status": "DRAFT"
+    },
+    {
+      "id": 62,
+      "status": "DRAFT"
+    },
+    {
+      "id": 63,
+      "status": "DRAFT"
+    },
+    {
+      "id": 64,
+      "status": "DRAFT"
+    },
+    {
+      "id": 65,
+      "status": "DRAFT"
+    },
+    {
+      "id": 66,
+      "status": "DRAFT"
+    },
+    {
+      "id": 67,
+      "status": "DRAFT"
+    },
+    {
+      "id": 68,
+      "status": "DRAFT"
+    },
+    {
+      "id": 69,
+      "status": "DRAFT"
+    },
+    {
+      "id": 70,
+      "status": "DRAFT"
+    },
+    {
+      "id": 71,
+      "status": "DRAFT"
+    },
+    {
+      "id": 72,
+      "status": "DRAFT"
+    },
+    {
+      "id": 73,
+      "status": "DRAFT"
+    },
+    {
+      "id": 74,
+      "status": "DRAFT"
+    },
+    {
+      "id": 75,
+      "status": "DRAFT"
+    },
+    {
+      "id": 76,
+      "status": "DRAFT"
+    },
+    {
+      "id": 77,
+      "status": "DRAFT"
+    },
+    {
+      "id": 78,
+      "status": "DRAFT"
+    },
+    {
+      "id": 79,
+      "status": "DRAFT"
+    },
+    {
+      "id": 80,
+      "status": "DRAFT"
+    },
+    {
+      "id": 81,
+      "status": "DRAFT"
+    },
+    {
+      "id": 82,
+      "status": "DRAFT"
+    },
+    {
+      "id": 83,
+      "status": "DRAFT"
+    },
+    {
+      "id": 84,
+      "status": "DRAFT"
+    },
+    {
+      "id": 85,
+      "status": "DRAFT"
+    },
+    {
+      "id": 86,
+      "status": "DRAFT"
+    },
+    {
+      "id": 87,
+      "status": "DRAFT"
+    },
+    {
+      "id": 88,
+      "status": "DRAFT"
+    },
+    {
+      "id": 89,
+      "status": "DRAFT"
+    },
+    {
+      "id": 90,
+      "status": "DRAFT"
+    },
+    {
+      "id": 91,
+      "status": "DRAFT"
+    },
+    {
+      "id": 92,
+      "status": "DRAFT"
+    },
+    {
+      "id": 93,
+      "status": "DRAFT"
+    },
+    {
+      "id": 94,
+      "status": "DRAFT"
+    },
+    {
+      "id": 95,
+      "status": "DRAFT"
+    },
+    {
+      "id": 96,
+      "status": "DRAFT"
+    },
+    {
+      "id": 97,
+      "status": "DRAFT"
+    },
+    {
+      "id": 98,
+      "status": "DRAFT"
+    },
+    {
+      "id": 99,
+      "status": "DRAFT"
+    },
+    {
+      "id": 100,
+      "status": "DRAFT"
+    },
+    {
+      "id": 101,
+      "status": "DRAFT"
+    },
+    {
+      "id": 102,
+      "status": "DRAFT"
+    },
+    {
+      "id": 103,
+      "status": "DRAFT"
+    },
+    {
+      "id": 104,
+      "status": "DRAFT"
+    },
+    {
+      "id": 105,
+      "status": "DRAFT"
+    },
+    {
+      "id": 106,
+      "status": "DRAFT"
+    },
+    {
+      "id": 107,
+      "status": "DRAFT"
+    },
+    {
+      "id": 108,
+      "status": "DRAFT"
+    },
+    {
+      "id": 109,
+      "status": "DRAFT"
+    },
+    {
+      "id": 110,
+      "status": "DRAFT"
+    },
+    {
+      "id": 111,
+      "status": "DRAFT"
+    },
+    {
+      "id": 112,
+      "status": "DRAFT"
+    },
+    {
+      "id": 113,
+      "status": "DRAFT"
+    },
+    {
+      "id": 114,
+      "status": "DRAFT"
+    },
+    {
+      "id": 115,
+      "status": "DRAFT"
+    },
+    {
+      "id": 116,
+      "status": "DRAFT"
+    },
+    {
+      "id": 117,
+      "status": "DRAFT"
+    },
+    {
+      "id": 118,
+      "status": "DRAFT"
+    },
+    {
+      "id": 119,
+      "status": "DRAFT"
+    },
+    {
+      "id": 120,
+      "status": "DRAFT"
+    },
+    {
+      "id": 121,
+      "status": "DRAFT"
+    },
+    {
+      "id": 122,
+      "status": "DRAFT"
+    },
+    {
+      "id": 123,
+      "status": "DRAFT"
+    },
+    {
+      "id": 124,
+      "status": "DRAFT"
+    },
+    {
+      "id": 125,
+      "status": "DRAFT"
+    },
+    {
+      "id": 126,
+      "status": "DRAFT"
+    },
+    {
+      "id": 127,
+      "status": "DRAFT"
+    },
+    {
+      "id": 128,
+      "status": "DRAFT"
+    },
+    {
+      "id": 129,
+      "status": "DRAFT"
+    },
+    {
+      "id": 130,
+      "status": "DRAFT"
+    },
+    {
+      "id": 131,
+      "status": "DRAFT"
+    },
+    {
+      "id": 132,
+      "status": "DRAFT"
+    },
+    {
+      "id": 133,
+      "status": "DRAFT"
+    },
+    {
+      "id": 134,
+      "status": "DRAFT"
+    },
+    {
+      "id": 135,
+      "status": "DRAFT"
+    },
+    {
+      "id": 136,
+      "status": "DRAFT"
+    },
+    {
+      "id": 137,
+      "status": "DRAFT"
+    },
+    {
+      "id": 138,
+      "status": "DRAFT"
+    },
+    {
+      "id": 139,
+      "status": "DRAFT"
+    }
+  ],
+  "gallery_rows_before": 141
+}

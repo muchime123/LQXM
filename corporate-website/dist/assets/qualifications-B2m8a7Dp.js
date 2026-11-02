@@ -1,0 +1,1 @@
+const a=[{id:1,name:"营业执照",category:"企业证照",image:"/images/business-license.jpg"}],e=[{id:1,name:"气调保鲜包装机",assetCategory:"专利",patentType:"外观设计",image:"/images/patent-map-packaging.png"},{id:2,name:"全自动连续式气调保鲜包装机",assetCategory:"专利",patentType:"外观设计",image:"/images/patent-continuous-map-packaging.png"}];export{a as c,e as p};

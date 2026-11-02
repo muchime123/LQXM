@@ -9,6 +9,7 @@
  */
 import { ref, computed, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { submitInquiry, fetchProductDetail, fetchCaptcha } from '../../api/website'
+import { snapshotMode } from '../../api/snapshot'
 import { useInquiryModal } from '../../composables/useInquiryModal'
 import { useCompany } from '../../composables/useCompany'
 import { useCopy } from '../../composables/useCopy'
@@ -29,11 +30,17 @@ const { company } = useCompany()
 const { copyText, toast } = useCopy()
 
 const phoneRaw = computed(() => company.value?.phone || '4009008878')
+const contactEmail = computed(() => company.value?.email || '768963166@qq.com')
+const contactMailto = computed(() => `mailto:${contactEmail.value}?subject=${encodeURIComponent(
+  `官网咨询${form.value.product ? `：${form.value.product}` : ''}`
+)}`)
 const isSampleInquiry = computed(() => inquiryType.value === 'sample')
 
 const formTitle = computed(() => (isSampleInquiry.value ? '申请样品试封' : '获取包装方案'))
 const formSubtitle = computed(() =>
-  isSampleInquiry.value
+  snapshotMode
+    ? '首版官网暂不在线收集表单。请通过商务邮箱或电话直接联系；邮件需在您的邮件程序中确认发送。'
+    : isSampleInquiry.value
     ? '填写以下信息，我们的工程师将安排样品试封测试。'
     : '填写以下信息，我们的工程师将尽快与您联系。'
 )
@@ -83,8 +90,8 @@ async function loadProductName() {
   if (!slug) return
   try {
     const detail = await fetchProductDetail(slug)
-    if (detail?.model?.name) {
-      form.value.product = detail.model.name
+    if (detail?.product?.name || detail?.model?.name) {
+      form.value.product = detail.product?.name || detail.model.name
     }
   } catch (err) {
     console.warn('Product lookup failed:', err)
@@ -146,7 +153,7 @@ async function handleSubmit() {
       resetForm()
       closeInquiry()
     }, 3500)
-    loadCaptcha()
+    if (!snapshotMode) loadCaptcha()
   } catch (err) {
     console.warn('Submit failed:', err)
     const msg = err.message || ''
@@ -269,7 +276,14 @@ onBeforeUnmount(() => {
 
               <!-- 右侧表单 -->
               <div class="inquiry-modal__body">
-                <form @submit.prevent="handleSubmit" class="modal-form-body">
+                <div v-if="snapshotMode" class="modal-form-body static-contact">
+                  <h4>直接联系商务团队</h4>
+                  <p>点击“写邮件”会打开您的邮件程序。只有确认发送后，我们才会收到消息；也可以直接拨打电话。</p>
+                  <a ref="firstInputRef" class="submit-button" :href="contactMailto">写邮件至 {{ contactEmail }} →</a>
+                  <a class="static-contact__phone" :href="`tel:${phoneRaw}`">拨打 {{ phoneRaw }}</a>
+                  <button type="button" class="static-contact__copy" @click="copyText(contactEmail)">复制邮箱地址</button>
+                </div>
+                <form v-else @submit.prevent="handleSubmit" class="modal-form-body">
                   <div class="form-row">
                     <FormField label="联系人" :required="true" :error="errors.name" html-for="im-name">
                       <input
@@ -391,6 +405,12 @@ onBeforeUnmount(() => {
 </template>
 
 <style scoped>
+.static-contact { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 18px; }
+.static-contact h4 { margin: 0; font-size: 24px; }
+.static-contact p { margin: 0; line-height: 1.75; color: #526173; }
+.static-contact .submit-button { display: inline-flex; align-items: center; text-decoration: none; }
+.static-contact__phone { color: var(--blue); font-weight: 700; }
+.static-contact__copy { border: 0; background: none; color: var(--blue); padding: 0; cursor: pointer; }
 /* ============ 遮罩 ============ */
 .inquiry-modal-overlay {
   position: fixed;

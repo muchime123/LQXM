@@ -20,9 +20,6 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -107,16 +104,4 @@ class WebsiteCompanySourceSwitchTest {
         verifyNoInteractions(nativeCompany);
     }
 
-    @Test
-    void nativeCompanySourceRetiresLegacyKnowledgeEndpointsWithoutReadingArchive() {
-        ReflectionTestUtils.setField(controller, "companySource", "native");
-
-        assertEquals(HttpStatus.GONE, assertThrows(ResponseStatusException.class,
-                controller::knowledgeCategories).getStatusCode());
-        assertEquals(HttpStatus.GONE, assertThrows(ResponseStatusException.class,
-                () -> controller.knowledgeArticles(null, null)).getStatusCode());
-        assertEquals(HttpStatus.GONE, assertThrows(ResponseStatusException.class,
-                () -> controller.knowledgeArticleDetail(1L)).getStatusCode());
-        verifyNoInteractions(legacyCompany);
-    }
 }

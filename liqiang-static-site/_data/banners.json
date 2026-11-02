@@ -1,0 +1,48 @@
+{
+  "ANNOUNCEMENT": [
+    {
+      "id": 2,
+      "title": "服务多元食品场景",
+      "subtitle": null,
+      "description": "餐饮连锁 · 预制菜 · 生鲜肉类 · 烘焙食品 · 航空餐 · 日化包装",
+      "imageUrl": null,
+      "buttonText": null,
+      "buttonUrl": null,
+      "secondaryButtonText": null,
+      "secondaryButtonUrl": null,
+      "badge": null,
+      "sortOrder": 1,
+      "position": "ANNOUNCEMENT"
+    }
+  ],
+  "HERO": [
+    {
+      "id": 4,
+      "title": "气调封口工艺，<em>让每一盒都稳定可靠</em>",
+      "subtitle": "MAP SEALING · 食品级密封方案",
+      "description": "针对托盒封口、异形盒与多种包装材料，提供从样品试封到量产落地的完整工艺验证与设备配置。",
+      "imageUrl": "/api/website/media/2/content",
+      "buttonText": "查看封口设备",
+      "buttonUrl": "/products",
+      "secondaryButtonText": "获取包装方案",
+      "secondaryButtonUrl": "",
+      "badge": "稳定封合 · 工艺支持",
+      "sortOrder": 2,
+      "position": "HERO"
+    },
+    {
+      "id": 5,
+      "title": "气调保鲜包装，<em>让产品新鲜到家</em>",
+      "subtitle": "气调保鲜 · 锁鲜封装",
+      "description": "围绕气体置换、封合效果与生产节拍，为生鲜、熟食、预制菜等企业匹配设备、模具与包装材料。",
+      "imageUrl": "/api/website/media/3/content",
+      "buttonText": "查看气调设备",
+      "buttonUrl": "/products",
+      "secondaryButtonText": "获取包装方案",
+      "secondaryButtonUrl": "",
+      "badge": "锁鲜配送 · 延长货架期",
+      "sortOrder": 3,
+      "position": "HERO"
+    }
+  ]
+}

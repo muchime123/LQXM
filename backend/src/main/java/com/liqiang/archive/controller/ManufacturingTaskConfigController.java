@@ -1,7 +1,6 @@
 package com.liqiang.archive.controller;
 
 import com.liqiang.archive.security.RequirePermission;
-import com.liqiang.archive.service.ProductionTrackingStageService;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -23,11 +22,9 @@ import java.util.*;
 @RequirePermission("manufacturing.template.manage")
 public class ManufacturingTaskConfigController {
     private final JdbcTemplate jdbc;
-    private final ProductionTrackingStageService stages;
 
-    public ManufacturingTaskConfigController(JdbcTemplate jdbc,ProductionTrackingStageService stages) {
+    public ManufacturingTaskConfigController(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        this.stages = stages;
     }
 
     /**
@@ -255,87 +252,6 @@ public class ManufacturingTaskConfigController {
         }
         jdbc.update("DELETE FROM manufacturing_task_config_items WHERE id=?",id);
     }
-    /* ==================== 制程节点管理（车间类别级） ==================== */
-    /*
-     * 节点序列原先硬编码在 ProductionTrackingPolicy，加一个节点要改常量 + 迁库 + 改测试 + 发版。
-     * 新增节点只进入字典；加入默认流程或发布产品模板后才用于任务。
-     *
-     * ⚠️ 两条约束由 ProductionTrackingStageService 把关，违反时抛 IllegalArgumentException（→ 400）：
-     *   ① 节点编码不可修改（历史里程碑行与基准行都按编码关联）；
-     *   ② 已有跟单记录的节点只能停用、不能删除。
-     * 改制程会改写所有在制工单的「已完成 x/y」判定，页面保存前先调 /impact 给出受影响单数。
-     */
-
-    @GetMapping("/stage-defs")
-    public List<Map<String,Object>> listStageDefs(@RequestParam(defaultValue="SEALER") String kind) {
-        return stages.list(kind);
-    }
-
-    @GetMapping("/stage-dictionary")
-    public List<Map<String,Object>> stageDictionary() { return stages.dictionary(); }
-
-    @PostMapping("/stage-dictionary")
-    public Map<String,Object> createStageDictionary(@RequestBody ProductionTrackingStageService.StageSave request) {
-        return stages.createDictionary(request);
-    }
-
-    @PutMapping("/stage-dictionary/{code}")
-    public Map<String,Object> updateStageDictionary(@PathVariable String code,
-            @RequestBody ProductionTrackingStageService.StageSave request) {
-        stages.updateDictionary(code,request);
-        return Map.of("stageCode",code);
-    }
-
-    @DeleteMapping("/stage-dictionary/{code}")
-    public Map<String,Object> deleteStageDictionary(@PathVariable String code) {
-        stages.removeDictionary(code);
-        return Map.of("stageCode",code);
-    }
-
-    @PostMapping("/stage-defs/default-flow")
-    public Map<String,Object> addDictionaryStageToDefaultFlow(@RequestBody Map<String,String> request) {
-        stages.addToDefaultFlow(request.get("kind"),request.get("code"));
-        return Map.of("kind",request.get("kind"),"code",request.get("code"));
-    }
-
-    /** 改制程的影响面：多少在制单会被改写完成判定。 */
-    @GetMapping("/stage-defs/impact")
-    public Map<String,Object> stageDefsImpact(@RequestParam(defaultValue="SEALER") String kind) {
-        return stages.impact(kind);
-    }
-
-    @PostMapping("/stage-defs")
-    public Map<String,Object> createStageDef(@RequestBody ProductionTrackingStageService.StageSave request) {
-        return stages.create(request);
-    }
-
-    @PutMapping("/stage-defs/{id}")
-    public Map<String,Object> updateStageDef(@PathVariable long id,
-            @RequestBody ProductionTrackingStageService.StageSave request) {
-        return stages.update(id,request);
-    }
-
-    /** 上移/下移一位；{@code up=true} 上移。 */
-    @PostMapping("/stage-defs/{id}/move")
-    public Map<String,Object> moveStageDef(@PathVariable long id,@RequestParam(defaultValue="true") boolean up) {
-        stages.move(id,up);
-        return Map.of("id",id);
-    }
-
-    @PutMapping("/stage-defs/{id}/default-flow")
-    public Map<String,Object> setStageDefaultFlow(@PathVariable long id,@RequestBody Map<String,Boolean> request) {
-        if(!request.containsKey("included")||request.get("included")==null)
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"请明确是否纳入车间默认流程");
-        stages.setDefaultIncluded(id,request.get("included"));
-        return Map.of("id",id,"included",request.get("included"));
-    }
-
-    @DeleteMapping("/stage-defs/{id}")
-    public Map<String,Object> deleteStageDef(@PathVariable long id) {
-        stages.remove(id);
-        return Map.of("id",id);
-    }
-
     private String requiredName(String value,String label) {
         if(value==null||value.isBlank()||value.trim().length()>200) throw new ResponseStatusException(HttpStatus.BAD_REQUEST,"请填写有效"+label);
         return value.trim();

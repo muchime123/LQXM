@@ -2,7 +2,7 @@
 /**
  * 首页。
  * - 数据通过 useWebsiteData 拉取（/api/website/home 聚合接口）
- * - Hero 暂时固定使用 public/images 中指定的三张图片
+ * - Hero 使用官网已发布 Banner；无 Banner 时显示无图文案
  * - 精选产品来自后台 website_featured=true 的产品，无精选时回退到已发布产品
  * - 公司数据从 useCompany 单例获取，与 Footer/About/Contact 共享
  * - reveal 动画由 v-reveal 指令接管
@@ -14,7 +14,8 @@ import { useCompany } from '../composables/useCompany'
 import { usePageSections } from '../composables/usePageSections'
 import { useInquiryModal } from '../composables/useInquiryModal'
 import { fetchSolutions, websiteProductMediaUrl } from '../api/website'
-import { useWebsiteIpItems } from '../composables/useWebsiteIpItems'
+import { patents } from '../data/qualifications'
+import { FALLBACK_IMAGE_URL } from '../utils/fallbackImage'
 import { setSchema, createOrganizationSchema, createLocalBusinessSchema } from '../composables/useSchema'
 import ProductCard from '../components/ProductCard.vue'
 import AppIcon from '../components/AppIcon.vue'
@@ -31,7 +32,6 @@ const {
 } = useWebsiteData()
 
 const { company } = useCompany()
-const { items: patents, load: loadIpItems } = useWebsiteIpItems()
 const { openInquiry } = useInquiryModal()
 const solutionGroups = ref([])
 
@@ -59,7 +59,6 @@ watchEffect(() => {
 
 onMounted(() => {
   load()
-  loadIpItems()
   loadHomeSolutions()
   pageSections.load()
   updateCarouselVisible()
@@ -106,7 +105,7 @@ onUnmounted(() => {
 })
 
 /* ============ Banner 数据 ============ */
-const DEFAULT_HERO_BANNERS = [
+const EMPTY_HERO_BANNERS = [
   {
     title: '包装设备与包材，<em>围绕您的产品配置</em>',
     subtitle: 'PACKAGING EQUIPMENT & MATERIALS',
@@ -115,33 +114,13 @@ const DEFAULT_HERO_BANNERS = [
     buttonUrl: '/products',
     secondaryButtonText: '获取包装方案',
     secondaryButtonUrl: '',
-    imageUrl: '/images/20220728153033303324.webp',
-  },
-  {
-    title: '气调保鲜包装，<em>让产品新鲜到家</em>',
-    subtitle: '气调保鲜 · 锁鲜封装',
-    description: '从托盒封口、气调保鲜到贴体包装，围绕锁鲜效果、生产节拍与配送稳定性提供完整设备与工艺方案。',
-    buttonText: '查看气调设备',
-    buttonUrl: '/products',
-    secondaryButtonText: '获取包装方案',
-    secondaryButtonUrl: '',
-    imageUrl: '/images/20240713113411341198.webp',
-  },
-  {
-    title: '气调保鲜包装，<em>让产品新鲜到家</em>',
-    subtitle: '气调保鲜 · 锁鲜封装',
-    description: '围绕气体置换、封合效果与生产节拍，为食品企业匹配设备和包装材料。',
-    buttonText: '查看气调设备',
-    buttonUrl: '/products',
-    secondaryButtonText: '获取包装方案',
-    secondaryButtonUrl: '',
-    imageUrl: '/images/20240713133113311363.webp',
+    imageUrl: '',
   },
 ]
 
 const pageSections = usePageSections('HOME')
 
-/* 首页 Hero 使用已发布的 Banner，保留静态图片回退。 */
+/* 首页 Hero 只展示已发布 Banner；没有内容时显示无图的品牌文案。 */
 function mapHeroBanner(b) {
   return {
     id: b.id,
@@ -159,13 +138,7 @@ const heroBanners = computed(() => {
   const validCms = (banners.value?.HERO || []).filter((b) => b?.imageUrl
     && !/hero-machine\.png$/.test(b.imageUrl)
     && ![b.title, b.subtitle, b.description].some((text) => text?.includes('模具')))
-  if (validCms.length >= 2) return validCms.map(mapHeroBanner)
-  const result = validCms.map(mapHeroBanner)
-  for (const fallback of DEFAULT_HERO_BANNERS) {
-    if (result.length >= 3) break
-    if (!result.find((m) => m.imageUrl === fallback.imageUrl)) result.push(fallback)
-  }
-  return result.length ? result : DEFAULT_HERO_BANNERS
+  return validCms.length ? validCms.map(mapHeroBanner) : EMPTY_HERO_BANNERS
 })
 
 /* 首页各区块标题/描述：优先后台「页面内容」配置，未配置时回退到前端默认文案。
@@ -363,39 +336,18 @@ const industryScenarios = computed(() => {
     name: scene.title,
     desc: scene.summary || '查看该生产场景下的包装判断与方案内容',
     scene: scene.itemKey,
-    image: scene.coverImageUrl || '/images/workshop.webp',
+    image: scene.coverImageUrl || FALLBACK_IMAGE_URL,
   })).filter((scene) => scene.scene)
 })
 
-/* 首页制造能力图位：后续可直接改为后台 HOME_SHOWCASE 图片数据 */
-const defaultManufacturingShowcase = [
-  {
-    key: 'equipment',
-    title: '包装设备制造',
-    image: '/images/workshop.webp',
-    to: '/products',
-  },
-  {
-    key: 'packaging',
-    title: '包材耗材配套',
-    image: '/images/manual-sealer.jpg',
-    to: '/packaging',
-  },
-  {
-    key: 'factory',
-    title: '工厂现场与交付',
-    image: '/images/factory.webp',
-    to: '/about',
-  },
-]
 const manufacturingShowcase = computed(() => {
   const rows = sectionRows('showcase').filter((row) => row.link !== '/molds'
     && ![row.title, row.description].some((text) => text?.includes('模具')))
-  if (!rows.length) return defaultManufacturingShowcase
+  if (!rows.length) return []
   return rows.map((row, index) => ({
     key: `cms-showcase-${index}`,
     title: row.title || '制造能力',
-    image: row.image || '/images/workshop.webp',
+    image: row.image || FALLBACK_IMAGE_URL,
     to: row.link || '/about',
   }))
 })
@@ -426,7 +378,7 @@ function openSceneAssistInquiry(sceneName) {
           :key="`hero-slide-${i}`"
           class="hero-slide"
           :class="{ 'is-active': i === heroIndex, 'is-loaded': shouldPreloadSlide(i) }"
-          :style="shouldPreloadSlide(i) ? { '--hero-background': `url(${b.imageUrl})` } : undefined"
+          :style="shouldPreloadSlide(i) ? { '--hero-background': b.imageUrl ? `url(${b.imageUrl})` : 'none' } : undefined"
           :data-bg="shouldPreloadSlide(i) ? undefined : b.imageUrl"
           :aria-hidden="i !== heroIndex"
         ></div>
@@ -489,7 +441,7 @@ function openSceneAssistInquiry(sceneName) {
       <div class="home-strength__facts">
         <RouterLink to="/about"><strong>{{ foundedYear }}</strong><span>创立于温州</span></RouterLink>
         <RouterLink to="/products"><strong>{{ productCount || homeProducts.length || '—' }}</strong><span>公开设备型号</span></RouterLink>
-        <RouterLink to="/patents"><strong>{{ patents.length || '—' }}</strong><span>专利与知识产权</span></RouterLink>
+        <RouterLink to="/patents"><strong>{{ patents.length || '—' }}</strong><span>专利证书展示</span></RouterLink>
         <RouterLink to="/about"><strong>配套</strong><span>设备 · 包材 · 方案</span></RouterLink>
       </div>
     </section>
@@ -546,7 +498,7 @@ function openSceneAssistInquiry(sceneName) {
     </section>
 
     <!-- 首页核心制造能力图廊 -->
-    <section v-if="homeSectionEnabled('showcase')" class="section manufacturing-showcase" id="manufacturing-showcase">
+    <section v-if="homeSectionEnabled('showcase') && manufacturingShowcase.length" class="section manufacturing-showcase" id="manufacturing-showcase">
       <SectionHeading
         eyebrow="MANUFACTURING"
         :title="homeHeadings.showcase.title"
@@ -555,8 +507,8 @@ function openSceneAssistInquiry(sceneName) {
         <template #description>
           <p>{{ homeHeadings.showcase.description }}</p>
           <div class="showcase-proof">
-            <RouterLink to="/credentials">ISO 9001 · CE 认证</RouterLink>
-            <RouterLink v-if="patents.length" to="/patents">{{ patents.length }} 项知识产权</RouterLink>
+            <RouterLink to="/credentials">查看企业资质</RouterLink>
+            <RouterLink v-if="patents.length" to="/patents">查看专利证书</RouterLink>
           </div>
         </template>
       </SectionHeading>

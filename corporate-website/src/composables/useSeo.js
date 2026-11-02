@@ -12,7 +12,7 @@
 
 export const SITE_NAME = '利强包装'
 export const SITE_URL = 'https://www.liqiangbz.com'
-const DEFAULT_OG_IMAGE = '/images/factory.webp'
+const DEFAULT_OG_IMAGE = '/images/logo-only.png'
 
 /**
  * 设置或更新一个 meta 标签。

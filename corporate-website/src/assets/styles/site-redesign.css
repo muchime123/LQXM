@@ -82,7 +82,7 @@ body { font-size: 16px; background: var(--white); }
   inset: 0;
   z-index: 0;
   background-image:
-    var(--page-hero-image, url('/images/workshop.webp')),
+    var(--page-hero-image, none),
     var(--img-fallback);
   background-size: contain;
   background-position: center;
@@ -784,21 +784,6 @@ body { font-size: 16px; background: var(--white); }
 .site-page--packaging .advantage-card:hover { border-color: var(--line); }
 .solutions-page .industries--dark { background: var(--navy); }
 
-/* 给不同业务页自己的首屏语境，避免所有内页看起来完全一样。 */
-.site-page--products .page-hero,
-.site-page--product-detail .page-hero {
-  --page-hero-image: url('/images/product-hero.webp');
-}
-.site-page--solutions .page-hero {
-  --page-hero-image: url('/images/factory.webp');
-}
-.site-page--packaging .page-hero {
-  --page-hero-image: url('/images/hero-machine.png');
-}
-.site-page--about .page-hero {
-  --page-hero-image: url('/images/workshop.webp');
-}
-
 /* 企业证明页面：让证书和专利成为主体。 */
 .credential-grid, .patent-grid { gap: 22px; }
 .credential-card, .patent-card { border-radius: 0 !important; box-shadow: none !important; }
@@ -873,7 +858,7 @@ footer { padding-top: 72px; background: var(--footer-bg); }
     width: 100%;
     aspect-ratio: 12 / 5;
     background-image:
-      var(--page-hero-image, url('/images/workshop.webp')),
+      var(--page-hero-image, none),
       var(--img-fallback);
     background-size: contain;
     background-position: center;

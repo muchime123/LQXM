@@ -118,22 +118,13 @@ DocumentView（试点）、OfficeAssetView、CertificateView。各页均含 `bat
 - 已下线模块不再提及：SoftwareView、PasswordManager、PricingView（均已整体删除）。
 - 注意：`Certificate` 的 `assetStatus` 存储为英文枚举（DB），批量更新时经 `toDbStatus` 中文→英文；`feeStatus` 存中文直接写入。OfficeAsset 的 `purchaseDate/warrantyUntil` 用 `LocalDate.parse`，`purchasePrice` 用 `new BigDecimal`。
 
-### 可视化官网编辑器（/website/visual-editor，2026-08）
+### 官网内容管理与可视化编辑器退役（2026-11）
 
-在后台 iframe 中加载真实官网（`?cmsEdit=1`），实现"看到哪里、改哪里"的 in-context 编辑。
-
-- **入口**：后台「官网运营 · 可视化编辑器」→ `frontend/src/views/WebsiteVisualEditorView.vue`（路由 `/website/visual-editor`）。iframe 指向 `VITE_CORPORATE_WEBSITE_URL`（默认 `http://{host}:5174`）。
-- **可编辑页面**：`EDITABLE_PAGES`（当前 HOME / PRODUCTS / SOLUTIONS / ABOUT，每页含 `defaultSection`）。iframe 地址随页面切换（首页 `/`、产品 `/products` 等）。官网顶栏导航为 RouterLink 客户端跳转，会在编辑模式丢失 `cmsEdit` 参数，故 App.vue 用 `onCmsNavClick` 拦截内链补回 `?cmsEdit=1`，并通过 `LIQIANG_CMS_NAV {pageKey}` 通知编辑器同步切换页面与表单（编辑器 `onPreviewMessage` 收到后调 `selectPage`）。`/credentials`、`/patents`、`/contact` 均 redirect 到 `/about#xxx`。
-- **通信协议**（corporate-website 与后台通过 postMessage，见 `corporate-website/src/App.vue`）：
-  - 官网在编辑模式把 `[data-cms-section]` 元素描边，点击发 `LIQIANG_CMS_SELECT {pageKey,sectionKey,source}`。
-  - 连接握手：父窗口发 `LIQIANG_CMS_PING`，官网回复 `LIQIANG_CMS_READY {app:'liqiang-corporate-website', pageKey}`（pageKey 随路由变化，如 /about 时 `ABOUT`）；超时 4.5s 显示「官网未连接」。
-  - 选中/滚动定位用 `LIQIANG_CMS_FOCUS {sectionKey, scroll}`（官网侧 `focusCmsSection` 切换 `data-cms-active` 高亮）；Hero 选中某 Banner 用 `LIQIANG_CMS_SHOW_BANNER {bannerId}`。
-  - 后台推草稿：`LIQIANG_CMS_DRAFT {pageKey,sectionKey,data:{title,subtitle,content,imageUrl,enabled}}` 和 `LIQIANG_CMS_BANNER_DRAFT {bannerId,data}`；清除用 `*_CLEAR_*`。
-  - 官网侧内存草稿在 `corporate-website/src/composables/useCmsPreview.js`（区块草稿 + Banner 草稿 + `activeBannerId`），刷新即失，保存=发布（写库后清草稿并重挂 iframe）。
-- **区块数据来源**：`hero` → Banner 管理（可面板直编）；`products/industries/process` → 页面配置标题 + 业务档案（面板只改标题，卡片跳转完整后台）；`showcase/service/cases` → 页面区块 `content` JSON（面板用 `STRUCTURED_SCHEMAS` 结构化行编辑：text/textarea/image）；`strength` → 公司信息；ABOUT 页 `intro/manufacturing` 额外支持区块主图（`imageUrl`）。
-- **草稿消费**：官网 `Home.vue` 用 `homeSectionEnabled`（草稿 enabled 优先）+ `sectionRows(key)`（content 存在即以草稿为准，含空列表）+ `d(key).title/subtitle`；`About.vue` 用 `sectionEnabled` + `aboutHeadings`；`Products.vue`/`Solutions.vue` 用 `sectionEnabled` + `pageContent`。四个页面均实现了「草稿 enabled 优先 + 标题/描述/图片回退链」。编辑区块新字段时需同时改：编辑器表单/Schema → 草稿推送 → 官网对应页消费草稿的 computed。
-- **未保存草稿标记**：编辑器用 `pushed`（键 `${pageKey}.${sectionKey}`）与 `pushedBannerIds` 跟踪已推送到 iframe 且未保存的草稿，结构面板行右上显示圆点；`hasPendingDrafts` 时显示「放弃全部草稿」`discardAllDrafts()`（遍历推送 `*_CLEAR_*` 后 `reloadPreview`）。任何 `reloadPreview()` 都会清空 `pushed`（iframe 重挂后内存草稿全部丢失）。
-- 结构面板的显示/隐藏开关 = `updatePageSection(id, {...all fields, enabled})` + 重挂预览；保存后必须 `reloadPreview()`（`frameKey++`）让新 iframe 重新拉取公开接口，否则草稿清除后仍显示旧数据。
+- `/website/visual-editor`、后台 iframe 编辑器及 `LIQIANG_CMS_*` 的 `postMessage` 协议已下线。不要按历史说明恢复 `cmsEdit` 参数或跨工程实时编辑链路。
+- 官网展示工程位于 `corporate-website/`；内容运营页面位于 `frontend/src/apps/archive/views/marketing/`。两者共用后端应用。产品、包材、公司介绍等动态内容由 `website_*` 专属表维护；少量证照与专利图片直接由官网工程的 `src/data/qualifications.js` 和 `public/images/` 维护。
+- 当前公司资料、包材和产品公开接口默认读取官网独立数据。产品原有图片路径只在显式 `APP_WEBSITE_PRODUCT_SOURCE=legacy` 回退时使用；移除回退分支前需检查部署环境和旧书签。
+- 已发布内容通过各自的受权限保护管理入口维护。页面预览、就绪检查及公开接口的实际来源以当前代码和部署配置为准。
+- 官网证照与专利的草稿／发布管理入口已退役。新增展示项时核对原件，将图片复制进官网 `public/images/`，再修改静态清单；不要恢复双数据源开关或在内部档案变动时自动同步。历史 `website_credentials`、`website_ip_items` 表及草稿记录保留作迁移痕迹，不执行 DROP 或清空。
 
 ### 方案文章富文本化（2026-08，可复用于知识库/新闻）
 

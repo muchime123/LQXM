@@ -12,6 +12,7 @@ import { useRoute } from 'vue-router'
 import DOMPurify from 'dompurify'
 import { fetchProductDetail, websiteProductMediaUrl } from '../api/website'
 import { apiBase } from '../api/http'
+import { FALLBACK_IMAGE_URL } from '../utils/fallbackImage'
 import { setSeo, SITE_URL } from '../composables/useSeo'
 import { setSchema, createProductSchema } from '../composables/useSchema'
 import { useCompany } from '../composables/useCompany'
@@ -45,6 +46,7 @@ const galleryImages = computed(() => {
       srcset: '',
       fileName: product.name,
     }]
+    return [{ id: 'website-fallback', url: FALLBACK_IMAGE_URL, srcset: '', fileName: product.name }]
   }
   const assets = detail.value.gallery || []
 
@@ -78,29 +80,8 @@ const galleryImages = computed(() => {
   }
 
   // 优先级 3：按设备分类匹配默认图
-  const categoryFallback = getCategoryFallbackImage(model.value.equipmentCategory)
-  if (categoryFallback) {
-    return [{ id: 'category-fallback', url: categoryFallback, srcset: '', fileName: '分类默认图' }]
-  }
-
-  // 优先级 4：全站 placeholder
-  return [{ id: 'fallback', url: '/images/manual-sealer.jpg', srcset: '', fileName: '默认图' }]
+  return [{ id: 'fallback', url: FALLBACK_IMAGE_URL, srcset: '', fileName: '默认图' }]
 })
-
-/**
- * 按设备分类返回对应的默认图路径。
- * 后台上传真实产品图后，此回退不会被触发。
- */
-function getCategoryFallbackImage(category) {
-  if (!category) return null
-  const map = {
-    '气调包装机': '/images/hero-machine.png',
-    '封口机': '/images/manual-sealer.jpg',
-    '真空包装机': '/images/hero-machine.png',
-    '全自动包装机': '/images/hero-machine.png',
-  }
-  return map[category] || null
-}
 
 const activeImage = computed(() => galleryImages.value[activeImageIndex.value] || galleryImages.value[0])
 
@@ -285,7 +266,7 @@ async function load() {
 }
 
 function handleImageError(event) {
-  event.target.src = '/images/manual-sealer.jpg'
+  event.target.src = FALLBACK_IMAGE_URL
 }
 
 onMounted(load)

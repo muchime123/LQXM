@@ -80,13 +80,6 @@
               <el-button v-if="canFollowup && !detail.order.stoppedAt && currentStage" size="small" type="primary" plain @click="quickCompleteCurrentStage">今天完成{{ currentStage.label }}</el-button>
             </div>
           </header>
-          <p v-if="processSnapshot && processSnapshot.sourceKind !== 'NOT_CAPTURED'" class="process-version-note">
-            本单制程：{{ processSnapshot.sourceKind === 'PUBLISHED' ? `产品模板 V${processSnapshot.templateVersion}` : '旧制程快照' }}
-            · {{ processSnapshot.nodes.length }} 个节点
-            <span v-if="processSnapshot.nodes.some(node => node.applicability === 'PENDING_REVIEW')"> · 条件节点待核实</span>
-            <el-button v-if="canManageProcess" link size="small" @click="processDialogVisible = true">调整本单制程</el-button>
-          </p>
-          <p v-else-if="canManageProcess" class="process-version-note"><el-button link size="small" @click="processDialogVisible = true">建立本单制程快照</el-button></p>
           <div v-if="referencePressure && !detail.order.stoppedAt && !detail.order.closedAt && !detail.order.deliveredDate" class="reference-pressure" role="status">
             <strong>参考进度晚于车间交期 {{ referencePressure.days }} 天</strong>
             <span>{{ referencePressure.stageLabel }}节点参考完成 {{ referencePressure.referenceDate }}，当前车间交期 {{ detail.schedule.deadline }}。请与车间核实能否提前关键节点；目标完成日期仅供协调。</span>
@@ -324,8 +317,6 @@
     <!-- 通用节点参考工期（原「基准设置」）已于 2026-10-22 迁到「生产产品与工期管理」页右上角，
          本页只负责按推算结果显示参考完成日期，不再承担配置入口。 -->
     <TrackingSourceDetailDrawer v-model="purchaseDetailVisible" kind="purchase" :loading="purchaseDetailLoading" :data="purchaseDetailData" :error="purchaseDetailError" />
-    <TrackingOrderProcessDialog v-model="processDialogVisible" :order-id="props.orderId ?? null"
-      :workshop="detail?.order.workshopType ?? null" @saved="onProcessSaved" />
   </div>
 </template>
 
@@ -347,7 +338,6 @@ import { EditPen } from '@element-plus/icons-vue'
 import type { TrackingMilestone, TrackingOrder } from '@/api/productionTracking'
 import type { TrackingClosureNodeConfirmation } from '@/api/productionTracking'
 import TrackingSourceDetailDrawer from '@/components/production/TrackingSourceDetailDrawer.vue'
-import TrackingOrderProcessDialog from '@/components/production/TrackingOrderProcessDialog.vue'
 import LqDialog from '@/components/common/LqDialog.vue'
 import ProductionSalesTracePanel from '@/components/production/ProductionSalesTracePanel.vue'
 import { useCurrentUser } from '@/composables/auth/useCurrentUser'
@@ -378,9 +368,7 @@ const emit = defineEmits<{ 'update:modelValue': [boolean]; saved: [] }>()
 
 const auth = useCurrentUser()
 const canFollowup = computed(() => auth.can('manufacturing.followup'))
-const canManageProcess = computed(() => auth.can('manufacturing.template.manage'))
 const canAbnormalClosure = computed(() => auth.can('manufacturing.followup.abnormal'))
-const processDialogVisible = ref(false)
 const sourceOrderPanels = ref(['source'])
 interface ProcessSnapshot { sourceKind: string; templateVersion?: number | null; nodes: { code: string; label: string; applicability: string }[] }
 const processSnapshot = ref<ProcessSnapshot | null>(null)
@@ -411,13 +399,6 @@ watch(() => [props.orderId, props.modelValue] as const, async ([id, visible]) =>
     processSnapshot.value = (await http.get<ProcessSnapshot>(`/manufacturing/tracking-processes/orders/${id}/snapshot`)).data
   } catch { /* 兼容迁移尚未启用或旧服务版本；原跟单详情仍可正常使用。 */ }
 }, { immediate: true })
-async function onProcessSaved() {
-  if (!props.orderId) return
-  processSnapshot.value = (await http.get<ProcessSnapshot>(
-    `/manufacturing/tracking-processes/orders/${props.orderId}/snapshot`)).data
-  loadOrder(props.orderId)
-  emit('saved')
-}
 function canEditManualReference(stage: TrackingMilestone) {
   return canFollowup.value && Boolean(detail.value?.order.scheduleTime) && !detail.value?.order.stoppedAt
     && stage.status !== 'DONE' && (!stage.optional || stage.applicable)
@@ -531,7 +512,6 @@ watch(drawer, value => { if (!value) emit('update:modelValue', false) })
 .detail-content h3 { margin: 0; color: #101828; font-size: 15px; font-weight: 600; line-height: 1.4; }
 .section-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .stage-quick-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.process-version-note { margin: 0 0 10px; color: var(--color-text-secondary); font-size: 12px; }
 .closure-node-list { display: grid; gap: 9px; margin: 12px 0; }
 .closure-node-row { display: grid; grid-template-columns: 120px minmax(150px, 1fr) minmax(180px, 1.2fr); align-items: center; gap: 8px; }
 .pending-change-count { color: #b54708; font-weight: 600; }

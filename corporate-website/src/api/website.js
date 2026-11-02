@@ -5,6 +5,8 @@
  */
 
 import { getJson, postJson, apiBase } from './http.js'
+import { snapshotMediaUrl, snapshotMode } from './snapshot.js'
+import { FALLBACK_IMAGE_URL } from '../utils/fallbackImage.js'
 
 /**
  * 拉取首页聚合数据（公司信息 + 产品 + 里程碑 + 资质）。
@@ -83,16 +85,6 @@ export function fetchCompanyDetail() {
   return getJson('/api/website/company-detail')
 }
 
-/** 官网资质独立内容预览；部署 V428 并开启后端门闩后才可使用。 */
-export function fetchNativeCredentials() {
-  return getJson('/api/website/native/credentials')
-}
-
-/** 官网独立知识产权；完成内容审核并打开双端开关后使用。 */
-export function fetchNativeIpItems() {
-  return getJson('/api/website/native/ip-items')
-}
-
 /**
  * 官网官方展示的自媒体账号列表（由后台「自媒体账号管理」勾选「官网官方展示」）。
  * @returns {Promise<Array<PublicMediaAccountView>>}
@@ -110,9 +102,11 @@ export function fetchOfficialMediaAccounts() {
 export function productImageUrl(product, size = 640) {
   const websiteMediaId = product.cardMediaId || product.heroMediaId
   if (websiteMediaId) return websiteProductMediaUrl(websiteMediaId)
+  // Native records must never fall through to an internal archive asset ID.
+  if (product.slug !== undefined) return FALLBACK_IMAGE_URL
   return product.defaultImageAssetId
     ? `${apiBase}/api/file-assets/product_model/assets/${product.defaultImageAssetId}/thumbnail?size=${size}`
-    : '/images/manual-sealer.jpg'
+    : FALLBACK_IMAGE_URL
 }
 
 /**
@@ -122,7 +116,7 @@ export function productImageUrl(product, size = 640) {
  * @returns {string} srcset 字符串，无图时返回空
  */
 export function productImageSrcSet(product) {
-  if (product.cardMediaId || product.heroMediaId) return ''
+  if (product.slug !== undefined || product.cardMediaId || product.heroMediaId) return ''
   if (!product.defaultImageAssetId) return ''
   const base = `${apiBase}/api/file-assets/product_model/assets/${product.defaultImageAssetId}/thumbnail?size=`
   return `${base}320 320w, ${base}640 640w, ${base}960 960w`
@@ -130,6 +124,7 @@ export function productImageSrcSet(product) {
 
 /** 官网独立媒体公开地址。 */
 export function websiteProductMediaUrl(mediaId) {
+  if (snapshotMode) return snapshotMediaUrl(mediaId)
   return `${apiBase}/api/website/media/${mediaId}/content`
 }
 

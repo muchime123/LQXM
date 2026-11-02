@@ -1,0 +1,343 @@
+/* ============================================================
+   利强包装 · 静态官网 补充样式
+   覆盖：回到顶部 / 复制提示 / 产品详情 / 联系页 / 方案卡片 /
+         解决方案方向 / 合作流程 / 静态站点用自定义区块
+   ============================================================ */
+
+/* ---------- 回到顶部（沿用原 BackToTop 视觉） ---------- */
+.back-to-top {
+  position: fixed;
+  right: 28px;
+  bottom: 32px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(145deg, var(--navy), var(--navy-tone));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 8px 24px rgba(7, 27, 52, .35);
+  z-index: 8000;
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), background var(--dur) var(--ease);
+  opacity: 0;
+  visibility: hidden;
+  transform: translateY(12px);
+}
+.back-to-top.show { opacity: 1; visibility: visible; transform: translateY(0); }
+.back-to-top:hover { box-shadow: 0 10px 28px rgba(14, 114, 232, .45); transform: translateY(-2px); }
+.back-to-top__ring { position: absolute; inset: 0; width: 100%; height: 100%; }
+.back-to-top__track { fill: none; stroke: rgba(255, 255, 255, .12); stroke-width: 2.5; }
+.back-to-top__bar {
+  fill: none;
+  stroke: var(--cyan);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: center;
+  transition: stroke-dashoffset .1s linear;
+}
+.back-to-top__icon { position: relative; z-index: 1; transition: transform var(--dur) var(--ease); }
+.back-to-top:hover .back-to-top__icon { transform: translateY(-2px); }
+
+/* ---------- 复制提示 ---------- */
+.copy-toast {
+  position: fixed;
+  left: 50%;
+  bottom: 40px;
+  transform: translateX(-50%);
+  background: var(--footer-bg-deep);
+  color: var(--white);
+  font-size: 14px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(6, 21, 40, .35);
+  border: 1px solid rgba(67, 198, 213, .4);
+  z-index: 10001;
+  max-width: 90vw;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .25s var(--ease), transform .25s var(--ease);
+}
+.copy-toast.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+
+/* ---------- 页面 Hero 背景缺省 ---------- */
+.page-hero {
+  --page-hero-image: none;
+}
+
+/* ---------- 产品详情页 ---------- */
+.product-detail-page { background: var(--white); }
+.breadcrumb {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 22px max(var(--pad), calc((100vw - var(--max)) / 2)) 0;
+  font-size: 13px;
+  color: var(--muted);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.breadcrumb a:hover { color: var(--brand-blue); }
+.breadcrumb strong { color: var(--ink); font-weight: 600; }
+.detail-container {
+  max-width: var(--max);
+  margin: 0 auto;
+  padding: 26px max(var(--pad), calc((100vw - var(--max)) / 2)) 20px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  gap: 44px;
+  align-items: start;
+}
+.detail-gallery { position: relative; }
+.detail-main-image {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  overflow: hidden;
+  background: var(--white);
+  aspect-ratio: 4 / 3;
+}
+.detail-main-image img { width: 100%; height: 100%; object-fit: contain; }
+.detail-thumbnails { display: flex; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
+.detail-thumbnail {
+  width: 76px;
+  height: 57px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+  background: #fff;
+}
+.detail-thumbnail img { width: 100%; height: 100%; object-fit: cover; }
+.detail-thumbnail.active { border-color: var(--brand-blue); box-shadow: 0 0 0 2px rgba(43, 168, 195, .25); }
+.detail-heading-meta { display: flex; gap: 10px; flex-wrap: wrap; }
+.detail-heading-meta span {
+  font-size: 12px;
+  letter-spacing: .6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--brand-blue-deep);
+  border: 1px solid var(--line);
+}
+.detail-info h1 { font-size: clamp(26px, 3vw, 36px); line-height: 1.2; margin: 16px 0 12px; font-weight: 800; }
+.detail-summary { color: var(--muted); font-size: 15px; line-height: 1.7; margin: 0 0 22px; }
+.detail-selection-facts { margin-bottom: 22px; }
+.detail-selection-label {
+  display: block;
+  font-size: 12px;
+  letter-spacing: 1px;
+  color: var(--muted-2);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+.detail-key-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.detail-key-facts > div { background: var(--white); padding: 12px 16px; }
+.detail-key-facts dt { font-size: 12px; color: var(--muted-2); margin-bottom: 4px; }
+.detail-key-facts dd { margin: 0; font-weight: 600; color: var(--ink); font-size: 14px; }
+.detail-fit-summary { margin-bottom: 24px; }
+.detail-fit-summary > span { font-size: 12px; color: var(--muted-2); letter-spacing: 1px; display: block; margin-bottom: 10px; }
+.detail-fit-summary ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.detail-fit-summary li { font-size: 13.5px; color: var(--ink); line-height: 1.6; display: flex; gap: 8px; }
+.detail-fit-summary li strong { min-width: 72px; color: var(--muted); font-weight: 500; }
+.detail-cta { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+.chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.chips span {
+  font-size: 12.5px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--paper-light);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.detail-sections { max-width: var(--max); margin: 10px auto 0; padding: 0 max(var(--pad), calc((100vw - var(--max)) / 2)) 10px; }
+.detail-section { padding: 34px 0; border-top: 1px solid var(--section-divider); }
+.detail-section__heading { margin-bottom: 18px; }
+.detail-section__heading > span { font-size: 12px; letter-spacing: 1.6px; color: var(--brand-blue); font-weight: 700; }
+.detail-section__heading h2 { font-size: clamp(22px, 2.4vw, 30px); margin: 6px 0 0; }
+.detail-section__heading p { color: var(--muted); font-size: 13.5px; margin: 8px 0 0; line-height: 1.6; }
+.detail-section__content .detail-text { color: var(--ink); line-height: 1.85; font-size: 15px; }
+.application-facts, .detail-key-facts.spec-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.application-facts > div, .detail-key-facts.spec-facts > div { background: var(--white); padding: 12px 16px; }
+.application-facts dt, .detail-key-facts.spec-facts dt { font-size: 12px; color: var(--muted-2); margin-bottom: 4px; }
+.application-facts dd, .detail-key-facts.spec-facts dd { margin: 0; font-weight: 600; }
+
+/* ---------- 联系页 ---------- */
+.contact-section { max-width: var(--max); margin: 0 auto; padding: 30px max(var(--pad), calc((100vw - var(--max)) / 2)) 10px; }
+.contact-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 34px; align-items: start; }
+.contact-cards { display: grid; gap: 14px; }
+.contact-card {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  padding: 20px 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--white);
+}
+.contact-card .contact-icon {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  border-radius: 12px;
+  background: var(--paper);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-blue);
+  font-size: 20px;
+  font-weight: 800;
+}
+.contact-card h3 { margin: 0 0 4px; font-size: 15px; font-weight: 700; }
+.contact-card .contact-value { font-size: 15px; font-weight: 600; color: var(--ink); }
+.contact-card .contact-note { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+.contact-card .contact-action {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--brand-blue-deep);
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+.contact-card .contact-action:hover { color: var(--brand-blue); }
+.inquiry-panel {
+  background: linear-gradient(160deg, var(--navy-deep) 0%, var(--navy) 60%, #0f5c8b 100%);
+  border-radius: 20px;
+  padding: 36px 34px 30px;
+  color: var(--on-navy-body);
+}
+.inquiry-panel__badge { font-size: 11px; letter-spacing: 2px; color: var(--cyan); text-transform: uppercase; font-weight: 600; }
+.inquiry-panel h2 { color: #fff; font-size: 26px; font-weight: 800; margin: 8px 0 6px; }
+.inquiry-panel__desc { font-size: 13.5px; line-height: 1.7; color: rgba(224, 236, 244, .82); margin: 0 0 20px; }
+.inquiry-form { display: grid; gap: 14px; }
+.inquiry-form .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.inquiry-form label { display: block; font-size: 12.5px; font-weight: 600; color: rgba(255, 255, 255, .9); margin-bottom: 6px; }
+.inquiry-form input,
+.inquiry-form textarea {
+  width: 100%;
+  padding: 11px 14px;
+  border-radius: 9px;
+  border: 1px solid rgba(255, 255, 255, .16);
+  background: rgba(255, 255, 255, .08);
+  color: #fff;
+  font-size: 14px;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color .2s, background .2s;
+}
+.inquiry-form input::placeholder,
+.inquiry-form textarea::placeholder { color: rgba(255, 255, 255, .42); }
+.inquiry-form input:focus,
+.inquiry-form textarea:focus { outline: none; border-color: var(--cyan); background: rgba(255, 255, 255, .12); }
+.inquiry-form .submit-button {
+  padding: 14px 24px;
+  background: var(--brand-cyan);
+  color: var(--navy-deep);
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: .2s;
+  margin-top: 4px;
+}
+.inquiry-form .submit-button:hover { background: var(--brand-cyan-hover); }
+.inquiry-privacy { display: flex; align-items: center; gap: 6px; margin: 6px 0 0; font-size: 11.5px; color: rgba(224, 236, 244, .6); line-height: 1.5; }
+.inquiry-success {
+  display: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(94, 234, 170, .16);
+  border: 1px solid rgba(94, 234, 170, .3);
+  color: #5eeaaa;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+/* ---------- 解决方案方向卡片（复用首页行业卡片视觉语言） ---------- */
+.solution-direction-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; margin-top: 8px; }
+.solution-direction-card {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--white);
+  padding: 26px 26px 24px;
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--dur) var(--ease), box-shadow var(--dur) var(--ease), border-color var(--dur) var(--ease);
+}
+.solution-direction-card:hover { transform: translateY(-4px); box-shadow: var(--card-shadow-hover); border-color: var(--card-border-hover); }
+.solution-direction-card .dir-icon {
+  width: 52px; height: 52px; border-radius: 14px;
+  background: linear-gradient(135deg, var(--brand-cyan), var(--brand-blue));
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; color: #fff; margin-bottom: 16px;
+}
+.solution-direction-card h3 { margin: 0 0 8px; font-size: 19px; font-weight: 700; }
+.solution-direction-card > p { color: var(--muted); font-size: 14px; line-height: 1.7; margin: 0 0 14px; }
+.solution-direction-card ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.solution-direction-card li { font-size: 13.5px; color: var(--ink); display: flex; gap: 8px; align-items: baseline; }
+.solution-direction-card li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--brand-cyan); flex: 0 0 6px; align-self: center; }
+
+/* ---------- 合作流程（PROCESS） ---------- */
+.process-steps { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 14px; margin-top: 8px; }
+.process-step {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--white);
+  padding: 20px 18px;
+  box-shadow: var(--shadow-xs);
+}
+.process-step .step-no { font-size: 30px; font-weight: 800; color: rgba(43, 168, 195, .18); line-height: 1; margin-bottom: 12px; }
+.process-step h3 { font-size: 15px; margin: 0 0 6px; font-weight: 700; }
+.process-step p { font-size: 12.5px; color: var(--muted); line-height: 1.6; margin: 0; }
+
+/* ---------- 方案整理中空状态（复用 solutions.css） ---------- */
+.solution-empty { max-width: 760px; margin: 0 auto; text-align: center; padding: 20px 0 10px; }
+.solution-empty h2 { font-size: clamp(24px, 3vw, 34px); margin: 12px 0 10px; }
+.solution-empty > p { color: var(--muted); font-size: 15px; line-height: 1.8; margin: 0 auto 24px; max-width: 560px; }
+.solution-empty__actions { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+
+/* ---------- 包材状态 ---------- */
+.packaging-catalog-state { text-align: center; padding: 40px 20px; }
+.packaging-catalog-state strong { font-size: 18px; display: block; margin-bottom: 8px; }
+.packaging-catalog-state p { color: var(--muted); font-size: 14px; line-height: 1.7; margin: 0; }
+
+/* ---------- 产品中心筛选工具栏 ---------- */
+.page-toolbar .product-filter__search input {
+  width: 100%;
+  height: var(--search-height);
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--search-radius);
+  background: var(--search-bg);
+  color: var(--ink);
+  font-size: 14px;
+}
+.page-toolbar .product-filter__search input:focus { outline: none; border-color: var(--search-focus-border); background: #fff; }
+.catalog-empty { text-align: center; padding: 50px 20px; color: var(--muted); }
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 980px) {
+  .detail-container { grid-template-columns: 1fr; gap: 26px; }
+  .contact-layout { grid-template-columns: 1fr; }
+  .solution-direction-grid { grid-template-columns: 1fr; }
+  .process-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 640px) {
+  .back-to-top { right: 16px; bottom: 22px; width: 46px; height: 46px; }
+  .inquiry-form .form-row { grid-template-columns: 1fr; }
+  .inquiry-panel { padding: 28px 20px 24px; }
+  .process-steps { grid-template-columns: 1fr; }
+  .detail-key-facts { grid-template-columns: 1fr; }
+}

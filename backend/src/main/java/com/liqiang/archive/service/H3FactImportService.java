@@ -139,7 +139,6 @@ private final SalesOutboundProfitService outboundProfitService;
 private final SalesOutboundNatureService outboundNatureService;
 private final H3PostImportAsyncService postImportAsyncService;
 private final BatchImportPipelineService pipeline;
-private final ProductionTrackingProcessService trackingProcess;
 private final DataFormatter formatter = new DataFormatter();
 
 /**
@@ -680,7 +679,6 @@ jdbc.update("UPDATE " + table(type) + " SET source_hash=?,last_synced_at=NOW() W
 
 private Long saveProduction(Group g) {
 Map<String, String> m = g.main();
-boolean newlyImported = existingId(FactType.PRODUCTION, g) == null;
 Long customerId = customerId(first(m, "客户选择", "客户信息"));
 Long salespersonId = memberId(m.get("业务员"));
 Long employeeId = memberEmployeeId(m.get("业务员"));
@@ -755,7 +753,6 @@ row.get("零部件制程.生产完成比例"), dateTime(row.get("零部件制程
 bool(row.get("零部件制程.是否最终工序")), bool(row.get("零部件制程.生产完成")),
 row.get("零部件制程.零部件工艺图"), row.get("零部件制程.报工二维码"));
 }
-if (newlyImported) trackingProcess.captureNewOrder(id);
 return id;
 }
 

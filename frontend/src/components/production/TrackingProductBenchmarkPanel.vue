@@ -6,7 +6,6 @@
           <el-tooltip placement="top" :show-after="200">
             <template #content>
               按自然日设置该产品各跟单节点的参考天数；空值沿用通用参考。<br>
-              同一行可配置本产品采用的节点、顺序、前置节点与参考天数；制程版本发布后用于新任务，氚云工序不受影响。<br>
               候选来自本产品的跟单记录，P50 / P75 仅供审核；保存或按 P50 填充后才参与参考日期。<br>
               批量填充要求样本至少 8 段、零天占比低于一半，且节点尚未发布。
             </template>
@@ -21,43 +20,12 @@
         <el-button :disabled="!peers.length" @click="openCopy">复制其它产品</el-button>
       </div>
     </header>
-    <TrackingProductProcessPanel :key="taskConfigId" :task-config-id="taskConfigId" :workshop-name="workshopName" :same-name-count="sameNameCount" @changed="emit('changed')" v-slot="{ nodes, canManage, toggleNode, moveNode, canMove }">
-      <div class="node-toolbar">
-        <span>本产品使用 {{ nodes.filter(node => node.selected).length }} 个节点</span>
-        <el-button v-if="canManage" size="small" @click="manageNodesVisible = true">管理节点</el-button>
-      </div>
       <div class="benchmark-scroll">
-      <el-table v-if="nodes.some(node => node.selected)" :data="orderedStageRows(nodes)" stripe size="small" class="benchmark-table" table-layout="fixed">
+      <el-table v-if="stageRows.length" :data="stageRows" stripe size="small" class="benchmark-table" table-layout="fixed">
       <el-table-column label="跟单节点" min-width="210">
         <template #default="{ row }">
           <div class="stage-name">{{ row.stageLabel }}<el-tag v-if="row.optionalStage" size="small" type="info" class="optional-tag">按需</el-tag></div>
           <small class="stage-interval">{{ row.intervalLabel }}</small>
-        </template>
-      </el-table-column>
-      <el-table-column label="本产品制程" width="126" align="center">
-        <template #default="{ row }">
-          <el-button v-for="node in nodes.filter(node => node.code === row.stageCode)" :key="node.code"
-            link type="danger" :disabled="!canManage" @click="toggleNode(node.code)">
-            移除节点
-          </el-button>
-        </template>
-      </el-table-column>
-      <el-table-column label="顺序" width="110" align="center">
-        <template #default="{ row }">
-          <div v-for="node in nodes.filter(node => node.code === row.stageCode && node.selected)" :key="node.code" class="order-actions">
-            <el-button size="small" text :disabled="!canManage || !canMove(node.code, -1)" aria-label="上移节点" @click="moveNode(node.code, -1)">↑</el-button>
-            <span>{{ node.sortNo }}</span>
-            <el-button size="small" text :disabled="!canManage || !canMove(node.code, 1)" aria-label="下移节点" @click="moveNode(node.code, 1)">↓</el-button>
-          </div>
-          <span v-if="!nodes.some(node => node.code === row.stageCode && node.selected)" class="days-unset">—</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="前置节点" min-width="220">
-        <template #default="{ row }">
-          <el-select v-for="node in nodes.filter(node => node.code === row.stageCode && node.selected)" :key="node.code" v-model="node.predecessors" multiple collapse-tags clearable placeholder="无前置节点" size="small" :disabled="!canManage" class="predecessor-select">
-            <el-option v-for="candidate in nodes.filter(item => item.selected && item.sortNo < node.sortNo)" :key="candidate.code" :label="candidate.label" :value="candidate.code" />
-          </el-select>
-          <span v-if="!nodes.some(node => node.code === row.stageCode && node.selected)" class="days-unset">加入后可设置</span>
         </template>
       </el-table-column>
       <el-table-column label="通用参考" width="100" align="center">
@@ -87,26 +55,16 @@
         </template>
       </el-table-column>
       </el-table>
-      <el-empty v-else :image-size="52" description="本产品尚未选择跟单节点，请点击“管理节点”添加" />
+      <el-empty v-else :image-size="52" description="暂无可配置的跟单节点" />
       </div>
-      <el-dialog v-model="manageNodesVisible" title="管理本产品跟单节点" width="min(520px, calc(100vw - 32px))" append-to-body>
-        <p class="manage-hint">从全局节点字典选择；未采用的节点不会出现在本产品的参考工期表中。</p>
-        <div v-for="node in nodes" :key="node.code" class="manage-node">
-          <span>{{ node.label }} <small>{{ node.code }}</small></span>
-          <el-button size="small" :type="node.selected ? 'danger' : 'primary'" plain @click="toggleNode(node.code)">{{ node.selected ? '移除' : '加入' }}</el-button>
-        </div>
-        <template #footer><el-button @click="manageNodesVisible = false">完成</el-button></template>
-      </el-dialog>
 
     <!-- 合计：把这一列数字还原成「整段」。与画像卡的参考工期同源（都是必经节点生效值相加），
          区别是这里就地按表格当前值算，保存后立刻能看到合计变化，不必等接口回来。 -->
-      <p v-if="nodes.length" class="total-row">
-      已选节点参考工期 <b>{{ totalSummary(nodes).text }}</b> 天
-      <span class="total-note">按已选必经节点试算（产品参考优先，通用参考兜底）{{ totalSummary(nodes).note }}</span>
-      <span v-if="totalSummary(nodes).missing" class="total-warn">缺 {{ totalSummary(nodes).missing }}，未计入合计。</span>
+      <p v-if="stageRows.length" class="total-row">
+      节点参考工期合计 <b>{{ totalSummary().text }}</b> 天
+      <span class="total-note">按必经节点试算（产品参考优先，通用参考兜底）{{ totalSummary().note }}</span>
+      <span v-if="totalSummary().missing" class="total-warn">缺 {{ totalSummary().missing }}，未计入合计。</span>
       </p>
-
-    </TrackingProductProcessPanel>
 
     <!-- 复制：同系列产品常共用一套节奏，逐个维护太慢；只补未发布节点，不覆盖人工审核值。 -->
     <el-dialog v-model="copyVisible" title="从同车间其它产品复制" width="min(460px, calc(100vw - 32px))">
@@ -134,7 +92,6 @@ import {
   saveTrackingProductBenchmark, type TrackingBenchmarkWorkshop, type TrackingProductBenchmarkRow
 } from '@/api/productionTracking'
 import ProductBenchmarkSamplesDrawer from './ProductBenchmarkSamplesDrawer.vue'
-import TrackingProductProcessPanel from './TrackingProductProcessPanel.vue'
 
 interface StageRow {
   stageCode: string
@@ -176,7 +133,6 @@ const revoking = ref<string | null>(null)
 const copyVisible = ref(false)
 const copySourceId = ref<number | null>(null)
 const copying = ref(false)
-const manageNodesVisible = ref(false)
 
 /** 车间类别与后端一致：车间名含「封口」即封口机节点序列。 */
 const workshopKind = computed(() => (props.workshopName ?? '').includes('封口') ? 'SEALER' : 'MACHINE')
@@ -203,29 +159,6 @@ const stageRows = computed<StageRow[]>(() => {
   })
 })
 
-function orderedStageRows(nodes: { code: string; label: string; conditional: boolean; selected: boolean; sortNo: number }[]) {
-  const byCode = new Map(nodes.map(node => [node.code, node]))
-  const rows = [...stageRows.value]
-  const existing = new Set(rows.map(row => row.stageCode))
-  for (const node of nodes) {
-    if (existing.has(node.code)) continue
-    const candidate = props.rows.find(row => row.stageCode === node.code)
-    rows.push({ stageCode: node.code, stageLabel: node.label, intervalLabel: '该车间暂无通用参考',
-      optionalStage: node.conditional, workshopDays: null, typicalDays: candidate?.typicalDays ?? null,
-      publishedSource: candidate?.publishedSource ?? null, publishedAt: candidate?.publishedAt ?? null,
-      sampleCount: candidate?.sampleCount ?? 0, p50Days: candidate?.p50Days ?? null,
-      p75Days: candidate?.p75Days ?? null, excludedCount: candidate?.excludedCount ?? 0,
-      zeroDayCount: candidate?.zeroDayCount ?? 0 })
-  }
-  return rows.filter(row => byCode.get(row.stageCode)?.selected).sort((a, b) => {
-    const aNode = byCode.get(a.stageCode)
-    const bNode = byCode.get(b.stageCode)
-    if (aNode?.selected !== bNode?.selected) return aNode?.selected ? -1 : 1
-    if (aNode?.selected && bNode?.selected) return aNode.sortNo - bNode.sortNo
-    return 0
-  })
-}
-
 /** 节点 code → 中文名，交给样本明细抽屉复用，不让它再拉一次矩阵。 */
 const stageLabels = computed<Record<string, string>>(() => {
   const map: Record<string, string> = {}
@@ -239,9 +172,8 @@ const fillableCount = computed(() => stageRows.value.filter(row =>
   && row.zeroDayCount * 2 < row.sampleCount).length)
 
 const effectiveDays = (row: StageRow) => row.typicalDays ?? row.workshopDays
-function totalSummary(nodes: { code: string; label: string; conditional: boolean; selected: boolean; sortNo: number }[]) {
-  const selectedCodes = new Set(nodes.filter(node => node.selected).map(node => node.code))
-  const required = orderedStageRows(nodes).filter(row => selectedCodes.has(row.stageCode) && !row.optionalStage)
+function totalSummary() {
+  const required = stageRows.value.filter(row => !row.optionalStage)
   const missing = required.filter(row => effectiveDays(row) == null).map(row => row.stageLabel).join('、')
   const days = required.reduce((sum, row) => sum + Math.round(effectiveDays(row) ?? 0), 0)
   const exact = required.reduce((sum, row) => sum + (effectiveDays(row) ?? 0), 0)

@@ -1,0 +1,17 @@
+{
+  "read_only": true,
+  "published_product_checks": {
+    "total": 45,
+    "missing_title": 0,
+    "missing_description": 0,
+    "missing_hero": 0,
+    "missing_card": 0
+  },
+  "published_categories": 9,
+  "published_products_with_gallery": 45,
+  "audit_action_counts": {
+    "WEBSITE_MEDIA_PUBLISH": 136,
+    "WEBSITE_PRODUCT_CATEGORY_PUBLISH": 9,
+    "WEBSITE_PRODUCT_PUBLISH": 45
+  }
+}

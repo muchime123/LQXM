@@ -1,0 +1,12 @@
+{
+  "ready": true,
+  "blockers": [],
+  "source_id": 10,
+  "target_id": 1,
+  "certificate_found": true,
+  "source_type": "外观专利",
+  "draft_type_before": "实用新型",
+  "media_already_registered": false,
+  "applied": false,
+  "published": false
+}

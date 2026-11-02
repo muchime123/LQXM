@@ -10,8 +10,8 @@
 import { ref, reactive, onMounted, onBeforeUnmount, nextTick, computed, watchEffect } from 'vue'
 import { fetchHome, websiteProductMediaUrl } from '../api/website'
 import { displayMilestones as resolveDisplayMilestones } from '../utils/milestoneDisplay'
-import { useWebsiteIpItems } from '../composables/useWebsiteIpItems'
-import { nativeCredentialsEnabled, useWebsiteCredentials } from '../composables/useWebsiteCredentials'
+import { FALLBACK_IMAGE_URL } from '../utils/fallbackImage'
+import { certifications, patents } from '../data/qualifications'
 import { useCompany } from '../composables/useCompany'
 import { usePageSections } from '../composables/usePageSections'
 import { useOfficialMedia } from '../composables/useOfficialMedia'
@@ -28,8 +28,6 @@ const error = ref(null)
 const { company } = useCompany()
 const { findByPlatform } = useOfficialMedia()
 const { copyText } = useCopy()
-const { credentials: certifications, loadError: credentialsError, load: loadCredentials } = useWebsiteCredentials()
-const { items: patents, load: loadIpItems } = useWebsiteIpItems()
 
 /* 关于页区块标题/描述：优先后台「页面内容」配置。
    使用 usePageSections 提供的 sectionRows / isEnabled 统一实现。 */
@@ -47,12 +45,12 @@ const aboutHeadings = computed(() => {
     intro: {
       title: s('intro')?.title && !s('intro').title.includes('模具') ? s('intro').title : '从包装设备制造出发，<br />把包材适配一起考虑',
       description: s('intro')?.subtitle && !s('intro').subtitle.includes('模具') ? s('intro').subtitle : '从包装设备制造出发，把包材适配一起考虑',
-      image: s('intro')?.imageUrl || '/images/factory.webp',
+      image: s('intro')?.imageUrl || FALLBACK_IMAGE_URL,
     },
     manufacturing: {
       title: s('manufacturing')?.title || '厂房设备',
       description: s('manufacturing')?.subtitle || '通过生产、装配与调试现场，展示设备从制造到交付验证的主要环节。',
-      image: s('manufacturing')?.imageUrl || '/images/workshop.webp',
+      image: s('manufacturing')?.imageUrl || FALLBACK_IMAGE_URL,
     },
     credentials: {
       title: s('credentials')?.title || '企业荣誉与资质认证',
@@ -73,9 +71,9 @@ const aboutHeadings = computed(() => {
 const introImageError = ref(false)
 const introSecondary = computed(() => {
   const rows = sectionRows('intro')
-  if (!rows.length) return { image: '/images/workshop.webp', caption: '温州 · 制造现场', hasData: false }
+  if (!rows.length) return { image: '', caption: '', hasData: false }
   const row = rows[0]
-  const image = row.image || '/images/workshop.webp'
+  const image = row.image || ''
   return {
     image,
     caption: row.caption || '温州 · 制造现场',
@@ -96,15 +94,8 @@ const showIntroSecondary = computed(() => {
 const galleryImageErrors = reactive(new Set())
 const manufacturingGallery = computed(() => {
   const rows = sectionRows('manufacturing')
-  if (!rows.length) {
-    return [
-      { image: '/images/factory.webp', caption: '生产与装配区域' },
-      { image: '/images/workshop.webp', caption: '设备制造现场' },
-      { image: '/images/manual-sealer.jpg', caption: '装机调试与验证' },
-    ]
-  }
-  return rows.map((row) => ({
-    image: row.image || '/images/workshop.webp',
+  return rows.filter((row) => row.image).map((row) => ({
+    image: row.image,
     caption: row.caption || '制造现场',
   }))
 })
@@ -121,8 +112,8 @@ const milestones = ref([])
 const companyContentSource = ref('unknown')
 const productCount = ref(0)
 /* 资质与知识产权均为官网自有展示内容。 */
-const certificationCount = computed(() => certifications.value.length)
-const patentCount = computed(() => patents.value.length)
+const certificationCount = certifications.length
+const patentCount = patents.length
 const certificationCarousel = ref(null)
 const patentCarousel = ref(null)
 
@@ -285,15 +276,13 @@ const stats = computed(() => [
   { label: '行业经验', value: yearsOfExperience.value },
   { label: '产品系列', value: productCount.value ? `${productCount.value}+` : legacyFallback(null, '10+') || '—' },
   { label: '客户覆盖', value: '全国' },
-  { label: '官网展示资质', value: certificationCount.value || '—' },
+  { label: '官网展示资质', value: certificationCount || '—' },
 ])
 
 const displayMilestones = computed(() => resolveDisplayMilestones(milestones.value, companyContentSource.value))
 
 onMounted(async () => {
   await load()
-  loadCredentials()
-  loadIpItems()
   pageSections.load()
   initContactMap()
 })
@@ -349,11 +338,11 @@ onBeforeUnmount(() => {
           <div class="about-profile__facts">
             <div><strong>{{ establishmentDate }}</strong><span>成立年份</span></div>
             <div><strong>{{ productCount || '—' }}</strong><span>公开设备型号</span></div>
-            <div><strong>{{ patentCount || '—' }}</strong><span>公开知识产权</span></div>
+            <div><strong>{{ patentCount || '—' }}</strong><span>专利证书展示</span></div>
           </div>
         </div>
         <div class="about-profile__visual reveal" v-reveal>
-          <figure class="about-profile__image-main"><img :src="aboutHeadings.intro.image" alt="利强工厂环境" loading="lazy" decoding="async" /></figure>
+          <figure class="about-profile__image-main"><img :src="aboutHeadings.intro.image" :alt="aboutHeadings.intro.image === FALLBACK_IMAGE_URL ? '利强包装品牌占位图' : '利强工厂环境'" loading="lazy" decoding="async" /></figure>
           <figure v-if="showIntroSecondary" class="about-profile__image-secondary"><img :src="introSecondary.image" alt="利强设备生产现场" loading="lazy" decoding="async" @error="onIntroImageError" /><figcaption>{{ introSecondary.caption }}</figcaption></figure>
         </div>
       </div>
@@ -368,7 +357,7 @@ onBeforeUnmount(() => {
       />
       <div class="manufacturing-grid">
         <div class="manufacturing-image reveal" v-reveal>
-          <img :src="aboutHeadings.manufacturing.image" alt="利强包装生产车间" loading="lazy" decoding="async" />
+          <img :src="aboutHeadings.manufacturing.image" :alt="aboutHeadings.manufacturing.image === FALLBACK_IMAGE_URL ? '利强包装品牌占位图' : '利强包装生产车间'" loading="lazy" decoding="async" />
           <div class="image-label">
             <span>MADE IN WENZHOU</span>
             <strong>制造，从细节开始</strong>
@@ -416,7 +405,7 @@ onBeforeUnmount(() => {
           </template>
         </div>
       </div>
-      <div class="workshop-gallery" aria-label="厂房与制造设备">
+      <div v-if="visibleManufacturingGallery.length" class="workshop-gallery" aria-label="厂房与制造设备">
         <figure v-for="(item, idx) in visibleManufacturingGallery" :key="idx"><img :src="item.image" :alt="item.caption" loading="lazy" decoding="async" @error="onGalleryImageError(idx)" /><figcaption>{{ item.caption }}</figcaption></figure>
       </div>
     </section>
@@ -453,7 +442,7 @@ onBeforeUnmount(() => {
       <SectionHeading
         eyebrow="CERTIFICATIONS"
         :title="aboutHeadings.credentials.title"
-        :description="aboutHeadings.credentials.description || (certifications.length ? '集中展示利强公开的质量体系、产品认证与相关资质证明。' : '资质信息持续整理中，具体文件可联系我们获取。')"
+        :description="aboutHeadings.credentials.description || '展示已核对原件的企业证照；其他资料可联系我们获取。'"
       />
       <div class="about-showcase-controls" aria-label="资质轮播控制">
         <button type="button" aria-label="上一组资质" @click="scrollShowcase(certificationCarousel, -1)">←</button>
@@ -462,11 +451,15 @@ onBeforeUnmount(() => {
       <!-- 资质证书轮播 -->
       <div ref="certificationCarousel" class="credentials-preview about-showcase-track">
         <template v-if="certifications.length">
-          <article
+          <a
             v-for="cert in certifications.slice(0, 6)"
             :key="cert.id || cert.name"
             class="cert-thumb reveal"
             v-reveal
+            :href="cert.image"
+            target="_blank"
+            rel="noopener noreferrer"
+            :aria-label="`查看${cert.name}原图`"
             :class="{ 'has-image': cert.image }"
           >
             <div v-if="cert.image" class="cert-thumb__image">
@@ -485,20 +478,9 @@ onBeforeUnmount(() => {
               <span class="cert-thumb__cat">{{ cert.category || '企业资质' }}</span>
               <strong class="cert-thumb__name">{{ cert.name }}</strong>
             </div>
-          </article>
+          </a>
         </template>
-        <template v-else-if="!nativeCredentialsEnabled && !credentialsError">
-          <div class="cert-thumb placeholder-thumb" v-for="n in 6" :key="n">
-            <div class="cert-thumb__badge">
-              <AppIcon name="shield" :size="22" />
-            </div>
-            <div class="cert-thumb__caption">
-              <span class="cert-thumb__cat">ISO · CE · 检测报告</span>
-              <strong class="cert-thumb__name">管理体系与产品合规认证</strong>
-            </div>
-          </div>
-        </template>
-        <p v-else class="patents-empty">{{ credentialsError ? '官网资质暂时无法加载，请稍后再试。' : '暂无已公开的官网资质。' }}</p>
+        <p v-else class="patents-empty">暂无已核对原件的官网资质。</p>
       </div>
     </section>
 
@@ -507,7 +489,7 @@ onBeforeUnmount(() => {
       <SectionHeading
         eyebrow="PATENTS &amp; IP"
         :title="aboutHeadings.patents.title"
-        :description="aboutHeadings.patents.description || (patents.length ? `当前共公开 ${patentCount} 项知识产权成果，以下展示部分代表性证书。` : '专利信息持续整理中，具体资料可联系我们获取。')"
+        :description="aboutHeadings.patents.description || (patents.length ? `展示 ${patentCount} 份已核对原件的专利证书。` : '专利资料持续整理中，具体资料可联系我们获取。')"
       />
       <div class="about-showcase-controls" aria-label="专利轮播控制">
         <button type="button" aria-label="上一组专利" @click="scrollShowcase(patentCarousel, -1)">←</button>
@@ -516,11 +498,15 @@ onBeforeUnmount(() => {
       <!-- 专利证书轮播 -->
       <div ref="patentCarousel" class="patents-preview about-showcase-track">
         <template v-if="patents.length">
-          <article
+          <a
             v-for="p in patents.slice(0, 6)"
             :key="p.id"
             class="patent-thumb reveal"
             v-reveal
+            :href="p.image"
+            target="_blank"
+            rel="noopener noreferrer"
+            :aria-label="`查看${p.name}专利证书原图`"
           >
             <div v-if="p.image" class="patent-thumb__image">
               <img :src="p.image" :alt="p.name" loading="lazy" decoding="async" @error="(e) => (e.target.style.display = 'none')" />
@@ -534,7 +520,7 @@ onBeforeUnmount(() => {
               <span v-if="p.patentNo">{{ p.patentNo }}</span>
               <span v-else-if="p.applicant">{{ p.applicant }}</span>
             </div>
-          </article>
+          </a>
         </template>
         <template v-else>
           <div class="patents-empty">
