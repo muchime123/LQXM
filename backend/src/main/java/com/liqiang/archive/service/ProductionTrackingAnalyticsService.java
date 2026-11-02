@@ -118,14 +118,25 @@ public class ProductionTrackingAnalyticsService {
         return count==null?0:count;
     }
 
-    /** 不带排序的下钻走这里：沿用既有顺序，其他所有指标的默认排序不受影响。 */
+    /** 不带排序 / 不带状态筛选的下钻走这里：沿用既有顺序，其他所有指标的默认排序不受影响。 */
     public Map<String,Object> orders(String fromDate,String toDate,String workshop,String dateBasis,String month,
                                      String bucket,String reason,String reasonCategory,int page,int size){
-        return orders(fromDate,toDate,workshop,dateBasis,month,bucket,reason,reasonCategory,page,size,null);
+        return orders(fromDate,toDate,workshop,dateBasis,month,bucket,reason,reasonCategory,page,size,null,null);
     }
 
+    /** 不带状态筛选的下钻走这里（周复盘「未完工清单」等只需指定排序的调用方）。 */
     public Map<String,Object> orders(String fromDate,String toDate,String workshop,String dateBasis,String month,
                                      String bucket,String reason,String reasonCategory,int page,int size,String sort){
+        return orders(fromDate,toDate,workshop,dateBasis,month,bucket,reason,reasonCategory,page,size,sort,null);
+    }
+
+    /**
+     * @param status 可选状态筛选，逗号分隔（{@code ON_TIME,LATE}）；留空＝不过滤。
+     *               在 bucket 过滤之后、分页切片之前生效，故 total 与分页随筛选一起变化。
+     */
+    public Map<String,Object> orders(String fromDate,String toDate,String workshop,String dateBasis,String month,
+                                     String bucket,String reason,String reasonCategory,int page,int size,String sort,
+                                     String status){
         if(page<1||size<1||size>100)throw new IllegalArgumentException("分页范围无效");
         if(!BUCKETS.contains(bucket))throw new IllegalArgumentException("分析指标无效");
         if(sort!=null&&!sort.isBlank()&&!SORTS.contains(sort))throw new IllegalArgumentException("排序方式无效");
@@ -135,10 +146,18 @@ public class ProductionTrackingAnalyticsService {
         if(reasonCategory!=null&&!reasonCategory.isBlank()
                 &&!ProductionTrackingReasonTaxonomy.keys().contains(reasonCategory))
             throw new IllegalArgumentException("原因类别无效");
+        // 状态筛选同样白名单校验：任意文本不得进入比较，非法取值走 400 而不是静默返回空列表。
+        var statuses=parseStatuses(status);
+        if(!STATUSES.containsAll(statuses))throw new IllegalArgumentException("工单状态无效");
         LocalDate today=LocalDate.now();
-        var selected=loadRows(fromDate,toDate,workshop,dateBasis,"missingExpected".equals(bucket)).stream()
+        var matched=loadRows(fromDate,toDate,workshop,dateBasis,"missingExpected".equals(bucket)).stream()
                 .filter(item->month==null||month.isBlank()||month.equals(item.row().baseline()==null?"未填写":item.row().baseline().toString().substring(0,7)))
                 .filter(item->matches(item.row(),bucket,reason,reasonCategory,today)).toList();
+        // 选项条数必须按「未加状态筛选」的匹配结果统计：否则勾上「未完工」后其余项全变 0，
+        // 用户既看不出这堆单里还有哪些状态，也没法再改选。
+        var facets=statusFacets(matched);
+        var selected=matched.stream()
+                .filter(item->statuses.isEmpty()||statuses.contains(status(item.row()))).toList();
         // 排序必须发生在切片**之前**：这里是先取全量再按 offset 取页，若只在前端重排已拿到的 20 条，
         // 得到的只是「最近创建的 20 张单」换个顺序，真正超期最久的老单根本不在这批数据里。
         var ordered="openUrgency".equals(sort)?selected.stream().sorted(openUrgency(today)).toList():selected;
@@ -161,7 +180,28 @@ public class ProductionTrackingAnalyticsService {
                     ?ChronoUnit.DAYS.between(row.baseline(),today):null);
             result.add(entry);
         }
-        return Map.of("items",result,"total",ordered.size(),"page",page,"size",size);
+        return Map.of("items",result,"total",ordered.size(),"page",page,"size",size,"statusFacets",facets);
+    }
+
+    /**
+     * 下钻结果里各状态的实际条数，供前端「状态」列表头筛选渲染选项（带条数）。
+     *
+     * <p>按 {@link #STATUSES} 的固定顺序输出、只保留出现过的状态——顺序固定是为了让
+     * 「按期 / 逾期 / 未完工」在下拉里始终同一位置，不被条数多少带跑。
+     */
+    private static java.util.List<Map<String,Object>> statusFacets(java.util.List<AnalysisItem> items){
+        var counts=new java.util.HashMap<String,Long>();
+        for(var item:items)counts.merge(status(item.row()),1L,Long::sum);
+        var facets=new ArrayList<Map<String,Object>>();
+        for(String value:STATUSES){
+            Long count=counts.get(value);
+            if(count!=null&&count>0){
+                var facet=new LinkedHashMap<String,Object>();
+                facet.put("value",value);facet.put("count",count);
+                facets.add(facet);
+            }
+        }
+        return facets;
     }
 
     /** 可选排序白名单：只有显式传入才生效，其余下钻沿用既有顺序（见不带 sort 的重载）。 */
@@ -271,6 +311,26 @@ public class ProductionTrackingAnalyticsService {
         if(row.baseline()==null)return "MISSING_EXPECTED";
         if(row.delivered()==null)return "UNFINISHED";
         return row.delivered().isAfter(row.baseline())?"LATE":"ON_TIME";
+    }
+
+    /**
+     * 下钻列表「状态」列筛选的取值白名单——与 {@link #status(OrderRow)} 的返回值、
+     * 前端 {@code utils/tracking/format.ts#statusLabel} 的 key **逐字同源**，改动必须三处同步。
+     */
+    static final java.util.Set<String> STATUSES=java.util.Set.of(
+            "ON_TIME","LATE","UNFINISHED","CANCELLED","STOPPED","MISSING_EXPECTED");
+
+    /**
+     * 解析前端传来的逗号分隔状态串；空串 / 空白＝不筛选。
+     *
+     * <p>【为什么后端筛而不是前端 filter-method】下钻列表是**服务端分页**（每页 30 条），
+     * 前端筛选只能过滤当前页已拿到的行，会出现「标题写着 200 单、表里只剩 8 行，翻页又回到全量」。
+     * 状态是已有列的取值，交给后端在切片前过滤，总数与分页才跟着一起变。
+     */
+    private static java.util.Set<String> parseStatuses(String status){
+        if(status==null||status.isBlank())return java.util.Set.of();
+        return java.util.Arrays.stream(status.split(",")).map(String::trim)
+                .filter(s->!s.isEmpty()).collect(java.util.toSet());
     }
 
     /**

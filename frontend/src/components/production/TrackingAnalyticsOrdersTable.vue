@@ -9,7 +9,8 @@
     </div>
     <!-- 面板内工具条：如节点分析的状态筛选（生产 / 周复盘不用）。 -->
     <slot name="toolbar" />
-    <el-table v-loading="loading" :data="items" stripe size="small" :empty-text="emptyText" @row-click="openOrder">
+    <el-table v-loading="loading" :data="items" stripe size="small" :empty-text="emptyText"
+      @row-click="openOrder" @filter-change="filters => emit('filter-change', filters)">
       <!-- 基础列：三个分析抽屉（生产分析 / 周复盘 / 节点分析）下钻列表都有的「工单基本信息」 -->
       <el-table-column label="任务单" min-width="80">
         <template #default="{ row }">
@@ -44,6 +45,11 @@
  *
  * 【边界】本组件负责「基础列 + 面板外壳（标题/收起/分页/空态文案）+ 点击打开详情」；
  * 右栏的整体布局与空态占位仍由调用方控制。附加列里若有需要 row 的列，用 `<template #default="{ row }">`。
+ *
+ * 【表头筛选】附加列想用表头筛选时，**不要给列写 `filter-method`** —— 数据是服务端分页的，
+ * 前端过滤只能作用于当前页，会出现「标题 200 单、表里 8 行」。统一做法：列上写
+ * `column-key` + `:filters` + `:filtered-value`，本组件只把 `filter-change` 原样上抛，
+ * 由调用方带着筛选条件重新请求；`filtered-value` 由调用方控制，用于回显与重置勾选。
  */
 import type { TrackingAnalyticsOrder } from '@/api/productionTracking'
 import TrackingAnalyticsSalespersonCell from './TrackingAnalyticsSalespersonCell.vue'
@@ -74,7 +80,13 @@ withDefaults(
   { loading: false, emptyText: '没有符合条件的工单', embedded: false }
 )
 
-const emit = defineEmits<{ 'update:page': [page: number]; 'open-order': [id: number]; close: [] }>()
+/** `filter-change` 是 el-table 原生事件的转发：`{ [columnKey]: 选中的值[] }`，由调用方决定怎么重新取数。 */
+const emit = defineEmits<{
+  'update:page': [page: number]
+  'open-order': [id: number]
+  close: []
+  'filter-change': [filters: Record<string, string[]>]
+}>()
 
 function openOrder(row: OrdersTableRow) {
   emit('open-order', row.id)

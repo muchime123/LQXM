@@ -475,6 +475,11 @@ export const fetchTrackingAnalyticsOrders = async (params: {
    * 其余按预计完成日期由近及远。其他下钻一律不传，避免影响既有默认顺序。
    */
   sort?: string
+  /**
+   * 可选状态筛选：逗号分隔（ON_TIME,LATE…），由下钻列表「状态」列表头筛选驱动。
+   * 走后端而不是前端 filter-method——列表是服务端分页，前端只筛当前页会与总数矛盾。
+   */
+  status?: string
   page: number; size: number
 }) => (await http.get<{ items: TrackingAnalyticsOrder[]; total: number; page: number; size: number }>(
   '/manufacturing/followups/analytics/orders', { params }

@@ -184,7 +184,7 @@ watch(isOpen, async (open) => {
     lastFocused = document.activeElement
     resetForm()
     /* 先加载，打开动画进行中并行跑网络请求 */
-    loadCaptcha()
+    if (!snapshotMode) loadCaptcha()
     loadProductName()
     document.documentElement.style.overflow = 'hidden'
     await nextTick()

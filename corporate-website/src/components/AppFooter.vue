@@ -65,7 +65,6 @@ const address = computed(() =>
           <strong>产品与方案</strong>
           <RouterLink to="/products">产品中心</RouterLink>
           <RouterLink to="/solutions">解决方案</RouterLink>
-          <RouterLink to="/packaging">包材耗材</RouterLink>
         </nav>
         <nav class="footer-nav-group" aria-label="企业导航">
           <strong>企业与合作</strong>
@@ -81,7 +80,7 @@ const address = computed(() =>
         <strong>联系我们</strong>
         <span v-if="address" class="footer-addr">{{ address }}</span>
         <a v-if="email" href="#" @click.prevent="copyText(email)">{{ email }}</a>
-        <button type="button" class="footer-consult-link" @click="openConsult()">提交包装需求 →</button>
+        <button type="button" class="footer-consult-link" @click="openConsult()">联系商务团队 →</button>
       </div>
     </div>
 
@@ -92,7 +91,7 @@ const address = computed(() =>
           <AppIcon name="douyin" :size="18" />
         </a>
       </div>
-      <span class="footer-motto">食品包装 · 设备 / 包材 / 方案</span>
+      <span class="footer-motto">食品包装 · 设备 / 方案 / 服务</span>
     </div>
   </footer>
 </template>

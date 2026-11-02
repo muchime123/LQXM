@@ -13,10 +13,23 @@
  */
 import { nextTick, ref } from 'vue'
 
+/**
+ * loader 的返回形状：`extra` 用于承载与本次下钻同源的附加信息
+ * （目前是生产分析下钻的状态分布 `statusFacets`）。
+ *
+ * 为什么不放在 items 里、也不由调用方自己在 loader 里写 ref：它必须和 items/total
+ * **同一次响应**更新，若调用方各写一份，快速切换指标时旧响应会把新指标的选项覆盖掉。
+ */
+export type TrackingDrilldownResult<T> = {
+  items: T[]
+  total: number
+  extra?: Record<string, unknown>
+}
+
 export type TrackingDrilldownLoader<T> = (
   page: number,
   size: number
-) => Promise<{ items: T[]; total: number }>
+) => Promise<TrackingDrilldownResult<T>>
 
 export function useTrackingDrilldown<T>(opts?: { size?: number }) {
   const size = opts?.size ?? 30
@@ -27,6 +40,8 @@ export function useTrackingDrilldown<T>(opts?: { size?: number }) {
   const loading = ref(false)
   const error = ref('')
   const panel = ref<HTMLElement | null>(null)
+  /** 本次响应附带的附加信息（如状态分布），与 items/total 同步更新、同步清空。 */
+  const extra = ref<Record<string, unknown>>({})
 
   /** 防竞态：后一次请求覆盖前一次，避免快速切换指标时旧响应覆盖新数据。 */
   let request = 0

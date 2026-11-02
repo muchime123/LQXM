@@ -3,8 +3,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 /**
  * 路由配置。
  * - /about          关于我们
- * - /packaging      包装耗材
- * - /molds          旧书签兼容，跳转包材页
+ * - /packaging、/supplies、/molds 旧书签兼容，跳转产品中心
  */
 /**
  * 主导航 key：用于当前一级页高亮。
@@ -15,7 +14,6 @@ export const NAV_KEYS = {
   HOME: 'home',
   PRODUCTS: 'products',
   SOLUTIONS: 'solutions',
-  SUPPLIES: 'supplies',
   ABOUT: 'about',
 }
 
@@ -132,27 +130,20 @@ const routes = [
     },
   },
   {
-    /* 旧耗材入口兼容至包材页。 */
+    /* 首版暂停包材展示，旧入口统一进入设备产品中心。 */
     path: '/supplies',
     name: 'supplies',
-    redirect: { path: '/packaging' },
+    redirect: { path: '/products' },
   },
   {
     path: '/packaging',
     name: 'packaging',
-    component: () => import('../views/Packaging.vue'),
-    meta: {
-      navKey: NAV_KEYS.SUPPLIES,
-      seo: {
-        title: '包装耗材｜封口膜 包装容器 一站式配套',
-        description: '利强包装提供封口膜、卷膜、托盒、杯罐等包装耗材，与利强设备同步匹配，减少采购方与兼容问题。',
-      },
-    },
+    redirect: { path: '/products' },
   },
   {
     path: '/molds',
     name: 'molds',
-    redirect: { path: '/packaging' },
+    redirect: { path: '/products' },
   },
   {
     path: '/:pathMatch(.*)*',

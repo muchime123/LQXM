@@ -173,14 +173,10 @@ const variantCards = computed(() => (detail.value?.variants || []).map((variant)
   specKey: variant.publicSku || variant.specKey,
 })).filter((variant) => variant.variantName || variant.facts.length).slice(0, 6))
 
-const compatiblePackaging = computed(() => detail.value?.compatiblePackaging || [])
-const hasCompatibility = computed(() => compatiblePackaging.value.length > 0)
-
 const detailNav = computed(() => [
   hasIntroduction.value && { id: 'introduction', label: '产品介绍' },
   hasApplicable.value && { id: 'applications', label: '适用场景' },
   variantCards.value.length && { id: 'variants', label: '可选规格' },
-  hasCompatibility.value && { id: 'compatibility', label: '兼容包材' },
   hasAdvantages.value && { id: 'advantages', label: '核心优势' },
   hasSpecs.value && { id: 'specifications', label: '技术参数' },
   hasPackaging.value && { id: 'delivery', label: '交付信息' },
@@ -416,33 +412,6 @@ watch(() => route.params.slug, load)
                 <div v-for="fact in variant.facts" :key="fact.label"><dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd></div>
               </dl>
             </article>
-          </div>
-        </section>
-
-        <section v-if="hasCompatibility" id="compatibility" class="detail-section compatibility-section">
-          <div class="detail-section__heading">
-            <span>COMPATIBILITY</span><h2>兼容包材</h2>
-            <p>可选包材仍需结合实际容器、膜材和生产条件进行试封确认。</p>
-          </div>
-          <div class="detail-section__content compatibility-columns">
-            <div v-if="compatiblePackaging.length" class="compatibility-panel">
-              <header><div><small>PACKAGING</small><h3>兼容包材类型</h3></div><strong>{{ compatiblePackaging.length }}</strong></header>
-              <article v-for="item in compatiblePackaging" :key="`${item.productVariantId}-${item.packagingVariantId}`" class="compatibility-card">
-                <div class="compatibility-card__title">
-                  <div><small>{{ item.productVariantName || '产品规格' }}</small><h4>{{ item.packagingModelName }}</h4></div>
-                  <span v-if="item.customizable">支持定制</span>
-                </div>
-                <p v-if="item.packagingVariantName">{{ item.packagingVariantName }}</p>
-                <ul>
-                  <li v-if="item.packagingKind">{{ item.packagingKind }}</li>
-                  <li v-if="item.material">{{ item.material }}</li>
-                  <li v-if="item.shapeType">{{ item.shapeType }}</li>
-                  <li v-if="item.apertureLabel">{{ item.apertureLabel }}</li>
-                  <li v-if="item.capacityMl">{{ item.capacityMl }} ml</li>
-                </ul>
-              </article>
-            </div>
-
           </div>
         </section>
 
