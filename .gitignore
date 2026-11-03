@@ -52,6 +52,14 @@ query
 corporate-website/node_modules/
 scripts/node_modules/
 
+# --- 官网构建产物（由 npm run build 生成，不入库） ---
+# dist 每次构建都会变（资源哈希、sitemap 条目、快照副本），入库后源码与产物容易分叉，
+# 也制造大量无意义 diff。部署侧从源码构建：Cloudflare Pages
+# Build command = npm run build，Build output directory = corporate-website/dist。
+corporate-website/dist/
+# 构建校验用的临时产物目录（与 dist 同源，同样不入库）
+website-build-check/
+
 # --- Env ---
 .env
 .env.local
