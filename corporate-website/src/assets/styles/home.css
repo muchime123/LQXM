@@ -8,7 +8,7 @@
 /* ============ Header ============ */
 .site-header {
   height: var(--header-height);
-  padding: 0 max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding: 0 var(--container-gutter);
   display: flex;
   align-items: center;
   gap: 56px;
@@ -235,7 +235,7 @@
   overflow: hidden;
   display: grid;
   grid-template-columns: minmax(0, 760px) 1fr;
-  padding: 150px max(var(--pad), calc((100vw - var(--max)) / 2)) 80px;
+  padding: 150px var(--container-gutter) 80px;
 }
 .hero-grid {
   position: absolute;
@@ -263,7 +263,7 @@
 
 /* ============ Section 通用 ============ */
 .section {
-  padding: var(--section-space) max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding: var(--section-space) var(--container-gutter);
 }
 .section--alt {
   background: var(--paper);
@@ -632,7 +632,7 @@
   background: var(--cta-bg-default);
   color: var(--white);
   min-height: var(--cta-min-height);
-  padding: var(--cta-padding-y) max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding: var(--cta-padding-y) var(--container-gutter);
   position: relative;
   overflow: hidden;
   display: flex;
@@ -647,7 +647,7 @@
   background: var(--paper);
   color: var(--ink);
   min-height: auto;
-  padding: 60px max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding: 60px var(--container-gutter);
 }
 .site-cta__inner {
   position: relative;
@@ -712,7 +712,7 @@
 footer {
   background: var(--footer-bg-deep);
   color: var(--footer-color);
-  padding: 28px max(var(--pad), calc((100vw - var(--max)) / 2)) 0;
+  padding: 28px var(--container-gutter) 0;
 }
 .footer-grid {
   display: grid;
@@ -771,6 +771,10 @@ footer {
   letter-spacing: .5px;
   transition: color var(--dur) var(--ease);
   cursor: pointer;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: inherit;
 }
 .footer-phone:hover {
   color: var(--cyan);
@@ -805,11 +809,20 @@ button.footer-consult-link {
   text-align: right;
 }
 button.footer-consult-link:hover { text-decoration: underline; }
-.footer-contact a {
+.footer-contact a,
+.footer-contact .footer-plain-link {
   color: var(--footer-color);
   transition: color var(--dur) var(--ease);
 }
-.footer-contact a:hover {
+.footer-contact .footer-plain-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+.footer-contact a:hover,
+.footer-contact .footer-plain-link:hover {
   color: var(--white);
 }
 .footer-contact .footer-addr {
@@ -869,10 +882,11 @@ button.footer-consult-link:hover { text-decoration: underline; }
 /* ============ 响应式 ============ */
 @media (max-width: 980px) {
   body.mobile-nav-active { overflow: hidden; }
-  .site-header { height: var(--header-height-mobile-sm); padding: 0 20px; }
+  /* 与 site-redesign.css 最终生效的 .site-header 高度保持一致，避免菜单盖住 header 底部 */
+  .site-header { height: var(--header-height-mobile); padding: 0 20px; }
   .desktop-nav {
     position: fixed;
-    top: var(--header-height-mobile-sm);
+    top: var(--header-height-mobile);
     left: 0;
     right: 0;
     background: var(--navy);

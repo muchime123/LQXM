@@ -32,12 +32,12 @@ async function load({ force = false } = {}) {
       const [data, featuredProducts, bannerData] = await Promise.all([
         fetchHome(),
         // 核心产品属于后台高频运营配置，每次加载首页都取最新值，不使用 10 分钟缓存。
-        fetchFeaturedProducts(12, { bypass: true }).catch(() => []),
+        fetchFeaturedProducts(8, { bypass: true }).catch(() => []),
         fetchBanners().catch(() => ({}))
       ])
       company.value = data.company || {}
       // 核心产品使用独立接口，避免首页聚合接口的历史数量上限影响轮播。
-      products.value = (featuredProducts.length ? featuredProducts : (data.products || [])).slice(0, 12)
+      products.value = (featuredProducts.length ? featuredProducts : (data.products || [])).slice(0, 8)
       milestones.value = data.milestones || []
       productCount.value = data.productCount || products.value.length || 0
       banners.value = bannerData || {}

@@ -172,7 +172,7 @@
   overflow: hidden;
   background: var(--navy);
   color: var(--white);
-  padding: var(--space-30) max(var(--pad), calc((100vw - var(--max)) / 2)) var(--space-20);
+  padding: var(--space-30) var(--container-gutter) var(--space-20);
   display: grid;
   grid-template-columns: 1fr;
   gap: var(--space-12);
@@ -256,7 +256,7 @@
 /* ===== 页面工具栏（搜索 + 分类 Tab） ===== */
 .page-toolbar {
   background: var(--white-alpha-96);
-  padding: 18px max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding: 18px var(--container-gutter);
   border-bottom: 1px solid var(--line);
   display: flex;
   align-items: center;
@@ -292,6 +292,30 @@
   border-color: var(--search-focus-border);
   background-color: var(--white);
 }
+/* 独立清除入口：只清关键词，不影响分类与高级筛选 */
+.searchbar__clear {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.searchbar__clear:hover { background: var(--paper); color: var(--ink); }
+.searchbar__clear:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+.searchbar:has(.searchbar__clear) input { padding-right: 42px; }
+/* 隐藏浏览器原生 search 清除按钮，避免与自定义入口重复 */
+.searchbar input::-webkit-search-cancel-button { display: none; }
+.searchbar input::-ms-clear { display: none; }
 .category-tabs {
   display: flex;
   gap: 8px;
@@ -326,7 +350,7 @@
   justify-content: center;
   align-items: center;
   gap: 8px;
-  padding: var(--space-8) max(var(--pad), calc((100vw - var(--max)) / 2)) var(--space-20);
+  padding: var(--space-8) var(--container-gutter) var(--space-20);
 }
 .pagination button {
   min-width: var(--pagination-btn-size);
@@ -358,6 +382,16 @@
   color: var(--muted);
   font-size: var(--text-sm);
   padding: 0 12px;
+}
+.pagination__pages { display: flex; align-items: center; gap: 8px; }
+.pagination__gap { min-width: var(--pagination-btn-size); text-align: center; color: var(--muted); }
+.pagination__compact { display: none; color: var(--ink); font-size: var(--text-sm); font-weight: 600; }
+/* 手机端不再渲染全部页码，改为「第 x / y 页」紧凑形态 */
+@media (max-width: 520px) {
+  .pagination { gap: 6px; flex-wrap: wrap; }
+  .pagination__pages,
+  .pagination .page-info { display: none; }
+  .pagination__compact { display: inline-flex; align-items: center; min-height: var(--pagination-btn-size); }
 }
 
 /* ===== 骨架屏 ===== */
@@ -483,7 +517,7 @@
 
 /* ===== 面包屑 ===== */
 .breadcrumb {
-  padding: var(--space-5) max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding: var(--space-5) var(--container-gutter);
   font-size: var(--text-sm);
   color: var(--muted);
   border-bottom: 1px solid var(--line);
@@ -512,7 +546,7 @@
 
 /* ===== 通用区块 ===== */
 .section {
-  padding: var(--section-space) max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding: var(--section-space) var(--container-gutter);
 }
 .section--alt {
   background: var(--paper);

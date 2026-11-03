@@ -149,8 +149,17 @@
   /* ===== 卡片交互态 ===== */
   --hover-border: #b9d9ea;
 
-  /* ===== 容器 ===== */
-  --max: 1440px;
+  /* ===== 容器 =====
+     内容实际宽度 = min(视口 - 2 × --pad, --container)。
+     - --container        展示型容器：区块 / 列表 / 详情 / 页头页脚，全站默认
+     - --container-read   阅读型容器：文章正文（长文需要控制行长，不与展示区同宽）
+     - --container-gutter 两侧留白公式，全站容器一律引用，禁止各处重复 calc
+     调整全站宽度只需改 --container；想让文章页更窄/更宽只改 --container-read。 */
+  --container: 1600px;
+  --container-read: 1440px;
+  --container-gutter: max(var(--pad), calc((100vw - var(--container)) / 2));
+  --container-gutter-read: max(var(--pad), calc((100vw - var(--container-read)) / 2));
+  --max: var(--container);   /* 兼容旧名：等价于展示型容器，新代码请用 --container */
   --pad: clamp(20px, 3vw, 32px);
 
   /* ===== 区块节奏 ===== */
@@ -196,6 +205,10 @@
   --header-height: 92px;
   --header-height-mobile: 76px;
   --header-height-mobile-sm: 72px;
+  /* 锚点滚动偏移：固定导航高度 + 视觉呼吸。
+     base.css 的 scroll-padding/scroll-margin、各处 scroll-margin-top、
+     router 的 scrollToHash 都引用这一处，不要再写 100/110 之类的数字。 */
+  --header-offset: 100px;
   --nav-dropdown-radius: 6px;
   --nav-item-font-size: 15px;
   --nav-item-opacity: .84;

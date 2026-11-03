@@ -8,18 +8,91 @@
   min-height: 100vh;
 }
 
-.product-catalog { background: var(--paper); padding-bottom: var(--section-space); scroll-margin-top: 92px; }
+.product-catalog { background: var(--paper); padding-bottom: var(--section-space); scroll-margin-top: var(--header-offset); }
 .product-filter { align-items: flex-end; flex-wrap: nowrap; }
 .product-filter__search { flex: 0 0 380px; }
 .product-filter__search .searchbar { max-width: none; }
 .product-filter__categories { min-width: 0; flex: 1; }
 .product-filter .category-tabs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; scrollbar-width: thin; }
+.advanced-filter-toggle-wrap { margin: 14px var(--container-gutter) 20px; }
+.advanced-filter-toggle { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 8px 16px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font: inherit; cursor: pointer; }
+.advanced-filter-toggle:hover { border-color: var(--brand-blue); }
+.advanced-filter-toggle:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+.advanced-filter-toggle span:last-child { font-size: 19px; line-height: 1; }
+
+/* ===== 切换筛选时的「更新中」状态 =====
+   保留上一批结果避免页面闪烁，但必须显式标记，且禁止基于旧结果交互。 */
+.catalog-refreshing {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border: 1px solid rgba(67, 198, 213, .35);
+  border-radius: 10px;
+  background: #f2fbfc;
+  color: var(--blue-deep);
+  font-size: 13px;
+}
+.catalog-refreshing__dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--cyan);
+  animation: catalog-pulse 1s ease-in-out infinite;
+}
+@keyframes catalog-pulse { 50% { opacity: .3; } }
+.products-grid[data-refreshing="true"] {
+  opacity: .55;
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+/* 小屏筛选面板收起后滚动到结果区时，避免被固定 header 遮挡 */
+#product-results { scroll-margin-top: var(--header-offset); }
+@media (prefers-reduced-motion: reduce) {
+  .catalog-refreshing__dot { animation: none; }
+}
+
+/* ===== 小屏筛选面板 =====
+   桌面沿用折叠按钮；<=900px 时面板限高内部滚动，并给出明确的收起 / 清除入口。 */
+.advanced-filter-actions { display: none; }
+@media (max-width: 900px) {
+  .advanced-filter-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+    padding: 12px 16px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+  }
+  .advanced-filter-actions > span { color: var(--muted); font-size: 12px; }
+  .advanced-filter-actions__buttons { display: flex; gap: 8px; }
+  .advanced-filter-actions button {
+    min-height: 40px;
+    padding: 0 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+    color: var(--ink);
+    font: inherit;
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .advanced-filter-actions button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+  .advanced-filter-actions button.is-primary { border-color: var(--blue); background: var(--blue); color: var(--white); }
+  .catalog-sidebar { max-height: 65vh; overflow-y: auto; overscroll-behavior: contain; }
+}
 
 /* ===== 两栏布局：左侧筛选 + 右侧内容 ===== */
 .catalog-layout {
   display: flex;
   gap: 28px;
-  margin: 0 max(var(--pad), calc((100vw - var(--max)) / 2));
+  margin: 0 var(--container-gutter);
   padding: 0 0 32px;
 }
 .catalog-sidebar {
@@ -64,8 +137,9 @@
 }
 .selection-filter select:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
 
+/* 列数只由下方 .products-grid 的 auto-fit 决定（min 280px）。
+   这里只收紧行高与间距，避免多处固定列数在同一元素上互相覆盖。 */
 .product-catalog .products-grid {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   grid-auto-rows: max-content;
   align-items: start;
   gap: 18px;
@@ -81,16 +155,11 @@
 @media (max-width: 900px) {
   .product-filter { align-items: stretch; flex-direction: column; }
   .product-filter__search { flex-basis: auto; width: 100%; }
-  .product-catalog .products-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-}
-
-@media (min-width: 901px) and (max-width: 1200px) {
-  .product-catalog .products-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 520px) {
+  .advanced-filter-toggle-wrap { margin-inline: 20px; }
   .product-filter { padding-inline: 20px; }
-  .product-catalog .products-grid { grid-template-columns: 1fr; }
   .catalog-layout { margin-inline: 20px; }
   .selection-filter { grid-template-columns: 1fr; padding: 15px; }
   .selection-filter__intro { grid-column: auto; }
@@ -113,18 +182,18 @@
   display: grid;
   /* auto-fit + minmax：列数随视口自适应，卡片最小宽度与首页精选产品一致（280px）
      以保持官网整体视觉节奏统一。
-     容器使用 --max + --pad 公式，与 Hero、工具栏、分页等所有容器严格对齐。
-     典型效果（1920px 封顶下）：
-       1920px → 6 列（(1920-2*48.6) - 5*24 = 1822.8 - 120 = 1702.8，1702.8÷280≈6.08）
-       1440px → 5 列（(1440-2*32) - 4*24 = 1376 - 96 = 1280，1280÷280≈4.57→5）
-       1200px → 4 列（(1200-2*32) - 3*24 = 1136 - 72 = 1064，1064÷280≈3.8→4）
-       950px  → 3 列（(950-2*32) - 2*24 = 886 - 48 = 838，838÷280≈2.99→3）
-       650px  → 2 列（(650-2*20) - 1*24 = 610 - 24 = 586，586÷280≈2.09→2）
+     容器 = --container，两侧留白 = --container-gutter，与 Hero、工具栏、分页等所有容器严格对齐。
+     可用宽 = 视口 - 2×留白，列数满足 n×280 + (n-1)×24 ≤ 可用宽：
+       1920px → 5 列（容器 1600）
+       1440px → 4 列（留白回落到 --pad，可用 1376）
+       1200px → 3 列（可用 1136）
+       950px  → 2 列（可用 886）
+       650px  → 2 列（可用 610）
        <560px → 1 列 */
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 24px;
   /* 与官网全局横向节奏对齐：Hero / toolbar / breadcrumb / pagination 全部走此公式 */
-  padding: 28px max(var(--pad), calc((100vw - var(--max)) / 2)) 32px;
+  padding: 28px var(--container-gutter) 32px;
 }
 
 .catalog-main .catalog-overview {
@@ -135,8 +204,8 @@
   padding: 24px 0 0;
 }
 .catalog-main .products-grid {
+  /* 列数继承 .products-grid 的 auto-fit，这里只覆盖内边距 */
   padding: 20px 0 32px;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
 }
 .catalog-overview__eyebrow { margin: 0 0 8px; color: var(--blue); font: 600 11px var(--font-display); letter-spacing: 1.8px; }
 .catalog-overview h2 { margin: 0; color: var(--ink); font-size: clamp(26px, 2.6vw, 36px); }
@@ -144,6 +213,65 @@
 .catalog-overview__meta strong { color: var(--ink); }
 .catalog-overview__meta button { padding: 0; border: 0; border-bottom: 1px solid currentColor; background: none; color: var(--blue-deep); font: inherit; cursor: pointer; }
 .catalog-overview__meta button:hover { color: var(--blue); }
+
+/* 当前已选条件：可逐项移除，避免只能整体清除 */
+.active-filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.active-filter-chips li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid rgba(120, 158, 168, .3);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 12px;
+}
+.active-filter-chips button {
+  width: 20px;
+  height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+}
+.active-filter-chips button:hover { background: var(--paper); color: var(--ink); }
+.active-filter-chips button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+/* 分类加载失败时的可见降级提示 */
+.category-tabs__error {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border: 1px solid rgba(196, 92, 62, .28);
+  border-radius: 8px;
+  background: #fdf5f2;
+  color: #8a3a24;
+  font-size: 12px;
+}
+.category-tabs__error button {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
 
 .empty-state .button { margin-top: 18px; }
 
@@ -220,16 +348,19 @@
   display: grid;
   grid-template-columns: 1.1fr 1fr;
   gap: clamp(44px, 5vw, 76px);
-  padding: 48px max(var(--pad), calc((100vw - var(--max)) / 2)) 64px;
+  padding: 48px var(--container-gutter) 64px;
 }
 
 .detail-gallery {
   position: sticky;
-  top: 100px;
+  top: var(--header-offset);
   align-self: start;
 }
+.detail-mobile-heading { display: none; }
 
 .detail-main-image {
+  padding: 0;
+  cursor: zoom-in;
   width: 100%;
   aspect-ratio: 4 / 3;
   background: var(--paper);
@@ -240,6 +371,28 @@
   justify-content: center;
   overflow: hidden;
 }
+
+.detail-image-preview {
+  position: fixed;
+  inset: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px;
+  background: rgba(8, 20, 38, .94);
+  color: white;
+}
+.detail-image-preview img { max-width: min(82vw, 1400px); max-height: 88vh; object-fit: contain; }
+.detail-image-preview button { border: 0; background: rgba(255,255,255,.12); color: white; cursor: pointer; font-size: 38px; min-width: 48px; min-height: 48px; }
+.detail-image-preview__close { position: absolute; top: 16px; right: 16px; }
+.detail-image-preview > span { position: absolute; bottom: 12px; }
+.detail-related { padding: 48px var(--container-gutter) 64px; }
+.detail-related__heading { display: flex; align-items: baseline; justify-content: space-between; gap: 20px; margin-bottom: 24px; }
+.detail-related__heading h2 { margin: 0; font-size: clamp(26px, 3vw, 38px); }
+.detail-related__grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+@media (max-width: 760px) { .detail-related__grid { grid-template-columns: 1fr; } }
 
 .detail-main-image img {
   width: 100%;
@@ -344,7 +497,7 @@
   display: flex;
   align-items: center;
   gap: 28px;
-  padding: 16px max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding: 16px var(--container-gutter);
   border-block: 1px solid var(--line);
   background: var(--white-alpha-96);
   box-shadow: 0 8px 20px rgba(16, 35, 60, .04);
@@ -412,7 +565,8 @@
   padding: 56px 0;
   margin-top: 0;
   border-top: 1px solid var(--line);
-  scroll-margin-top: 130px;
+  /* 详情页有第二层锚点导航（sticky），偏移 = 固定导航 + 子导航高度 */
+  scroll-margin-top: calc(var(--header-offset) + 30px);
 }
 
 .detail-section__heading span {
@@ -516,6 +670,15 @@
   .detail-anchor-nav a { flex: 0 0 auto; scroll-snap-align: start; }
 }
 @media (max-width: 640px) {
+  .detail-mobile-heading { display: block; }
+  .detail-mobile-heading h1 { font-size: clamp(28px, 8vw, 38px); line-height: 1.15; margin: 10px 0 0; }
+  .detail-info .detail-desktop-heading { display: none; }
+  .detail-info { display: flex; flex-direction: column; }
+  .detail-info .detail-summary { order: 1; }
+  .detail-info .detail-cta { order: 2; }
+  .detail-info .detail-selection-facts { order: 3; }
+  .detail-info .detail-fit-summary { order: 4; }
+  .detail-info .chips { order: 5; }
   .compatibility-columns { grid-template-columns: 1fr; }
 
 
@@ -558,9 +721,9 @@
 
 /* 详情 sections 容器。
    与 .detail-container / .detail-anchor-nav 保持同一水平节奏：全宽元素 + calc 留白，
-   内容宽度恒为 var(--max)。不能用 max-width 限制（border-box 下会与 calc 内边距叠加压缩内容）。 */
+   内容宽度恒为 var(--container)。不能用 max-width 限制（border-box 下会与 calc 内边距叠加压缩内容）。 */
 .product-detail-page .detail-sections {
-  padding: 0 max(var(--pad), calc((100vw - var(--max)) / 2)) var(--section-space);
+  padding: 0 var(--container-gutter) var(--section-space);
   max-width: none;
   margin-inline: 0;
 }

@@ -9,7 +9,7 @@
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
   gap: clamp(40px, 4.5vw, 72px);
-  width: min(calc(100% - (var(--pad) * 2)), var(--max));
+  width: min(calc(100% - (var(--pad) * 2)), var(--container-read));
   margin: 0 auto;
   padding: 0 0 var(--section-space);
 }
@@ -24,13 +24,34 @@
   padding: 4px 4px 22px;
 }
 
-.article-viewer__toc-title {
+/* 桌面端：details 常开，summary 作为纯标题（点击不折叠） */
+.article-viewer__toc-summary {
   display: block;
-  margin-bottom: 6px;
+  padding: 0 0 6px;
   color: var(--blue);
   font-size: 11px;
   font-weight: var(--font-bold);
   letter-spacing: .1em;
+  list-style: none;
+  cursor: default;
+}
+
+.article-viewer__toc-summary::-webkit-details-marker {
+  display: none;
+}
+
+.article-viewer__toc-title {
+  display: inline;
+}
+
+.article-viewer__toc-count {
+  color: var(--muted);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+.article-viewer__toc-list {
+  display: block;
 }
 
 .article-viewer__toc-item {
@@ -82,7 +103,7 @@
   color: var(--ink);
   font-size: clamp(25px, 2.5vw, 34px);
   line-height: 1.35;
-  scroll-margin-top: 120px;
+  scroll-margin-top: calc(var(--header-offset) + 20px);
 }
 
 .article-rich h3 {
@@ -90,7 +111,7 @@
   color: var(--ink);
   font-size: clamp(19px, 1.8vw, 24px);
   line-height: 1.45;
-  scroll-margin-top: 120px;
+  scroll-margin-top: calc(var(--header-offset) + 20px);
 }
 
 .article-rich p {
@@ -155,6 +176,8 @@
 .article-rich img {
   display: block;
   width: 100%;
+  max-width: 100%;
+  height: auto;
   margin: 8px 0 26px;
   border-radius: var(--radius-card);
   background: var(--paper);
@@ -174,6 +197,28 @@
   margin: 0 0 28px;
   border-collapse: collapse;
   font-size: 14px;
+}
+
+/* 宽参数表由 ArticleViewer 自动包一层横向滚动容器：
+   表格保持可读列宽，页面本身不被撑出横向溢出。 */
+.article-table-scroll {
+  margin: 0 0 28px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+}
+
+.article-table-scroll table {
+  margin: 0;
+  min-width: 480px;
+  border: 0;
+}
+
+.article-table-scroll th,
+.article-table-scroll td {
+  border-left: 0;
+  border-right: 0;
 }
 
 .article-rich th,
@@ -216,9 +261,52 @@
 
   .article-viewer__aside {
     position: static;
+    margin-bottom: 26px;
   }
 
+  /* 手机端不再隐藏目录，改为可展开的章节菜单，避免长文失去导航 */
   .article-viewer__toc {
-    display: none;
+    padding: 0;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-card);
+    background: #fff;
+    overflow: hidden;
+  }
+
+  .article-viewer__toc-summary {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 48px;
+    padding: 0 16px;
+    color: var(--ink);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0;
+    cursor: pointer;
+  }
+
+  .article-viewer__toc-summary::after {
+    content: '+';
+    margin-left: auto;
+    color: var(--blue);
+    font-size: 18px;
+    line-height: 1;
+  }
+
+  .article-viewer__toc[open] .article-viewer__toc-summary::after {
+    content: '−';
+  }
+
+  .article-viewer__toc-list {
+    padding: 4px 16px 14px;
+    border-top: 1px solid var(--line);
+    max-height: 46vh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .article-viewer__toc-item {
+    padding: 10px 0;
   }
 }

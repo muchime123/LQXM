@@ -158,8 +158,16 @@ const routes = [
   },
 ]
 
-/* 固定 header 高度：与 .site-header (88px) 对齐，滚动时避免锚点被遮挡 */
-const HEADER_OFFSET = 100
+/* 锚点偏移的唯一来源是 tokens.css 的 --header-offset（固定导航高度 + 视觉呼吸）。
+   CSS 尚未加载或变量缺失时回退到 100，保证跳转行为不退化；
+   不要再在页面里写 100/110 之类的固定数字。 */
+const FALLBACK_HEADER_OFFSET = 100
+
+function headerOffset() {
+  const raw = getComputedStyle(document.documentElement).getPropertyValue('--header-offset')
+  const value = Number.parseFloat(raw)
+  return Number.isFinite(value) ? value : FALLBACK_HEADER_OFFSET
+}
 
 /**
  * 尝试滚动到锚点：兼容跨页异步渲染组件（Solutions 的 :id 等）。
@@ -171,7 +179,7 @@ function scrollToHash(hash) {
     const tryScroll = () => {
       const el = document.querySelector(hash)
       if (el) {
-        const y = el.getBoundingClientRect().top + window.pageYOffset - HEADER_OFFSET
+        const y = el.getBoundingClientRect().top + window.pageYOffset - headerOffset()
         window.scrollTo({ top: y, behavior: attempts > 0 ? 'auto' : 'smooth' })
         resolve()
       } else if (attempts < 12) {

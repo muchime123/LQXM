@@ -11,7 +11,10 @@
  */
 
 export const SITE_NAME = '利强包装'
-export const SITE_URL = 'https://www.liqiangbz.com'
+/* 站点主域名来自构建配置：国内站与外贸站共用同一套代码时，通过 VITE_SITE_URL
+   指定收录域名，canonical / og:url / 分享图绝对地址会一起跟随；
+   未配置时回退中文站默认域名，本地开发与既有部署行为不变。 */
+export const SITE_URL = (import.meta.env?.VITE_SITE_URL || 'https://www.liqiangbz.com').replace(/\/+$/, '')
 const DEFAULT_OG_IMAGE = '/images/logo-only.png'
 
 /**

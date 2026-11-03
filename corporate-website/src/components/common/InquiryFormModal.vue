@@ -13,6 +13,7 @@ import { snapshotMode } from '../../api/snapshot'
 import { useInquiryModal } from '../../composables/useInquiryModal'
 import { useCompany } from '../../composables/useCompany'
 import { useCopy } from '../../composables/useCopy'
+import { trapTabKey } from '../../composables/useFocusTrap'
 import AppIcon from '../AppIcon.vue'
 import FormField from './FormField.vue'
 
@@ -23,6 +24,9 @@ const {
   productName: modalProductName,
   sourcePage: modalSourcePage,
   sceneLabel: modalSceneLabel,
+  sceneKey: modalSceneKey,
+  articleSlug: modalArticleSlug,
+  articleTitle: modalArticleTitle,
   closeInquiry,
 } = useInquiryModal()
 
@@ -30,10 +34,23 @@ const { company } = useCompany()
 const { copyText, toast } = useCopy()
 
 const phoneRaw = computed(() => company.value?.phone || '4009008878')
+/* 提示文案里的号码跟随后台配置，不再写死；400 号码按 3-3-4 分组便于阅读 */
+const phoneDisplay = computed(() => {
+  const raw = String(phoneRaw.value || '').replace(/\s+/g, '')
+  return /^400\d{7}$/.test(raw) ? `${raw.slice(0, 3)} ${raw.slice(3, 6)} ${raw.slice(6)}` : phoneRaw.value
+})
 const contactEmail = computed(() => company.value?.email || '768963166@qq.com')
-const contactMailto = computed(() => `mailto:${contactEmail.value}?subject=${encodeURIComponent(
-  `官网咨询${form.value.product ? `：${form.value.product}` : ''}`
-)}`)
+/* 静态模式没有后端，上下文只能写进邮件：主题带产品，正文带场景与所读文章，
+   让商务在不打开官网的情况下也知道这条线索从哪来。 */
+const contactMailto = computed(() => {
+  const subject = `官网咨询｜${[formTitle.value, form.value.product].filter(Boolean).join(' · ')}`
+  const lines = [`咨询类型：${formTitle.value}`]
+  if (form.value.product) lines.push(`关注产品：${form.value.product}`)
+  if (modalSceneLabel.value) lines.push(`应用场景：${modalSceneLabel.value}`)
+  if (modalArticleTitle.value) lines.push(`阅读文章：${modalArticleTitle.value}`)
+  lines.push('', '需求描述：', '', '（请补充产品、容器尺寸、目标产能或样品信息）')
+  return `mailto:${contactEmail.value}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`
+})
 const isSampleInquiry = computed(() => inquiryType.value === 'sample')
 
 const formTitle = computed(() => (isSampleInquiry.value ? '申请样品试封' : '获取包装方案'))
@@ -131,6 +148,8 @@ async function handleSubmit() {
     const source = modalSourcePage.value || 'modal'
     const slug = modalProductSlug.value
     const scene = modalSceneLabel.value
+    const sceneKeyValue = modalSceneKey.value
+    const article = modalArticleSlug.value
     const payload = {
       name: form.value.name,
       company: form.value.company,
@@ -138,7 +157,8 @@ async function handleSubmit() {
       email: form.value.email,
       product: form.value.product,
       description: form.value.description,
-      sourcePage: `[弹窗] type=${inquiryType.value}${slug ? `&product=${slug}` : ''}${scene ? `&scene=${encodeURIComponent(scene)}` : ''}&source=${encodeURIComponent(source)}`,
+      /* 来源串带上文章 slug，后台据此区分「看完哪篇方案后发起咨询」 */
+      sourcePage: `[弹窗] type=${inquiryType.value}${slug ? `&product=${slug}` : ''}${scene ? `&scene=${encodeURIComponent(scene)}` : ''}${sceneKeyValue ? `&sceneKey=${encodeURIComponent(sceneKeyValue)}` : ''}${article ? `&article=${encodeURIComponent(article)}` : ''}&source=${encodeURIComponent(source)}`,
       website: form.value.website,
       captchaId: captchaId.value,
       captchaAnswer: captchaAnswer.value,
@@ -161,9 +181,9 @@ async function handleSubmit() {
       submitError.value = '验证码不正确或已过期，请重新填写'
       loadCaptcha()
     } else if (msg.includes('RATE_LIMITED') || msg.includes('429')) {
-      submitError.value = '提交过于频繁，请稍后再试或直接拨打 400 900 8878'
+      submitError.value = `提交过于频繁，请稍后再试或直接拨打 ${phoneDisplay.value}`
     } else {
-      submitError.value = '提交失败，请稍后重试或直接拨打 400 900 8878'
+      submitError.value = `提交失败，请稍后重试或直接拨打 ${phoneDisplay.value}`
     }
     if (msg.includes('CAPTCHA_INVALID') || msg.includes('400')) {
       loadCaptcha()
@@ -197,10 +217,14 @@ watch(isOpen, async (open) => {
   }
 })
 
-/* ESC 关闭 */
+/* ESC 关闭 + Tab 焦点限制在弹窗内（背景内容仍可聚焦，必须拦截） */
 function onKeyDown(e) {
   if (!isOpen.value) return
-  if (e.key === 'Escape') closeInquiry()
+  if (e.key === 'Escape') {
+    closeInquiry()
+    return
+  }
+  trapTabKey(e, dialogRef.value)
 }
 
 /* 点击遮罩关闭（仅当直接点到 overlay 本身） */
@@ -259,6 +283,12 @@ onBeforeUnmount(() => {
                   <div class="context-value">{{ modalSceneLabel }}</div>
                 </div>
 
+                <!-- 带入的方案文章上下文 -->
+                <div v-if="modalArticleTitle" class="side-context">
+                  <div class="context-label">阅读文章</div>
+                  <div class="context-value">{{ modalArticleTitle }}</div>
+                </div>
+
                 <!-- 样品模式专属提示 -->
                 <div v-if="isSampleInquiry" class="side-tip side-tip--sample">
                   <AppIcon name="check" :size="16" />
@@ -266,11 +296,11 @@ onBeforeUnmount(() => {
                 </div>
                 <div v-else class="side-tip">
                   <AppIcon name="automation" :size="16" />
-                  <span>24 小时内响应，选型 / 工艺 / 产线一站式建议</span>
+                  <span>设备选型与样品试封咨询</span>
                 </div>
 
                 <div class="side-contact">
-                  <div><strong>咨询热线</strong><a :href="`tel:${phoneRaw}`">{{ phoneRaw }}</a></div>
+                  <div><strong>咨询热线</strong><a :href="`tel:${phoneRaw}`">{{ phoneDisplay }}</a></div>
                 </div>
               </aside>
 
@@ -278,10 +308,18 @@ onBeforeUnmount(() => {
               <div class="inquiry-modal__body">
                 <div v-if="snapshotMode" class="modal-form-body static-contact">
                   <h4>直接联系商务团队</h4>
-                  <p>点击“写邮件”会打开您的邮件程序。只有确认发送后，我们才会收到消息；也可以直接拨打电话。</p>
-                  <a ref="firstInputRef" class="submit-button" :href="contactMailto">写邮件至 {{ contactEmail }} →</a>
-                  <a class="static-contact__phone" :href="`tel:${phoneRaw}`">拨打 {{ phoneRaw }}</a>
-                  <button type="button" class="static-contact__copy" @click="copyText(contactEmail)">复制邮箱地址</button>
+                  <p>首版官网不收集在线表单。点击按钮复制联系方式，在您自己的电话或邮箱里发起联系；也可以直接写邮件。</p>
+                  <div class="static-contact__actions">
+                    <button ref="firstInputRef" type="button" class="submit-button" @click="copyText(phoneDisplay)">
+                      复制电话 {{ phoneDisplay }}
+                    </button>
+                    <button type="button" class="submit-button is-ghost" @click="copyText(contactEmail)">
+                      复制邮箱 {{ contactEmail }}
+                    </button>
+                  </div>
+                  <p class="static-contact__alt">
+                    或<a :href="contactMailto">直接写邮件</a>／<a :href="`tel:${phoneRaw}`">拨打 {{ phoneDisplay }}</a>
+                  </p>
                 </div>
                 <form v-else @submit.prevent="handleSubmit" class="modal-form-body">
                   <div class="form-row">
@@ -409,8 +447,11 @@ onBeforeUnmount(() => {
 .static-contact h4 { margin: 0; font-size: 24px; }
 .static-contact p { margin: 0; line-height: 1.75; color: #526173; }
 .static-contact .submit-button { display: inline-flex; align-items: center; text-decoration: none; }
-.static-contact__phone { color: var(--blue); font-weight: 700; }
-.static-contact__copy { border: 0; background: none; color: var(--blue); padding: 0; cursor: pointer; }
+/* 静态模式与页脚保持同一策略：联系方式以复制为主，拨号/写邮件作为次要出口保留 */
+.static-contact__actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.static-contact .submit-button.is-ghost { background: none; border: 1px solid var(--line); color: var(--blue); }
+.static-contact__alt { font-size: 13px; color: var(--muted); }
+.static-contact__alt a { color: var(--blue); font-weight: 700; }
 /* ============ 遮罩 ============ */
 .inquiry-modal-overlay {
   position: fixed;
@@ -768,6 +809,10 @@ onBeforeUnmount(() => {
     max-width: 100%;
     max-height: 100vh;
     height: 100vh;
+    /* 移动端浏览器地址栏会压缩 100vh，支持的浏览器改用动态视口高度，
+       避免底部提交按钮被系统工具栏遮住；不支持时回退到上面的 100vh。 */
+    max-height: 100dvh;
+    height: 100dvh;
     border-radius: 0;
   }
   .inquiry-modal__grid {

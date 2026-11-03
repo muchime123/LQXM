@@ -85,10 +85,13 @@ export async function snapshotGet(path) {
   }
   if (pathname === '/api/website/products') {
     const products = (await readSnapshot('products')).filter((row) => productMatches(row, url.searchParams))
-    const page = Math.max(0, Number(url.searchParams.get('page')) || 0)
     const size = Math.max(1, Math.min(100, Number(url.searchParams.get('size')) || 12))
+    const totalPages = Math.ceil(products.length / size)
+    const requested = Math.max(0, Number(url.searchParams.get('page')) || 0)
+    /* 快照自身也要收敛页码：page=9999 这类异常链接不应返回空列表且无法自愈 */
+    const page = totalPages > 0 ? Math.min(requested, totalPages - 1) : 0
     return { items: products.slice(page * size, (page + 1) * size), total: products.length,
-      totalPages: Math.ceil(products.length / size), page }
+      totalPages, page }
   }
   if (pathname.startsWith('/api/website/products/')) {
     const slug = decodeURIComponent(pathname.slice('/api/website/products/'.length))

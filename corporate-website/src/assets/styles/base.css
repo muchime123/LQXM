@@ -3,11 +3,11 @@
 html {
   scroll-behavior: smooth;
   /* 固定导航高度 + 视觉呼吸，锚点跳转时留出头部空间（兼容原生 hash 导航） */
-  scroll-padding-top: 100px;
+  scroll-padding-top: var(--header-offset);
 }
 /* 对所有带 id 的 section 兜底，兼容老浏览器 */
 section[id], [id].hero, #top {
-  scroll-margin-top: 100px;
+  scroll-margin-top: var(--header-offset);
 }
 body {
   margin: 0;

@@ -15,6 +15,7 @@ function showToast(msg) {
   timer = setTimeout(() => (toast.value = ''), 2200)
 }
 
+/** 返回 execCommand 的实际结果：受限浏览器会返回 false 而不抛错，不能默认成功。 */
 function legacyCopy(text) {
   const ta = document.createElement('textarea')
   ta.value = text
@@ -24,7 +25,9 @@ function legacyCopy(text) {
   document.body.appendChild(ta)
   ta.select()
   try {
-    document.execCommand('copy')
+    return document.execCommand('copy')
+  } catch {
+    return false
   } finally {
     document.body.removeChild(ta)
   }
@@ -36,8 +39,8 @@ async function copyText(text) {
   try {
     if (navigator.clipboard && window.isSecureContext) {
       await navigator.clipboard.writeText(value)
-    } else {
-      legacyCopy(value)
+    } else if (!legacyCopy(value)) {
+      throw new Error('COPY_COMMAND_REJECTED')
     }
     showToast(`已复制：${value}`)
     return true

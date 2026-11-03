@@ -15,6 +15,10 @@ const productSlug = ref('')
 const productName = ref('')
 const sourcePage = ref('')
 const sceneLabel = ref('')
+const sceneKey = ref('')
+/* 方案文章上下文：让询盘能区分「看完哪篇文章后发起」，而不只是一个固定来源标记 */
+const articleSlug = ref('')
+const articleTitle = ref('')
 
 export function useInquiryModal() {
   function openInquiry(opts = {}) {
@@ -23,6 +27,9 @@ export function useInquiryModal() {
     productName.value = opts.productName || ''
     sourcePage.value = opts.source || ''
     sceneLabel.value = opts.sceneLabel || ''
+    sceneKey.value = opts.sceneKey || ''
+    articleSlug.value = opts.articleSlug || ''
+    articleTitle.value = opts.articleTitle || ''
     isOpen.value = true
   }
 
@@ -37,6 +44,9 @@ export function useInquiryModal() {
     productName,
     sourcePage,
     sceneLabel,
+    sceneKey,
+    articleSlug,
+    articleTitle,
     openInquiry,
     closeInquiry,
   }

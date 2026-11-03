@@ -471,7 +471,7 @@
 
 /* ============ CTA ============ */
 .about-cta {
-  padding: 80px max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding: 80px var(--container-gutter);
   background: var(--white);
 }
 
@@ -479,7 +479,7 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 28px;
-  max-width: var(--max);
+  max-width: var(--container);
   margin: 0 auto;
 }
 
@@ -686,6 +686,13 @@
   outline: 3px solid var(--blue);
   outline-offset: 3px;
 }
+/* 原图加载失败的证照卡片：保留名称与占位图标，但不再指向坏地址 */
+.cert-thumb.is-broken, .patent-thumb.is-broken {
+  cursor: default;
+}
+.cert-thumb[aria-disabled='true'], .patent-thumb[aria-disabled='true'] {
+  cursor: default;
+}
 .cert-thumb__badge {
   width: 56px;
   height: 56px;
@@ -823,14 +830,6 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   min-height: 42px;
-}
-
-.patent-thumb__meta {
-  font-size: var(--text-xs);
-  color: var(--muted);
-  font-family: var(--font-display);
-  letter-spacing: .2px;
-  margin-top: auto;
 }
 
 /* About 专利预览响应式 */

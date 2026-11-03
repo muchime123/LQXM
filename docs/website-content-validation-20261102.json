@@ -1,0 +1,383 @@
+{
+  "generatedAt": "2026-11-02T08:17:06.631Z",
+  "scope": {
+    "projectRoot": "corporate-website",
+    "contentFiles": [
+      "public/content/banners.json",
+      "public/content/company.json",
+      "public/content/featured.json",
+      "public/content/home.json",
+      "public/content/page-sections.json",
+      "public/content/product-details.json",
+      "public/content/products.json",
+      "public/content/solutions.json"
+    ],
+    "mediaManifest": "src/data/websiteMediaManifest.js",
+    "staticMediaDir": "public/content/media",
+    "note": "只读校验；不对产品名称、参数、公司事实做真伪判定，仅标记需业务审核项。"
+  },
+  "totals": {
+    "products": 45,
+    "details": 45,
+    "featured": 12,
+    "homeProducts": 12,
+    "manifestEntries": 139,
+    "referencedMediaIds": 139,
+    "solutionArticles": 0,
+    "claimMatches": 31
+  },
+  "checks": [
+    {
+      "code": "content.files",
+      "title": "内容快照文件读取与 JSON 合法性",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "code": "product.slug",
+      "title": "产品列表 slug / ID 唯一性与格式",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "code": "product.detail",
+      "title": "每个发布产品 slug 均有详情（双向）",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "code": "product.media",
+      "title": "产品卡片/主图/图库媒体 ID 均在清单中",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "code": "product.copy",
+      "title": "产品文案不含占位宣传句与未经确认的承诺",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "code": "product.fields",
+      "title": "产品展示字段完整性（型号/标签/参数/规格/正文）",
+      "severity": "warning",
+      "status": "warn",
+      "count": 2,
+      "issues": [
+        "product-80: capacityLevel 为空字符串（应为 null）",
+        "product-128: 公开型号含首尾空格 \"LQ-A14-F6 \""
+      ],
+      "coverage": {
+        "products": 45,
+        "emptyTechnicalParameters": 45,
+        "emptyVariants": 45,
+        "emptyDescriptionHtml": 40,
+        "emptyApplicationTags": 44,
+        "emptyContainerTags": 44
+      }
+    },
+    {
+      "code": "featured.slugs",
+      "title": "精选/首页产品均指向已发布 slug",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "code": "featured.flags",
+      "title": "精选标记与精选快照条数口径一致",
+      "severity": "warning",
+      "status": "warn",
+      "count": 1,
+      "issues": [
+        "products.json 中 featured=true 共 43 条，精选快照 featured.json 为 12 条；需确认发布口径"
+      ]
+    },
+    {
+      "code": "content.archiveUrls",
+      "title": "公开内容不含内部档案资源引用",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "code": "media.references",
+      "title": "全站内容引用的每个媒体 ID 都能找到实际文件",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": [],
+      "referencedMediaIds": 139
+    },
+    {
+      "code": "media.manifest",
+      "title": "媒体清单条目均有对应且非空物理文件",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "code": "media.orphans",
+      "title": "静态媒体目录中不在清单内的游离文件",
+      "severity": "warning",
+      "status": "pass",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "code": "retired.content",
+      "title": "已下线内容不进入页面区块与内容链接",
+      "severity": "warning",
+      "status": "warn",
+      "count": 1,
+      "issues": [
+        "page-sections.json:[14].pageKey 仍含已下线页面区块 PACKAGING"
+      ]
+    },
+    {
+      "code": "retired.routes",
+      "title": "包材旧路由仅做 /products 跳转且不在导航中",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "code": "retired.snapshot",
+      "title": "静态快照对包材公开接口返回空列表",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": []
+    },
+    {
+      "code": "retired.sitemap",
+      "title": "sitemap 不含已下线路由或未发布产品",
+      "severity": "error",
+      "status": "pass",
+      "count": 0,
+      "issues": [],
+      "sitemapUrls": [
+        {
+          "source": "public/sitemap.xml",
+          "count": 4
+        },
+        {
+          "source": "dist/sitemap.xml",
+          "count": 49
+        },
+        {
+          "source": "website-build-check/sitemap.xml",
+          "count": 49
+        }
+      ]
+    },
+    {
+      "code": "seo.prerenderCoverage",
+      "title": "每个发布产品都有预渲染 HTML 与 sitemap 条目",
+      "severity": "warning",
+      "status": "pass",
+      "count": 0,
+      "issues": [],
+      "prerenderCoverage": [
+        {
+          "output": "dist",
+          "sitemapProductUrls": 45,
+          "productHtmlFiles": 45
+        },
+        {
+          "output": "website-build-check",
+          "sitemapProductUrls": 45,
+          "productHtmlFiles": 45
+        }
+      ]
+    },
+    {
+      "code": "content.solutionArticles",
+      "title": "方案文章快照内容数量",
+      "severity": "warning",
+      "status": "warn",
+      "count": 1,
+      "issues": [
+        "solutions.json 无 ARTICLE 分组，/solutions/:slug 当前无可用文章"
+      ],
+      "articleCount": 0
+    },
+    {
+      "code": "content.companyGaps",
+      "title": "公司资料空字段（需业务核实，不自动补全）",
+      "severity": "info",
+      "status": "info",
+      "count": 6,
+      "issues": [
+        "company.json brandSlogan 为空",
+        "company.json mission 为空",
+        "company.json vision 为空",
+        "company.json values 为空",
+        "company.json factoryAddress 为空",
+        "company.json enterpriseScale 为空"
+      ]
+    },
+    {
+      "code": "contact.fallback",
+      "title": "公开联系方式不依赖代码兜底值",
+      "severity": "warning",
+      "status": "warn",
+      "count": 1,
+      "issues": [
+        "InquiryFormModal.vue 硬编码兜底电话 4009008878 / 邮箱 768963166@qq.com；建议移入官网内容配置并由业务确认"
+      ],
+      "configuredPhone": "4009008878",
+      "configuredEmail": "768963166@qq.com"
+    },
+    {
+      "code": "claims.inventory",
+      "title": "需业务逐条确认的公开承诺/资质表述清单（按短语汇总）",
+      "severity": "info",
+      "status": "info",
+      "count": 6,
+      "issues": [
+        {
+          "phrase": "样品试封",
+          "count": 15,
+          "sources": [
+            "banners.json",
+            "solutions.json",
+            "src/views/About.vue",
+            "src/views/ProductDetail.vue",
+            "src/components/common/InquiryFormModal.vue",
+            "src/components/AppFooter.vue",
+            "src/router/index.js"
+          ],
+          "samples": [
+            "banners.json:HERO[0].description — 针对托盒封口、异形盒与多种包装材料，提供从样品试封到量产落地的完整工艺验证与设备配置。",
+            "solutions.json:[0].items[1].points[3] — 样品试封服务",
+            "solutions.json:[1].items[2].title — 样品试封"
+          ]
+        },
+        {
+          "phrase": "一站式",
+          "count": 5,
+          "sources": [
+            "company.json",
+            "home.json",
+            "solutions.json",
+            "src/components/AppFooter.vue",
+            "src/router/index.js"
+          ],
+          "samples": [
+            "company.json:corePositioning — One-stop packaging partner / 一站式包装合作伙伴",
+            "home.json:company.corePositioning — One-stop packaging partner / 一站式包装合作伙伴",
+            "solutions.json:[0].items[3].points[3] — 一站式配套"
+          ]
+        },
+        {
+          "phrase": "支持定制",
+          "count": 3,
+          "sources": [
+            "company.json",
+            "home.json",
+            "src/views/About.vue"
+          ],
+          "samples": [
+            "company.json:advantages — 设备 + 耗材 + 模具一体化；支持定制；响应快；可提供样品测试与方案建议",
+            "home.json:company.advantages — 设备 + 耗材 + 模具一体化；支持定制；响应快；可提供样品测试与方案建议",
+            "src/views/About.vue:231 — return value && !value.includes('模具') ? value : legacyFallback(null, '设备与包材配套；支持定制；响应快；可提供…"
+          ]
+        },
+        {
+          "phrase": "非标定制",
+          "count": 6,
+          "sources": [
+            "company.json",
+            "home.json",
+            "solutions.json",
+            "src/views/About.vue",
+            "src/router/index.js"
+          ],
+          "samples": [
+            "company.json:manufacturingStrengths — [ { \"title\": \"源头研发制造\", \"description\": \"核心设备自主研发与制造，从设计到装配全流程可控。\", \"icon\": \"factory\", \"sort…",
+            "home.json:company.manufacturingStrengths — [ { \"title\": \"源头研发制造\", \"description\": \"核心设备自主研发与制造，从设计到装配全流程可控。\", \"icon\": \"factory\", \"sort…",
+            "home.json:milestones[2].description — 部署自动化产线与非标定制能力，覆盖大中型客户。"
+          ]
+        },
+        {
+          "phrase": "免费",
+          "count": 1,
+          "sources": [
+            "src/components/common/InquiryFormModal.vue"
+          ],
+          "samples": [
+            "src/components/common/InquiryFormModal.vue:265 — <span>工程师免费提供样品试封测试与封合参数建议</span>"
+          ]
+        },
+        {
+          "phrase": "ISO9001",
+          "count": 1,
+          "sources": [
+            "src/router/index.js"
+          ],
+          "samples": [
+            "src/router/index.js:91 — description: '浙江利强包装科技企业资质：ISO9001 质量体系认证、CE 认证、实用新型专利、第三方检测报告等，证明设备品质与制造能力。',"
+          ]
+        }
+      ],
+      "totalMatches": 31
+    },
+    {
+      "code": "seo.siteUrl",
+      "title": "canonical / sitemap 站点地址可按部署环境配置",
+      "severity": "warning",
+      "status": "warn",
+      "count": 2,
+      "issues": [
+        "useSeo.js 站点地址写死，未跟随部署域名；英文站不得复用中文 canonical",
+        "prerender-products.mjs 站点地址写死，sitemap/canonical 需与部署域名一致"
+      ]
+    },
+    {
+      "code": "review.manifest",
+      "title": "发布审核闸门（业务签署后方可放行）",
+      "severity": "error",
+      "status": "fail",
+      "count": 1,
+      "issues": [
+        "缺少 corporate-website/content-review.json 业务审核签署文件；当前所有产品、联系方式与服务承诺均视为「待审核」，不得判定为可发布"
+      ],
+      "reviewManifestPath": "corporate-website/content-review.json",
+      "expectedSchema": {
+        "reviewedAt": "ISO 日期",
+        "reviewer": "业务审核人",
+        "approvedProductSlugs": [
+          "全部已发布产品 slug"
+        ],
+        "approvedContact": true,
+        "approvedPhone": "company.json.phone",
+        "approvedEmail": "company.json.email",
+        "approvedClaims": [
+          "已确认的公开承诺 ID/文案"
+        ]
+      }
+    }
+  ],
+  "gate": {
+    "passed": false,
+    "blockers": [
+      "review.manifest"
+    ],
+    "rule": "全部 error 级检查通过且存在有效业务审核签署文件后，才允许进入正式发布产物。"
+  }
+}

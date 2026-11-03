@@ -11,7 +11,9 @@ const props = defineProps({
   product: { type: Object, required: true },
 })
 
-const link = computed(() => `/products/${props.product.websiteSlug || props.product.slug || props.product.id}`)
+/* 链接必须与详情查询口径一致：公开接口按 product.slug 查详情，
+   因此 slug 优先；websiteSlug 仅作旧数据兜底，避免点进去 404。 */
+const link = computed(() => `/products/${props.product.slug || props.product.websiteSlug || props.product.id}`)
 const subtitle = computed(
   () => props.product.productLineName || props.product.equipmentCategory || props.product.category || '包装设备'
 )
@@ -25,7 +27,7 @@ const subtitle = computed(
         decoding="async"
         :src="productImageUrl(product)"
         :srcset="productImageSrcSet(product)"
-        sizes="(max-width: 980px) 50vw, (max-width: 1200px) 33vw, 25vw"
+        sizes="(max-width: 520px) 100vw, (max-width: 980px) 50vw, (max-width: 1200px) 33vw, 25vw"
         :alt="product.name"
       />
       <div class="catalog-card__name-plate">

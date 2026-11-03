@@ -8,14 +8,17 @@
  * - 滚动 24px 后切换 .scrolled 样式（高斯模糊收缩）
  * - 移动端汉堡菜单切换 .desktop-nav.open
  */
-import { computed, ref, onMounted, onUnmounted, watch } from 'vue'
+import { computed, ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute } from 'vue-router'
 import { useInquiryModal } from '../composables/useInquiryModal'
+import { trapTabKey } from '../composables/useFocusTrap'
 
 const route = useRoute()
 const { openInquiry } = useInquiryModal()
 const scrolled = ref(false)
 const mobileNavOpen = ref(false)
+const navRef = ref(null)
+const menuButtonRef = ref(null)
 
 /**
  * 全站一级主导航。key 与 router.meta.navKey 对齐用于高亮。
@@ -53,24 +56,54 @@ function closeMobileNav() {
 }
 
 function handleKeydown(event) {
-  if (event.key === 'Escape' && mobileNavOpen.value) closeMobileNav()
+  if (!mobileNavOpen.value) return
+  if (event.key === 'Escape') {
+    closeMobileNav()
+    /* 键盘关闭后把焦点还回汉堡按钮，否则焦点会落在 body 上丢失位置 */
+    menuButtonRef.value?.focus()
+    return
+  }
+  trapTabKey(event, navRef.value)
+}
+
+/* 点击菜单与汉堡按钮之外的区域时收起（小屏全屏菜单的 header 区域仍可点） */
+function handleOutsidePointer(event) {
+  if (!mobileNavOpen.value) return
+  const target = event.target instanceof Element ? event.target : null
+  if (target && target.closest('.desktop-nav, .menu-button')) return
+  closeMobileNav()
+}
+
+/* 从窄屏拉宽到桌面时收起，避免 open 状态与 body 滚动锁残留 */
+function handleResize() {
+  if (window.innerWidth > 980 && mobileNavOpen.value) closeMobileNav()
 }
 
 // 路由切换后关闭移动菜单
 watch(() => route.fullPath, closeMobileNav)
-watch(mobileNavOpen, (open) => {
+watch(mobileNavOpen, async (open) => {
+  /* 与 home.css 的 body.mobile-nav-active { overflow:hidden } 配合锁定背景滚动 */
   document.body.classList.toggle('mobile-nav-active', open)
+  if (!open) return
+  await nextTick()
+  /* 覆盖式菜单打开后把焦点移入第一项，键盘用户不需要再 Tab 穿过 header 才够到菜单；
+     桌面宽度下菜单是行内导航，不抢焦点。 */
+  if (window.innerWidth <= 980) navRef.value?.querySelector('.nav-item')?.focus()
 })
 
 onMounted(() => {
   window.addEventListener('scroll', handleScroll, { passive: true })
   window.addEventListener('keydown', handleKeydown)
+  window.addEventListener('resize', handleResize)
+  document.addEventListener('pointerdown', handleOutsidePointer)
   handleScroll()
 })
 
 onUnmounted(() => {
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('keydown', handleKeydown)
+  window.removeEventListener('resize', handleResize)
+  document.removeEventListener('pointerdown', handleOutsidePointer)
   document.body.classList.remove('mobile-nav-active')
 })
 </script>
@@ -86,7 +119,7 @@ onUnmounted(() => {
         <em class="brand-subtitle">LIQIANG</em>
       </span>
     </RouterLink>
-    <nav class="desktop-nav" :class="{ open: mobileNavOpen }" aria-label="主导航">
+    <nav id="primary-nav" ref="navRef" class="desktop-nav" :class="{ open: mobileNavOpen }" aria-label="主导航">
       <div
         v-for="link in navLinks"
         :key="link.navKey"
@@ -124,8 +157,10 @@ onUnmounted(() => {
     </nav>
     <button type="button" class="header-cta" @click="openHeaderInquiry()">获取包装方案 <span>→</span></button>
     <button
+      ref="menuButtonRef"
       class="menu-button"
       :aria-expanded="String(mobileNavOpen)"
+      aria-controls="primary-nav"
       :aria-label="mobileNavOpen ? '关闭导航' : '打开导航'"
       @click="toggleMobileNav"
     >{{ mobileNavOpen ? '×' : '☰' }}</button>

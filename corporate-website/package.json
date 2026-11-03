@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-products.mjs",
+    "validate:content": "node scripts/validate-content.mjs",
     "test": "node --test",
+    "verify": "npm test && npm run build && node scripts/validate-content.mjs --out .tmp-validation/report.json",
     "preview": "vite preview --host 0.0.0.0"
   },
   "devDependencies": {

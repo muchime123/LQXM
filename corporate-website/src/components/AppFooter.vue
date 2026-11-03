@@ -6,14 +6,14 @@
 import { computed } from 'vue'
 import { useCompany } from '../composables/useCompany'
 import { useOfficialMedia } from '../composables/useOfficialMedia'
-import { useCopy } from '../composables/useCopy'
 import { useInquiryModal } from '../composables/useInquiryModal'
+import { useCopy } from '../composables/useCopy'
 import AppIcon from './AppIcon.vue'
 
 const { company } = useCompany()
 const { findByPlatform } = useOfficialMedia()
-const { copyText } = useCopy()
 const { openInquiry } = useInquiryModal()
+const { copyText } = useCopy()
 
 function openConsult() {
   openInquiry({ type: 'consult', source: 'footer' })
@@ -53,10 +53,10 @@ const address = computed(() =>
         </RouterLink>
         <div class="footer-brand-meta">
           <p class="footer-slogan">一站式包装合作伙伴</p>
-          <a v-if="phone" class="footer-phone" href="#" @click.prevent="copyText(phoneText)">
+          <button v-if="phone" type="button" class="footer-phone" :aria-label="`复制服务热线 ${phoneText}`" @click="copyText(phone)">
             <span class="footer-phone__label">服务热线</span>
             <strong>{{ phoneText }}</strong>
-          </a>
+          </button>
         </div>
       </div>
 
@@ -79,7 +79,7 @@ const address = computed(() =>
       <div class="footer-contact">
         <strong>联系我们</strong>
         <span v-if="address" class="footer-addr">{{ address }}</span>
-        <a v-if="email" href="#" @click.prevent="copyText(email)">{{ email }}</a>
+        <button v-if="email" type="button" class="footer-plain-link" :aria-label="`复制邮箱 ${email}`" @click="copyText(email)">{{ email }}</button>
         <button type="button" class="footer-consult-link" @click="openConsult()">联系商务团队 →</button>
       </div>
     </div>

@@ -15,14 +15,14 @@
 
 body { font-size: 16px; background: var(--white); }
 .site-page--home main { display: flex; flex-direction: column; }
-.section { padding: var(--section-space) max(var(--pad), calc((100vw - var(--max)) / 2)); }
+.section { padding: var(--section-space) var(--container-gutter); }
 .section + .section:not(.section--alt) { border-top: 1px solid var(--section-divider); }
 .section--alt { background: linear-gradient(180deg, var(--paper-alt) 0%, var(--paper-alt-deep) 100%); }
 
 /* 导航：稳定、克制，首页叠图，内页实体。 */
 .site-header {
   height: var(--header-height);
-  padding-inline: max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding-inline: var(--container-gutter);
   gap: clamp(24px, 3vw, 52px);
 }
 .site-header.solid { height: var(--header-height); }
@@ -48,6 +48,10 @@ body { font-size: 16px; background: var(--white); }
   color: var(--ink);
 }
 .header-cta span { margin-left: 20px; font-size: 15px; }
+@media (max-width: 980px) {
+  .site-header .header-cta,
+  .site-header.solid .header-cta { display: none; }
+}
 .nav-dropdown { border-radius: 6px; }
 
 /* 通用标题：由小字号装饰转为明确的阅读层级。 */
@@ -88,10 +92,12 @@ body { font-size: 16px; background: var(--white); }
   background-position: center;
   background-repeat: no-repeat;
 }
+.page-hero--without-image .page-hero__media { display: none; }
+.page-hero--without-image { background: linear-gradient(120deg, var(--navy-deep), var(--navy-light)); }
 .page-hero .hero-grid, .page-hero .hero-rings { opacity: .35; }
 .page-hero .hero-copy {
   position: absolute;
-  left: max(var(--pad), calc((100vw - var(--max)) / 2));
+  left: var(--container-gutter);
   bottom: clamp(28px, 4vw, 64px);
   max-width: min(820px, 58vw);
 }
@@ -133,7 +139,7 @@ body { font-size: 16px; background: var(--white); }
 }
 .page-hero--two-col .hero-side {
   position: absolute;
-  right: max(var(--pad), calc((100vw - var(--max)) / 2));
+  right: var(--container-gutter);
   bottom: clamp(28px, 4vw, 64px);
   max-width: 34vw;
 }
@@ -215,7 +221,7 @@ body { font-size: 16px; background: var(--white); }
 .site-page--home .hero > .hero-dots { z-index: 10; }
 .site-page--home .hero-copy {
   position: absolute;
-  left: max(var(--pad), calc((100vw - var(--max)) / 2));
+  left: var(--container-gutter);
   top: 50%;
   transform: translateY(-50%);
   bottom: auto;
@@ -543,7 +549,7 @@ body { font-size: 16px; background: var(--white); }
 .manufacturing-card:hover .manufacturing-card__overlay span::after { transform: translateX(4px); }
 
 .home-strength {
-  padding: 16px max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding: 16px var(--container-gutter);
   display: grid;
   grid-template-columns: 1.1fr 2fr;
   align-items: stretch;
@@ -649,7 +655,7 @@ body { font-size: 16px; background: var(--white); }
 /* 全站深色收尾 CTA：统一采用首页的紧凑横向版式。 */
 .site-cta--dark {
   min-height: 0;
-  padding: 48px max(var(--pad), calc((100vw - var(--max)) / 2));
+  padding: 48px var(--container-gutter);
   text-align: left;
   background:
     radial-gradient(ellipse at 10% 40%, var(--white-alpha-14) 0%, transparent 52%),
@@ -750,9 +756,9 @@ body { font-size: 16px; background: var(--white); }
 .site-page:not(.site-page--home) .industry-item h4 { font-size: 21px; }
 
 
-/* 产品、方案、耗材：图片区优先，卡片减少装饰。 */
+/* 产品、方案、耗材：图片区优先，卡片减少装饰。
+   产品网格列数统一由 products.css 的 .products-grid auto-fit 决定，此处不再重复声明。 */
 .catalog-overview { padding-top: var(--section-space); }
-.products-grid { padding-top: 42px; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .solution-detail-grid, .packaging-grid { gap: 18px; }
 .solution-detail-card,
 .support-card,
@@ -832,7 +838,6 @@ footer { padding-top: 72px; background: var(--footer-bg); }
   .hero-dot.is-active { width: 48px; }
   .site-page--home .hero-copy { max-width: 640px; }
 
-  .products-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .footer-grid { grid-template-columns: 1fr 1fr; }
   .footer-brand { grid-column: 1 / -1; }
   .home-strength { grid-template-columns: 1fr; gap: 30px; }
@@ -934,7 +939,6 @@ footer { padding-top: 72px; background: var(--footer-bg); }
   .section-heading__right { margin-top: 20px; }
   .site-page--home .industries .section-heading { display: block; padding-bottom: 24px; }
   .site-page--home .industries .section-heading__right { max-width: 620px; justify-self: auto; }
-  .products-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .product-carousel__track { transform: translateX(calc(var(--carousel-index) * (-50% - 5px))); }
   .product-carousel__track > .catalog-card { flex-basis: calc(50% - 5px); }
   .product-carousel__controls button { width: 44px; height: 44px; }
@@ -972,7 +976,7 @@ footer { padding-top: 72px; background: var(--footer-bg); }
 }
 
 @media (max-width: 520px) {
-  .products-grid, .industries-grid { grid-template-columns: 1fr; }
+  .industries-grid { grid-template-columns: 1fr; }
   .site-page--home .hero h1 { font-size: clamp(26px, 9.5vw, 36px); letter-spacing: -.04em; white-space: normal; }
   .site-page--home .hero { padding: 0; }
   .site-page--home .hero-copy { padding: 24px 20px 28px; }

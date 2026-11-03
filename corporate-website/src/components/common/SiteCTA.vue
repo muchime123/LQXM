@@ -33,6 +33,12 @@ const props = defineProps({
   actionTo: { type: String, default: '' },
   inquiryType: { type: String, default: 'consult' }, // 'consult' | 'sample'
   inquirySource: { type: String, default: '' },
+  productSlug: { type: String, default: '' },
+  productName: { type: String, default: '' },
+  /* 方案文章页传入，让询盘记录「看完哪篇方案后发起」 */
+  articleSlug: { type: String, default: '' },
+  articleTitle: { type: String, default: '' },
+  sceneKey: { type: String, default: '' },
   variant: { type: String, default: 'dark' }, // dark | light
   id: { type: String, default: '' },
 })
@@ -51,6 +57,11 @@ function handleActionClick() {
   openInquiry({
     type: props.inquiryType === 'sample' ? 'sample' : 'consult',
     source: props.inquirySource,
+    productSlug: props.productSlug,
+    productName: props.productName,
+    articleSlug: props.articleSlug,
+    articleTitle: props.articleTitle,
+    sceneKey: props.sceneKey,
   })
 }
 </script>

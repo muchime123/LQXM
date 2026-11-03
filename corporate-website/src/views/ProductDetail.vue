@@ -7,26 +7,41 @@
  * - slug 不存在或未发布显示 404 错误页
  * - 注入 Product 结构化数据支持搜索引擎理解产品信息
  */
-import { ref, computed, onMounted, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import DOMPurify from 'dompurify'
-import { fetchProductDetail, websiteProductMediaUrl } from '../api/website'
+import { fetchProductDetail, fetchProducts, websiteProductMediaUrl } from '../api/website'
 import { apiBase } from '../api/http'
 import { FALLBACK_IMAGE_URL } from '../utils/fallbackImage'
+import { reviewedSummary } from '../utils/publicSummary'
 import { setSeo, SITE_URL } from '../composables/useSeo'
 import { setSchema, createProductSchema } from '../composables/useSchema'
 import { useCompany } from '../composables/useCompany'
 import { useInquiryModal } from '../composables/useInquiryModal'
 import SiteCTA from '../components/common/SiteCTA.vue'
+import ProductCard from '../components/ProductCard.vue'
 
 const route = useRoute()
+const router = useRouter()
 const { company } = useCompany()
 const { openInquiry } = useInquiryModal()
 const loading = ref(true)
 const notFound = ref(false)
 const detail = ref(null)
+const relatedProducts = ref([])
+let detailRequest = 0
 
 const activeImageIndex = ref(0)
+const previewOpen = ref(false)
+function moveImage(direction) {
+  activeImageIndex.value = (activeImageIndex.value + direction + galleryImages.value.length) % galleryImages.value.length
+}
+function onPreviewKeydown(event) {
+  if (!previewOpen.value) return
+  if (event.key === 'Escape') previewOpen.value = false
+  if (event.key === 'ArrowLeft') moveImage(-1)
+  if (event.key === 'ArrowRight') moveImage(1)
+}
 
 // 图库：优先 main_image → 其他展示类图片 → 分类默认图 → 全站 placeholder
 const galleryImages = computed(() => {
@@ -34,6 +49,10 @@ const galleryImages = computed(() => {
   if (detail.value.product) {
     const product = detail.value.product
     const gallery = (detail.value.gallery || []).filter((item) => item.mediaId)
+      .sort((a, b) => {
+        const priority = (item) => item.role === 'HERO' || item.mediaId === product.heroMediaId ? 0 : 1
+        return priority(a) - priority(b) || (a.sortOrder ?? 0) - (b.sortOrder ?? 0)
+      })
     if (gallery.length) return gallery.map((item) => ({
       id: item.id,
       url: websiteProductMediaUrl(item.mediaId),
@@ -92,8 +111,9 @@ const model = computed(() => {
     name: product.name,
     modelCode: product.publicModel,
     equipmentCategory: product.category,
+    productLineName: product.productLineName || product.category,
     websiteSlug: product.slug,
-    websiteSummary: product.summary,
+    websiteSummary: reviewedSummary(product.name, product.summary),
     applicationTags: product.applicationTags,
     containerTags: product.containerTags,
     packagingProcessTags: product.processTags,
@@ -131,11 +151,7 @@ const hasSpecs = computed(() => specRows.value.length > 0)
 
 const hasIntroduction = computed(() => nativeDescriptionHtml.value || model.value.introductionCn || model.value.applicableScope)
 const hasAdvantages = computed(() => model.value.equipmentAdvantages)
-const hasApplicable = computed(() =>
-  model.value.applicableIndustry || model.value.applicableProduct ||
-  model.value.applicationTags?.length || model.value.containerTags?.length ||
-  model.value.packagingProcessTags?.length || model.value.capacityLevel
-)
+const hasApplicable = computed(() => Boolean(model.value.applicableProduct))
 const hasPackaging = computed(
   () => model.value.packagingMethodCn || model.value.shippingMethods || model.value.leadTimeStock
 )
@@ -206,6 +222,9 @@ function openSampleInquiry() {
 }
 
 async function load() {
+  const request = ++detailRequest
+  previewOpen.value = false
+  relatedProducts.value = []
   loading.value = true
   notFound.value = false
   detail.value = null
@@ -213,6 +232,7 @@ async function load() {
   try {
     const slug = route.params.slug
     const data = await fetchProductDetail(slug)
+    if (request !== detailRequest) return
     if (!data) {
       notFound.value = true
     } else {
@@ -222,15 +242,16 @@ async function load() {
         name: data.product.name,
         modelCode: data.product.publicModel,
         equipmentCategory: data.product.category,
-        websiteSummary: data.product.summary,
-        introductionCn: data.product.summary,
+        websiteSummary: reviewedSummary(data.product.name, data.product.summary),
+        introductionCn: reviewedSummary(data.product.name, data.product.summary),
         defaultImage: null,
       } : (data.model || {})
       const titleParts = [m.name, m.modelCode].filter(Boolean)
       const seoTitle = data.product?.seoTitle || (titleParts.length > 0 ? titleParts.join('｜') : '产品详情')
-      const seoDesc = data.product?.seoDescription || (m.introductionCn
+      const rawSeoDesc = data.product?.seoDescription
+      const seoDesc = reviewedSummary(data.product?.name, rawSeoDesc) || (m.introductionCn
         ? m.introductionCn.slice(0, 150)
-        : `${m.name || '利强包装设备'}｜${m.equipmentCategory || '食品包装设备'}，支持非标定制与样品试封。`)
+        : `${m.name || '利强包装设备'}｜${m.equipmentCategory || '食品包装设备'}。查看设备图片与已公开技术参数。`)
       setSeo(seoTitle, seoDesc, {
         ogType: 'product',
         ogImage: data.product?.heroMediaId ? websiteProductMediaUrl(data.product.heroMediaId) : data.imageUrl,
@@ -252,12 +273,24 @@ async function load() {
         url: window.location.href
       })
       setSchema(productSchema)
+      const category = data.product?.category
+      if (category) {
+        try {
+          const related = await fetchProducts({ equipmentCategory: category, page: 0, size: 12 })
+          if (request === detailRequest) relatedProducts.value = (related.items || [])
+            .filter((item) => item.slug !== slug && item.websiteSlug !== slug)
+            .slice(0, 3)
+        } catch (error) {
+          console.warn('Related products unavailable:', error)
+        }
+      }
     }
   } catch (err) {
+    if (request !== detailRequest) return
     console.warn('Product detail unavailable:', err)
     notFound.value = true
   } finally {
-    loading.value = false
+    if (request === detailRequest) loading.value = false
   }
 }
 
@@ -265,8 +298,25 @@ function handleImageError(event) {
   event.target.src = FALLBACK_IMAGE_URL
 }
 
-onMounted(load)
+onMounted(() => {
+  load()
+  window.addEventListener('keydown', onPreviewKeydown)
+})
+onUnmounted(() => window.removeEventListener('keydown', onPreviewKeydown))
 watch(() => route.params.slug, load)
+
+/**
+ * 返回产品中心时优先回到来源列表（保留筛选条件与页码、复用历史滚动位置），
+ * 直接打开详情链接时退回默认产品中心，不会因为无历史而离开站点。
+ */
+function backToCatalog() {
+  const previous = window.history.state?.back
+  if (typeof previous === 'string' && /^\/products(\?|#|$)/.test(previous)) {
+    router.back()
+    return
+  }
+  router.push('/products')
+}
 </script>
 
 <template>
@@ -291,15 +341,22 @@ watch(() => route.params.slug, load)
       <nav class="breadcrumb">
         <RouterLink to="/">首页</RouterLink>
         <span>/</span>
-        <RouterLink to="/products">产品中心</RouterLink>
+        <a href="/products" @click.prevent="backToCatalog">产品中心</a>
         <span>/</span>
         <strong>{{ model.name }}</strong>
       </nav>
 
       <!-- 主体：左图库 + 右信息 -->
       <div class="detail-container">
+        <div class="detail-mobile-heading">
+          <div class="detail-heading-meta">
+            <span>{{ model.productLineName || model.equipmentCategory || '包装设备' }}</span>
+            <span v-if="model.modelCode">{{ model.modelCode }}</span>
+          </div>
+          <h1>{{ model.name }}</h1>
+        </div>
         <div class="detail-gallery">
-          <div class="detail-main-image">
+          <button type="button" class="detail-main-image" aria-label="放大查看产品图片" @click="previewOpen = true">
             <img
               v-if="activeImage"
               :src="activeImage.url"
@@ -309,7 +366,7 @@ watch(() => route.params.slug, load)
               decoding="async"
               @error="handleImageError"
             />
-          </div>
+          </button>
           <div v-if="galleryImages.length > 1" class="detail-thumbnails" aria-label="产品图片选择">
             <button
               v-for="(img, idx) in galleryImages"
@@ -327,11 +384,11 @@ watch(() => route.params.slug, load)
         </div>
 
         <div class="detail-info">
-          <div class="detail-heading-meta">
+          <div class="detail-heading-meta detail-desktop-heading">
             <span>{{ model.productLineName || model.equipmentCategory || '包装设备' }}</span>
             <span v-if="model.modelCode">{{ model.modelCode }}</span>
           </div>
-          <h1>{{ model.name }}</h1>
+          <h1 class="detail-desktop-heading">{{ model.name }}</h1>
 
           <p v-if="model.websiteSummary" class="detail-summary">{{ model.websiteSummary }}</p>
 
@@ -389,10 +446,6 @@ watch(() => route.params.slug, load)
         <section v-if="hasApplicable" id="applications" class="detail-section">
           <div class="detail-section__heading"><span>APPLICATIONS</span><h2>适用行业与产品</h2></div>
           <div class="detail-section__content">
-            <dl v-if="selectionFacts.length" class="application-facts">
-              <div v-for="item in selectionFacts" :key="item.label"><dt>{{ item.label }}</dt><dd>{{ item.value }}</dd></div>
-            </dl>
-            <p v-if="model.applicableIndustry" class="detail-text-applicable">{{ model.applicableIndustry }}</p>
             <p v-if="model.applicableProduct" class="detail-text-applicable">{{ model.applicableProduct }}</p>
           </div>
         </section>
@@ -441,13 +494,26 @@ watch(() => route.params.slug, load)
         </section>
 
       </div>
+      <section v-if="relatedProducts.length" class="detail-related" aria-label="同类设备">
+        <div class="detail-related__heading"><h2>看看同类设备</h2><RouterLink to="/products">浏览全部设备 →</RouterLink></div>
+        <div class="detail-related__grid"><ProductCard v-for="item in relatedProducts" :key="item.slug || item.id" :product="item" /></div>
+      </section>
       <SiteCTA
         eyebrow="PRODUCT CONSULTATION"
         :title="`确认 ${model.name || '这款设备'} 是否适合您的产品`"
         description="提供产品、容器尺寸和目标产能，工程师将协助核对设备与包材配置。"
         action-text="咨询该产品"
         inquiry-source="product-detail-bottom"
+        :product-slug="productSlug"
+        :product-name="productNameForInquiry"
       />
+      <div v-if="previewOpen && activeImage" class="detail-image-preview" role="dialog" aria-modal="true" aria-label="产品图片预览" @click.self="previewOpen = false">
+        <button type="button" class="detail-image-preview__close" aria-label="关闭预览" @click="previewOpen = false">×</button>
+        <button v-if="galleryImages.length > 1" type="button" aria-label="上一张图片" @click="moveImage(-1)">‹</button>
+        <img :src="activeImage.url" :alt="model.name" @error="handleImageError" />
+        <button v-if="galleryImages.length > 1" type="button" aria-label="下一张图片" @click="moveImage(1)">›</button>
+        <span>{{ activeImageIndex + 1 }} / {{ galleryImages.length }}</span>
+      </div>
     </template>
   </main>
 </template>

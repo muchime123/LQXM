@@ -7,7 +7,8 @@
  * - 工商信息：从接口拉取工商字段
  * - CTA：跳转到资质页和联系页
  */
-import { ref, reactive, onMounted, onBeforeUnmount, nextTick, computed, watchEffect } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, nextTick, computed, watch, watchEffect } from 'vue'
+import { useRoute } from 'vue-router'
 import { fetchHome, websiteProductMediaUrl } from '../api/website'
 import { displayMilestones as resolveDisplayMilestones } from '../utils/milestoneDisplay'
 import { FALLBACK_IMAGE_URL } from '../utils/fallbackImage'
@@ -17,6 +18,7 @@ import { usePageSections } from '../composables/usePageSections'
 import { useOfficialMedia } from '../composables/useOfficialMedia'
 import { useCopy } from '../composables/useCopy'
 import { useAMap } from '../composables/useAMap'
+import { useScrollOverflow } from '../composables/useScrollOverflow'
 import { setSchema, createLocalBusinessSchema } from '../composables/useSchema'
 import AppIcon from '../components/AppIcon.vue'
 import PageHero from '../components/common/PageHero.vue'
@@ -34,35 +36,67 @@ const { copyText } = useCopy()
 const pageSections = usePageSections('ABOUT')
 const sectionEnabled = (key) => pageSections.isEnabled(key)
 const sectionRows = (key) => pageSections.sectionRows(key)
+const route = useRoute()
+
+/* 后台标题统一按纯文本渲染：标题位置用的是 {{ }}，若文案里带 <br> 会原样显示成字符，
+   需要换行交给 CSS 处理，不要为了一个换行改成 v-html。 */
+const plainText = (value) => String(value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+
+/* 包材/模具业务已从官网下线（/packaging、/supplies、/molds 统一跳转产品中心），
+   后台文案若仍带「模具」，按分句剔除，而不是整段换成默认文案——
+   否则同一句里仍然有效的业务描述会被一起丢掉。
+   待后台文案清理完成后，可连同 RETIRED_TERMS 一起删除。 */
+const RETIRED_TERMS = ['模具']
+const hasRetiredTerm = (value) => RETIRED_TERMS.some((term) => String(value || '').includes(term))
+
+/** 剔除含已下线业务的分句，保留其余内容（返回用「、」连接的空格清理结果）。 */
+function stripRetiredSegments(value) {
+  const text = String(value || '')
+  if (!text.trim()) return ''
+  return text
+    .split(/[、，,；;]+/)
+    .map((segment) => segment.trim())
+    .filter((segment) => segment && !hasRetiredTerm(segment))
+    .join('、')
+}
+
 const aboutHeadings = computed(() => {
   const s = (key) => pageSections.section(key)
+  const text = (key, field) => plainText(s(key)?.[field])
+  /* 标题整句含已下线业务时无法局部剔除，退回默认表述 */
+  const headline = (key, fallback) => {
+    const value = text(key, 'title')
+    return value && !hasRetiredTerm(value) ? value : fallback
+  }
   return {
     hero: {
-      title: s('hero')?.title || '',
-      description: s('hero')?.subtitle || '了解利强的企业定位、制造能力、发展历程，以及公开展示的资质认证与知识产权成果。',
+      title: text('hero', 'title'),
+      description: text('hero', 'subtitle') || '了解利强的企业定位、制造能力、发展历程，以及公开展示的资质认证与知识产权成果。',
       image: s('hero')?.imageUrl || '',
     },
     intro: {
-      title: s('intro')?.title && !s('intro').title.includes('模具') ? s('intro').title : '从包装设备制造出发，<br />把包材适配一起考虑',
-      description: s('intro')?.subtitle && !s('intro').subtitle.includes('模具') ? s('intro').subtitle : '从包装设备制造出发，把包材适配一起考虑',
+      title: headline('intro', '从包装设备制造出发，把包材适配一起考虑'),
+      description: text('intro', 'subtitle') && !hasRetiredTerm(text('intro', 'subtitle'))
+        ? text('intro', 'subtitle')
+        : '围绕食品包装设备的研发与制造，从容器、膜材到产线条件一起评估。',
       image: s('intro')?.imageUrl || FALLBACK_IMAGE_URL,
     },
     manufacturing: {
-      title: s('manufacturing')?.title || '厂房设备',
-      description: s('manufacturing')?.subtitle || '通过生产、装配与调试现场，展示设备从制造到交付验证的主要环节。',
+      title: headline('manufacturing', '厂房设备'),
+      description: text('manufacturing', 'subtitle') || '通过生产、装配与调试现场，展示设备从制造到交付验证的主要环节。',
       image: s('manufacturing')?.imageUrl || FALLBACK_IMAGE_URL,
     },
     credentials: {
-      title: s('credentials')?.title || '企业荣誉与资质认证',
-      description: s('credentials')?.subtitle || '',
+      title: headline('credentials', '企业荣誉与资质认证'),
+      description: text('credentials', 'subtitle') || '',
     },
     patents: {
-      title: s('patents')?.title || '专利与知识产权',
-      description: s('patents')?.subtitle || '',
+      title: headline('patents', '专利与知识产权'),
+      description: text('patents', 'subtitle') || '',
     },
     contact: {
-      title: s('contact')?.title || '联系利强',
-      description: s('contact')?.subtitle || '您可以直接电话、邮件或通过官方账号联系我们；方案和样品需求请使用全站咨询弹窗提交。',
+      title: headline('contact', '联系利强'),
+      description: text('contact', 'subtitle') || '您可以直接通过电话或邮件联系我们，咨询设备方案与样品试封。',
     },
   }
 })
@@ -90,22 +124,27 @@ const showIntroSecondary = computed(() => {
   return !!introSecondary.value.image
 })
 
-/* Manufacturing 图廊（结构化内容，支持编辑器中编辑） */
+/* Manufacturing 图廊（结构化内容，支持编辑器中编辑）。
+   失败记录用「行自身的稳定标识」而不是渲染后的下标：
+   隐藏前一张图会让后面图片的下标整体前移，用下标会把错误记到别的图上。 */
 const galleryImageErrors = reactive(new Set())
 const manufacturingGallery = computed(() => {
   const rows = sectionRows('manufacturing')
-  return rows.filter((row) => row.image).map((row) => ({
-    image: row.image,
-    caption: row.caption || '制造现场',
-  }))
+  return rows
+    .filter((row) => row.image)
+    .map((row, index) => ({
+      key: String(row.id ?? row.image ?? `row-${index}`),
+      image: row.image,
+      caption: row.caption || '制造现场',
+    }))
 })
 
-function onGalleryImageError(idx) {
-  galleryImageErrors.add(idx)
+function onGalleryImageError(key) {
+  galleryImageErrors.add(key)
 }
 
 const visibleManufacturingGallery = computed(() => {
-  return manufacturingGallery.value.filter((_, idx) => !galleryImageErrors.has(idx))
+  return manufacturingGallery.value.filter((item) => !galleryImageErrors.has(item.key))
 })
 
 const milestones = ref([])
@@ -120,6 +159,17 @@ const patentCarousel = ref(null)
 function scrollShowcase(target, direction) {
   target.value?.scrollBy({ left: direction * target.value.clientWidth * 0.82, behavior: 'smooth' })
 }
+
+/* 证书/专利目前各只有 1 张营业执照和 2 份专利证书，
+   一屏放得下时不应出现「上一组 / 下一组」，否则会让人误以为还有内容没看到。 */
+const { overflowing: certificationOverflowing } = useScrollOverflow(certificationCarousel)
+const { overflowing: patentOverflowing } = useScrollOverflow(patentCarousel)
+
+/* 图片失效时不再让卡片指向坏地址：记录到集合，模板据此去掉 href 并显示占位。 */
+const brokenShowcase = reactive(new Set())
+const showcaseKey = (kind, item) => `${kind}-${item.id ?? item.name}`
+const markShowcaseBroken = (kind, item) => brokenShowcase.add(showcaseKey(kind, item))
+const isShowcaseBroken = (kind, item) => brokenShowcase.has(showcaseKey(kind, item))
 
 const legacyFallback = (value, fallback) => value || (companyContentSource.value === 'legacy' ? fallback : '')
 const contactPhone = computed(() => legacyFallback(company.value?.phone, '4009008878'))
@@ -139,13 +189,25 @@ let contactMapResizeObserver = null
 let contactMapWindowResize = null
 let contactMapResizeTimers = []
 
+/* 已建地图对应的地址：地址变化时才重建，避免重复实例 */
+let contactMapAddress = ''
+
 async function initContactMap() {
-  if (!contactAddress.value) return
-  contactMapLoading.value = true
+  const address = contactAddress.value
+  /* 公司信息是异步单例，页面挂载时地址可能还没回来；
+     这里只做「当前是否具备条件」的判断，由下方 watch 在地址/容器就绪后再次触发。 */
+  if (!address || !contactMapRef.value) return
+  if (contactMapInstance && contactMapAddress === address) return
   if (!hasAMapKey) {
     contactMapError.value = true
-    contactMapLoading.value = false
     return
+  }
+
+  contactMapLoading.value = true
+  contactMapError.value = false
+  if (contactMapInstance) {
+    contactMapInstance.destroy()
+    contactMapInstance = null
   }
 
   try {
@@ -168,6 +230,7 @@ async function initContactMap() {
       animateEnable: false,
       resizeEnable: true,
     })
+    contactMapAddress = address
     contactMapInstance.add(new AMap.Marker({ position: center, anchor: 'bottom-center' }))
 
     const keepCentered = () => {
@@ -223,12 +286,12 @@ async function load() {
 const companyName = computed(() => legacyFallback(company.value?.companyName, '浙江利强包装科技有限公司'))
 const companyNameEn = computed(() => legacyFallback(company.value?.companyNameEn, 'ZHEJIANG LIQIANG PACKAGING TECHNOLOGY'))
 const mainBusiness = computed(() => {
-  const value = company.value?.mainBusiness
-  return value && !value.includes('模具') ? value : legacyFallback(null, '封口机、气调包装机、真空包装机、热收缩设备、包装容器及封口膜')
+  const value = stripRetiredSegments(company.value?.mainBusiness)
+  return value || legacyFallback(null, '封口机、气调包装机、真空包装机、热收缩设备、包装容器及封口膜')
 })
 const advantages = computed(() => {
-  const value = company.value?.advantages
-  return value && !value.includes('模具') ? value : legacyFallback(null, '设备与包材配套；支持定制；响应快；可提供样品测试与方案建议')
+  const value = stripRetiredSegments(company.value?.advantages)
+  return value || legacyFallback(null, '设备与包材配套；支持定制；响应快；可提供样品测试与方案建议')
 })
 const establishmentDate = computed(() => {
   const d = company.value?.establishmentDate
@@ -271,20 +334,51 @@ const businessList = computed(() => {
   return raw.split(/[、，,；;]+/).filter(s => s.trim())
 })
 
-/* 统计数据 */
+/* Hero 统计：只放能由数据直接支撑的口径。
+   产品数量是「公开设备型号」条数，不等于产品系列数；
+   客户覆盖范围属于对外声明，没有可核实来源时不写死为「全国」。 */
 const stats = computed(() => [
   { label: '行业经验', value: yearsOfExperience.value },
-  { label: '产品系列', value: productCount.value ? `${productCount.value}+` : legacyFallback(null, '10+') || '—' },
-  { label: '客户覆盖', value: '全国' },
-  { label: '官网展示资质', value: certificationCount || '—' },
+  { label: '公开设备型号', value: productCount.value || '—' },
+  { label: '公开展示资质', value: certificationCount || '—' },
+  { label: '公开展示专利', value: patentCount || '—' },
 ])
 
 const displayMilestones = computed(() => resolveDisplayMilestones(milestones.value, companyContentSource.value))
 
+/* 地址或地图容器晚于页面挂载就绪时补建地图（例如公司信息接口较慢、联系区块后渲染） */
+watch(
+  () => [contactAddress.value, sectionEnabled('contact'), contactMapRef.value],
+  () => { initContactMap() },
+  { flush: 'post' },
+)
+
+/**
+ * 锚点落点：/credentials、/patents、/contact 都跳到本页区块。
+ * 区块受后台开关控制，被关闭时对应 DOM 会消失，入口就会停在页面顶部；
+ * 这里退到始终存在的底部 CTA，保证入口仍有明确落点。
+ */
+async function landOnHash() {
+  const hash = route.hash.replace('#', '')
+  if (!hash) return
+  await nextTick()
+  const id = decodeURIComponent(hash)
+  const target = document.getElementById(id)
+  if (target) {
+    target.scrollIntoView({ block: 'start' })
+    return
+  }
+  document.getElementById('cta')?.scrollIntoView({ block: 'start' })
+}
+
+watch(() => route.hash, landOnHash)
+
 onMounted(async () => {
   await load()
-  pageSections.load()
+  await pageSections.load()
+  await nextTick()
   initContactMap()
+  landOnHash()
 })
 
 onBeforeUnmount(() => {
@@ -317,7 +411,7 @@ onBeforeUnmount(() => {
       <template #side>
         <div class="hero-stats">
           <div v-for="s in stats" :key="s.label" class="stat-item">
-            <span class="stat-value">{{ typeof s.value === 'string' ? s.value : s.value }}</span>
+            <span class="stat-value">{{ s.value }}</span>
             <span class="stat-label">{{ s.label }}</span>
           </div>
         </div>
@@ -406,7 +500,7 @@ onBeforeUnmount(() => {
         </div>
       </div>
       <div v-if="visibleManufacturingGallery.length" class="workshop-gallery" aria-label="厂房与制造设备">
-        <figure v-for="(item, idx) in visibleManufacturingGallery" :key="idx"><img :src="item.image" :alt="item.caption" loading="lazy" decoding="async" @error="onGalleryImageError(idx)" /><figcaption>{{ item.caption }}</figcaption></figure>
+        <figure v-for="item in visibleManufacturingGallery" :key="item.key"><img :src="item.image" :alt="item.caption" loading="lazy" decoding="async" @error="onGalleryImageError(item.key)" /><figcaption>{{ item.caption }}</figcaption></figure>
       </div>
     </section>
 
@@ -444,7 +538,7 @@ onBeforeUnmount(() => {
         :title="aboutHeadings.credentials.title"
         :description="aboutHeadings.credentials.description || '展示已核对原件的企业证照；其他资料可联系我们获取。'"
       />
-      <div class="about-showcase-controls" aria-label="资质轮播控制">
+      <div v-if="certificationOverflowing" class="about-showcase-controls" aria-label="资质轮播控制">
         <button type="button" aria-label="上一组资质" @click="scrollShowcase(certificationCarousel, -1)">←</button>
         <button type="button" aria-label="下一组资质" @click="scrollShowcase(certificationCarousel, 1)">→</button>
       </div>
@@ -452,23 +546,25 @@ onBeforeUnmount(() => {
       <div ref="certificationCarousel" class="credentials-preview about-showcase-track">
         <template v-if="certifications.length">
           <a
-            v-for="cert in certifications.slice(0, 6)"
+            v-for="cert in certifications"
             :key="cert.id || cert.name"
             class="cert-thumb reveal"
             v-reveal
-            :href="cert.image"
-            target="_blank"
-            rel="noopener noreferrer"
-            :aria-label="`查看${cert.name}原图`"
-            :class="{ 'has-image': cert.image }"
+            :href="isShowcaseBroken('cert', cert) ? undefined : cert.image"
+            :target="isShowcaseBroken('cert', cert) ? undefined : '_blank'"
+            :rel="isShowcaseBroken('cert', cert) ? undefined : 'noopener noreferrer'"
+            :aria-label="isShowcaseBroken('cert', cert) ? cert.name : `查看${cert.name}原图`"
+            :aria-disabled="isShowcaseBroken('cert', cert) || undefined"
+            :class="{ 'has-image': cert.image, 'is-broken': isShowcaseBroken('cert', cert) }"
+            @click="isShowcaseBroken('cert', cert) && $event.preventDefault()"
           >
-            <div v-if="cert.image" class="cert-thumb__image">
+            <div v-if="cert.image && !isShowcaseBroken('cert', cert)" class="cert-thumb__image">
               <img
                 :src="cert.image"
                 :alt="cert.name"
                 loading="lazy"
                 decoding="async"
-                @error="(e) => (e.target.style.display = 'none')"
+                @error="markShowcaseBroken('cert', cert)"
               />
             </div>
             <div v-else class="cert-thumb__badge">
@@ -491,7 +587,7 @@ onBeforeUnmount(() => {
         :title="aboutHeadings.patents.title"
         :description="aboutHeadings.patents.description || (patents.length ? `展示 ${patentCount} 份已核对原件的专利证书。` : '专利资料持续整理中，具体资料可联系我们获取。')"
       />
-      <div class="about-showcase-controls" aria-label="专利轮播控制">
+      <div v-if="patentOverflowing" class="about-showcase-controls" aria-label="专利轮播控制">
         <button type="button" aria-label="上一组专利" @click="scrollShowcase(patentCarousel, -1)">←</button>
         <button type="button" aria-label="下一组专利" @click="scrollShowcase(patentCarousel, 1)">→</button>
       </div>
@@ -499,27 +595,26 @@ onBeforeUnmount(() => {
       <div ref="patentCarousel" class="patents-preview about-showcase-track">
         <template v-if="patents.length">
           <a
-            v-for="p in patents.slice(0, 6)"
+            v-for="p in patents"
             :key="p.id"
             class="patent-thumb reveal"
             v-reveal
-            :href="p.image"
-            target="_blank"
-            rel="noopener noreferrer"
-            :aria-label="`查看${p.name}专利证书原图`"
+            :href="isShowcaseBroken('patent', p) ? undefined : p.image"
+            :target="isShowcaseBroken('patent', p) ? undefined : '_blank'"
+            :rel="isShowcaseBroken('patent', p) ? undefined : 'noopener noreferrer'"
+            :aria-label="isShowcaseBroken('patent', p) ? p.name : `查看${p.name}专利证书原图`"
+            :aria-disabled="isShowcaseBroken('patent', p) || undefined"
+            :class="{ 'is-broken': isShowcaseBroken('patent', p) }"
+            @click="isShowcaseBroken('patent', p) && $event.preventDefault()"
           >
-            <div v-if="p.image" class="patent-thumb__image">
-              <img :src="p.image" :alt="p.name" loading="lazy" decoding="async" @error="(e) => (e.target.style.display = 'none')" />
+            <div v-if="p.image && !isShowcaseBroken('patent', p)" class="patent-thumb__image">
+              <img :src="p.image" :alt="p.name" loading="lazy" decoding="async" @error="markShowcaseBroken('patent', p)" />
             </div>
             <div class="patent-thumb__head">
               <span class="patent-thumb__cat">{{ p.assetCategory || '知识产权' }}</span>
               <span v-if="p.patentType" class="patent-thumb__type">{{ p.patentType }}</span>
             </div>
             <strong class="patent-thumb__name">{{ p.name }}</strong>
-            <div class="patent-thumb__meta">
-              <span v-if="p.patentNo">{{ p.patentNo }}</span>
-              <span v-else-if="p.applicant">{{ p.applicant }}</span>
-            </div>
           </a>
         </template>
         <template v-else>

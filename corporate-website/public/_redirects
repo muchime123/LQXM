@@ -1,3 +1,10 @@
+# 已下线路由 → 产品中心（301，保留既有外链与书签价值）
 /packaging /products 301
 /supplies /products 301
 /molds /products 301
+
+# SPA 深链接：Cloudflare Pages 在找不到同名静态文件且无 404.html 时，
+# 默认回退到 index.html，本项目当前依赖这一默认行为。
+# 若预览环境实测 /products/<slug>、/solutions/<slug> 刷新返回 404，再启用下一行
+# （静态资源优先于该规则匹配，不会影响 /content/*.json 与 /images/*）：
+# /* /index.html 200

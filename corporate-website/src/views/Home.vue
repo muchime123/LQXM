@@ -8,7 +8,8 @@
  * - reveal 动画由 v-reveal 指令接管
  * - 注入 Organization 结构化数据支持搜索引擎理解
  */
-import { computed, onMounted, onUnmounted, ref, watchEffect, reactive, nextTick } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch, watchEffect, reactive, nextTick } from 'vue'
+import DOMPurify from 'dompurify'
 import { useWebsiteData } from '../composables/useWebsiteData'
 import { useCompany } from '../composables/useCompany'
 import { usePageSections } from '../composables/usePageSections'
@@ -135,18 +136,19 @@ function mapHeroBanner(b) {
   }
 }
 const heroBanners = computed(() => {
-  const validCms = (banners.value?.HERO || []).filter((b) => b?.imageUrl
-    && !/hero-machine\.png$/.test(b.imageUrl)
-    && ![b.title, b.subtitle, b.description].some((text) => text?.includes('模具')))
+  const validCms = (banners.value?.HERO || []).filter((b) => b?.imageUrl)
   return validCms.length ? validCms.map(mapHeroBanner) : EMPTY_HERO_BANNERS
 })
+const safeHeroTitle = computed(() => DOMPurify.sanitize(currentHero.value?.title || '', {
+  ALLOWED_TAGS: ['em', 'br'], ALLOWED_ATTR: [],
+}))
 
 /* 首页各区块标题/描述：优先后台「页面内容」配置，未配置时回退到前端默认文案。
    使用 usePageSections 提供的 sectionRows / isEnabled 统一实现。 */
 const homeSectionEnabled = (key) => pageSections.isEnabled(key)
 const sectionRows = (key) => pageSections.sectionRows(key)
 const parseSectionRows = pageSections.parseSectionRows
-const publicCopy = (value, fallback) => value && !value.includes('模具') ? value : fallback
+const publicCopy = (value, fallback) => value || fallback
 const homeHeadings = computed(() => {
   const s = (key) => pageSections.section(key)
   return {
@@ -193,6 +195,9 @@ const hasProducts = computed(() => homeProducts.value.length > 0)
 
 /* ============ Hero 轮播图 ============ */
 const heroIndex = ref(0)
+watch(() => heroBanners.value.length, (length) => {
+  if (heroIndex.value >= length) heroIndex.value = 0
+})
 const heroTransitioning = ref(false)
 const heroPaused = ref(false)
 const heroSectionEl = ref(null)
@@ -265,14 +270,17 @@ function onCarouselKeydown(event) {
 
 function onCarouselPointerDown(event) {
   if (event.pointerType === 'mouse') return
-  carouselPointerStart.value = event.clientX
+  carouselPointerStart.value = { x: event.clientX, y: event.clientY }
   carouselPaused.value = true
 }
 
 function onCarouselPointerUp(event) {
   if (carouselPointerStart.value == null) return
-  const distance = event.clientX - carouselPointerStart.value
-  if (Math.abs(distance) > 42) moveCarouselManually(distance < 0 ? 1 : -1)
+  const distance = event.clientX - carouselPointerStart.value.x
+  const vertical = event.clientY - carouselPointerStart.value.y
+  if (Math.abs(distance) > 42 && Math.abs(distance) > Math.abs(vertical) * 1.25) {
+    moveCarouselManually(distance < 0 ? 1 : -1)
+  }
   carouselPointerStart.value = null
   carouselPaused.value = false
 }
@@ -341,13 +349,12 @@ const industryScenarios = computed(() => {
 })
 
 const manufacturingShowcase = computed(() => {
-  const rows = sectionRows('showcase').filter((row) => row.link !== '/molds'
-    && ![row.title, row.description].some((text) => text?.includes('模具')))
+  const rows = sectionRows('showcase').filter((row) => row.image && row.link !== '/molds')
   if (!rows.length) return []
   return rows.map((row, index) => ({
     key: `cms-showcase-${index}`,
     title: row.title || '制造能力',
-    image: row.image || FALLBACK_IMAGE_URL,
+    image: row.image,
     to: row.link || '/about',
   }))
 })
@@ -389,7 +396,7 @@ function openSceneAssistInquiry(sceneName) {
       <div class="hero-copy reveal" v-reveal :key="`hero-copy-${heroIndex}`">
         <div class="hero-copy__inner">
           <p v-if="currentHero?.subtitle" class="hero-eyebrow">{{ currentHero.subtitle }}</p>
-          <h1 v-if="currentHero?.title" v-html="currentHero.title"></h1>
+          <h1 v-if="currentHero?.title" v-html="safeHeroTitle"></h1>
           <p v-if="currentHero?.description" class="hero-description">{{ currentHero.description }}</p>
           <div class="hero-actions">
             <RouterLink v-if="isInternalRoute(heroButtonUrl)" :to="heroButtonUrl" class="button primary">{{ heroButtonText }} <span>→</span></RouterLink>

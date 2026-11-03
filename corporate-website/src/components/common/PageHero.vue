@@ -86,7 +86,7 @@ function renderAction(action, variant, key) {
     :class="[
       `page-hero--${theme}`,
       `page-hero--${size}`,
-      { 'page-hero--two-col': twoCol }
+      { 'page-hero--two-col': twoCol, 'page-hero--without-image': !image }
     ]"
     :style="image ? { '--page-hero-image': `url(${image})` } : undefined"
   >
