@@ -10,7 +10,7 @@ FINANCE = {"cashflow_entities", "h3_cash_accounts", "h3_cashflow_entries", "cash
 AUTH = {"employees", "employee_roles", "system_roles", "system_permissions",
         "system_role_permissions", "system_role_feature_grants", "system_features",
         "system_feature_actions", "auth_sessions"}
-SQL = Path(__file__).resolve().parents[1] / "backend/src/main/resources/db/migration/V419__cashflow_entry_account_id.sql"
+SQL = Path(__file__).resolve().parents[1] / "backend/src/main/resources/db/migration/V442__cashflow_entry_account_id.sql"
 
 conn = pymysql.connect(host="localhost", user=os.environ.get("DB_USERNAME", "root"),
                        password=os.environ["DB_PASSWORD"], autocommit=True)
