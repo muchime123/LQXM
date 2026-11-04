@@ -29,8 +29,15 @@ try:
                        WHERE table_schema=DATABASE() AND table_name='h3_cashflow_entries'
                          AND column_name='account_id'""")
         existing_column = cur.fetchone()[0]
+        cur.execute("""SELECT MAX(CAST(version AS UNSIGNED)) FROM flyway_schema_history
+                       WHERE success=1 AND version REGEXP '^[0-9]+$'""")
+        latest_applied = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM flyway_schema_history WHERE success=0")
+        failed_migrations = cur.fetchone()[0]
         print(f"{SCHEMA}: entries={total} matched={matched} orphaned={orphaned} ambiguous={ambiguous} account_id_column={existing_column}")
+        print(f"Flyway: latest_success={latest_applied} failed={failed_migrations}; V442 requires V441 baseline")
         assert total > 0 and matched == total and orphaned == 0 and ambiguous == 0
         assert existing_column == 0, "Account-ID migration must not run against a partially migrated table"
+        assert latest_applied == 441 and failed_migrations == 0, "Flyway baseline is not ready for V442"
 finally:
     conn.close()
