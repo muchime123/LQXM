@@ -330,7 +330,7 @@ public class ProductionTrackingAnalyticsService {
     private static java.util.Set<String> parseStatuses(String status){
         if(status==null||status.isBlank())return java.util.Set.of();
         return java.util.Arrays.stream(status.split(",")).map(String::trim)
-                .filter(s->!s.isEmpty()).collect(java.util.toSet());
+                .filter(s->!s.isEmpty()).collect(java.util.stream.Collectors.toSet());
     }
 
     /**
